@@ -2,6 +2,9 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
+
+use function Pest\Laravel\json;
 
 Route::get('/test', function () {
     return response()->json([
@@ -10,7 +13,6 @@ Route::get('/test', function () {
     ]);
 });
 
-use App\Http\Controllers\AuthController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
