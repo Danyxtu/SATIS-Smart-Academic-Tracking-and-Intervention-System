@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\TeacherController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
+use App\Models\User;
 
 /*
 |--------------------------------------------------------------------------
@@ -35,7 +37,7 @@ Route::get('/', function () {
 
 // All routes in this group are protected by the 'can:access-student-portal' gate
 Route::middleware(['auth', 'verified', 'can:access-student-portal'])->group(function () {
-    
+
     Route::get('/dashboard', function () {
         return Inertia::render('Dashboard');
     })->name('dashboard');
@@ -55,7 +57,7 @@ Route::middleware(['auth', 'verified', 'can:access-student-portal'])->group(func
     Route::get('/attendance', function () {
         return Inertia::render('Attendance');
     })->name('attendance');
-    
+
     Route::get('/analytics', function () {
         return Inertia::render('Analytics/Index');
     })->name('analytics.index');
@@ -82,43 +84,41 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
     ->name('teacher.')  // All route names will start with teacher.
     ->group(function () {
 
-    // Teacher Dashboard
-    // URL: /teacher/dashboard
-    // Name: route('teacher.dashboard')
-    Route::get('/dashboard', function () {
-        return Inertia::render('Teacher/Dashboard');
-    })->name('dashboard');
+        // Teacher Dashboard
+        // URL: /teacher/dashboard
+        // Name: route('teacher.dashboard')
+        Route::get('/dashboard', [TeacherController::class, 'showDashboard'])->name('dashboard');
 
-    // --- (NEW) ATTENDANCE ROUTE ---
-    // URL: /teacher/attendance
-    // Name: route('teacher.attendance.index')
-    Route::get('/attendance', function () {
-        // This route renders the Attendance.jsx component you just created
-        return Inertia::render('Teacher/Attendance');
-    })->name('attendance.index');
-    // --- (NEW) ATTENDANCE LOG ROUTE ---
-    Route::get('/attendance/log', function () {
-        // This route renders the Attendance.jsx component you just created
-        return Inertia::render('Teacher/AttendanceLog');
-    })->name('attendance.log');
+        // --- (NEW) ATTENDANCE ROUTE ---
+        // URL: /teacher/attendance
+        // Name: route('teacher.attendance.index')
+        Route::get('/attendance', function () {
+            // This route renders the Attendance.jsx component you just created
+            return Inertia::render('Teacher/Attendance');
+        })->name('attendance.index');
 
-    // --- (NEW) MY CLASSES ROUTE ---
-    // URL: /teacher/classes
-    // Name: route('teacher.classes.index')
-    Route::get('/classes', function () {
-        // You'll need to create a 'Teacher/MyClasses.jsx' component for this
-        return Inertia::render('Teacher/MyClasses');
-    })->name('classes.index');
+        // --- (NEW) ATTENDANCE LOG ROUTE ---
+        Route::get('/attendance/log', function () {
+            // This route renders the Attendance.jsx component you just created
+            return Inertia::render('Teacher/AttendanceLog');
+        })->name('attendance.log');
 
-    // --- (NEW) INTERVENTIONS ROUTE ---
-    // URL: /teacher/interventions
-    // Name: route('teacher.interventions.index')
-    Route::get('/interventions', function () {
-        // You'll need to create a 'Teacher/Interventions.jsx' component for this
-        return Inertia::render('Teacher/Interventions');
-    })->name('interventions.index');
-    
-});
+        // --- (NEW) MY CLASSES ROUTE ---
+        // URL: /teacher/classes
+        // Name: route('teacher.classes.index')
+        Route::get('/classes', function () {
+            // You'll need to create a 'Teacher/MyClasses.jsx' component for this
+            return Inertia::render('Teacher/MyClasses');
+        })->name('classes.index');
+
+        // --- (NEW) INTERVENTIONS ROUTE ---
+        // URL: /teacher/interventions
+        // Name: route('teacher.interventions.index')
+        Route::get('/interventions', function () {
+            // You'll need to create a 'Teacher/Interventions.jsx' component for this
+            return Inertia::render('Teacher/Interventions');
+        })->name('interventions.index');
+    });
 
 /*
 |--------------------------------------------------------------------------
@@ -157,7 +157,6 @@ Route::get('/redirect-after-login', function () {
 
     // A fallback just in case
     return redirect('/');
-    
 })->middleware(['auth']);
 
 
@@ -170,4 +169,4 @@ Route::get('/redirect-after-login', function () {
 |
 */
 
-require __DIR__.'/auth.php';    
+require __DIR__ . '/auth.php';
