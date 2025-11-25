@@ -46,7 +46,7 @@ export default function ForgotPassword({ status }) {
                 </div>
 
                 <div className="flex items-center justify-between">
-                    {/* 👇 Back to Login Link */}
+                    {/* Back to Login Link */}
                     <Link
                         href={route('login')}
                         className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 transition-colors"
