@@ -1,6 +1,7 @@
 import TeacherLayout from "@/Layouts/TeacherLayout";
 import React, { useState, useEffect } from "react";
 import { useForm } from "@inertiajs/react";
+import { ArrowLeft } from "lucide-react";
 
 // --- Mock Data (Placeholder) ---
 const mockStudentList = [
@@ -83,25 +84,64 @@ const getPriorityClasses = (priority) => {
 
 // --- Dashboard Component ---
 function InterventionDashboard({ students, onSelectStudent }) {
+    const totalStudents = students.length;
+    const highPriority = students.filter((s) => s.priority === "High").length;
+    const mediumPriority = students.filter(
+        (s) => s.priority === "Medium"
+    ).length;
+    const lowPriority = students.filter((s) => s.priority === "Low").length;
+
     return (
-        <div className="dashboard-container">
-            <h2 className="text-2xl font-semibold text-gray-800">
-                Priority Watchlist
+        <div className="p-6 bg-gray-50 rounded-lg shadow-sm">
+            <h2 className="text-2xl font-semibold text-gray-800 mb-6">
+                Intervention Overview
             </h2>
-            <div className="flex flex-col mt-6">
-                <table className="min-w-full divide-y divide-gray-200 shadow-sm">
-                    <thead className="bg-gray-50">
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div className="bg-white p-5 rounded-lg shadow-md border border-gray-200">
+                    <p className="text-sm font-medium text-gray-500">
+                        Total Students on Watchlist
+                    </p>
+                    <p className="text-3xl font-bold text-gray-900 mt-1">
+                        {totalStudents}
+                    </p>
+                </div>
+                <div className="bg-red-50 p-5 rounded-lg shadow-md border border-red-200">
+                    <p className="text-sm font-medium text-red-700">
+                        High Priority
+                    </p>
+                    <p className="text-3xl font-bold text-red-900 mt-1">
+                        {highPriority}
+                    </p>
+                </div>
+                <div className="bg-yellow-50 p-5 rounded-lg shadow-md border border-yellow-200">
+                    <p className="text-sm font-medium text-yellow-700">
+                        Medium Priority
+                    </p>
+                    <p className="text-3xl font-bold text-yellow-900 mt-1">
+                        {mediumPriority}
+                    </p>
+                </div>
+            </div>
+
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                Priority Watchlist
+            </h3>
+            <div className="bg-white shadow-lg rounded-lg overflow-hidden border border-gray-200">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-100">
                         <tr>
                             {[
                                 "Student Name",
                                 "Alert Reason",
                                 "Priority",
-                                "Class",
-                                "Last Contact",
+                                "Subject", // Changed from 'Class' to 'Subject' for clarity
+                                "Last Intervention", // Changed from 'Last Contact'
                             ].map((head) => (
                                 <th
                                     key={head}
-                                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                                    className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider"
                                 >
                                     {head}
                                 </th>
@@ -116,7 +156,16 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                 className="hover:bg-gray-50 cursor-pointer transition-colors"
                             >
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    {s.name}
+                                    <div className="flex items-center">
+                                        {/* Simple Avatar with Initials */}
+                                        <div className="flex-shrink-0 h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-800 text-xs font-bold mr-3">
+                                            {s.name
+                                                .split(" ")
+                                                .map((n) => n[0])
+                                                .join("")}
+                                        </div>
+                                        {s.name}
+                                    </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                     {s.alertReason}
@@ -426,19 +475,28 @@ function StudentInterventionProfile({ studentId, onBack }) {
     const numericGrade = parseInt(student.currentGrade);
     const showAISuggestion = numericGrade < 75;
 
+    // Helper for initials
+    const getInitials = (name) => {
+        return name
+            .split(" ")
+            .map((n) => n[0])
+            .join("")
+            .toUpperCase();
+    };
+
     return (
-        <div className="p-4">
-            <div className="flex justify-between items-center mb-6">
+        <div className="p-4 sm:p-6 bg-white rounded-lg shadow-xl border border-gray-200">
+            <div className="flex justify-between items-center mb-6 border-b pb-4">
                 <button
                     onClick={onBack}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                    className="flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
                 >
-                    &larr; Back to Dashboard
+                    <ArrowLeft size={16} className="mr-1" /> Back to Dashboard
                 </button>
                 {/* NEW: Start Intervention Button */}
                 <button
                     onClick={() => setIsInterventionModalOpen(true)}
-                    className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 shadow-sm transition-all"
+                    className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 shadow-md transition-all"
                 >
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -457,70 +515,148 @@ function StudentInterventionProfile({ studentId, onBack }) {
             </div>
 
             {/* Snapshot */}
-            <div className="flex flex-col sm:flex-row items-start bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-200">
-                <div className="w-20 h-20 rounded-full bg-gray-300 flex-shrink-0 mb-4 sm:mb-0 sm:mr-6" />
-                <div className="flex-1">
-                    <h2 className="text-2xl font-bold text-gray-900">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start bg-blue-50 p-6 rounded-lg shadow-inner border border-blue-200">
+                <div className="w-24 h-24 rounded-full bg-blue-200 flex items-center justify-center text-blue-800 text-3xl font-bold flex-shrink-0 mb-4 sm:mb-0 sm:mr-6">
+                    {getInitials(student.name)}
+                </div>
+                <div className="flex-1 text-center sm:text-left">
+                    <h2 className="text-3xl font-bold text-blue-900">
                         {student.name}
                     </h2>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <p className="text-md text-blue-700 mt-2">
                         <strong>Parent Contact:</strong> {student.parentContact}
                     </p>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-md text-blue-700">
                         <strong>Counselor:</strong> {student.counselor}
                     </p>
+                    {student.specialPrograms.length > 0 && (
+                        <p className="text-md text-blue-700">
+                            <strong>Programs:</strong>{" "}
+                            {student.specialPrograms.join(", ")}
+                        </p>
+                    )}
                 </div>
             </div>
 
             {/* Vitals */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                <div className="bg-white p-6 rounded-lg border shadow-sm">
-                    <h3 className="text-lg font-semibold mb-3">
-                        Academic Vitals
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-2">Current Grade:</p>
-                    <p
-                        className={`text-4xl font-bold ${
-                            numericGrade < 75
-                                ? "text-red-600"
-                                : "text-green-600"
-                        }`}
-                    >
-                        {student.currentGrade}
-                    </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-md flex flex-col justify-between">
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                            Academic Status
+                        </h3>
+                        <p className="text-sm text-gray-600 mb-2">
+                            Current Grade:
+                        </p>
+                        <p
+                            className={`text-4xl font-bold ${
+                                numericGrade < 75
+                                    ? "text-red-600"
+                                    : "text-green-600"
+                            }`}
+                        >
+                            {student.currentGrade}
+                        </p>
+                    </div>
+                    {student.gradeTrend && student.gradeTrend.length > 1 && (
+                        <p className="text-sm text-gray-500 mt-4">
+                            Grade Trend:{" "}
+                            {student.gradeTrend[0] >
+                            student.gradeTrend[
+                                student.gradeTrend.length - 1
+                            ] ? (
+                                <span className="text-red-500">Decreasing</span>
+                            ) : student.gradeTrend[0] <
+                              student.gradeTrend[
+                                  student.gradeTrend.length - 1
+                              ] ? (
+                                <span className="text-green-500">
+                                    Increasing
+                                </span>
+                            ) : (
+                                <span className="text-gray-500">Stable</span>
+                            )}
+                        </p>
+                    )}
                 </div>
 
-                <div className="bg-white p-6 rounded-lg border shadow-sm">
-                    <h3 className="text-lg font-semibold mb-3">Engagement</h3>
-                    <p className="text-sm text-gray-600 mb-1">
-                        <strong>Attendance:</strong> {student.attendanceSummary}
-                    </p>
+                <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-md flex flex-col justify-between">
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                            Engagement
+                        </h3>
+                        <p className="text-sm text-gray-600 mb-1">
+                            <strong>Attendance:</strong>{" "}
+                            {student.attendanceSummary}
+                        </p>
+                        {student.missingAssignments &&
+                            student.missingAssignments.length > 0 && (
+                                <div className="mt-3">
+                                    <p className="text-sm text-gray-600 font-semibold mb-1">
+                                        Missing Assignments:
+                                    </p>
+                                    <ul className="list-disc list-inside text-sm text-red-600">
+                                        {student.missingAssignments.map(
+                                            (assignment) => (
+                                                <li key={assignment.id}>
+                                                    {assignment.title}
+                                                </li>
+                                            )
+                                        )}
+                                    </ul>
+                                </div>
+                            )}
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-md">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                        Other Notes
+                    </h3>
+                    {student.behaviorLog && student.behaviorLog.length > 0 ? (
+                        <ul className="list-disc list-inside text-sm text-gray-700">
+                            {student.behaviorLog.map((log, index) => (
+                                <li key={index}>{log}</li> // Assuming behaviorLog stores strings
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="text-sm text-gray-500">
+                            No recent behavioral notes.
+                        </p>
+                    )}
                 </div>
             </div>
 
             {/* System Suggested Intervention */}
             {showAISuggestion && (
-                <div className="mt-8 bg-gradient-to-r from-indigo-50 to-white border border-indigo-200 rounded-lg shadow-sm p-6">
-                    <h3 className="text-lg font-semibold text-indigo-700 mb-2">
+                <div className="mt-8 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-300 rounded-lg shadow-lg p-6">
+                    <h3 className="text-xl font-bold text-indigo-800 mb-3">
                         🤖 System-Suggested Intervention
                     </h3>
-                    <p className="text-sm text-gray-700 mb-4">
-                        The system detected low academic performance. Consider
-                        assigning an AI-generated quiz or sending personal
-                        feedback.
+                    <p className="text-md text-gray-700 mb-4">
+                        The system detected low academic performance and/or
+                        missing assignments. Consider assigning an AI-generated
+                        quiz, sending personal feedback, or initiating a new
+                        intervention strategy.
                     </p>
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap gap-3">
                         <button
                             onClick={() => setOpenQuizModal(true)}
-                            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+                            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 shadow-md transition-all"
                         >
                             Generate AI Quiz
                         </button>
                         <button
                             onClick={() => setOpenFeedbackModal(true)}
-                            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 shadow-md transition-all"
                         >
                             Send Feedback
+                        </button>
+                        <button
+                            onClick={() => setIsInterventionModalOpen(true)}
+                            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 shadow-md transition-all"
+                        >
+                            Start New Intervention
                         </button>
                     </div>
                 </div>
@@ -531,14 +667,32 @@ function StudentInterventionProfile({ studentId, onBack }) {
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">
                     Intervention Log
                 </h3>
-                {student.interventionLog.map((log) => (
-                    <div key={log.id} className="border-b pb-4 mb-3">
-                        <strong className="text-sm text-gray-900">
-                            {log.date} - {log.action}
-                        </strong>
-                        <p className="text-sm text-gray-700">{log.notes}</p>
-                    </div>
-                ))}
+                <div className="grid gap-4">
+                    {student.interventionLog.length > 0 ? (
+                        student.interventionLog.map((log) => (
+                            <div
+                                key={log.id}
+                                className="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm"
+                            >
+                                <p className="text-sm font-semibold text-gray-800 mb-1">
+                                    {log.date} - {log.action}
+                                </p>
+                                <p className="text-sm text-gray-700">
+                                    {log.notes}
+                                </p>
+                                {log.followUp && (
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        Follow-up: {log.followUp}
+                                    </p>
+                                )}
+                            </div>
+                        ))
+                    ) : (
+                        <p className="text-gray-500 text-center py-4">
+                            No intervention history for this student.
+                        </p>
+                    )}
+                </div>
             </div>
 
             <AIGeneratedQuizModal
