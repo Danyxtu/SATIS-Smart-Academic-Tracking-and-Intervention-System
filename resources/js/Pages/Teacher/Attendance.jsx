@@ -12,6 +12,8 @@ import {
     History,
 } from "lucide-react";
 import NavLink from "@/Components/NavLink";
+import SeatingGrid from "@/Components/SeatingGrid";
+import StudentList from "@/Components/StudentList";
 
 // --- Mock Data Generation (Unchanged) ---
 
@@ -174,16 +176,22 @@ const Attendance = () => {
 
             // Find the source seat using its coordinates (row, col) from draggedSeatInfo
             const sourceSeatIndex = newLayout.findIndex(
-                (seat) => seat.row === draggedSeatInfo.row && seat.col === draggedSeatInfo.col
+                (seat) =>
+                    seat.row === draggedSeatInfo.row &&
+                    seat.col === draggedSeatInfo.col
             );
             // Find the target seat using its coordinates (row, col)
             const targetSeatIndex = newLayout.findIndex(
-                (seat) => seat.row === targetCoords.row && seat.col === targetCoords.col
+                (seat) =>
+                    seat.row === targetCoords.row &&
+                    seat.col === targetCoords.col
             );
 
             // Crucial checks: ensure both source and target seats are found
             if (sourceSeatIndex === -1) {
-                console.error("Dragged student's original seat not found in layout.");
+                console.error(
+                    "Dragged student's original seat not found in layout."
+                );
                 return prevLayout;
             }
             if (targetSeatIndex === -1) {
@@ -197,8 +205,14 @@ const Attendance = () => {
             // Create new seat objects with swapped student IDs
             // The studentId from the *dragged* item goes to the *target* seat
             // The studentId from the *target* item goes to the *source* seat
-            const updatedSourceSeat = { ...sourceSeat, studentId: targetSeat.studentId };
-            const updatedTargetSeat = { ...targetSeat, studentId: draggedSeatInfo.studentId };
+            const updatedSourceSeat = {
+                ...sourceSeat,
+                studentId: targetSeat.studentId,
+            };
+            const updatedTargetSeat = {
+                ...targetSeat,
+                studentId: draggedSeatInfo.studentId,
+            };
 
             // Update the new layout array
             newLayout[sourceSeatIndex] = updatedSourceSeat;
@@ -290,7 +304,9 @@ const Attendance = () => {
                     <div className="flex items-center gap-2">
                         {/* Dragging Toggle Button */}
                         <button
-                            onClick={() => setIsDraggingEnabled(!isDraggingEnabled)}
+                            onClick={() =>
+                                setIsDraggingEnabled(!isDraggingEnabled)
+                            }
                             className={`flex items-center gap-2 px-3 py-2 rounded-md font-medium text-sm transition-colors
                                 ${
                                     isDraggingEnabled
@@ -298,7 +314,9 @@ const Attendance = () => {
                                         : "bg-gray-200 text-gray-600 hover:bg-gray-300"
                                 }`}
                         >
-                            {isDraggingEnabled ? "Disable Dragging" : "Enable Dragging"}
+                            {isDraggingEnabled
+                                ? "Disable Dragging"
+                                : "Enable Dragging"}
                         </button>
                         {/* Log Button as a standard <a> tag */}
                         <NavLink
@@ -411,230 +429,3 @@ const Attendance = () => {
 };
 
 export default Attendance;
-
-// --- 2. Grid View Component---
-
-const SeatingGrid = ({
-    students,
-    seatLayout,
-    onClick,
-    isDraggingEnabled,
-    onSeatDrop,
-}) => {
-    const handleDragOver = (e) => {
-        e.preventDefault(); // Necessary to allow dropping
-    };
-
-    const handleDrop = (e, targetRow, targetCol) => {
-        e.preventDefault();
-        const seatDataString = e.dataTransfer.getData("seat-data");
-        if (seatDataString && isDraggingEnabled) {
-            const draggedSeatInfo = JSON.parse(seatDataString);
-            onSeatDrop(draggedSeatInfo, { row: targetRow, col: targetCol });
-        }
-    };
-
-    return (
-        <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="text-center text-sm font-medium text-gray-500 bg-gray-100 border border-gray-300 rounded-lg py-3 mb-8">
-                Teacher's Desk / Front of Classroom
-            </div>
-            <div
-                className="grid gap-x-2 gap-y-4"
-                style={{ gridTemplateColumns: "repeat(11, 1fr)" }}
-                onDragOver={isDraggingEnabled ? handleDragOver : null}
-            >
-                {seatLayout.map((seat) => {
-                    const student = seat.studentId
-                        ? students.find((s) => s.id === seat.studentId)
-                        : null;
-                    // Adjust column for visual spacing in grid, assuming 10 cols + 1 for middle aisle
-                    const gridCol = seat.col > 5 ? seat.col + 1 : seat.col;
-
-                    if (student) {
-                        return (
-                            <SeatCard
-                                key={student.id}
-                                student={student}
-                                onClick={() => onClick(student.id)}
-                                seatRow={seat.row}
-                                seatCol={gridCol}
-                                isDraggingEnabled={isDraggingEnabled}
-                                onDrop={handleDrop}
-                            />
-                        );
-                    } else {
-                        return (
-                            <EmptySeatCard
-                                key={`empty-${seat.row}-${seat.col}`}
-                                seatRow={seat.row}
-                                seatCol={gridCol}
-                                isDraggingEnabled={isDraggingEnabled}
-                                onDrop={handleDrop}
-                            />
-                        );
-                    }
-                })}
-            </div>
-        </div>
-    );
-};
-
-const SeatCard = ({ student, onClick, seatRow, seatCol, isDraggingEnabled, onDrop }) => {
-    const statusStyles = {
-        present: "bg-green-100 border-green-400 text-green-800",
-        absent: "bg-red-100 border-red-400 text-red-800 opacity-60",
-        late: "bg-yellow-100 border-yellow-400 text-yellow-800",
-    };
-
-    const handleDragStart = (e) => {
-        if (!isDraggingEnabled) return;
-
-        const payload = {
-            studentId: student.id,
-            row: seatRow,
-            col: seatCol > 5 ? seatCol - 1 : seatCol, // fix aisle offset when reversing
-        };
-
-        e.dataTransfer.setData("seat-data", JSON.stringify(payload));
-        e.dataTransfer.effectAllowed = "move";
-    };
-
-    return (
-        <div
-            draggable={isDraggingEnabled}
-            onDragStart={handleDragStart}
-            onDrop={(e) => onDrop(e, seatRow, seatCol > 5 ? seatCol - 1 : seatCol)}
-            onDragOver={(e) => isDraggingEnabled && e.preventDefault()}
-            className={`
-                relative rounded-lg border p-3 flex flex-col items-center justify-center cursor-pointer
-                transition-transform hover:scale-105 select-none
-                ${statusStyles[student.status]}
-            `}
-            style={{
-                gridColumn: seatCol,
-            }}
-            onClick={() => {
-                if (!isDraggingEnabled) onClick(student.id);
-            }}
-        >
-            <img
-                src={student.avatar}
-                alt={student.name}
-                className="w-12 h-12 rounded-full mb-2"
-            />
-            <p className="text-sm font-semibold">{student.name}</p>
-            <p className="text-xs opacity-80 capitalize">{student.status}</p>
-        </div>
-    );
-};
-
-
-const EmptySeatCard = ({ seatRow, seatCol, isDraggingEnabled, onDrop }) => {
-    return (
-        <div
-            onDrop={(e) => onDrop(e, seatRow, seatCol > 5 ? seatCol - 1 : seatCol)}
-            onDragOver={(e) => isDraggingEnabled && e.preventDefault()}
-            style={{
-                gridColumn: seatCol,
-            }}
-            className="border border-dashed border-gray-400 rounded-lg h-20 flex items-center justify-center text-gray-400"
-        >
-            Empty
-        </div>
-    );
-};
-
-// --- 3. List View Component ---
-
-const StudentList = ({ students, onClick }) => (
-    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-        <ul className="divide-y divide-gray-200">
-            {students
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((student) => (
-                    <StudentListItem
-                        key={student.id}
-                        student={student}
-                        onClick={onClick}
-                    />
-                ))}
-        </ul>
-    </div>
-);
-
-const StudentListItem = ({ student, onClick }) => (
-    <li className="p-4 flex flex-col sm:flex-row items-center justify-between">
-        {/* Student Info */}
-        <div className="flex items-center gap-4 mb-4 sm:mb-0">
-            <img
-                src={student.avatar}
-                alt={student.name}
-                className="w-12 h-12 rounded-full"
-            />
-            <div>
-                <p className="text-lg font-semibold text-gray-900">
-                    {student.name}
-                </p>
-                <p
-                    className={`text-sm font-medium ${
-                        student.status === "present"
-                            ? "text-green-600"
-                            : student.status === "absent"
-                            ? "text-red-600"
-                            : "text-yellow-600"
-                    }`}
-                >
-                    Status: <span className="uppercase">{student.status}</span>
-                </p>
-            </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex space-x-2">
-            <StatusButton
-                label="Present"
-                icon={<Check size={16} />}
-                isActive={student.status === "present"}
-                onClick={() => onClick(student.id, "present")}
-                className="bg-green-100 text-green-700 hover:bg-green-200 active:bg-green-600 active:text-white"
-                activeClassName="bg-green-600 text-white"
-            />
-            <StatusButton
-                label="Absent"
-                icon={<XIcon size={16} />}
-                isActive={student.status === "absent"}
-                onClick={() => onClick(student.id, "absent")}
-                className="bg-red-100 text-red-700 hover:bg-red-200 active:bg-red-600 active:text-white"
-                activeClassName="bg-red-600 text-white"
-            />
-            <StatusButton
-                label="Late"
-                icon={<Clock size={16} />}
-                isActive={student.status === "late"}
-                onClick={() => onClick(student.id, "late")}
-                className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 active:bg-yellow-600 active:text-white"
-                activeClassName="bg-yellow-600 text-white"
-            />
-        </div>
-    </li>
-);
-
-const StatusButton = ({
-    label,
-    icon,
-    isActive,
-    onClick,
-    className,
-    activeClassName,
-}) => (
-    <button
-        onClick={onClick}
-        className={`flex items-center gap-1.5 py-2 px-3 rounded-full font-medium text-sm transition-all
-            ${isActive ? activeClassName : className}
-        `}
-    >
-        {icon}
-        <span className="hidden md:inline">{label}</span>
-    </button>
-);
