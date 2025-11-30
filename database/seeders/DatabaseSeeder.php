@@ -23,16 +23,16 @@ class DatabaseSeeder extends Seeder
         //     'password' => bcrypt('password'),
         //     'role' => 'teacher',
         // ]);
-        User::factory()->create([
-            'name' => 'Teacher User',
-            'email' => 'student@gmail.com',
-            'password' => bcrypt('password'),
-            'role' => 'student',
-        ]);
+        // User::factory()->create([
+        //     'name' => 'Student User',
+        //     'email' => 'student@gmail.com',
+        //     'password' => bcrypt('password'),
+        //     'role' => 'student',
+        // ]);
 
-        // // Create students
-        // User::factory(20)->create(['role' => 'student'])->each(function ($user) {
-        //     Student::factory()->create(['user_id' => $user->id]);
-        // });
+        // Create students
+        User::factory(20)->create(['role' => 'student'])->each(function ($user) {
+            Student::factory()->create(['user_id' => $user->id]);
+        });
     }
 }
