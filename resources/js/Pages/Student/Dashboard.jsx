@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head } from '@inertiajs/react';
-import HeaderImage from '../../assets/dashboard-header.png';
+import HeaderImage from '../../../assets/dashboard-header.png';
 import { 
   HiAcademicCap, HiExclamation, HiChartPie, HiBadgeCheck  // <-- CORRECTED ICON NAME
 } from 'react-icons/hi';

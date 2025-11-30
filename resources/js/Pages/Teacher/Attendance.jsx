@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import TeacherLayout from "../../Layouts/TeacherLayout";
 import { Head, Link } from "@inertiajs/react";
+import { useLoading } from "@/Context/LoadingContext";
 import AttendanceLog from "./AttendanceLog";
 import {
     LayoutGrid,
@@ -127,6 +128,7 @@ const mockClasses = [
 // --- 1. The Main Attendance Page Component ---
 
 const Attendance = () => {
+    const { startLoading, stopLoading } = useLoading();
     const [viewMode, setViewMode] = useState("grid");
     const [selectedClassId, setSelectedClassId] = useState(mockClasses[0].id);
     const [currentDate, setCurrentDate] = useState(
@@ -167,6 +169,14 @@ const Attendance = () => {
                     : student
             )
         );
+    };
+
+    const handleViewModeChange = (newMode) => {
+        startLoading();
+        setTimeout(() => {
+            setViewMode(newMode);
+            stopLoading();
+        }, 300);
     };
 
     // --- Drag and Drop Logic ---
@@ -330,7 +340,7 @@ const Attendance = () => {
                         {/* View Mode Toggle */}
                         <div className="flex items-center p-1 bg-gray-200 rounded-lg">
                             <button
-                                onClick={() => setViewMode("grid")}
+                                onClick={() => handleViewModeChange("grid")}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm
                                 ${
                                     viewMode === "grid"
@@ -342,7 +352,7 @@ const Attendance = () => {
                                 Grid View
                             </button>
                             <button
-                                onClick={() => setViewMode("list")}
+                                onClick={() => handleViewModeChange("list")}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm
                                 ${
                                     viewMode === "list"

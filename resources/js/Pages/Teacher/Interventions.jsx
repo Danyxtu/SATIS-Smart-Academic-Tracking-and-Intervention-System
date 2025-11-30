@@ -1,6 +1,7 @@
 import TeacherLayout from "@/Layouts/TeacherLayout";
 import React, { useState, useEffect } from "react";
 import { useForm } from "@inertiajs/react";
+import { useLoading } from "@/Context/LoadingContext";
 import { ArrowLeft } from "lucide-react";
 
 // --- Mock Data (Placeholder) ---
@@ -720,12 +721,29 @@ function StudentInterventionProfile({ studentId, onBack }) {
 
 // --- Parent Component ---
 function InterventionCenter() {
+    const { startLoading, stopLoading } = useLoading();
     const [students, setStudents] = useState([]);
     const [selectedStudentId, setSelectedStudentId] = useState(null);
 
     useEffect(() => {
         setStudents(mockStudentList);
     }, []);
+
+    const handleSelectStudent = (studentId) => {
+        startLoading();
+        setTimeout(() => {
+            setSelectedStudentId(studentId);
+            stopLoading();
+        }, 300);
+    };
+
+    const handleBackToDashboard = () => {
+        startLoading();
+        setTimeout(() => {
+            setSelectedStudentId(null);
+            stopLoading();
+        }, 300);
+    };
 
     return (
         <div className="p-4 sm:p-6 font-sans">
@@ -736,25 +754,26 @@ function InterventionCenter() {
             {selectedStudentId ? (
                 <StudentInterventionProfile
                     studentId={selectedStudentId}
-                    onBack={() => setSelectedStudentId(null)}
+                    onBack={handleBackToDashboard}
                 />
             ) : (
                 <InterventionDashboard
                     students={students}
-                    onSelectStudent={setSelectedStudentId}
+                    onSelectStudent={handleSelectStudent}
                 />
             )}
         </div>
     );
 }
 
-// --- Export Page ---
-const Interventions = () => (
-    <TeacherLayout>
+const Interventions = () => {
+    return (
         <div className="bg-gray-100 min-h-screen">
             <InterventionCenter />
         </div>
-    </TeacherLayout>
-);
+    );
+};
+
+Interventions.layout = (page) => <TeacherLayout children={page} />;
 
 export default Interventions;
