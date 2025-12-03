@@ -66,11 +66,36 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
         });
     };
 
-    // Export to PDF (client-side using print)
-    const handleExportPDF = () => {
+    // Export to PDF (server-side) - fallback to print if endpoint not available
+    const handleExportPDF = async () => {
+        const url = route("teacher.attendance.log.export.pdf", {
+            subject: section.id,
+        });
+        try {
+            const resp = await fetch(url, {
+                method: "GET",
+                credentials: "same-origin",
+                headers: { Accept: "application/pdf" },
+            });
+
+            if (
+                resp.ok &&
+                resp.headers.get("Content-Type")?.includes("application/pdf")
+            ) {
+                const blob = await resp.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const win = window.open(blobUrl, "_blank");
+                // revoke after a timeout
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 20000);
+                return;
+            }
+        } catch (err) {
+            // ignore and fallback
+        }
+
+        // fallback: client-side print
         const printContent = tableRef.current;
         const printWindow = window.open("", "_blank");
-
         printWindow.document.write(`
             <!DOCTYPE html>
             <html>

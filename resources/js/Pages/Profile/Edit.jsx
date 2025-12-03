@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Head, useForm, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import TeacherLayout from "@/Layouts/TeacherLayout";
+import AdminLayout from "@/Layouts/AdminLayout";
 import {
     User,
     Mail,
@@ -261,6 +263,8 @@ export default function Edit({ status, student }) {
     const { auth } = usePage().props;
     const user = auth.user;
     const isStudent = user.role === "student";
+    const isTeacher = user.role === "teacher";
+    const isAdmin = user.role === "admin";
 
     const [showPasswordModal, setShowPasswordModal] = useState(false);
 
@@ -272,8 +276,15 @@ export default function Edit({ status, student }) {
               }${student.last_name || ""}`.trim()
             : user.name;
 
+    // Determine the correct layout based on user role
+    const Layout = isTeacher
+        ? TeacherLayout
+        : isAdmin
+        ? AdminLayout
+        : AuthenticatedLayout;
+
     return (
-        <AuthenticatedLayout>
+        <Layout>
             <Head title="My Profile" />
 
             <div className="min-h-screen bg-gray-50/50 py-8">
@@ -484,6 +495,6 @@ export default function Edit({ status, student }) {
                 show={showPasswordModal}
                 onClose={() => setShowPasswordModal(false)}
             />
-        </AuthenticatedLayout>
+        </Layout>
     );
 }

@@ -64,6 +64,7 @@ class ClassController extends Controller
                 'strand' => $subject->strand,
                 'track' => $subject->track,
                 'student_count' => $subject->enrollments->count(),
+                'current_quarter' => $subject->current_quarter ?? 1,
             ])->values(),
             'rosters' => $subjects->mapWithKeys(fn($subject) => [
                 $subject->id => $subject->enrollments->map(function ($enrollment) use ($subject) {
@@ -151,16 +152,26 @@ class ClassController extends Controller
             'email' => 'nullable|email|max:255',
         ]);
 
-        $this->persistStudentRecord($subject, array_merge([
+        $result = $this->persistStudentRecord($subject, array_merge([
             'grade_level' => $subject->grade_level,
             'section' => $subject->section,
             'strand' => $subject->strand,
             'track' => $subject->track,
         ], $data));
 
-        return redirect()
-            ->route('teacher.classes.index')
-            ->with('success', 'Student added to class.');
+        // Prepare flash with generated password if created
+        $redirect = redirect()->route('teacher.classes.index')->with('success', 'Student added to class.');
+
+        if (is_array($result) && ! empty($result['password'])) {
+            $redirect = $redirect->with('new_student_password', [
+                'name' => $data['name'],
+                'lrn' => $data['lrn'],
+                'email' => $data['email'] ?? null,
+                'password' => $result['password'],
+            ]);
+        }
+
+        return $redirect;
     }
 
     public function uploadClasslist(Request $request, Subject $subject): RedirectResponse
@@ -310,6 +321,7 @@ class ClassController extends Controller
             'updated' => 0,
             'skipped' => 0,
             'errors' => [],
+            'created_students' => [],
         ];
 
         $seenLrns = [];
@@ -337,10 +349,19 @@ class ClassController extends Controller
 
             try {
                 $result = $this->persistStudentRecord($subject, $payload);
-                if ($result === 'created') {
+                if ($result['status'] === 'created') {
                     $summary['imported']++;
                 } else {
                     $summary['updated']++;
+                }
+
+                if (!empty($result['password'])) {
+                    $summary['created_students'][] = [
+                        'name' => $payload['name'] ?? null,
+                        'lrn' => $payload['lrn'] ?? null,
+                        'email' => $payload['email'] ?? null,
+                        'password' => $result['password'],
+                    ];
                 }
             } catch (ValidationException $exception) {
                 $summary['skipped']++;
@@ -351,10 +372,13 @@ class ClassController extends Controller
             }
         }
 
+        // Ensure created_students array exists
+        $summary['created_students'] = $summary['created_students'] ?? [];
+
         return $summary;
     }
 
-    private function persistStudentRecord(Subject $subject, array $payload): string
+    private function persistStudentRecord(Subject $subject, array $payload): array
     {
         $validator = Validator::make($payload, [
             'name' => 'required|string|max:255',
@@ -384,13 +408,17 @@ class ClassController extends Controller
             $user = $student->user;
 
             if (! $user) {
-                $user = $this->createStudentUser($fullName, $payload['email'] ?? null);
+                $created = $this->createStudentUser($fullName, $payload['email'] ?? null);
+                $user = $created['user'];
+                $generatedPlainPassword = $created['password'];
                 $student->user()->associate($user);
             } else {
                 $user->update(['name' => $fullName]);
             }
         } else {
-            $user = $this->createStudentUser($fullName, $payload['email'] ?? null);
+            $created = $this->createStudentUser($fullName, $payload['email'] ?? null);
+            $user = $created['user'];
+            $generatedPlainPassword = $created['password'];
             $student = Student::firstOrNew(['user_id' => $user->id]);
         }
 
@@ -426,7 +454,7 @@ class ClassController extends Controller
             ]
         );
 
-        return $wasExisting ? 'updated' : 'created';
+        return ['status' => $wasExisting ? 'updated' : 'created', 'password' => $generatedPlainPassword ?? null, 'user' => $user];
     }
 
     private function readSpreadsheetRows(UploadedFile $file): array
@@ -511,18 +539,26 @@ class ClassController extends Controller
         return $digits !== '' ? $digits : null;
     }
 
-    private function createStudentUser(string $fullName, ?string $preferredEmail = null): User
+    private function createStudentUser(string $fullName, ?string $preferredEmail = null): array
     {
         $email = strtolower($preferredEmail ?: $this->generateSchoolEmail($fullName));
 
-        return User::firstOrCreate(
+        $plainPassword = Str::random(12);
+
+        $user = User::firstOrCreate(
             ['email' => $email],
             [
                 'name' => $fullName,
-                'password' => Hash::make(Str::random(12)),
+                'password' => Hash::make($plainPassword),
                 'role' => 'student',
             ]
         );
+
+        // Only return the generated plaintext password when a user was newly created
+        return [
+            'user' => $user,
+            'password' => $user->wasRecentlyCreated ? $plainPassword : null,
+        ];
     }
 
     private function splitName(string $fullName): array
@@ -624,5 +660,28 @@ class ClassController extends Controller
         }
 
         return back()->with('success', "Nudge sent to {$sentCount} student(s) in {$subject->name}!");
+    }
+
+    /**
+     * Start or advance the active quarter for the class.
+     */
+    public function startQuarter(Request $request, Subject $subject): RedirectResponse
+    {
+        $this->ensureTeacherOwnsSubject($request->user()->id, $subject);
+
+        $data = $request->validate([
+            'quarter' => 'required|integer|min:1|max:4',
+        ]);
+
+        $quarter = (int) $data['quarter'];
+
+        // Only allow advancing forward, not going backward
+        if ($quarter <= ($subject->current_quarter ?? 1)) {
+            return back()->with('error', 'Cannot set to a previous or same quarter.');
+        }
+
+        $subject->update(['current_quarter' => $quarter]);
+
+        return back()->with('success', "Quarter {$quarter} started for {$subject->name}.");
     }
 }

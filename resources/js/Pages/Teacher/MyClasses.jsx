@@ -356,6 +356,10 @@ const MyClasses = ({
     const flash = page?.props?.flash ?? {};
     const importSummary =
         typeof flash.import_summary === "object" ? flash.import_summary : null;
+    const newStudentPassword =
+        typeof flash.new_student_password === "object"
+            ? flash.new_student_password
+            : null;
     const gradeUpdateSummary =
         typeof flash.grade_update_summary === "object"
             ? flash.grade_update_summary
@@ -942,9 +946,6 @@ const MyClasses = ({
                                     size={16}
                                     className="text-gray-400"
                                 />
-                                <span className="text-sm font-medium text-gray-600">
-                                    {selectedClassHeading}
-                                </span>
                             </div>
                         )}
                         <h1 className="text-3xl font-bold text-gray-900">
@@ -1012,6 +1013,101 @@ const MyClasses = ({
                                     </ul>
                                 </details>
                             )}
+                            {/* Created students with generated passwords (shown once) */}
+                            {(importSummary.created_students?.length ?? 0) >
+                                0 && (
+                                <details className="mt-3">
+                                    <summary className="cursor-pointer font-medium text-indigo-800">
+                                        View generated passwords for{" "}
+                                        {importSummary.created_students.length}{" "}
+                                        newly created student(s)
+                                    </summary>
+                                    <ul className="mt-2 space-y-2 text-indigo-900">
+                                        {importSummary.created_students.map(
+                                            (s, idx) => (
+                                                <li
+                                                    key={idx}
+                                                    className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-center p-2 bg-white rounded-md border border-indigo-100"
+                                                >
+                                                    <div className="col-span-1 font-medium">
+                                                        {s.name ??
+                                                            s.email ??
+                                                            "Student"}
+                                                    </div>
+                                                    <div className="text-sm text-gray-600">
+                                                        LRN: {s.lrn ?? "N/A"}
+                                                    </div>
+                                                    <div className="text-sm text-gray-600">
+                                                        Email:{" "}
+                                                        {s.email ?? "N/A"}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 text-sm">
+                                                        <span className="font-mono bg-indigo-50 px-2 py-1 rounded">
+                                                            {s.password}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                navigator.clipboard.writeText(
+                                                                    s.password
+                                                                )
+                                                            }
+                                                            className="text-sm text-indigo-700 hover:underline"
+                                                        >
+                                                            Copy
+                                                        </button>
+                                                    </div>
+                                                </li>
+                                            )
+                                        )}
+                                    </ul>
+                                </details>
+                            )}
+                        </div>
+                    )}
+
+                    {newStudentPassword && (
+                        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-900 shadow-sm">
+                            <p className="font-semibold">New student created</p>
+                            <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <div>
+                                    <p className="text-sm text-gray-700">
+                                        Name
+                                    </p>
+                                    <p className="font-medium">
+                                        {newStudentPassword.name}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-700">
+                                        Email
+                                    </p>
+                                    <p className="font-medium">
+                                        {newStudentPassword.email ?? "N/A"}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-700">
+                                        Password
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-mono bg-green-50 px-2 py-1 rounded">
+                                            {newStudentPassword.password}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                navigator.clipboard.writeText(
+                                                    newStudentPassword.password
+                                                )
+                                            }
+                                            className="text-sm text-emerald-700 hover:underline"
+                                        >
+                                            Copy
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -1141,9 +1237,17 @@ const MyClasses = ({
                 <div className="bg-white rounded-xl shadow-lg p-6">
                     <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                         <div>
-                            <h2 className="text-2xl font-bold text-gray-900">
-                                {selectedClassHeading}
-                            </h2>
+                            <div className="flex items-center gap-3">
+                                <h2 className="text-2xl font-bold text-gray-900">
+                                    {selectedClassHeading}
+                                </h2>
+                                {selectedClass?.current_quarter && (
+                                    <span className="px-2 py-0.5 text-sm rounded-full bg-indigo-100 text-indigo-700 font-medium">
+                                        Current: Q
+                                        {selectedClass.current_quarter}
+                                    </span>
+                                )}
+                            </div>
                             <p className="text-gray-600">
                                 {selectedClass.subject}
                             </p>
@@ -1339,48 +1443,104 @@ const MyClasses = ({
                                                                     1
                                                                 )
                                                         );
-                                                    if (q1Finished) {
+                                                    const canOpenQ2 =
+                                                        selectedClass?.current_quarter >=
+                                                            2 || q1Finished;
+                                                    if (canOpenQ2) {
                                                         setSelectedQuarter(2);
                                                     }
                                                 }}
                                                 disabled={
-                                                    !students.some((student) =>
-                                                        hasQuarterlyExamScores(
-                                                            student.grades,
-                                                            gradeCategories,
-                                                            1
+                                                    !(
+                                                        selectedClass?.current_quarter >=
+                                                            2 ||
+                                                        students.some(
+                                                            (student) =>
+                                                                hasQuarterlyExamScores(
+                                                                    student.grades,
+                                                                    gradeCategories,
+                                                                    1
+                                                                )
                                                         )
                                                     )
                                                 }
                                                 className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${
                                                     selectedQuarter === 2
                                                         ? "bg-white text-indigo-700 shadow-sm"
-                                                        : !students.some(
-                                                              (student) =>
-                                                                  hasQuarterlyExamScores(
-                                                                      student.grades,
-                                                                      gradeCategories,
-                                                                      1
-                                                                  )
+                                                        : !(
+                                                              selectedClass?.current_quarter >=
+                                                                  2 ||
+                                                              students.some(
+                                                                  (student) =>
+                                                                      hasQuarterlyExamScores(
+                                                                          student.grades,
+                                                                          gradeCategories,
+                                                                          1
+                                                                      )
+                                                              )
                                                           )
                                                         ? "text-gray-400 cursor-not-allowed"
                                                         : "text-gray-600 hover:bg-gray-200"
                                                 }`}
                                                 title={
-                                                    !students.some((student) =>
-                                                        hasQuarterlyExamScores(
-                                                            student.grades,
-                                                            gradeCategories,
-                                                            1
+                                                    !(
+                                                        selectedClass?.current_quarter >=
+                                                            2 ||
+                                                        students.some(
+                                                            (student) =>
+                                                                hasQuarterlyExamScores(
+                                                                    student.grades,
+                                                                    gradeCategories,
+                                                                    1
+                                                                )
                                                         )
                                                     )
-                                                        ? "Complete Quarter 1 quarterly exam first"
+                                                        ? "Complete Quarter 1 quarterly exam first or start Quarter 2"
                                                         : ""
                                                 }
                                             >
                                                 Q2
                                             </button>
                                         </div>
+                                        {/* Start Quarter 2 */}
+                                        {selectedClass?.current_quarter < 2 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (!selectedClass) return;
+                                                    if (
+                                                        !confirm(
+                                                            "Start Quarter 2 for this class?\nThis will allow you to view Q2 grades and begin entering Q2 data."
+                                                        )
+                                                    )
+                                                        return;
+                                                    router.post(
+                                                        route(
+                                                            "teacher.classes.quarter.start",
+                                                            selectedClass.id
+                                                        ),
+                                                        { quarter: 2 },
+                                                        {
+                                                            preserveScroll: true,
+                                                            onSuccess: () => {
+                                                                setSelectedQuarter(
+                                                                    2
+                                                                );
+                                                                router.reload({
+                                                                    only: [
+                                                                        "classes",
+                                                                        "rosters",
+                                                                    ],
+                                                                });
+                                                            },
+                                                        }
+                                                    );
+                                                }}
+                                                className="ml-2 px-3 py-1.5 rounded-md text-sm bg-emerald-600 text-white hover:bg-emerald-700"
+                                            >
+                                                Start Q2
+                                            </button>
+                                        )}
                                     </div>
 
                                     {/* Grades Column Toggle */}
@@ -1402,6 +1562,7 @@ const MyClasses = ({
                                 </div>
 
                                 {selectedQuarter === 2 &&
+                                    selectedClass?.current_quarter < 2 &&
                                     !students.some((student) =>
                                         hasQuarterlyExamScores(
                                             student.grades,

@@ -90,6 +90,12 @@ const TrendIndicator = ({ trend }) => {
             bg: "bg-gray-50",
             label: "Stable",
         },
+        new: {
+            icon: Minus,
+            color: "text-blue-600",
+            bg: "bg-blue-50",
+            label: "New",
+        },
     };
 
     const c = config[trend] || config.stable;

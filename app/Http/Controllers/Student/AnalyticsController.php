@@ -5,12 +5,20 @@ namespace App\Http\Controllers\Student;
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\Subject;
+use App\Services\PredictionService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class AnalyticsController extends Controller
 {
+    protected PredictionService $predictionService;
+
+    public function __construct(PredictionService $predictionService)
+    {
+        $this->predictionService = $predictionService;
+    }
+
     /**
      * Display the analytics index with all subjects and their grades.
      */
@@ -28,7 +36,7 @@ class AnalyticsController extends Controller
             ->where('user_id', $user->id)
             ->get();
 
-        // Build subjects data with calculated grades
+        // Build subjects data with calculated grades and predictions
         $subjects = $enrollments->map(function ($enrollment) {
             $grades = $enrollment->grades;
             $totalScore = $grades->sum('score');
@@ -44,13 +52,15 @@ class AnalyticsController extends Controller
                 ? round((($presentDays + ($lateDays * 0.5)) / $totalDays) * 100)
                 : 100;
 
-            // Determine status
-            $status = 'good';
-            if ($percentage !== null && $percentage < 70) {
-                $status = 'critical';
-            } elseif ($percentage !== null && $percentage < 75) {
-                $status = 'warning';
-            }
+            // Count missing assignments
+            $missingCount = $grades->filter(fn($g) => $g->score === null || $g->score === 0)->count();
+
+            // Get risk category from PredictionService
+            $riskCategory = $this->predictionService->determineRiskCategory($percentage, $missingCount, $attendanceRate);
+            $riskKey = $this->predictionService->getRiskCategoryKey($percentage, $missingCount, $attendanceRate);
+
+            // Get prediction
+            $prediction = $this->predictionService->predictFinalGrade($enrollment);
 
             return [
                 'id' => $enrollment->id,
@@ -59,9 +69,24 @@ class AnalyticsController extends Controller
                 'teacher' => $enrollment->subject?->teacher?->name ?? 'N/A',
                 'grade' => $percentage,
                 'attendanceRate' => $attendanceRate,
-                'status' => $status,
+                'missingCount' => $missingCount,
+                // New risk category format
+                'riskCategory' => $riskKey,
+                'riskLabel' => $riskCategory['label'],
+                'riskColor' => $riskCategory['color'],
+                // Legacy status for backwards compatibility
+                'status' => match ($riskKey) {
+                    'on_track' => 'good',
+                    'needs_attention' => 'warning',
+                    'at_risk', 'critical' => 'critical',
+                    default => 'good',
+                },
                 'hasIntervention' => $enrollment->intervention !== null,
                 'gradeCount' => $grades->count(),
+                // Prediction data
+                'predictedGrade' => $prediction['predicted_grade'],
+                'gradeTrend' => $prediction['trend'],
+                'trendDirection' => $prediction['trend_direction'],
             ];
         })->sortByDesc('grade')->values();
 
@@ -69,7 +94,8 @@ class AnalyticsController extends Controller
         $overallGrade = $subjects->whereNotNull('grade')->avg('grade');
         $overallGrade = $overallGrade ? round($overallGrade, 1) : null;
 
-        $subjectsAtRisk = $subjects->filter(fn($s) => $s['grade'] !== null && $s['grade'] < 75)->count();
+        $subjectsAtRisk = $subjects->filter(fn($s) => in_array($s['riskCategory'], ['at_risk', 'critical']))->count();
+        $subjectsNeedingAttention = $subjects->filter(fn($s) => $s['riskCategory'] === 'needs_attention')->count();
 
         return Inertia::render('Student/Analytics/Index', [
             'subjects' => $subjects,
@@ -77,7 +103,9 @@ class AnalyticsController extends Controller
                 'overallGrade' => $overallGrade,
                 'totalSubjects' => $subjects->count(),
                 'subjectsAtRisk' => $subjectsAtRisk,
+                'subjectsNeedingAttention' => $subjectsNeedingAttention,
                 'subjectsExcelling' => $subjects->filter(fn($s) => $s['grade'] !== null && $s['grade'] >= 90)->count(),
+                'subjectsOnTrack' => $subjects->filter(fn($s) => $s['riskCategory'] === 'on_track')->count(),
             ],
         ]);
     }
@@ -107,6 +135,9 @@ class AnalyticsController extends Controller
         $totalScore = $grades->sum('score');
         $totalPossible = $grades->sum('total_score');
         $overallGrade = $totalPossible > 0 ? round(($totalScore / $totalPossible) * 100) : null;
+
+        // Get comprehensive analytics from PredictionService
+        $analytics = $this->predictionService->getStudentAnalytics($enrollment);
 
         // Group grades by quarter
         $quarterlyData = $grades->groupBy('quarter')->map(function ($quarterGrades, $quarter) use ($enrollment) {
@@ -188,9 +219,6 @@ class AnalyticsController extends Controller
             ];
         }
 
-        // Generate study suggestions based on performance
-        $suggestions = $this->generateSuggestions($overallGrade, $attendanceRate, $gradeBreakdown);
-
         // Determine school year (from subject or current)
         $schoolYear = $subject?->school_year ?? date('Y') . '-' . (date('Y') + 1);
 
@@ -205,6 +233,7 @@ class AnalyticsController extends Controller
                 'teacher' => $subject?->teacher?->name ?? 'N/A',
                 'section' => $subject?->section,
                 'schoolYear' => $schoolYear,
+                'current_quarter' => $subject?->current_quarter ?? 1,
             ],
             'performance' => [
                 'overallGrade' => $overallGrade,
@@ -220,83 +249,124 @@ class AnalyticsController extends Controller
                 'excusedDays' => $excusedDays,
             ],
             'intervention' => $interventionData,
-            'suggestions' => $suggestions,
+            // Enhanced analytics from PredictionService
+            'prediction' => $analytics['prediction'],
+            'risk' => $analytics['risk'],
+            'suggestions' => $analytics['suggestions'],
         ]);
     }
 
     /**
-     * Generate study suggestions based on performance.
+     * Export student analytics as a PDF.
      */
-    private function generateSuggestions($grade, $attendanceRate, $gradeBreakdown)
+    public function exportPdf(Request $request, $enrollmentId)
     {
-        $suggestions = [];
+        $user = $request->user();
 
-        // Grade-based suggestions
-        if ($grade === null) {
-            $suggestions[] = [
-                'type' => 'info',
-                'icon' => 'info',
-                'title' => 'No Grades Yet',
-                'message' => 'Your grades will appear here once your teacher starts recording them. Stay attentive in class!',
+        $enrollment = Enrollment::with([
+            'subject.teacher',
+            'grades',
+            'attendanceRecords',
+            'intervention.tasks',
+            'user',
+        ])
+            ->where('user_id', $user->id)
+            ->where('id', $enrollmentId)
+            ->firstOrFail();
+
+        $subject = $enrollment->subject;
+        // Build the same data as `show()` to ensure parity
+        $grades = $enrollment->grades;
+
+        $totalScore = $grades->sum('score');
+        $totalPossible = $grades->sum('total_score');
+        $overallGrade = $totalPossible > 0 ? round(($totalScore / $totalPossible) * 100) : null;
+
+        $analytics = $this->predictionService->getStudentAnalytics($enrollment);
+
+        // Group grades by quarter
+        $quarterlyData = $grades->groupBy('quarter')->map(function ($quarterGrades, $quarter) use ($enrollment) {
+            $qScore = $quarterGrades->sum('score');
+            $qTotal = $quarterGrades->sum('total_score');
+            $qGrade = $qTotal > 0 ? round(($qScore / $qTotal) * 100) : null;
+
+            // Determine attendance roughly
+            $attendance = $enrollment->attendanceRecords;
+            $totalDays = $attendance->count();
+            $presentDays = $attendance->whereIn('status', ['present', 'excused'])->count();
+            $attendanceRate = $totalDays > 0 ? round(($presentDays / $totalDays) * 100) : 100;
+
+            return [
+                'quarterNum' => $quarter,
+                'grade' => $qGrade,
+                'attendance' => "{$attendanceRate}%",
+                'assignmentCount' => $quarterGrades->count(),
             ];
-        } elseif ($grade >= 90) {
-            $suggestions[] = [
-                'type' => 'success',
-                'icon' => 'star',
-                'title' => 'Excellent Performance! ⭐',
-                'message' => "You're doing amazing! Keep up the great work. Consider helping classmates who might be struggling.",
+        })->sortBy('quarterNum')->values();
+
+        $gradeBreakdown = $grades->map(function ($grade) {
+            $percentage = $grade->total_score > 0
+                ? round(($grade->score / $grade->total_score) * 100)
+                : null;
+            return [
+                'name' => $grade->assignment_name,
+                'score' => $grade->score,
+                'totalScore' => $grade->total_score,
+                'percentage' => $percentage,
+                'quarter' => (int) $grade->quarter,
             ];
-        } elseif ($grade >= 85) {
-            $suggestions[] = [
-                'type' => 'success',
-                'icon' => 'thumbs-up',
-                'title' => 'Great Job!',
-                'message' => "You're performing very well. To reach excellent, try reviewing your notes for 15 minutes after each class.",
-            ];
-        } elseif ($grade >= 80) {
-            $suggestions[] = [
-                'type' => 'info',
-                'icon' => 'lightbulb',
-                'title' => 'Good Progress',
-                'message' => "You're on the right track! Focus on understanding concepts deeply rather than just memorizing.",
-            ];
-        } elseif ($grade >= 75) {
-            $suggestions[] = [
-                'type' => 'warning',
-                'icon' => 'alert',
-                'title' => 'Room for Improvement',
-                'message' => "You're passing but have room to grow. Consider forming a study group or visiting during office hours.",
-            ];
-        } else {
-            $suggestions[] = [
-                'type' => 'danger',
-                'icon' => 'alert-triangle',
-                'title' => 'Needs Attention',
-                'message' => "Your grade is below passing. Please talk to your teacher as soon as possible for support and guidance.",
-            ];
+        })->values();
+
+        $attendanceRecords = $enrollment->attendanceRecords;
+        $totalDays = $attendanceRecords->count();
+        $presentDays = $attendanceRecords->where('status', 'present')->count();
+        $absentDays = $attendanceRecords->where('status', 'absent')->count();
+        $lateDays = $attendanceRecords->where('status', 'late')->count();
+        $excusedDays = $attendanceRecords->where('status', 'excused')->count();
+        $attendanceRate = $totalDays > 0
+            ? round((($presentDays + $excusedDays + ($lateDays * 0.5)) / $totalDays) * 100)
+            : 100;
+
+        // Check if PDF package present
+        $pdfClass = 'Barryvdh\\DomPDF\\Facade\\Pdf';
+        if (! class_exists($pdfClass)) {
+            return response()->json([
+                'message' => 'PDF export not available. Please install barryvdh/laravel-dompdf via Composer: composer require barryvdh/laravel-dompdf',
+            ], 501);
         }
 
-        // Attendance-based suggestions
-        if ($attendanceRate < 85) {
-            $suggestions[] = [
-                'type' => 'warning',
-                'icon' => 'calendar',
-                'title' => 'Improve Attendance',
-                'message' => "Your attendance rate is {$attendanceRate}%. Regular attendance is crucial for success. Try to attend every class.",
-            ];
-        }
+        $dataForView = [
+            'student' => [
+                'name' => $enrollment->user->name,
+                'lrn' => $enrollment->user->student->lrn ?? null,
+            ],
+            'subject' => [
+                'name' => $subject->name,
+                'section' => $subject->section,
+                'grade_level' => $subject->grade_level,
+                'current_quarter' => $subject->current_quarter ?? 1,
+            ],
+            'performance' => [
+                'overallGrade' => $overallGrade,
+                'quarterlyGrades' => $quarterlyData,
+                'gradeBreakdown' => $gradeBreakdown,
+            ],
+            'attendance' => [
+                'rate' => $attendanceRate,
+                'totalDays' => $totalDays,
+                'presentDays' => $presentDays,
+                'absentDays' => $absentDays,
+                'lateDays' => $lateDays,
+                'excusedDays' => $excusedDays,
+            ],
+            'prediction' => $analytics['prediction'],
+            'risk' => $analytics['risk'],
+            'suggestions' => $analytics['suggestions'],
+        ];
 
-        // Check for low-scoring assignments
-        $lowScoring = collect($gradeBreakdown)->filter(fn($g) => $g['percentage'] !== null && $g['percentage'] < 70);
-        if ($lowScoring->count() > 0) {
-            $suggestions[] = [
-                'type' => 'info',
-                'icon' => 'book',
-                'title' => 'Review Past Work',
-                'message' => "You have {$lowScoring->count()} assignment(s) below 70%. Review these topics to strengthen your understanding.",
-            ];
-        }
+        $pdf = $pdfClass::loadView('pdf.student_analytics', $dataForView);
+        $filename = sprintf('analytics_%s_%s.pdf', $enrollment->id, now()->format('Y-m-d'));
 
-        return $suggestions;
+        return $pdf->download($filename);
     }
 }

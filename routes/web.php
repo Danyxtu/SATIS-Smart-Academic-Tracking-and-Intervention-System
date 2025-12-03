@@ -4,6 +4,7 @@ use App\Http\Controllers\Teacher\AttendanceController;
 use App\Http\Controllers\Teacher\ClassController;
 use App\Http\Controllers\Teacher\GradeController;
 use App\Http\Controllers\Teacher\DashboardController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TeacherController;
 use Illuminate\Foundation\Application;
@@ -75,6 +76,8 @@ Route::middleware(['auth', 'verified', 'can:access-student-portal'])->group(func
 
     Route::get('/analytics/{enrollment}', [App\Http\Controllers\Student\AnalyticsController::class, 'show'])
         ->name('analytics.show');
+    Route::get('/analytics/{enrollment}/export/pdf', [App\Http\Controllers\Student\AnalyticsController::class, 'exportPdf'])
+        ->name('analytics.show.pdf');
 });
 
 /*
@@ -110,6 +113,9 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
             ->name('attendance.log.show');
         Route::get('/attendance/log/{subject}/export', [AttendanceController::class, 'export'])
             ->name('attendance.log.export');
+        // Server-side PDF export (requires barryvdh/laravel-dompdf package)
+        Route::get('/attendance/log/{subject}/export/pdf', [AttendanceController::class, 'exportPdf'])
+            ->name('attendance.log.export.pdf');
         // Save attendance (persist records)
         Route::post('/attendance', [AttendanceController::class, 'store'])
             ->name('attendance.store');
@@ -123,6 +129,8 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
             ->name('classes.students.store');
         Route::post('/classes/{subject}/classlist', [ClassController::class, 'uploadClasslist'])
             ->name('classes.classlist.store');
+        Route::post('/classes/{subject}/quarter', [ClassController::class, 'startQuarter'])
+            ->name('classes.quarter.start');
         Route::post('/classes/{subject}/grades/bulk', [GradeController::class, 'bulkStore'])
             ->name('classes.grades.bulk');
         Route::post('/classes/{subject}/grades/import', [GradeController::class, 'import'])
@@ -149,6 +157,56 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
 
 /*
 |--------------------------------------------------------------------------
+| Admin Portal Routes
+|--------------------------------------------------------------------------
+|
+| These routes are only for users with the 'admin' role.
+| Admin users manage user accounts (students and teachers).
+|
+*/
+
+Route::middleware(['auth', 'verified', 'can:access-admin-portal'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+
+        // Admin Dashboard
+        Route::get('/dashboard', [AdminUserController::class, 'dashboard'])
+            ->name('dashboard');
+
+        // User Management
+        Route::get('/users', [AdminUserController::class, 'index'])
+            ->name('users.index');
+        Route::get('/users/create', [AdminUserController::class, 'create'])
+            ->name('users.create');
+        Route::post('/users', [AdminUserController::class, 'store'])
+            ->name('users.store');
+        Route::get('/users/{user}/edit', [AdminUserController::class, 'edit'])
+            ->name('users.edit');
+        Route::put('/users/{user}', [AdminUserController::class, 'update'])
+            ->name('users.update');
+        Route::delete('/users/{user}', [AdminUserController::class, 'destroy'])
+            ->name('users.destroy');
+
+        // Password Reset
+        Route::post('/users/{user}/reset-password', [AdminUserController::class, 'resetPassword'])
+            ->name('users.reset-password');
+
+        // Bulk Actions
+        Route::post('/users/bulk-destroy', [AdminUserController::class, 'bulkDestroy'])
+            ->name('users.bulk-destroy');
+
+        // Password Reset Requests Management
+        Route::get('/password-reset-requests', [AdminUserController::class, 'passwordResetRequests'])
+            ->name('password-reset-requests');
+        Route::post('/password-reset-requests/{passwordResetRequest}/approve', [AdminUserController::class, 'approvePasswordResetRequest'])
+            ->name('password-reset-requests.approve');
+        Route::post('/password-reset-requests/{passwordResetRequest}/reject', [AdminUserController::class, 'rejectPasswordResetRequest'])
+            ->name('password-reset-requests.reject');
+    });
+
+/*
+|--------------------------------------------------------------------------
 | Universal Authenticated Routes
 |--------------------------------------------------------------------------
 |
@@ -160,6 +218,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Password Reset Request (for teachers)
+    Route::post('/profile/request-password-reset', [ProfileController::class, 'requestPasswordReset'])
+        ->name('profile.request-password-reset');
+    Route::delete('/profile/cancel-password-reset', [ProfileController::class, 'cancelPasswordResetRequest'])
+        ->name('profile.cancel-password-reset');
 });
 
 /*
@@ -173,6 +237,10 @@ Route::middleware('auth')->group(function () {
 */
 Route::get('/redirect-after-login', function () {
     $user = Auth::user();
+
+    if ($user->role === 'admin') {
+        return redirect()->route('admin.dashboard');
+    }
 
     if ($user->role === 'teacher') {
         return redirect()->route('teacher.dashboard');

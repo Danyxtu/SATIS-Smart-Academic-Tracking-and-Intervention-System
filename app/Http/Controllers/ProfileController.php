@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Models\PasswordResetRequest;
 use App\Models\Student;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
@@ -28,6 +29,11 @@ class ProfileController extends Controller
             $student = Student::where('user_id', $user->id)->first();
         }
 
+        // Get pending password reset request if any
+        $pendingPasswordReset = PasswordResetRequest::where('user_id', $user->id)
+            ->pending()
+            ->first();
+
         return Inertia::render('Profile/Edit', [
             'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => session('status'),
@@ -42,6 +48,12 @@ class ProfileController extends Controller
                 'strand' => $student->strand,
                 'track' => $student->track,
                 'avatar' => $student->avatar,
+            ] : null,
+            'pendingPasswordReset' => $pendingPasswordReset ? [
+                'id' => $pendingPasswordReset->id,
+                'reason' => $pendingPasswordReset->reason,
+                'status' => $pendingPasswordReset->status,
+                'created_at' => $pendingPasswordReset->created_at->diffForHumans(),
             ] : null,
         ]);
     }
@@ -120,5 +132,54 @@ class ProfileController extends Controller
         $request->session()->regenerateToken();
 
         return Redirect::to('/');
+    }
+
+    /**
+     * Submit a password reset request to admin.
+     */
+    public function requestPasswordReset(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+
+        // Check if there's already a pending request
+        $existingRequest = PasswordResetRequest::where('user_id', $user->id)
+            ->pending()
+            ->first();
+
+        if ($existingRequest) {
+            return back()->with('error', 'You already have a pending password reset request.');
+        }
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        PasswordResetRequest::create([
+            'user_id' => $user->id,
+            'reason' => $validated['reason'] ?? 'Password reset requested by user.',
+            'status' => 'pending',
+        ]);
+
+        return back()->with('success', 'Your password reset request has been submitted. An admin will review it shortly.');
+    }
+
+    /**
+     * Cancel a pending password reset request.
+     */
+    public function cancelPasswordResetRequest(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+
+        $pendingRequest = PasswordResetRequest::where('user_id', $user->id)
+            ->pending()
+            ->first();
+
+        if (!$pendingRequest) {
+            return back()->with('error', 'No pending password reset request found.');
+        }
+
+        $pendingRequest->delete();
+
+        return back()->with('success', 'Your password reset request has been cancelled.');
     }
 }

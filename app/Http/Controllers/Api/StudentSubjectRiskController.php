@@ -1,20 +1,18 @@
 <?php
 
-namespace App\Http\Controllers\Student;
+namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\Intervention;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Inertia\Response;
 
-class SubjectRiskController extends Controller
+class StudentSubjectRiskController extends Controller
 {
     /**
-     * Display subjects at risk for the student.
+     * Display subjects at risk for the student (JSON API).
      */
-    public function index(Request $request): Response
+    public function index(Request $request)
     {
         $user = $request->user();
 
@@ -52,7 +50,20 @@ class SubjectRiskController extends Controller
                 : 100;
 
             // Group grades by category/type for breakdown
-            $gradesByCategory = $grades->groupBy('category')->map(function ($categoryGrades) {
+            $gradesByCategory = $grades->groupBy(function ($grade) {
+                $key = strtolower($grade->assignment_key ?? '');
+                $name = strtolower($grade->assignment_name ?? '');
+                $combined = $key . ' ' . $name;
+
+                if (str_contains($combined, 'written') || str_contains($combined, 'ww') || str_contains($key, 'written_work')) {
+                    return 'written_works';
+                } elseif (str_contains($combined, 'performance') || str_contains($combined, 'pt') || str_contains($key, 'performance_task')) {
+                    return 'performance_task';
+                } elseif (str_contains($combined, 'exam') || str_contains($combined, 'quarterly') || str_contains($key, 'quarterly_exam')) {
+                    return 'quarterly_exam';
+                }
+                return 'other';
+            })->map(function ($categoryGrades) {
                 $score = $categoryGrades->sum('score');
                 $possible = $categoryGrades->sum('total_score');
                 return [
@@ -74,7 +85,7 @@ class SubjectRiskController extends Controller
                 ];
             });
 
-            // Calculate grade trend by comparing quarterly performance (consistent with Performance Analytics)
+            // Calculate grade trend by comparing quarterly performance (same as Performance Analytics)
             // Group grades by quarter and compare Q1 to Q2
             $q1Grades = $grades->where('quarter', 1);
             $q2Grades = $grades->where('quarter', 2);
@@ -137,7 +148,7 @@ class SubjectRiskController extends Controller
             foreach ($gradesByCategory as $category => $data) {
                 if ($data['percentage'] !== null && $data['percentage'] < 70) {
                     if ($riskLevel === 'low') $riskLevel = 'medium';
-                    $riskReasons[] = ucfirst($category) . ' score is low (' . $data['percentage'] . '%)';
+                    $riskReasons[] = ucfirst(str_replace('_', ' ', $category)) . ' score is low (' . $data['percentage'] . '%)';
                 }
             }
 
@@ -153,7 +164,7 @@ class SubjectRiskController extends Controller
                 $riskReasons[] = 'Grade trend is declining';
             }
 
-            // Calculate expected/projected grade based on current performance
+            // Calculate expected/projected grade
             $expectedGrade = $currentGrade;
             if ($trend === 'declining' && $currentGrade !== null) {
                 $expectedGrade = max(0, $currentGrade - 5);
@@ -161,11 +172,18 @@ class SubjectRiskController extends Controller
                 $expectedGrade = min(100, $currentGrade + 5);
             }
 
-            // Get recent grade entries for display
+            // Generate advice based on risk
+            $advice = 'Keep up the great work!';
+            if ($riskLevel === 'high') {
+                $advice = 'Immediate action required. Consider meeting with your teacher.';
+            } elseif ($riskLevel === 'medium') {
+                $advice = 'Focus on improving weak areas and maintain consistent study habits.';
+            }
+
+            // Get recent grade entries
             $recentGradeEntries = $grades->sortByDesc('created_at')->take(5)->map(fn($g) => [
                 'id' => $g->id,
-                'name' => $g->name,
-                'category' => $g->category,
+                'name' => $g->assignment_name,
                 'score' => $g->score,
                 'totalScore' => $g->total_score,
                 'percentage' => $g->total_score > 0 ? round(($g->score / $g->total_score) * 100, 1) : 0,
@@ -173,13 +191,23 @@ class SubjectRiskController extends Controller
                 'date' => $g->created_at->format('M d'),
             ])->values();
 
+            // Calculate course progress (% of graded items vs expected)
+            $courseProgress = $currentGrade ?? 0;
+
+            // Get risk label text
+            $riskLabel = match ($riskLevel) {
+                'high' => 'High Risk',
+                'medium' => 'Medium Risk',
+                default => 'Low Risk',
+            };
+
             return [
                 'id' => $enrollment->id,
                 'subjectId' => $subject?->id,
-                'subjectName' => $subject?->name ?? 'Unknown Subject',
+                'name' => $subject?->name ?? 'Unknown Subject',
+                'instructor' => $subject?->teacher?->name ?? 'N/A',
                 'section' => $subject?->section,
-                'teacherName' => $subject?->teacher?->name ?? 'N/A',
-                'currentGrade' => $currentGrade,
+                'grade' => $currentGrade,
                 'expectedGrade' => $expectedGrade !== null ? round($expectedGrade, 1) : null,
                 'attendanceRate' => $attendanceRate,
                 'totalClasses' => $totalDays,
@@ -187,9 +215,13 @@ class SubjectRiskController extends Controller
                 'absentDays' => $absentDays,
                 'lateDays' => $lateDays,
                 'trend' => $trend,
+                'risk' => $riskLabel,
                 'riskLevel' => $riskLevel,
                 'riskReasons' => $riskReasons,
                 'missingWork' => $missingWork,
+                'courseProgress' => $courseProgress,
+                'advice' => $advice,
+                'deadline' => now()->addWeeks(2)->format('M d, Y'), // Placeholder
                 'gradesByCategory' => $gradesByCategory,
                 'gradesByQuarter' => $gradesByQuarter,
                 'recentGrades' => $recentGradeEntries,
@@ -219,9 +251,8 @@ class SubjectRiskController extends Controller
         $highRiskCount = $subjects->where('riskLevel', 'high')->count();
         $mediumRiskCount = $subjects->where('riskLevel', 'medium')->count();
         $lowRiskCount = $subjects->where('riskLevel', 'low')->count();
-        $atRiskSubjects = $subjects->whereIn('riskLevel', ['high', 'medium']);
 
-        return Inertia::render('Student/SubjectRisk', [
+        return response()->json([
             'subjects' => $subjects,
             'stats' => [
                 'total' => $subjects->count(),

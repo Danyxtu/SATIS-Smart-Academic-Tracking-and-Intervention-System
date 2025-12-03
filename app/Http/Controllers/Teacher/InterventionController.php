@@ -9,6 +9,7 @@ use App\Models\Intervention;
 use App\Models\InterventionTask;
 use App\Models\StudentNotification;
 use App\Models\Subject;
+use App\Services\PredictionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Redirect;
@@ -18,6 +19,13 @@ use Illuminate\Support\Facades\Log;
 
 class InterventionController extends Controller
 {
+    protected PredictionService $predictionService;
+
+    public function __construct(PredictionService $predictionService)
+    {
+        $this->predictionService = $predictionService;
+    }
+
     /**
      * Display the intervention dashboard with students needing intervention.
      */
@@ -61,37 +69,36 @@ class InterventionController extends Controller
             // Count missing assignments (scores that are 0 or null)
             $missingAssignments = $grades->filter(fn($g) => $g->score === null || $g->score == 0)->count();
 
-            // Determine priority based on risk factors
-            $priority = 'Low';
+            // Use PredictionService for risk category
+            $riskCategory = $this->predictionService->determineRiskCategory(
+                $gradePercentage,
+                $missingAssignments,
+                $attendanceRate
+            );
+            $riskKey = $this->predictionService->getRiskCategoryKey(
+                $gradePercentage,
+                $missingAssignments,
+                $attendanceRate
+            );
+
+            // Build alert reasons
             $alertReasons = [];
-
-            if ($gradePercentage !== null && $gradePercentage < 70) {
-                $priority = 'High';
-                $alertReasons[] = "Grade < 70% ({$gradePercentage}%)";
-            } elseif ($gradePercentage !== null && $gradePercentage < 75) {
-                $priority = $priority === 'High' ? 'High' : 'Medium';
-                $alertReasons[] = "Grade < 75% ({$gradePercentage}%)";
+            if ($gradePercentage !== null && $gradePercentage < 75) {
+                $alertReasons[] = "Grade: {$gradePercentage}%";
             }
-
-            if ($missingAssignments >= 4) {
-                $priority = 'High';
-                $alertReasons[] = "{$missingAssignments}+ Missing Assignments";
-            } elseif ($missingAssignments >= 2) {
-                $priority = $priority === 'High' ? 'High' : 'Medium';
-                $alertReasons[] = "{$missingAssignments} Missing Assignments";
+            if ($missingAssignments >= 2) {
+                $alertReasons[] = "{$missingAssignments} Missing";
             }
-
-            if ($attendanceRate < 80) {
-                $priority = 'High';
-                $alertReasons[] = "Low Attendance ({$attendanceRate}%)";
-            } elseif ($attendanceRate < 90) {
-                $priority = $priority === 'High' ? 'High' : 'Medium';
-                $alertReasons[] = "Attendance Concern ({$attendanceRate}%)";
+            if ($attendanceRate < 90) {
+                $alertReasons[] = "Attendance: {$attendanceRate}%";
             }
 
             // Get existing intervention info
             $intervention = $enrollment->intervention;
             $lastInterventionDate = $intervention?->updated_at?->format('Y-m-d');
+
+            // Get prediction data
+            $prediction = $this->predictionService->predictFinalGrade($enrollment);
 
             return [
                 'id' => $enrollment->id,
@@ -110,10 +117,24 @@ class InterventionController extends Controller
                 'attendanceRate' => $attendanceRate,
                 'attendanceSummary' => $this->buildAttendanceSummary($enrollment->attendanceRecords),
                 'missingAssignmentCount' => $missingAssignments,
-                'priority' => $priority,
+                // New risk category format
+                'riskCategory' => $riskKey,
+                'riskLabel' => $riskCategory['label'],
+                'riskColor' => $riskCategory['color'],
+                // Keep legacy priority for backwards compatibility
+                'priority' => match ($riskKey) {
+                    'critical' => 'High',
+                    'at_risk' => 'High',
+                    'needs_attention' => 'Medium',
+                    default => 'Low',
+                },
                 'alertReason' => !empty($alertReasons) ? implode(', ', $alertReasons) : 'Under Observation',
                 'lastInterventionDate' => $lastInterventionDate ?? 'Never',
                 'hasActiveIntervention' => $intervention && $intervention->status === 'active',
+                // Prediction data
+                'predictedGrade' => $prediction['predicted_grade'],
+                'gradeTrend' => $prediction['trend'],
+                'trendDirection' => $prediction['trend_direction'],
                 'intervention' => $intervention ? [
                     'id' => $intervention->id,
                     'type' => $intervention->type,
@@ -128,11 +149,12 @@ class InterventionController extends Controller
                 ] : null,
             ];
         })
-            // Only include students with some risk factor or active intervention
-            ->filter(fn($s) => $s['priority'] !== 'Low' || $s['hasActiveIntervention'])
-            ->sortByDesc(fn($s) => match ($s['priority']) {
-                'High' => 3,
-                'Medium' => 2,
+            // Only include students who are NOT on_track or have active intervention
+            ->filter(fn($s) => $s['riskCategory'] !== 'on_track' || $s['hasActiveIntervention'])
+            ->sortByDesc(fn($s) => match ($s['riskCategory']) {
+                'critical' => 4,
+                'at_risk' => 3,
+                'needs_attention' => 2,
                 default => 1,
             })
             ->values();

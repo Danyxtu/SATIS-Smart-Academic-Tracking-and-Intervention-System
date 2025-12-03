@@ -1,8 +1,9 @@
 <?php
 
 namespace App\Providers;
+
 use App\Models\User; // <-- Add this
-use Illuminate\Support\Facades\Gate; 
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 
@@ -27,6 +28,9 @@ class AppServiceProvider extends ServiceProvider
         });
         Gate::define('access-student-portal', function (User $user) {
             return $user->role === 'student';
+        });
+        Gate::define('access-admin-portal', function (User $user) {
+            return $user->role === 'admin';
         });
     }
 }

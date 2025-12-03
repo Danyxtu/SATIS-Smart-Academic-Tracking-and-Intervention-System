@@ -284,6 +284,96 @@ class AttendanceController extends Controller
     }
 
     /**
+     * Export attendance data as a PDF using dompdf.
+     */
+    public function exportPdf(Request $request, Subject $subject)
+    {
+        $teacher = $request->user();
+
+        if ($subject->user_id !== $teacher->id) {
+            abort(403, 'You are not authorized to export this attendance.');
+        }
+
+        // Try to use Dompdf via barryvdh/laravel-dompdf
+        if (! class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+            // Return a 501 Not Implemented with instructions
+            return response()->json([
+                'message' => 'PDF export not available. Please install barryvdh/laravel-dompdf via Composer: composer require barryvdh/laravel-dompdf',
+            ], 501);
+        }
+
+        // Same data preparation as export() function
+        $subject->load(['enrollments.user.student', 'enrollments.attendanceRecords']);
+
+        $allDates = $subject->enrollments
+            ->flatMap(fn($e) => $e->attendanceRecords->pluck('date'))
+            ->unique()
+            ->sort()
+            ->values()
+            ->map(fn($date) => $date->format('Y-m-d'))
+            ->toArray();
+
+        $students = $subject->enrollments
+            ->map(function ($enrollment) use ($allDates) {
+                $user = $enrollment->user;
+                $student = $user?->student;
+                $fullName = $user?->name ?? trim(($student?->first_name ?? '') . ' ' . ($student?->last_name ?? ''));
+
+                $attendance = [];
+                foreach ($allDates as $date) {
+                    $record = $enrollment->attendanceRecords->first(fn($r) => $r->date->format('Y-m-d') === $date);
+                    $attendance[$date] = $record?->status ?? null;
+                }
+
+                $records = $enrollment->attendanceRecords;
+                $totalDays = $records->count();
+                $presentDays = $records->where('status', 'present')->count();
+                $absentDays = $records->where('status', 'absent')->count();
+                $lateDays = $records->where('status', 'late')->count();
+
+                return [
+                    'id' => $enrollment->id,
+                    'name' => $fullName ?: 'Student',
+                    'lrn' => $student?->lrn,
+                    'attendance' => $attendance,
+                    'stats' => [
+                        'total' => $totalDays,
+                        'present' => $presentDays,
+                        'absent' => $absentDays,
+                        'late' => $lateDays,
+                        'rate' => $totalDays > 0 ? round(($presentDays / $totalDays) * 100, 1) : 0,
+                    ],
+                ];
+            })
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->toArray();
+
+        // Prepare view data
+        $viewData = [
+            'section' => [
+                'id' => $subject->id,
+                'name' => $subject->name,
+                'grade_level' => $subject->grade_level,
+                'section' => $subject->section,
+                'label' => sprintf('%s - %s (%s)', $subject->grade_level, $subject->section, $subject->name),
+            ],
+            'dates' => $allDates,
+            'students' => $students,
+        ];
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.attendance', $viewData);
+        $filename = sprintf(
+            'attendance_%s_%s_%s.pdf',
+            str_replace(' ', '_', $subject->grade_level),
+            str_replace(' ', '_', $subject->section),
+            now()->format('Y-m-d')
+        );
+
+        return $pdf->download($filename);
+    }
+
+    /**
      * Persist attendance records for a class on a given date.
      */
     public function store(Request $request)
