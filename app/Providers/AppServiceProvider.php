@@ -23,6 +23,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Vite::prefetch(concurrency: 3);
+
+        Gate::define('access-super-admin-portal', function (User $user) {
+            return $user->role === 'super_admin';
+        });
         Gate::define('access-teacher-portal', function (User $user) {
             return $user->role === 'teacher';
         });
