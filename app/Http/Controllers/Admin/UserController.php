@@ -10,6 +10,7 @@ use App\Models\Enrollment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -152,17 +153,33 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        // Different validation rules based on role
+        $rules = [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'role' => 'required|in:student,teacher,admin',
-        ]);
+        ];
+
+        // Only require password for non-student roles
+        if ($request->role !== 'student') {
+            $rules['password'] = ['required', 'confirmed', Rules\Password::defaults()];
+        }
+
+        $validated = $request->validate($rules);
+
+        // Generate random password for students, use provided password for others
+        $tempPassword = null;
+        if ($validated['role'] === 'student') {
+            $tempPassword = Str::random(10);
+            $password = $tempPassword;
+        } else {
+            $password = $validated['password'];
+        }
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
+            'password' => Hash::make($password),
             'role' => $validated['role'],
         ]);
 
@@ -172,6 +189,15 @@ class UserController extends Controller
                 'user_id' => $user->id,
                 'student_id' => 'STU-' . str_pad($user->id, 6, '0', STR_PAD_LEFT),
             ]);
+
+            // Return with temporary password for student
+            return redirect()->route('admin.users.index')
+                ->with('success', 'Student created successfully.')
+                ->with('tempPassword', $tempPassword)
+                ->with('createdUser', [
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ]);
         }
 
         return redirect()->route('admin.users.index')

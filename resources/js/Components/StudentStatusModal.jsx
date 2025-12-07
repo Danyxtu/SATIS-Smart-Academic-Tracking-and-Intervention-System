@@ -10,13 +10,11 @@ const StudentStatusModal = ({
     calculateOverallFinalGrade,
     hasQuarterlyExamScores,
     onClose,
+    tempPassword = null, // Optional: Only passed when a new student is created
 }) => {
     const [showPassword, setShowPassword] = useState(false);
     const [copied, setCopied] = useState(false);
     const [selectedQuarter, setSelectedQuarter] = useState(1);
-
-    // Temporary password - will be replaced with auto-generated password later
-    const temporaryPassword = "password";
 
     if (!student) return null;
 
@@ -66,9 +64,11 @@ const StudentStatusModal = ({
     };
 
     const handleCopyPassword = () => {
-        navigator.clipboard.writeText(temporaryPassword);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        if (tempPassword) {
+            navigator.clipboard.writeText(tempPassword);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
     };
 
     return (
@@ -153,62 +153,64 @@ const StudentStatusModal = ({
 
                 {/* Scrollable Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                    {/* Temporary Password Section */}
-                    <div className="rounded-xl border-2 border-amber-200 bg-amber-50 p-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                            <div>
-                                <p className="text-sm font-semibold text-amber-800">
-                                    Temporary Password
-                                </p>
-                                <p className="text-xs text-amber-600">
-                                    Share this password with the student for
-                                    initial login
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-2 rounded-lg bg-white border border-amber-300 px-4 py-2">
-                                    <span className="font-mono text-lg font-semibold text-gray-900 tracking-wider">
-                                        {showPassword
-                                            ? temporaryPassword
-                                            : "••••••••"}
-                                    </span>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setShowPassword(!showPassword)
-                                        }
-                                        className="p-1 text-gray-500 hover:text-gray-700 transition"
-                                        aria-label={
-                                            showPassword
-                                                ? "Hide password"
-                                                : "Show password"
-                                        }
-                                    >
-                                        {showPassword ? (
-                                            <EyeOff size={18} />
-                                        ) : (
-                                            <Eye size={18} />
-                                        )}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleCopyPassword}
-                                        className="p-1 text-gray-500 hover:text-gray-700 transition"
-                                        aria-label="Copy password"
-                                    >
-                                        {copied ? (
-                                            <Check
-                                                size={18}
-                                                className="text-green-600"
-                                            />
-                                        ) : (
-                                            <Copy size={18} />
-                                        )}
-                                    </button>
+                    {/* Temporary Password Section - Only shown when tempPassword is provided (new student) */}
+                    {tempPassword && (
+                        <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50 p-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div>
+                                    <p className="text-sm font-semibold text-emerald-800">
+                                        Temporary Password
+                                    </p>
+                                    <p className="text-xs text-emerald-600">
+                                        Share this password with the student for
+                                        initial login
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 rounded-lg bg-white border border-emerald-300 px-4 py-2">
+                                        <span className="font-mono text-lg font-semibold text-gray-900 tracking-wider">
+                                            {showPassword
+                                                ? tempPassword
+                                                : "••••••••••••"}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setShowPassword(!showPassword)
+                                            }
+                                            className="p-1 text-gray-500 hover:text-gray-700 transition"
+                                            aria-label={
+                                                showPassword
+                                                    ? "Hide password"
+                                                    : "Show password"
+                                            }
+                                        >
+                                            {showPassword ? (
+                                                <EyeOff size={18} />
+                                            ) : (
+                                                <Eye size={18} />
+                                            )}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleCopyPassword}
+                                            className="p-1 text-gray-500 hover:text-gray-700 transition"
+                                            aria-label="Copy password"
+                                        >
+                                            {copied ? (
+                                                <Check
+                                                    size={18}
+                                                    className="text-green-600"
+                                                />
+                                            ) : (
+                                                <Copy size={18} />
+                                            )}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Meta Information Grid */}
                     <div className="grid gap-3 grid-cols-2 md:grid-cols-3">

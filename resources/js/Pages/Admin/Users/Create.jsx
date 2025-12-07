@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import AdminLayout from "@/Layouts/AdminLayout";
-import { Head, Link, useForm } from "@inertiajs/react";
+import { Head, Link, useForm, usePage } from "@inertiajs/react";
 import {
     UserPlus,
     ArrowLeft,
@@ -13,6 +13,9 @@ import {
     GraduationCap,
     UserCog,
     CheckCircle,
+    Info,
+    Copy,
+    Key,
 } from "lucide-react";
 
 // Role Selection Card
@@ -226,98 +229,123 @@ export default function Create() {
                         )}
                     </div>
 
-                    {/* Password */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label
-                                htmlFor="password"
-                                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                            >
-                                Password *
-                            </label>
-                            <div className="relative">
-                                <Lock
-                                    size={18}
-                                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                                />
-                                <input
-                                    id="password"
-                                    type={showPassword ? "text" : "password"}
-                                    value={data.password}
-                                    onChange={(e) =>
-                                        setData("password", e.target.value)
-                                    }
-                                    className="w-full pl-10 pr-10 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                    placeholder="Enter password"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setShowPassword(!showPassword)
-                                    }
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                >
-                                    {showPassword ? (
-                                        <EyeOff size={18} />
-                                    ) : (
-                                        <Eye size={18} />
-                                    )}
-                                </button>
-                            </div>
-                            {errors.password && (
-                                <p className="mt-1 text-sm text-red-600">
-                                    {errors.password}
+                    {/* Info box for student role - auto-generated password */}
+                    {data.role === "student" && (
+                        <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                            <Key
+                                size={20}
+                                className="text-blue-500 mt-0.5 flex-shrink-0"
+                            />
+                            <div>
+                                <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                                    Auto-generated Password
                                 </p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label
-                                htmlFor="password_confirmation"
-                                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                            >
-                                Confirm Password *
-                            </label>
-                            <div className="relative">
-                                <Lock
-                                    size={18}
-                                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                                />
-                                <input
-                                    id="password_confirmation"
-                                    type={
-                                        showConfirmPassword
-                                            ? "text"
-                                            : "password"
-                                    }
-                                    value={data.password_confirmation}
-                                    onChange={(e) =>
-                                        setData(
-                                            "password_confirmation",
-                                            e.target.value
-                                        )
-                                    }
-                                    className="w-full pl-10 pr-10 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                    placeholder="Confirm password"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setShowConfirmPassword(
-                                            !showConfirmPassword
-                                        )
-                                    }
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                >
-                                    {showConfirmPassword ? (
-                                        <EyeOff size={18} />
-                                    ) : (
-                                        <Eye size={18} />
-                                    )}
-                                </button>
+                                <p className="text-sm text-blue-600 dark:text-blue-300 mt-1">
+                                    A secure random password will be
+                                    automatically generated for this student.
+                                    You'll be able to view and copy it after
+                                    creating the account.
+                                </p>
                             </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* Password - only show for non-student roles */}
+                    {data.role !== "student" && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label
+                                    htmlFor="password"
+                                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                                >
+                                    Password *
+                                </label>
+                                <div className="relative">
+                                    <Lock
+                                        size={18}
+                                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                                    />
+                                    <input
+                                        id="password"
+                                        type={
+                                            showPassword ? "text" : "password"
+                                        }
+                                        value={data.password}
+                                        onChange={(e) =>
+                                            setData("password", e.target.value)
+                                        }
+                                        className="w-full pl-10 pr-10 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                        placeholder="Enter password"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setShowPassword(!showPassword)
+                                        }
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    >
+                                        {showPassword ? (
+                                            <EyeOff size={18} />
+                                        ) : (
+                                            <Eye size={18} />
+                                        )}
+                                    </button>
+                                </div>
+                                {errors.password && (
+                                    <p className="mt-1 text-sm text-red-600">
+                                        {errors.password}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label
+                                    htmlFor="password_confirmation"
+                                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                                >
+                                    Confirm Password *
+                                </label>
+                                <div className="relative">
+                                    <Lock
+                                        size={18}
+                                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                                    />
+                                    <input
+                                        id="password_confirmation"
+                                        type={
+                                            showConfirmPassword
+                                                ? "text"
+                                                : "password"
+                                        }
+                                        value={data.password_confirmation}
+                                        onChange={(e) =>
+                                            setData(
+                                                "password_confirmation",
+                                                e.target.value
+                                            )
+                                        }
+                                        className="w-full pl-10 pr-10 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                        placeholder="Confirm password"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setShowConfirmPassword(
+                                                !showConfirmPassword
+                                            )
+                                        }
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    >
+                                        {showConfirmPassword ? (
+                                            <EyeOff size={18} />
+                                        ) : (
+                                            <Eye size={18} />
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Submit Buttons */}
                     <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">

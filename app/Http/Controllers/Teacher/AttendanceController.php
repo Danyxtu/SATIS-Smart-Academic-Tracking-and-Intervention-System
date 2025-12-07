@@ -294,8 +294,8 @@ class AttendanceController extends Controller
             abort(403, 'You are not authorized to export this attendance.');
         }
 
-        // Try to use Dompdf via barryvdh/laravel-dompdf
-        if (! class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+        // Try to use Dompdf via barryvdh/laravel-dompdf (use string to avoid static analysis error when package is not installed)
+        if (! class_exists('Barryvdh\\DomPDF\\Facade\\Pdf')) {
             // Return a 501 Not Implemented with instructions
             return response()->json([
                 'message' => 'PDF export not available. Please install barryvdh/laravel-dompdf via Composer: composer require barryvdh/laravel-dompdf',
@@ -362,7 +362,8 @@ class AttendanceController extends Controller
             'students' => $students,
         ];
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.attendance', $viewData);
+        /** @var \Barryvdh\DomPDF\PDF $pdf */
+        $pdf = app('dompdf.wrapper')->loadView('pdf.attendance', $viewData);
         $filename = sprintf(
             'attendance_%s_%s_%s.pdf',
             str_replace(' ', '_', $subject->grade_level),

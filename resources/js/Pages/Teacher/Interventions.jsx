@@ -1,5 +1,5 @@
 import TeacherLayout from "@/Layouts/TeacherLayout";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useForm, usePage, router } from "@inertiajs/react";
 import { useLoading } from "@/Context/LoadingContext";
 import { ArrowLeft } from "lucide-react";
@@ -20,10 +20,22 @@ const getPriorityClasses = (priority) => {
     }
 };
 
+// Priority order for sorting (High first, then Medium, then Low)
+const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
+
 // --- Dashboard Component ---
 function InterventionDashboard({ students, onSelectStudent }) {
     const [selectedIds, setSelectedIds] = useState([]);
     const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+
+    // Sort students by priority: High → Medium → Low
+    const sortedStudents = useMemo(() => {
+        return [...students].sort((a, b) => {
+            const orderA = PRIORITY_ORDER[a.priority] ?? 99;
+            const orderB = PRIORITY_ORDER[b.priority] ?? 99;
+            return orderA - orderB;
+        });
+    }, [students]);
 
     const totalStudents = students.length;
     const highPriority = students.filter((s) => s.priority === "High").length;
@@ -40,10 +52,10 @@ function InterventionDashboard({ students, onSelectStudent }) {
     };
 
     const toggleSelectAll = () => {
-        if (selectedIds.length === students.length) {
+        if (selectedIds.length === sortedStudents.length) {
             setSelectedIds([]);
         } else {
-            setSelectedIds(students.map((s) => s.id));
+            setSelectedIds(sortedStudents.map((s) => s.id));
         }
     };
 
@@ -51,7 +63,9 @@ function InterventionDashboard({ students, onSelectStudent }) {
         setSelectedIds([]);
     };
 
-    const selectedStudents = students.filter((s) => selectedIds.includes(s.id));
+    const selectedStudents = sortedStudents.filter((s) =>
+        selectedIds.includes(s.id)
+    );
 
     return (
         <div className="space-y-6">
@@ -243,13 +257,13 @@ function InterventionDashboard({ students, onSelectStudent }) {
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="w-12 px-4 py-3">
-                                    {students.length > 0 && (
+                                    {sortedStudents.length > 0 && (
                                         <input
                                             type="checkbox"
                                             checked={
                                                 selectedIds.length ===
-                                                    students.length &&
-                                                students.length > 0
+                                                    sortedStudents.length &&
+                                                sortedStudents.length > 0
                                             }
                                             onChange={toggleSelectAll}
                                             className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
@@ -273,7 +287,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-100">
-                            {students.length === 0 ? (
+                            {sortedStudents.length === 0 ? (
                                 <tr>
                                     <td
                                         colSpan="6"
@@ -307,7 +321,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                     </td>
                                 </tr>
                             ) : (
-                                students.map((s) => (
+                                sortedStudents.map((s) => (
                                     <tr
                                         key={s.id}
                                         onClick={() => onSelectStudent(s.id)}

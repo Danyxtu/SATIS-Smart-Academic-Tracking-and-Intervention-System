@@ -39,6 +39,14 @@ export default function TeacherLayout({ children }) {
             activeCheck: "teacher.dashboard",
             showBadge: false,
         },
+         {
+            icon: <BookOpen size={18} />,
+            label: "My Classes",
+            // We will need to create this route
+            destination: "teacher.classes.index",
+            activeCheck: "teacher.classes.*",
+            showBadge: false,
+        },
         {
             icon: <CalendarCheck size={18} />,
             label: "Attendance",
@@ -47,14 +55,7 @@ export default function TeacherLayout({ children }) {
             activeCheck: "teacher.attendance.*",
             showBadge: false,
         },
-        {
-            icon: <BookOpen size={18} />,
-            label: "My Classes",
-            // We will need to create this route
-            destination: "teacher.classes.index",
-            activeCheck: "teacher.classes.*",
-            showBadge: false,
-        },
+       
         {
             icon: <ClipboardList size={18} />,
             label: "Interventions",

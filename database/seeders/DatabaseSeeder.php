@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 use App\Models\Student;
 
 class DatabaseSeeder extends Seeder
@@ -16,23 +17,25 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Create an admin
+        // Create an admin with random password
+        $adminPassword = Str::random(10);
         User::factory()->create([
             'name' => 'Admin User',
             'email' => 'admin@gmail.com',
-            'password' => bcrypt('password'),
+            'password' => bcrypt($adminPassword),
             'role' => 'admin',
         ]);
 
-        // Create a teacher
+        // Create a teacher with random password
+        $teacherPassword = Str::random(10);
         User::factory()->create([
             'name' => 'Teacher User',
             'email' => 'teacher@gmail.com',
-            'password' => bcrypt('password'),
+            'password' => bcrypt($teacherPassword),
             'role' => 'teacher',
         ]);
 
-        // Create 60 students (20 per class) with unique emails
+        // Create 60 students (20 per class) with unique emails and random passwords
         $this->createStudentsForClass('STEM-A', 'Grade 12', 'STEM', 'Academic', 20);
         $this->createStudentsForClass('ABM-B', 'Grade 11', 'ABM', 'Academic', 20);
         $this->createStudentsForClass('HUMSS-A', 'Grade 11', 'HUMSS', 'Academic', 20);
@@ -151,10 +154,13 @@ class DatabaseSeeder extends Seeder
                     $sectionCode . $i . '@student.edu.ph'
             );
 
+            // Generate random password for each student
+            $tempPassword = Str::random(10);
+
             $user = User::factory()->create([
                 'name' => "{$firstName} {$middleName} {$lastName}",
                 'email' => $email,
-                'password' => bcrypt('password'),
+                'password' => bcrypt($tempPassword),
                 'role' => 'student',
             ]);
 
