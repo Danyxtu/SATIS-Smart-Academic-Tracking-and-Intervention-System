@@ -38,6 +38,11 @@ class AuthenticatedSessionController extends Controller
         // Get the authenticated user
         $user = Auth::user();
 
+        // Check if user must change password (first-time login)
+        if ($user->must_change_password) {
+            return redirect()->route('password.force-change');
+        }
+
         // Check their role and redirect them
         if ($user->role === 'admin') {
             return redirect()->intended(route('admin.dashboard'));

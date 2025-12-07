@@ -84,6 +84,8 @@ class ClassController extends Controller
                         'section' => $studentProfile?->section ?? $subject->section,
                         'strand' => $studentProfile?->strand ?? $subject->strand,
                         'track' => $studentProfile?->track ?? $subject->track,
+                        'temp_password' => $user?->temp_password,
+                        'must_change_password' => $user?->must_change_password ?? true,
                         'grades' => $enrollment->grades->mapWithKeys(fn($grade) => [
                             $grade->assignment_key ?: Str::slug($grade->assignment_name, '_') => $grade->score,
                         ])->all(),
@@ -549,7 +551,9 @@ class ClassController extends Controller
             ['email' => $email],
             [
                 'name' => $fullName,
-                'password' => Hash::make($plainPassword),
+                'password' => $plainPassword, // Store plain text initially - will be hashed on first login change
+                'temp_password' => $plainPassword, // Store for teacher to view
+                'must_change_password' => true,
                 'role' => 'student',
             ]
         );

@@ -10,13 +10,19 @@ const StudentStatusModal = ({
     calculateOverallFinalGrade,
     hasQuarterlyExamScores,
     onClose,
-    tempPassword = null, // Optional: Only passed when a new student is created
 }) => {
     const [showPassword, setShowPassword] = useState(false);
     const [copied, setCopied] = useState(false);
     const [selectedQuarter, setSelectedQuarter] = useState(1);
 
     if (!student) return null;
+
+    // Get the temporary password from the student's user record
+    const temporaryPassword =
+        student.user?.temp_password || student.temp_password || null;
+    const hasChangedPassword =
+        student.user?.must_change_password === false ||
+        student.must_change_password === false;
 
     // Check if Q1 is finished (has quarterly exam scores)
     const q1Finished = hasQuarterlyExamScores
@@ -64,11 +70,9 @@ const StudentStatusModal = ({
     };
 
     const handleCopyPassword = () => {
-        if (tempPassword) {
-            navigator.clipboard.writeText(tempPassword);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        }
+        navigator.clipboard.writeText(temporaryPassword);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
     };
 
     return (
@@ -153,8 +157,29 @@ const StudentStatusModal = ({
 
                 {/* Scrollable Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                    {/* Temporary Password Section - Only shown when tempPassword is provided (new student) */}
-                    {tempPassword && (
+                    {/* Temporary Password Section */}
+                    {hasChangedPassword ? (
+                        // Student has already changed their password
+                        <div className="rounded-xl border-2 border-gray-200 bg-gray-50 p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                                    <Check
+                                        size={20}
+                                        className="text-green-600"
+                                    />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-800">
+                                        Password Changed
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                        This student has set their own password
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    ) : temporaryPassword ? (
+                        // Student has a temporary password
                         <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50 p-4">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                 <div>
@@ -170,7 +195,7 @@ const StudentStatusModal = ({
                                     <div className="flex items-center gap-2 rounded-lg bg-white border border-emerald-300 px-4 py-2">
                                         <span className="font-mono text-lg font-semibold text-gray-900 tracking-wider">
                                             {showPassword
-                                                ? tempPassword
+                                                ? temporaryPassword
                                                 : "••••••••••••"}
                                         </span>
                                         <button
@@ -207,6 +232,24 @@ const StudentStatusModal = ({
                                             )}
                                         </button>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        // No temporary password available
+                        <div className="rounded-xl border-2 border-amber-200 bg-amber-50 p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
+                                    <Eye size={20} className="text-amber-600" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold text-amber-800">
+                                        No Temporary Password
+                                    </p>
+                                    <p className="text-xs text-amber-600">
+                                        This student account was created without
+                                        a temporary password
+                                    </p>
                                 </div>
                             </div>
                         </div>

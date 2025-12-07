@@ -39,6 +39,15 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $user,
             ],
+            'flash' => [
+                'success' => fn() => $request->session()->get('success'),
+                'error' => fn() => $request->session()->get('error'),
+                'message' => fn() => $request->session()->get('message'),
+                'import_summary' => fn() => $request->session()->get('import_summary'),
+                'new_student_password' => fn() => $request->session()->get('new_student_password'),
+                'grade_update_summary' => fn() => $request->session()->get('grade_update_summary'),
+                'grade_import_summary' => fn() => $request->session()->get('grade_import_summary'),
+            ],
             'notifications' => $this->getNotificationData($user),
         ];
     }
