@@ -16,6 +16,7 @@ import {
     Info,
     Copy,
     Key,
+    Building2,
 } from "lucide-react";
 
 // Role Selection Card
@@ -75,7 +76,7 @@ const RoleCard = ({
     </button>
 );
 
-export default function Create() {
+export default function Create({ department }) {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -94,6 +95,7 @@ export default function Create() {
         });
     };
 
+    // Only student and teacher roles - admins cannot create other admins
     const roles = [
         {
             value: "student",
@@ -106,21 +108,38 @@ export default function Create() {
             value: "teacher",
             icon: UserCog,
             label: "Teacher",
-            description:
-                "Can manage classes, grades, attendance, and create interventions.",
-        },
-        {
-            value: "admin",
-            icon: Shield,
-            label: "Administrator",
-            description:
-                "Full access to user management. No access to academic features.",
+            description: department
+                ? `Will be assigned to ${department.name} department.`
+                : "Can manage classes, grades, attendance, and create interventions.",
         },
     ];
 
     return (
         <AdminLayout>
             <Head title="Create User" />
+
+            {/* Department Info Banner */}
+            {department && (
+                <div className="mb-6 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg p-4 text-white">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-white/20 rounded-lg">
+                            <Building2 size={24} />
+                        </div>
+                        <div>
+                            <p className="text-sm text-blue-100">
+                                Creating users for
+                            </p>
+                            <h2 className="text-lg font-bold">
+                                {department.name}
+                            </h2>
+                            <p className="text-xs text-blue-100">
+                                Teachers created will be automatically assigned
+                                to this department
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Header */}
             <div className="mb-6">
@@ -148,7 +167,7 @@ export default function Create() {
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                             Select Role *
                         </label>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {roles.map((role) => (
                                 <RoleCard
                                     key={role.value}

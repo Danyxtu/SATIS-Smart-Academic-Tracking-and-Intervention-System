@@ -7,7 +7,7 @@ import TextInput from "@/Components/TextInput";
 import Spacer from "@/Components/util/Spacer";
 import GuestLayout from "@/Layouts/GuestLayout";
 import { Head, Link, useForm } from "@inertiajs/react";
-import { Eye, EyeClosed, LogIn, Sparkles } from "lucide-react";
+import { Eye, EyeClosed, LogIn, Sparkles, UserPlus } from "lucide-react";
 import { useState } from "react";
 
 export default function Login({ status, canResetPassword }) {
@@ -156,6 +156,20 @@ export default function Login({ status, canResetPassword }) {
                             </Link>
                         </div>
                     )}
+
+                    {/* Teacher Registration Link */}
+                    <div className="text-center pt-4 border-t border-gray-200 mt-4">
+                        <p className="text-sm text-gray-500 mb-2">
+                            Are you a teacher?
+                        </p>
+                        <Link
+                            href={route("teacher.registration.create")}
+                            className="inline-flex items-center gap-2 text-sm text-primary hover:text-pink-500 transition-colors duration-200 font-medium"
+                        >
+                            <UserPlus className="w-4 h-4" />
+                            Register as a Teacher
+                        </Link>
+                    </div>
                 </div>
             </form>
         </GuestLayout>

@@ -97,6 +97,15 @@ class InterventionController extends Controller
                     'startDate' => $intervention->created_at->diffForHumans(),
                     'startDateFull' => $intervention->created_at->format('M d, Y'),
                     'createdAt' => $intervention->created_at,
+                    // Tier 3 completion request fields
+                    'isTier3' => $intervention->isTier3(),
+                    'canRequestCompletion' => $intervention->canRequestCompletion(),
+                    'completionRequestedAt' => $intervention->completion_requested_at?->format('M d, Y'),
+                    'completionRequestNotes' => $intervention->completion_request_notes,
+                    'isPendingApproval' => $intervention->isPendingApproval(),
+                    'approvedAt' => $intervention->approved_at?->format('M d, Y'),
+                    'rejectedAt' => $intervention->rejected_at?->format('M d, Y'),
+                    'rejectionReason' => $intervention->rejection_reason,
                 ];
             })
             ->sortByDesc('createdAt')
@@ -188,5 +197,50 @@ class InterventionController extends Controller
         $notification->markAsRead();
 
         return back()->with('success', 'Marked as read.');
+    }
+
+    /**
+     * Request completion of a Tier 3 intervention.
+     */
+    public function requestCompletion(Request $request, Intervention $intervention)
+    {
+        // Verify the intervention belongs to this student
+        $enrollment = $intervention->enrollment;
+
+        if ($enrollment->user_id !== $request->user()->id) {
+            abort(403, 'Unauthorized');
+        }
+
+        // Check if completion can be requested
+        if (!$intervention->canRequestCompletion()) {
+            return back()->with('error', 'Cannot request completion for this intervention.');
+        }
+
+        $request->validate([
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        $intervention->update([
+            'completion_requested_at' => now(),
+            'completion_request_notes' => $request->input('notes'),
+            // Reset any previous rejection
+            'rejected_at' => null,
+            'rejection_reason' => null,
+        ]);
+
+        // Create notification for the teacher
+        $teacher = $enrollment->subject?->user;
+        if ($teacher) {
+            StudentNotification::create([
+                'user_id' => $teacher->id,
+                'sender_id' => $request->user()->id,
+                'intervention_id' => $intervention->id,
+                'type' => 'alert',
+                'title' => 'Completion Request',
+                'message' => $request->user()->name . ' has requested to mark their intervention as complete.',
+            ]);
+        }
+
+        return back()->with('success', 'Completion request submitted! Your teacher will review it.');
     }
 }

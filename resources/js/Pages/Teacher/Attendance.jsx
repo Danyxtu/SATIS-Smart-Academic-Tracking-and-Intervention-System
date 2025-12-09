@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { router } from "@inertiajs/react";
+import axios from "axios";
 import TeacherLayout from "../../Layouts/TeacherLayout";
 import { Head } from "@inertiajs/react";
 import { useLoading } from "@/Context/LoadingContext";
@@ -37,6 +37,14 @@ const Attendance = ({ classes = [], rosters = {} }) => {
         new Date().toISOString().split("T")[0]
     );
     const [isDraggingEnabled, setIsDraggingEnabled] = useState(false);
+    const [attendanceAlreadySaved, setAttendanceAlreadySaved] = useState(false);
+    const [checkingAttendance, setCheckingAttendance] = useState(false);
+
+    // Check if selected date is a Sunday
+    const isSunday = useMemo(() => {
+        const date = new Date(currentDate);
+        return date.getDay() === 0; // 0 = Sunday
+    }, [currentDate]);
 
     const baseStates = useMemo(() => {
         const map = {};
@@ -67,6 +75,33 @@ const Attendance = ({ classes = [], rosters = {} }) => {
             setSelectedClassId(classes[0].id);
         }
     }, [classes, selectedClassId]);
+
+    // Check if attendance already exists for selected class and date
+    useEffect(() => {
+        const checkAttendanceExists = async () => {
+            if (!selectedClassId || !currentDate) {
+                setAttendanceAlreadySaved(false);
+                return;
+            }
+
+            setCheckingAttendance(true);
+            try {
+                const response = await axios.get(
+                    route("teacher.attendance.check"),
+                    {
+                        params: { classId: selectedClassId, date: currentDate },
+                    }
+                );
+                setAttendanceAlreadySaved(response.data.exists);
+            } catch (error) {
+                setAttendanceAlreadySaved(false);
+            } finally {
+                setCheckingAttendance(false);
+            }
+        };
+
+        checkAttendanceExists();
+    }, [selectedClassId, currentDate]);
 
     const currentClassState = useMemo(() => {
         if (selectedClassId && classStates[selectedClassId]) {
@@ -198,7 +233,7 @@ const Attendance = ({ classes = [], rosters = {} }) => {
         });
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!selectedClassId) return;
 
         const payload = {
@@ -210,19 +245,29 @@ const Attendance = ({ classes = [], rosters = {} }) => {
 
         startLoading();
 
-        router.post(route("teacher.attendance.store"), payload, {
-            preserveScroll: true,
-            onSuccess: () => {
-                showToast.success(
+        try {
+            const response = await axios.post(
+                route("teacher.attendance.store"),
+                payload
+            );
+            showToast.success(
+                response.data.message ||
                     `Attendance saved for ${stats.total} students.`
-                );
-                stopLoading();
-            },
-            onError: (errors) => {
+            );
+        } catch (error) {
+            if (
+                error.response?.status === 422 &&
+                error.response?.data?.already_saved
+            ) {
+                showToast.error(error.response.data.message);
+            } else if (error.response?.data?.message) {
+                showToast.error(error.response.data.message);
+            } else {
                 showToast.error("Failed to save attendance. Please try again.");
-                stopLoading();
-            },
-        });
+            }
+        } finally {
+            stopLoading();
+        }
     };
 
     const hasClasses = classes.length > 0;
@@ -282,10 +327,17 @@ const Attendance = ({ classes = [], rosters = {} }) => {
                             <input
                                 type="date"
                                 id="dateSelect"
-                                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                className={`rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 ${
+                                    isSunday ? "border-red-300 bg-red-50" : ""
+                                }`}
                                 value={currentDate}
                                 onChange={(e) => setCurrentDate(e.target.value)}
                             />
+                            {isSunday && (
+                                <p className="text-xs text-red-600 mt-1">
+                                    ⚠️ Sunday - No classes
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -406,13 +458,41 @@ const Attendance = ({ classes = [], rosters = {} }) => {
                                     </span>
                                 </div>
                             </div>
-                            <button
-                                onClick={handleSubmit}
-                                disabled={!hasClasses}
-                                className="bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                            >
-                                Save Attendance
-                            </button>
+                            <div className="flex flex-col items-end gap-2">
+                                {attendanceAlreadySaved && !isSunday && (
+                                    <span className="text-sm text-amber-600 font-medium">
+                                        ⚠️ Attendance already saved for this
+                                        date
+                                    </span>
+                                )}
+                                {isSunday && (
+                                    <span className="text-sm text-red-600 font-medium">
+                                        🚫 Cannot take attendance on Sunday
+                                    </span>
+                                )}
+                                <button
+                                    onClick={handleSubmit}
+                                    disabled={
+                                        !hasClasses ||
+                                        attendanceAlreadySaved ||
+                                        checkingAttendance ||
+                                        isSunday
+                                    }
+                                    className={`font-semibold py-3 px-6 rounded-lg shadow-md transition-colors disabled:opacity-50 ${
+                                        attendanceAlreadySaved || isSunday
+                                            ? "bg-gray-400 text-white cursor-not-allowed"
+                                            : "bg-indigo-600 text-white hover:bg-indigo-700"
+                                    }`}
+                                >
+                                    {checkingAttendance
+                                        ? "Checking..."
+                                        : isSunday
+                                        ? "No Class on Sunday"
+                                        : attendanceAlreadySaved
+                                        ? "Already Saved"
+                                        : "Save Attendance"}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

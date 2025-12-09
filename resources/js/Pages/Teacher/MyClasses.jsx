@@ -14,6 +14,9 @@ import {
     Users,
     SearchX,
     UserPlus,
+    Settings,
+    BookOpen,
+    Calendar,
 } from "lucide-react";
 import AddNewClassModal from "@/Components/AddNewClassModal";
 import ClassCard from "@/Components/ClassCard";
@@ -22,6 +25,7 @@ import StudentStatusModal from "@/Components/StudentStatusModal";
 import AddGradeTaskModal from "@/Components/AddGradeTaskModal";
 import SendNudgeModal from "@/Components/SendNudgeModal";
 import TemporaryPasswordModal from "@/Components/TemporaryPasswordModal";
+import EditGradeCategoriesModal from "@/Components/EditGradeCategoriesModal";
 
 // --- Empty State Component for No Students ---
 const EmptyStudentState = ({ hasSearchTerm, searchTerm, onAddStudent }) => {
@@ -416,6 +420,11 @@ const MyClasses = ({
     rosters = {},
     gradeStructures = {},
     defaultSchoolYear,
+    currentSemester = 1,
+    selectedSemester = 1,
+    semester1Count = 0,
+    semester2Count = 0,
+    masterSubjects = [],
 }) => {
     const page = usePage();
     const flash = page?.props?.flash ?? {};
@@ -448,6 +457,22 @@ const MyClasses = ({
         useState(null);
     const [isDragging, setIsDragging] = useState(false);
     const [droppedFile, setDroppedFile] = useState(null);
+    const [highlightAddClass, setHighlightAddClass] = useState(false);
+
+    // Check for highlight query parameter from tutorial
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get("highlight") === "addclass") {
+            setHighlightAddClass(true);
+            // Remove the query parameter from URL without refresh
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, "", newUrl);
+            // Stop blinking after 2 seconds (2 blinks)
+            setTimeout(() => {
+                setHighlightAddClass(false);
+            }, 2000);
+        }
+    }, []);
     const [gradeDrafts, setGradeDrafts] = useState({});
     const [dirtyGrades, setDirtyGrades] = useState({});
     const [isSavingGrades, setIsSavingGrades] = useState(false);
@@ -462,6 +487,8 @@ const MyClasses = ({
     const [nudgeTargetClass, setNudgeTargetClass] = useState(null);
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [passwordModalData, setPasswordModalData] = useState(null);
+    const [isEditCategoriesModalOpen, setIsEditCategoriesModalOpen] =
+        useState(false);
     const gradeUploadInputRef = useRef(null);
 
     // Show password modal when new student is created with password
@@ -1035,7 +1062,21 @@ const MyClasses = ({
                             <button
                                 type="button"
                                 onClick={() => setIsAddClassModalOpen(true)}
-                                className="flex items-center gap-2 rounded-lg border border-indigo-600 px-4 py-2 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-50"
+                                className={`flex items-center gap-2 rounded-lg border border-indigo-600 px-4 py-2 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-50 ${
+                                    highlightAddClass
+                                        ? "animate-pulse-twice"
+                                        : ""
+                                }`}
+                                style={
+                                    highlightAddClass
+                                        ? {
+                                              animation:
+                                                  "pulse-highlight 0.5s ease-in-out 4",
+                                              boxShadow:
+                                                  "0 0 20px rgba(99, 102, 241, 0.5)",
+                                          }
+                                        : {}
+                                }
                             >
                                 <Plus size={16} /> Add New Class
                             </button>
@@ -1277,6 +1318,121 @@ const MyClasses = ({
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
                 >
+                    {/* Semester Navigation Toggle */}
+                    <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
+                        {/* Header with School Year */}
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <Calendar
+                                    size={20}
+                                    className="text-indigo-600"
+                                />
+                                <span className="font-semibold text-gray-700">
+                                    Academic Year {defaultSchoolYear}
+                                </span>
+                            </div>
+                            {selectedSemester !== currentSemester && (
+                                <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                                    Viewing past semester
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Semester Tabs */}
+                        <div className="flex gap-2">
+                            {[
+                                {
+                                    id: 1,
+                                    label: "1st Semester",
+                                    shortLabel: "Sem 1",
+                                    count: semester1Count,
+                                },
+                                {
+                                    id: 2,
+                                    label: "2nd Semester",
+                                    shortLabel: "Sem 2",
+                                    count: semester2Count,
+                                },
+                            ].map((semester) => {
+                                const isActive =
+                                    selectedSemester === semester.id;
+                                const isCurrentSemester =
+                                    currentSemester === semester.id;
+
+                                return (
+                                    <button
+                                        key={semester.id}
+                                        onClick={() => {
+                                            router.get(
+                                                window.location.pathname,
+                                                { semester: semester.id },
+                                                {
+                                                    preserveState: true,
+                                                    preserveScroll: true,
+                                                }
+                                            );
+                                        }}
+                                        className={`
+                                            flex-1 relative flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all
+                                            ${
+                                                isActive
+                                                    ? "bg-indigo-600 text-white shadow-md"
+                                                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                            }
+                                        `}
+                                    >
+                                        <BookOpen size={18} />
+                                        <span className="hidden sm:inline">
+                                            {semester.label}
+                                        </span>
+                                        <span className="sm:hidden">
+                                            {semester.shortLabel}
+                                        </span>
+
+                                        {/* Class Count Badge */}
+                                        <span
+                                            className={`
+                                                ml-1 px-2 py-0.5 rounded-full text-xs font-bold
+                                                ${
+                                                    isActive
+                                                        ? "bg-white/20 text-white"
+                                                        : "bg-gray-200 text-gray-600"
+                                                }
+                                            `}
+                                        >
+                                            {semester.count}
+                                        </span>
+
+                                        {/* Current Semester Indicator */}
+                                        {isCurrentSemester && (
+                                            <span
+                                                className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${
+                                                    isActive
+                                                        ? "bg-green-400"
+                                                        : "bg-green-500"
+                                                } border-2 border-white`}
+                                                title="Current Semester"
+                                            />
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Info Text */}
+                        <p className="text-center text-xs text-gray-500 mt-3">
+                            Viewing{" "}
+                            {selectedSemester === 1 ? "First" : "Second"}{" "}
+                            Semester classes
+                            {semester1Count + semester2Count > 0 && (
+                                <span className="ml-1">
+                                    ({classes.length} of{" "}
+                                    {semester1Count + semester2Count} total)
+                                </span>
+                            )}
+                        </p>
+                    </div>
+
                     {/* Dropzone Overlay */}
                     {isDragging && (
                         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-indigo-500 bg-opacity-75 rounded-xl border-4 border-dashed border-white">
@@ -1291,21 +1447,48 @@ const MyClasses = ({
                     )}
 
                     {/* Class Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {classes.map((cls, index) => {
-                            const colors = getColorClasses(cls.color);
-                            const classKey = buildClassKey(cls, index);
-                            return (
-                                <ClassCard
-                                    key={classKey}
-                                    colors={colors}
-                                    cls={cls}
-                                    handleClassSelect={handleClassSelect}
-                                    onSendNudge={handleSendNudge}
-                                />
-                            );
-                        })}
-                    </div>
+                    {classes.length === 0 ? (
+                        <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <BookOpen size={32} className="text-gray-400" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                                No classes for{" "}
+                                {selectedSemester === 1 ? "1st" : "2nd"}{" "}
+                                Semester
+                            </h3>
+                            <p className="text-gray-500 mb-4">
+                                {selectedSemester === currentSemester
+                                    ? "Add your first class to get started with this semester."
+                                    : "No classes were created during this semester."}
+                            </p>
+                            {selectedSemester === currentSemester && (
+                                <button
+                                    onClick={() => setIsAddClassModalOpen(true)}
+                                    className="inline-flex items-center gap-2 bg-indigo-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors"
+                                >
+                                    <Plus size={18} />
+                                    Add Class
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {classes.map((cls, index) => {
+                                const colors = getColorClasses(cls.color);
+                                const classKey = buildClassKey(cls, index);
+                                return (
+                                    <ClassCard
+                                        key={classKey}
+                                        colors={colors}
+                                        cls={cls}
+                                        handleClassSelect={handleClassSelect}
+                                        onSendNudge={handleSendNudge}
+                                    />
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             ) : (
                 // Classlist / Grade View
@@ -1622,22 +1805,40 @@ const MyClasses = ({
                                         )}
                                     </div>
 
-                                    {/* Grades Column Toggle */}
-                                    <button
-                                        onClick={() =>
-                                            setGradesExpanded(!gradesExpanded)
-                                        }
-                                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
-                                    >
-                                        {gradesExpanded ? (
-                                            <ChevronUp size={14} />
-                                        ) : (
-                                            <ChevronDown size={14} />
-                                        )}
-                                        {gradesExpanded
-                                            ? "Collapse Grades"
-                                            : "Expand Grades"}
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        {/* Edit Grade Categories Button */}
+                                        <button
+                                            onClick={() =>
+                                                setIsEditCategoriesModalOpen(
+                                                    true
+                                                )
+                                            }
+                                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                                            title="Edit grade category percentages"
+                                        >
+                                            <Settings size={14} />
+                                            Edit Percentages
+                                        </button>
+
+                                        {/* Grades Column Toggle */}
+                                        <button
+                                            onClick={() =>
+                                                setGradesExpanded(
+                                                    !gradesExpanded
+                                                )
+                                            }
+                                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                                        >
+                                            {gradesExpanded ? (
+                                                <ChevronUp size={14} />
+                                            ) : (
+                                                <ChevronDown size={14} />
+                                            )}
+                                            {gradesExpanded
+                                                ? "Collapse Grades"
+                                                : "Expand Grades"}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {selectedQuarter === 2 &&
@@ -2434,7 +2635,9 @@ const MyClasses = ({
                         setDroppedFile(null);
                     }}
                     defaultSchoolYear={defaultSchoolYear}
+                    currentSemester={currentSemester}
                     initialFile={droppedFile}
+                    masterSubjects={masterSubjects}
                 />
             )}
 
@@ -2489,6 +2692,14 @@ const MyClasses = ({
                     }}
                 />
             )}
+
+            {/* --- Edit Grade Categories Modal --- */}
+            <EditGradeCategoriesModal
+                isOpen={isEditCategoriesModalOpen}
+                onClose={() => setIsEditCategoriesModalOpen(false)}
+                subjectId={selectedClass?.id}
+                categories={gradeCategories}
+            />
         </>
     );
 };

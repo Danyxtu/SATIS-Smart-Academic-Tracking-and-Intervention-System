@@ -146,7 +146,14 @@ class InterventionController extends Controller
                         'description' => $task->description,
                         'is_completed' => $task->is_completed,
                     ])->toArray(),
+                    // Tier 3 completion request fields
+                    'isTier3' => $intervention->isTier3(),
+                    'isPendingApproval' => $intervention->isPendingApproval(),
+                    'completionRequestedAt' => $intervention->completion_requested_at?->format('M d, Y'),
+                    'completionRequestNotes' => $intervention->completion_request_notes,
                 ] : null,
+                // Flag for pending completion requests (for easy filtering)
+                'hasPendingCompletionRequest' => $intervention?->isPendingApproval() ?? false,
             ];
         })
             // Only include students who are NOT on_track or have active intervention
@@ -196,6 +203,49 @@ class InterventionController extends Controller
                 ];
             }
 
+            // Calculate risk category to determine priority
+            $grades = $enrollment->grades;
+            $totalScore = $grades->sum('score');
+            $totalPossibleGrade = $grades->sum('total_score');
+            $gradePercentageForRisk = $totalPossibleGrade > 0 ? round(($totalScore / $totalPossibleGrade) * 100) : null;
+
+            $attendanceRecords = $enrollment->attendanceRecords;
+            $totalClasses = $attendanceRecords->count();
+            $presentCount = $attendanceRecords->whereIn('status', ['present', 'late', 'excused'])->count();
+            $attendanceRateForRisk = $totalClasses > 0 ? round(($presentCount / $totalClasses) * 100) : 100;
+
+            // Determine risk category
+            if ($gradePercentageForRisk !== null && $gradePercentageForRisk < 60) {
+                $riskKey = 'critical';
+            } elseif ($attendanceRateForRisk < 70) {
+                $riskKey = 'critical';
+            } elseif ($gradePercentageForRisk !== null && $gradePercentageForRisk < 75) {
+                $riskKey = 'at_risk';
+            } elseif ($attendanceRateForRisk < 85) {
+                $riskKey = 'needs_attention';
+            } else {
+                $riskKey = 'on_track';
+            }
+
+            $priority = match ($riskKey) {
+                'critical' => 'High',
+                'at_risk' => 'High',
+                'needs_attention' => 'Medium',
+                default => 'Low',
+            };
+
+            // Build pending completion request data
+            $pendingCompletionRequest = null;
+            if ($intervention && $intervention->isPendingApproval()) {
+                $pendingCompletionRequest = [
+                    'interventionId' => $intervention->id,
+                    'type' => $intervention->type,
+                    'typeLabel' => Intervention::getTypes()[$intervention->type] ?? $intervention->type,
+                    'requestedAt' => $intervention->completion_requested_at?->format('M d, Y'),
+                    'requestNotes' => $intervention->completion_request_notes,
+                ];
+            }
+
             return [
                 $enrollment->id => [
                     'id' => $enrollment->id,
@@ -209,6 +259,8 @@ class InterventionController extends Controller
                     'missingAssignments' => $missingAssignments,
                     'behaviorLog' => [],
                     'interventionLog' => $interventionLog,
+                    'priority' => $priority,
+                    'pendingCompletionRequest' => $pendingCompletionRequest,
                 ],
             ];
         })->toArray();
@@ -464,5 +516,93 @@ class InterventionController extends Controller
     {
         $this->createTasks($intervention, $tasks);
         $this->createNotification($enrollment, $intervention, $teacher, 'task');
+    }
+
+    /**
+     * Approve a student's completion request for a Tier 3 intervention.
+     */
+    public function approveCompletion(Request $request, Intervention $intervention)
+    {
+        $teacher = $request->user();
+        $enrollment = $intervention->enrollment;
+        $subject = $enrollment->subject;
+
+        // Verify the intervention belongs to this teacher's subject
+        if ($subject->user_id !== $teacher->id) {
+            abort(403, 'Unauthorized');
+        }
+
+        // Check if there's a pending completion request
+        if (!$intervention->isPendingApproval()) {
+            return back()->with('error', 'No pending completion request for this intervention.');
+        }
+
+        $request->validate([
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        $intervention->update([
+            'status' => 'completed',
+            'approved_at' => now(),
+            'approved_by' => $teacher->id,
+            'approval_notes' => $request->input('notes'),
+        ]);
+
+        // Notify the student
+        StudentNotification::create([
+            'user_id' => $enrollment->user_id,
+            'intervention_id' => $intervention->id,
+            'sender_id' => $teacher->id,
+            'type' => 'feedback',
+            'title' => '✅ Intervention Completed!',
+            'message' => 'Congratulations! Your teacher has approved your intervention completion request. ' .
+                ($request->input('notes') ? "Teacher notes: {$request->input('notes')}" : 'Great job on completing your intervention!'),
+        ]);
+
+        return back()->with('success', 'Intervention completion approved successfully!');
+    }
+
+    /**
+     * Reject a student's completion request for a Tier 3 intervention.
+     */
+    public function rejectCompletion(Request $request, Intervention $intervention)
+    {
+        $teacher = $request->user();
+        $enrollment = $intervention->enrollment;
+        $subject = $enrollment->subject;
+
+        // Verify the intervention belongs to this teacher's subject
+        if ($subject->user_id !== $teacher->id) {
+            abort(403, 'Unauthorized');
+        }
+
+        // Check if there's a pending completion request
+        if (!$intervention->isPendingApproval()) {
+            return back()->with('error', 'No pending completion request for this intervention.');
+        }
+
+        $request->validate([
+            'reason' => 'required|string|max:1000',
+        ]);
+
+        $intervention->update([
+            'rejected_at' => now(),
+            'rejection_reason' => $request->input('reason'),
+            // Clear the completion request so student can try again
+            'completion_requested_at' => null,
+            'completion_request_notes' => null,
+        ]);
+
+        // Notify the student
+        StudentNotification::create([
+            'user_id' => $enrollment->user_id,
+            'intervention_id' => $intervention->id,
+            'sender_id' => $teacher->id,
+            'type' => 'alert',
+            'title' => '⚠️ Completion Request Not Approved',
+            'message' => "Your intervention completion request was not approved. Reason: {$request->input('reason')}. Please continue working on the intervention requirements and submit again when ready.",
+        ]);
+
+        return back()->with('success', 'Completion request rejected. Student has been notified.');
     }
 }

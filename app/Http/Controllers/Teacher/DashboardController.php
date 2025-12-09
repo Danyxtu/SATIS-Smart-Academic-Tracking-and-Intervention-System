@@ -10,6 +10,7 @@ use App\Models\Student;
 use App\Models\Grade;
 use App\Models\Intervention;
 use App\Models\User;
+use App\Models\SystemSetting;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
@@ -17,6 +18,11 @@ class DashboardController extends Controller
     public function index()
     {
         $teacher = Auth::user();
+        $teacher->load('department');
+
+        // Get current academic period
+        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
+        $currentSemester = SystemSetting::getCurrentSemester();
 
         // Get all enrollments for the teacher's subjects
         $enrollments = Enrollment::whereHas('subject', function ($query) use ($teacher) {
@@ -31,7 +37,9 @@ class DashboardController extends Controller
         ])->get();
 
         $students = $enrollments->map(function ($enrollment) {
-            $averageGrade = $enrollment->grades->avg('score');
+            $grades = $enrollment->grades;
+            $hasGrades = $grades->isNotEmpty();
+            $averageGrade = $hasGrades ? $grades->avg('score') : null;
             $studentProfile = $enrollment->student;
 
             return [
@@ -40,7 +48,8 @@ class DashboardController extends Controller
                 'last_name' => optional($studentProfile)->last_name ?? '',
                 'avatar' => optional($studentProfile)->avatar,
                 'subject' => optional($enrollment->subject)->name,
-                'grade' => round($averageGrade),
+                'grade' => $hasGrades ? round($averageGrade) : null,
+                'has_grades' => $hasGrades,
                 'trend' => optional($studentProfile)->trend,
                 'enrollment_id' => $enrollment->id,
                 'intervention' => $enrollment->intervention ? [
@@ -52,32 +61,38 @@ class DashboardController extends Controller
             ];
         });
 
-        // 1. Students at Risk
-        $studentsAtRiskCount = $students->where('grade', '<', 75)->count();
+        // Only consider students WITH grades for risk calculations
+        $studentsWithGrades = $students->filter(fn($s) => $s['has_grades'] === true);
 
-        // 2. Average Grade
-        $averageGrade = $students->avg('grade');
+        // 1. Students at Risk (only those with grades below 75)
+        $studentsAtRiskCount = $studentsWithGrades->filter(fn($s) => $s['grade'] < 75)->count();
 
-        // 3. Needs Attention
+        // 2. Average Grade (only from students with grades)
+        $averageGrade = $studentsWithGrades->avg('grade') ?? 0;
+
+        // 3. Needs Attention (based on attendance - 2+ absences)
         $needsAttentionCount = $enrollments->filter(function ($enrollment) {
             return $enrollment->attendanceRecords->where('status', 'absent')->count() >= 2;
         })->count();
 
         // 4. Recent Declines
-        $recentDeclinesCount = $students->where('trend', 'Declining')->count();
+        $recentDeclinesCount = $studentsWithGrades->filter(fn($s) => $s['trend'] === 'Declining')->count();
 
-        // 5. Priority Students
-        $criticalStudents = $students->where('grade', '<', 70);
-        $warningStudents = $students->where('grade', '>=', 70)->where('grade', '<', 75);
-        $watchListStudents = $students->where('grade', '>=', 75)->where('grade', '<', 80)->where('trend', 'Declining');
+        // 5. Priority Students - Based on expected/actual grade thresholds
+        // Critical: Grade below 70 (failing)
+        // Warning: Grade between 70-74 (at risk of failing)
+        // Watchlist: Grade between 75-79 AND declining trend
+        $criticalStudents = $studentsWithGrades->filter(fn($s) => $s['grade'] < 70);
+        $warningStudents = $studentsWithGrades->filter(fn($s) => $s['grade'] >= 70 && $s['grade'] < 75);
+        $watchListStudents = $studentsWithGrades->filter(fn($s) => $s['grade'] >= 75 && $s['grade'] < 80 && $s['trend'] === 'Declining');
 
-        // 6. Grade Distribution
+        // 6. Grade Distribution (only students with grades)
         $gradeDistribution = [
-            '90-100' => $students->where('grade', '>=', 90)->count(),
-            '80-89' => $students->where('grade', '>=', 80)->where('grade', '<', 90)->count(),
-            '75-79' => $students->where('grade', '>=', 75)->where('grade', '<', 80)->count(),
-            '70-74' => $students->where('grade', '>=', 70)->where('grade', '<', 75)->count(),
-            '<70' => $students->where('grade', '<', 70)->count(),
+            '90-100' => $studentsWithGrades->filter(fn($s) => $s['grade'] >= 90)->count(),
+            '80-89' => $studentsWithGrades->filter(fn($s) => $s['grade'] >= 80 && $s['grade'] < 90)->count(),
+            '75-79' => $studentsWithGrades->filter(fn($s) => $s['grade'] >= 75 && $s['grade'] < 80)->count(),
+            '70-74' => $studentsWithGrades->filter(fn($s) => $s['grade'] >= 70 && $s['grade'] < 75)->count(),
+            '<70' => $studentsWithGrades->filter(fn($s) => $s['grade'] < 70)->count(),
         ];
 
         // 7. Recent Activity
@@ -90,6 +105,8 @@ class DashboardController extends Controller
                 'averageGrade' => round($averageGrade, 2),
                 'needsAttention' => $needsAttentionCount,
                 'recentDeclines' => $recentDeclinesCount,
+                'totalStudents' => $students->count(),
+                'studentsWithGrades' => $studentsWithGrades->count(),
             ],
             'priorityStudents' => [
                 'critical' => $criticalStudents->values(),
@@ -98,6 +115,15 @@ class DashboardController extends Controller
             ],
             'gradeDistribution' => $gradeDistribution,
             'recentActivity' => $recentActivity,
+            'academicPeriod' => [
+                'schoolYear' => $currentSchoolYear,
+                'semester' => $currentSemester,
+            ],
+            'department' => $teacher->department ? [
+                'id' => $teacher->department->id,
+                'name' => $teacher->department->name,
+                'code' => $teacher->department->code,
+            ] : null,
         ]);
     }
 }

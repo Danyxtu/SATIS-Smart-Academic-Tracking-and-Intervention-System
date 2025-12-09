@@ -18,12 +18,29 @@ import {
     X,
     CheckCircle,
     XCircle,
+    Calendar,
+    Mail,
+    Hash,
+    FileText,
+    Activity,
 } from "lucide-react";
 import { useState } from "react";
 
 export default function Index({ departments, filters }) {
     const [search, setSearch] = useState(filters.search || "");
     const [status, setStatus] = useState(filters.status || "");
+    const [selectedDepartment, setSelectedDepartment] = useState(null);
+    const [showModal, setShowModal] = useState(false);
+
+    const openModal = (dept) => {
+        setSelectedDepartment(dept);
+        setShowModal(true);
+    };
+
+    const closeModal = () => {
+        setShowModal(false);
+        setSelectedDepartment(null);
+    };
 
     const handleSearch = (e) => {
         e.preventDefault();
@@ -178,7 +195,8 @@ export default function Index({ departments, filters }) {
                                     {departments.data.map((dept) => (
                                         <tr
                                             key={dept.id}
-                                            className="hover:bg-slate-50/50 transition-colors"
+                                            onClick={() => openModal(dept)}
+                                            className="hover:bg-slate-50/50 transition-colors cursor-pointer"
                                         >
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
@@ -245,9 +263,12 @@ export default function Index({ departments, filters }) {
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <button
-                                                    onClick={() =>
-                                                        handleToggleStatus(dept)
-                                                    }
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleToggleStatus(
+                                                            dept
+                                                        );
+                                                    }}
                                                     className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
                                                         dept.is_active
                                                             ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
@@ -272,16 +293,12 @@ export default function Index({ departments, filters }) {
                                                 </button>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <Link
-                                                        href={route(
-                                                            "superadmin.departments.show",
-                                                            dept.id
-                                                        )}
-                                                        className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-                                                    >
-                                                        <Eye size={16} />
-                                                    </Link>
+                                                <div
+                                                    className="flex items-center justify-end gap-1"
+                                                    onClick={(e) =>
+                                                        e.stopPropagation()
+                                                    }
+                                                >
                                                     <Link
                                                         href={route(
                                                             "superadmin.departments.edit",
@@ -348,6 +365,193 @@ export default function Index({ departments, filters }) {
                     )}
                 </div>
             </div>
+
+            {/* Department Summary Modal */}
+            {showModal && selectedDepartment && (
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    {/* Backdrop */}
+                    <div
+                        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+                        onClick={closeModal}
+                    />
+
+                    {/* Modal */}
+                    <div className="flex min-h-full items-center justify-center p-4">
+                        <div className="relative w-full max-w-2xl transform rounded-2xl bg-white shadow-2xl transition-all">
+                            {/* Header */}
+                            <div className="relative overflow-hidden rounded-t-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-8">
+                                <div className="absolute inset-0 bg-grid-white/10" />
+                                <div className="absolute top-0 right-0 -mt-10 -mr-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
+                                <button
+                                    onClick={closeModal}
+                                    className="absolute top-4 right-4 rounded-lg p-2 text-white/80 hover:bg-white/20 hover:text-white transition-colors"
+                                >
+                                    <X size={20} />
+                                </button>
+                                <div className="relative flex items-center gap-4">
+                                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
+                                        <Building2 className="h-8 w-8 text-white" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-bold text-white">
+                                            {selectedDepartment.name}
+                                        </h2>
+                                        <div className="mt-1 flex items-center gap-2">
+                                            <span className="inline-flex items-center rounded-lg bg-white/20 px-2.5 py-1 text-xs font-semibold text-white">
+                                                <Hash
+                                                    size={12}
+                                                    className="mr-1"
+                                                />
+                                                {selectedDepartment.code}
+                                            </span>
+                                            <span
+                                                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                                                    selectedDepartment.is_active
+                                                        ? "bg-emerald-400/20 text-emerald-100"
+                                                        : "bg-slate-400/20 text-slate-200"
+                                                }`}
+                                            >
+                                                {selectedDepartment.is_active ? (
+                                                    <>
+                                                        <Activity size={12} />
+                                                        Active
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <XCircle size={12} />
+                                                        Inactive
+                                                    </>
+                                                )}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Content */}
+                            <div className="p-6">
+                                {/* Description */}
+                                {selectedDepartment.description && (
+                                    <div className="mb-6">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <FileText
+                                                size={16}
+                                                className="text-slate-400"
+                                            />
+                                            <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
+                                                Description
+                                            </h3>
+                                        </div>
+                                        <p className="text-slate-600 text-sm leading-relaxed">
+                                            {selectedDepartment.description}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Stats Grid */}
+                                <div className="grid grid-cols-3 gap-4 mb-6">
+                                    <div className="rounded-xl bg-violet-50 p-4 text-center">
+                                        <div className="flex justify-center mb-2">
+                                            <div className="h-10 w-10 rounded-lg bg-violet-100 flex items-center justify-center">
+                                                <UserCog className="h-5 w-5 text-violet-600" />
+                                            </div>
+                                        </div>
+                                        <p className="text-2xl font-bold text-violet-700">
+                                            {selectedDepartment.admins_count}
+                                        </p>
+                                        <p className="text-xs font-medium text-violet-600">
+                                            Administrators
+                                        </p>
+                                    </div>
+                                    <div className="rounded-xl bg-emerald-50 p-4 text-center">
+                                        <div className="flex justify-center mb-2">
+                                            <div className="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                                                <Users className="h-5 w-5 text-emerald-600" />
+                                            </div>
+                                        </div>
+                                        <p className="text-2xl font-bold text-emerald-700">
+                                            {selectedDepartment.teachers_count}
+                                        </p>
+                                        <p className="text-xs font-medium text-emerald-600">
+                                            Teachers
+                                        </p>
+                                    </div>
+                                    <div className="rounded-xl bg-amber-50 p-4 text-center">
+                                        <div className="flex justify-center mb-2">
+                                            <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                                                <GraduationCap className="h-5 w-5 text-amber-600" />
+                                            </div>
+                                        </div>
+                                        <p className="text-2xl font-bold text-amber-700">
+                                            {selectedDepartment.students_count}
+                                        </p>
+                                        <p className="text-xs font-medium text-amber-600">
+                                            Students
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Additional Info */}
+                                <div className="rounded-xl bg-slate-50 p-4 space-y-3">
+                                    <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-3">
+                                        Additional Information
+                                    </h3>
+                                    {selectedDepartment.created_at && (
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="flex items-center gap-2 text-slate-500">
+                                                <Calendar size={14} />
+                                                Created
+                                            </span>
+                                            <span className="font-medium text-slate-700">
+                                                {new Date(
+                                                    selectedDepartment.created_at
+                                                ).toLocaleDateString("en-US", {
+                                                    year: "numeric",
+                                                    month: "long",
+                                                    day: "numeric",
+                                                })}
+                                            </span>
+                                        </div>
+                                    )}
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="flex items-center gap-2 text-slate-500">
+                                            <Users size={14} />
+                                            Total Members
+                                        </span>
+                                        <span className="font-medium text-slate-700">
+                                            {selectedDepartment.admins_count +
+                                                selectedDepartment.teachers_count +
+                                                selectedDepartment.students_count}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Footer Actions */}
+                            <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4 bg-slate-50/50 rounded-b-2xl">
+                                <button
+                                    onClick={closeModal}
+                                    className="rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+                                >
+                                    Close
+                                </button>
+                                <div className="flex items-center gap-2">
+                                    <Link
+                                        href={route(
+                                            "superadmin.departments.edit",
+                                            selectedDepartment.id
+                                        )}
+                                        className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 transition-colors"
+                                    >
+                                        <Edit size={16} />
+                                        Edit
+                                    </Link>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

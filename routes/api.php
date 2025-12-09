@@ -28,6 +28,9 @@ Route::get('/health', function () {
 
 Route::post('login', [AuthController::class, 'login']);
 
+// Force password change for new accounts
+Route::middleware('auth:sanctum')->post('force-change-password', [AuthController::class, 'forceChangePassword']);
+
 Route::middleware('auth:sanctum')->get('student/dashboard', [\App\Http\Controllers\Api\StudentDashboardController::class, 'index']);
 Route::middleware('auth:sanctum')->get('student/performance', [\App\Http\Controllers\Api\StudentPerformanceController::class, 'index']);
 Route::middleware('auth:sanctum')->get('student/performance/{enrollment}', [\App\Http\Controllers\Api\StudentPerformanceController::class, 'show']);

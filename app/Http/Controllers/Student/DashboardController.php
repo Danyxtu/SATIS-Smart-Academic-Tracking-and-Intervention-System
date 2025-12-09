@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\Intervention;
 use App\Models\StudentNotification;
+use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -20,15 +21,31 @@ class DashboardController extends Controller
         $user = $request->user();
         $student = $user->student;
 
+        // Get current and selected semester
+        $currentSemester = SystemSetting::getCurrentSemester();
+        $selectedSemester = $request->query('semester', $currentSemester);
+        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
+
         // Get all enrollments for this student with related data
-        $enrollments = Enrollment::with([
-            'subject',
+        $allEnrollments = Enrollment::with([
+            'subject.masterSubject',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
         ])
             ->where('user_id', $user->id)
             ->get();
+
+        // Filter enrollments by semester
+        $enrollments = $allEnrollments->filter(function ($enrollment) use ($selectedSemester) {
+            $subjectSemester = $enrollment->subject?->semester;
+            // If subject has semester field, use it; otherwise default to 1
+            return $subjectSemester == $selectedSemester;
+        });
+
+        // Count enrollments per semester for navigation
+        $semester1Count = $allEnrollments->filter(fn($e) => ($e->subject?->semester ?? '1') == '1')->count();
+        $semester2Count = $allEnrollments->filter(fn($e) => ($e->subject?->semester ?? '1') == '2')->count();
 
         // Calculate overall statistics
         $totalSubjects = $enrollments->count();
@@ -190,6 +207,13 @@ class DashboardController extends Controller
             'unreadNotificationCount' => $unreadCount,
             'upcomingTasks' => $upcomingTasks,
             'gradeTrend' => $recentGrades,
+            'semesters' => [
+                'current' => (int) $currentSemester,
+                'selected' => (int) $selectedSemester,
+                'schoolYear' => $currentSchoolYear,
+                'semester1Count' => $semester1Count,
+                'semester2Count' => $semester2Count,
+            ],
         ]);
     }
 

@@ -359,12 +359,21 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                                     <div className="text-sm font-medium text-gray-900">
                                                         {s.name}
                                                     </div>
-                                                    {s.hasActiveIntervention && (
-                                                        <span className="text-xs text-green-600 flex items-center gap-1">
-                                                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-                                                            Active Intervention
+                                                    {s.hasPendingCompletionRequest && (
+                                                        <span className="text-xs text-amber-600 flex items-center gap-1">
+                                                            <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
+                                                            Pending Completion
+                                                            Request
                                                         </span>
                                                     )}
+                                                    {!s.hasPendingCompletionRequest &&
+                                                        s.hasActiveIntervention && (
+                                                            <span className="text-xs text-green-600 flex items-center gap-1">
+                                                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                                                                Active
+                                                                Intervention
+                                                            </span>
+                                                        )}
                                                 </div>
                                             </div>
                                         </td>
@@ -1223,10 +1232,19 @@ const StrategyIcons = {
 };
 
 // --- Start Intervention Modal (NEW) ---
-function StartInterventionModal({ open, onClose, enrollmentId, studentName }) {
+function StartInterventionModal({
+    open,
+    onClose,
+    enrollmentId,
+    studentName,
+    priority,
+}) {
+    // Check if student is high risk (priority is "High")
+    const isHighRisk = priority === "High";
+
     const { data, setData, post, processing, reset } = useForm({
         enrollment_id: enrollmentId,
-        type: "parent_contact",
+        type: isHighRisk ? "academic_agreement" : "parent_contact", // Default to tier 3 for high risk
         notes: "",
         tasks: [],
     });
@@ -1365,6 +1383,7 @@ function StartInterventionModal({ open, onClose, enrollmentId, studentName }) {
             emerald: "text-emerald-600",
             amber: "text-amber-600",
             red: "text-red-600",
+            gray: "text-gray-400",
         };
         return colorMap[tierColor] || "text-gray-600";
     };
@@ -1381,6 +1400,8 @@ function StartInterventionModal({ open, onClose, enrollmentId, studentName }) {
                         ? "bg-emerald-100"
                         : tierColor === "amber"
                         ? "bg-amber-100"
+                        : tierColor === "gray"
+                        ? "bg-gray-100"
                         : "bg-red-100"
                 }`}
             >
@@ -1459,20 +1480,52 @@ function StartInterventionModal({ open, onClose, enrollmentId, studentName }) {
                             {/* All Tiers in a Grid Layout */}
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                                 {/* Tier 1 Column */}
-                                <div className="bg-emerald-50/50 rounded-xl p-4 border border-emerald-100">
+                                <div
+                                    className={`rounded-xl p-4 border ${
+                                        isHighRisk
+                                            ? "bg-gray-100 border-gray-200 opacity-60"
+                                            : "bg-emerald-50/50 border-emerald-100"
+                                    }`}
+                                >
                                     <div className="flex items-center gap-2 mb-3">
-                                        <span className="w-6 h-6 rounded-full bg-emerald-500 text-white text-xs font-bold flex items-center justify-center">
+                                        <span
+                                            className={`w-6 h-6 rounded-full text-white text-xs font-bold flex items-center justify-center ${
+                                                isHighRisk
+                                                    ? "bg-gray-400"
+                                                    : "bg-emerald-500"
+                                            }`}
+                                        >
                                             1
                                         </span>
                                         <div>
-                                            <span className="text-sm font-bold text-emerald-700">
+                                            <span
+                                                className={`text-sm font-bold ${
+                                                    isHighRisk
+                                                        ? "text-gray-500"
+                                                        : "text-emerald-700"
+                                                }`}
+                                            >
                                                 Tier 1
                                             </span>
-                                            <span className="text-xs text-emerald-600 ml-1">
+                                            <span
+                                                className={`text-xs ml-1 ${
+                                                    isHighRisk
+                                                        ? "text-gray-400"
+                                                        : "text-emerald-600"
+                                                }`}
+                                            >
                                                 • Automated
                                             </span>
                                         </div>
                                     </div>
+                                    {isHighRisk && (
+                                        <div className="mb-3 p-2 bg-gray-200 rounded-lg">
+                                            <p className="text-xs text-gray-500 text-center font-medium">
+                                                Not available for high-risk
+                                                students
+                                            </p>
+                                        </div>
+                                    )}
                                     <div className="space-y-2">
                                         {Object.entries(interventionStrategies)
                                             .filter(([_, s]) => s.tier === 1)
@@ -1480,44 +1533,56 @@ function StartInterventionModal({ open, onClose, enrollmentId, studentName }) {
                                                 <button
                                                     key={key}
                                                     type="button"
+                                                    disabled={isHighRisk}
                                                     onClick={() =>
+                                                        !isHighRisk &&
                                                         setData("type", key)
                                                     }
-                                                    className={`relative w-full p-3 rounded-lg border-2 text-left transition-all hover:shadow-md ${
-                                                        data.type === key
+                                                    className={`relative w-full p-3 rounded-lg border-2 text-left transition-all ${
+                                                        isHighRisk
+                                                            ? "border-transparent bg-gray-50 cursor-not-allowed grayscale"
+                                                            : data.type === key
                                                             ? "border-indigo-500 bg-white ring-2 ring-indigo-200 shadow-md"
-                                                            : "border-transparent bg-white/80 hover:bg-white hover:border-emerald-200"
+                                                            : "border-transparent bg-white/80 hover:bg-white hover:border-emerald-200 hover:shadow-md"
                                                     }`}
                                                 >
                                                     <div className="flex items-center gap-3">
                                                         {renderIcon(
                                                             strategy.iconKey,
-                                                            strategy.tierColor,
-                                                            data.type === key
+                                                            isHighRisk
+                                                                ? "gray"
+                                                                : strategy.tierColor,
+                                                            !isHighRisk &&
+                                                                data.type ===
+                                                                    key
                                                         )}
                                                         <p
                                                             className={`font-medium text-sm flex-1 ${
-                                                                data.type ===
-                                                                key
+                                                                isHighRisk
+                                                                    ? "text-gray-400"
+                                                                    : data.type ===
+                                                                      key
                                                                     ? "text-indigo-900"
                                                                     : "text-gray-700"
                                                             }`}
                                                         >
                                                             {strategy.label}
                                                         </p>
-                                                        {data.type === key && (
-                                                            <svg
-                                                                className="w-5 h-5 text-indigo-600 flex-shrink-0"
-                                                                fill="currentColor"
-                                                                viewBox="0 0 20 20"
-                                                            >
-                                                                <path
-                                                                    fillRule="evenodd"
-                                                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                                                    clipRule="evenodd"
-                                                                />
-                                                            </svg>
-                                                        )}
+                                                        {!isHighRisk &&
+                                                            data.type ===
+                                                                key && (
+                                                                <svg
+                                                                    className="w-5 h-5 text-indigo-600 flex-shrink-0"
+                                                                    fill="currentColor"
+                                                                    viewBox="0 0 20 20"
+                                                                >
+                                                                    <path
+                                                                        fillRule="evenodd"
+                                                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                                                        clipRule="evenodd"
+                                                                    />
+                                                                </svg>
+                                                            )}
                                                     </div>
                                                 </button>
                                             ))}
@@ -1525,20 +1590,52 @@ function StartInterventionModal({ open, onClose, enrollmentId, studentName }) {
                                 </div>
 
                                 {/* Tier 2 Column */}
-                                <div className="bg-amber-50/50 rounded-xl p-4 border border-amber-100">
+                                <div
+                                    className={`rounded-xl p-4 border ${
+                                        isHighRisk
+                                            ? "bg-gray-100 border-gray-200 opacity-60"
+                                            : "bg-amber-50/50 border-amber-100"
+                                    }`}
+                                >
                                     <div className="flex items-center gap-2 mb-3">
-                                        <span className="w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center">
+                                        <span
+                                            className={`w-6 h-6 rounded-full text-white text-xs font-bold flex items-center justify-center ${
+                                                isHighRisk
+                                                    ? "bg-gray-400"
+                                                    : "bg-amber-500"
+                                            }`}
+                                        >
                                             2
                                         </span>
                                         <div>
-                                            <span className="text-sm font-bold text-amber-700">
+                                            <span
+                                                className={`text-sm font-bold ${
+                                                    isHighRisk
+                                                        ? "text-gray-500"
+                                                        : "text-amber-700"
+                                                }`}
+                                            >
                                                 Tier 2
                                             </span>
-                                            <span className="text-xs text-amber-600 ml-1">
+                                            <span
+                                                className={`text-xs ml-1 ${
+                                                    isHighRisk
+                                                        ? "text-gray-400"
+                                                        : "text-amber-600"
+                                                }`}
+                                            >
                                                 • Teacher Led
                                             </span>
                                         </div>
                                     </div>
+                                    {isHighRisk && (
+                                        <div className="mb-3 p-2 bg-gray-200 rounded-lg">
+                                            <p className="text-xs text-gray-500 text-center font-medium">
+                                                Not available for high-risk
+                                                students
+                                            </p>
+                                        </div>
+                                    )}
                                     <div className="space-y-2">
                                         {Object.entries(interventionStrategies)
                                             .filter(([_, s]) => s.tier === 2)
@@ -1546,44 +1643,56 @@ function StartInterventionModal({ open, onClose, enrollmentId, studentName }) {
                                                 <button
                                                     key={key}
                                                     type="button"
+                                                    disabled={isHighRisk}
                                                     onClick={() =>
+                                                        !isHighRisk &&
                                                         setData("type", key)
                                                     }
-                                                    className={`relative w-full p-3 rounded-lg border-2 text-left transition-all hover:shadow-md ${
-                                                        data.type === key
+                                                    className={`relative w-full p-3 rounded-lg border-2 text-left transition-all ${
+                                                        isHighRisk
+                                                            ? "border-transparent bg-gray-50 cursor-not-allowed grayscale"
+                                                            : data.type === key
                                                             ? "border-indigo-500 bg-white ring-2 ring-indigo-200 shadow-md"
-                                                            : "border-transparent bg-white/80 hover:bg-white hover:border-amber-200"
+                                                            : "border-transparent bg-white/80 hover:bg-white hover:border-amber-200 hover:shadow-md"
                                                     }`}
                                                 >
                                                     <div className="flex items-center gap-3">
                                                         {renderIcon(
                                                             strategy.iconKey,
-                                                            strategy.tierColor,
-                                                            data.type === key
+                                                            isHighRisk
+                                                                ? "gray"
+                                                                : strategy.tierColor,
+                                                            !isHighRisk &&
+                                                                data.type ===
+                                                                    key
                                                         )}
                                                         <p
                                                             className={`font-medium text-sm flex-1 ${
-                                                                data.type ===
-                                                                key
+                                                                isHighRisk
+                                                                    ? "text-gray-400"
+                                                                    : data.type ===
+                                                                      key
                                                                     ? "text-indigo-900"
                                                                     : "text-gray-700"
                                                             }`}
                                                         >
                                                             {strategy.label}
                                                         </p>
-                                                        {data.type === key && (
-                                                            <svg
-                                                                className="w-5 h-5 text-indigo-600 flex-shrink-0"
-                                                                fill="currentColor"
-                                                                viewBox="0 0 20 20"
-                                                            >
-                                                                <path
-                                                                    fillRule="evenodd"
-                                                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                                                    clipRule="evenodd"
-                                                                />
-                                                            </svg>
-                                                        )}
+                                                        {!isHighRisk &&
+                                                            data.type ===
+                                                                key && (
+                                                                <svg
+                                                                    className="w-5 h-5 text-indigo-600 flex-shrink-0"
+                                                                    fill="currentColor"
+                                                                    viewBox="0 0 20 20"
+                                                                >
+                                                                    <path
+                                                                        fillRule="evenodd"
+                                                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                                                        clipRule="evenodd"
+                                                                    />
+                                                                </svg>
+                                                            )}
                                                     </div>
                                                 </button>
                                             ))}
@@ -1591,12 +1700,18 @@ function StartInterventionModal({ open, onClose, enrollmentId, studentName }) {
                                 </div>
 
                                 {/* Tier 3 Column */}
-                                <div className="bg-red-50/50 rounded-xl p-4 border border-red-100">
+                                <div
+                                    className={`rounded-xl p-4 border ${
+                                        isHighRisk
+                                            ? "bg-red-50 border-red-300 ring-2 ring-red-200"
+                                            : "bg-red-50/50 border-red-100"
+                                    }`}
+                                >
                                     <div className="flex items-center gap-2 mb-3">
                                         <span className="w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
                                             3
                                         </span>
-                                        <div>
+                                        <div className="flex-1">
                                             <span className="text-sm font-bold text-red-700">
                                                 Tier 3
                                             </span>
@@ -1604,7 +1719,20 @@ function StartInterventionModal({ open, onClose, enrollmentId, studentName }) {
                                                 • Intensive
                                             </span>
                                         </div>
+                                        {isHighRisk && (
+                                            <span className="px-2 py-0.5 bg-red-600 text-white text-xs font-bold rounded-full animate-pulse">
+                                                REQUIRED
+                                            </span>
+                                        )}
                                     </div>
+                                    {isHighRisk && (
+                                        <div className="mb-3 p-2 bg-red-100 border border-red-200 rounded-lg">
+                                            <p className="text-xs text-red-700 text-center font-medium">
+                                                ⚠️ High-risk student requires
+                                                intensive intervention
+                                            </p>
+                                        </div>
+                                    )}
                                     <div className="space-y-2">
                                         {Object.entries(interventionStrategies)
                                             .filter(([_, s]) => s.tier === 3)
@@ -1949,12 +2077,59 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
     // NEW: State for Intervention Modal
     const [isInterventionModalOpen, setIsInterventionModalOpen] =
         useState(false);
+    // NEW: State for completion approval modal
+    const [showApprovalModal, setShowApprovalModal] = useState(false);
+    const [showRejectModal, setShowRejectModal] = useState(false);
+    const [approvalNotes, setApprovalNotes] = useState("");
+    const [rejectionReason, setRejectionReason] = useState("");
+    const [isProcessing, setIsProcessing] = useState(false);
 
     useEffect(() => {
         if (studentData) {
             setStudent({ ...studentData });
         }
     }, [studentData]);
+
+    // Get pending completion request from studentData
+    const pendingRequest = studentData?.pendingCompletionRequest || null;
+
+    const handleApproveCompletion = () => {
+        if (!pendingRequest) return;
+        setIsProcessing(true);
+        router.post(
+            route("teacher.interventions.approve", {
+                intervention: pendingRequest.interventionId,
+            }),
+            { notes: approvalNotes },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setShowApprovalModal(false);
+                    setApprovalNotes("");
+                },
+                onFinish: () => setIsProcessing(false),
+            }
+        );
+    };
+
+    const handleRejectCompletion = () => {
+        if (!pendingRequest || !rejectionReason.trim()) return;
+        setIsProcessing(true);
+        router.post(
+            route("teacher.interventions.reject", {
+                intervention: pendingRequest.interventionId,
+            }),
+            { reason: rejectionReason },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setShowRejectModal(false);
+                    setRejectionReason("");
+                },
+                onFinish: () => setIsProcessing(false),
+            }
+        );
+    };
 
     const handleAddFeedback = (message) => {
         const newFeedback = {
@@ -2070,6 +2245,93 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                     </div>
                 </div>
             </div>
+
+            {/* Pending Completion Request Banner */}
+            {pendingRequest && (
+                <div className="mt-6 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-xl p-5 shadow-md">
+                    <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-6 w-6 text-amber-600"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                            >
+                                <path
+                                    fillRule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                                    clipRule="evenodd"
+                                />
+                            </svg>
+                        </div>
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                                <h3 className="font-bold text-amber-800">
+                                    Pending Completion Request
+                                </h3>
+                                <span className="px-2 py-0.5 bg-amber-200 text-amber-800 text-xs font-semibold rounded-full">
+                                    {pendingRequest.typeLabel}
+                                </span>
+                            </div>
+                            <p className="text-sm text-amber-700 mb-2">
+                                {student.name} has requested to mark their Tier
+                                3 intervention as complete.
+                            </p>
+                            {pendingRequest.requestNotes && (
+                                <div className="bg-white/60 rounded-lg p-3 mb-3">
+                                    <p className="text-xs font-medium text-amber-600 mb-1">
+                                        Student's Notes:
+                                    </p>
+                                    <p className="text-sm text-gray-700">
+                                        "{pendingRequest.requestNotes}"
+                                    </p>
+                                </div>
+                            )}
+                            <p className="text-xs text-amber-600 mb-3">
+                                Requested on {pendingRequest.requestedAt}
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowApprovalModal(true)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors shadow-sm"
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        className="h-4 w-4"
+                                        viewBox="0 0 20 20"
+                                        fill="currentColor"
+                                    >
+                                        <path
+                                            fillRule="evenodd"
+                                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                            clipRule="evenodd"
+                                        />
+                                    </svg>
+                                    Approve Completion
+                                </button>
+                                <button
+                                    onClick={() => setShowRejectModal(true)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-white border border-red-300 text-red-600 rounded-lg hover:bg-red-50 font-medium transition-colors"
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        className="h-4 w-4"
+                                        viewBox="0 0 20 20"
+                                        fill="currentColor"
+                                    >
+                                        <path
+                                            fillRule="evenodd"
+                                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                            clipRule="evenodd"
+                                        />
+                                    </svg>
+                                    Reject
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Vitals */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mt-6">
@@ -2430,7 +2692,225 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                 onClose={() => setIsInterventionModalOpen(false)}
                 enrollmentId={enrollmentId}
                 studentName={student.name}
+                priority={student.priority}
             />
+
+            {/* Approval Modal */}
+            {showApprovalModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                        <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-4">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-5 w-5"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                >
+                                    <path
+                                        fillRule="evenodd"
+                                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                        clipRule="evenodd"
+                                    />
+                                </svg>
+                                Approve Completion
+                            </h3>
+                            <p className="text-green-100 text-sm">
+                                {student.name}'s intervention
+                            </p>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-gray-600 text-sm mb-4">
+                                You are about to approve this student's Tier 3
+                                intervention completion request. This will mark
+                                the intervention as completed.
+                            </p>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Notes for the student (optional)
+                                </label>
+                                <textarea
+                                    value={approvalNotes}
+                                    onChange={(e) =>
+                                        setApprovalNotes(e.target.value)
+                                    }
+                                    placeholder="Add any congratulatory message or feedback..."
+                                    className="w-full border border-gray-300 rounded-xl p-3 text-sm resize-none h-24 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                    maxLength={1000}
+                                />
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowApprovalModal(false);
+                                        setApprovalNotes("");
+                                    }}
+                                    className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleApproveCompletion}
+                                    disabled={isProcessing}
+                                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    {isProcessing ? (
+                                        <>
+                                            <svg
+                                                className="animate-spin h-4 w-4"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <circle
+                                                    className="opacity-25"
+                                                    cx="12"
+                                                    cy="12"
+                                                    r="10"
+                                                    stroke="currentColor"
+                                                    strokeWidth="4"
+                                                    fill="none"
+                                                />
+                                                <path
+                                                    className="opacity-75"
+                                                    fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                                />
+                                            </svg>
+                                            Approving...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                className="h-4 w-4"
+                                                viewBox="0 0 20 20"
+                                                fill="currentColor"
+                                            >
+                                                <path
+                                                    fillRule="evenodd"
+                                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                                    clipRule="evenodd"
+                                                />
+                                            </svg>
+                                            Approve
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Rejection Modal */}
+            {showRejectModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                        <div className="bg-gradient-to-r from-red-500 to-rose-600 px-6 py-4">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-5 w-5"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                >
+                                    <path
+                                        fillRule="evenodd"
+                                        d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                        clipRule="evenodd"
+                                    />
+                                </svg>
+                                Reject Completion Request
+                            </h3>
+                            <p className="text-red-100 text-sm">
+                                {student.name}'s intervention
+                            </p>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-gray-600 text-sm mb-4">
+                                Please provide a reason for rejecting this
+                                completion request. The student will be able to
+                                submit a new request after addressing your
+                                feedback.
+                            </p>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Reason for rejection{" "}
+                                    <span className="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    value={rejectionReason}
+                                    onChange={(e) =>
+                                        setRejectionReason(e.target.value)
+                                    }
+                                    placeholder="Explain what the student needs to complete or improve..."
+                                    className="w-full border border-gray-300 rounded-xl p-3 text-sm resize-none h-24 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                    maxLength={1000}
+                                    required
+                                />
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowRejectModal(false);
+                                        setRejectionReason("");
+                                    }}
+                                    className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleRejectCompletion}
+                                    disabled={
+                                        isProcessing || !rejectionReason.trim()
+                                    }
+                                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-xl hover:from-red-600 hover:to-rose-700 font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isProcessing ? (
+                                        <>
+                                            <svg
+                                                className="animate-spin h-4 w-4"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <circle
+                                                    className="opacity-25"
+                                                    cx="12"
+                                                    cy="12"
+                                                    r="10"
+                                                    stroke="currentColor"
+                                                    strokeWidth="4"
+                                                    fill="none"
+                                                />
+                                                <path
+                                                    className="opacity-75"
+                                                    fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                                />
+                                            </svg>
+                                            Rejecting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                className="h-4 w-4"
+                                                viewBox="0 0 20 20"
+                                                fill="currentColor"
+                                            >
+                                                <path
+                                                    fillRule="evenodd"
+                                                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                                    clipRule="evenodd"
+                                                />
+                                            </svg>
+                                            Reject Request
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

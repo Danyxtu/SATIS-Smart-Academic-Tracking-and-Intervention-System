@@ -18,6 +18,7 @@ class Subject extends Model
         'name',
         'room_number',
         'school_year',
+        'semester',
         'grade_level',
         'section',
         'strand',

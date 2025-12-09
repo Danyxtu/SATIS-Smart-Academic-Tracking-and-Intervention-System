@@ -12,6 +12,7 @@ import {
     RefreshCw,
     CheckCircle2,
 } from "lucide-react";
+import SemesterNavigation from "@/Components/SemesterNavigation";
 
 // --- Helper function for color-coding ---
 const getGradeStyles = (grade) => {
@@ -152,7 +153,7 @@ const SubjectGradeCard = ({
 };
 
 // --- Main Page Component ---
-const AnalyticsIndex = ({ subjects = [], stats = {} }) => {
+const AnalyticsIndex = ({ subjects = [], stats = {}, semesters = {} }) => {
     const hasSubjects = subjects && subjects.length > 0;
 
     const handleRefresh = () => {
@@ -163,7 +164,7 @@ const AnalyticsIndex = ({ subjects = [], stats = {} }) => {
         <AuthenticatedLayout>
             <Head title="Performance Analytics" />
 
-            <div className="max-w-7xl mx-auto space-y-8">
+            <div className="max-w-7xl mx-auto space-y-6">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-3">
@@ -178,6 +179,14 @@ const AnalyticsIndex = ({ subjects = [], stats = {} }) => {
                         Refresh
                     </button>
                 </div>
+
+                {/* Semester Navigation */}
+                <SemesterNavigation
+                    currentSemester={semesters.current || 1}
+                    schoolYear={semesters.schoolYear || ""}
+                    semester1Count={semesters.semester1Count || 0}
+                    semester2Count={semesters.semester2Count || 0}
+                />
 
                 {/* Stats Summary */}
                 {hasSubjects && (

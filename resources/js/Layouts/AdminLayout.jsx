@@ -15,6 +15,8 @@ import {
     Shield,
     Settings,
     Key,
+    Building2,
+    UserPlus,
 } from "lucide-react";
 
 export default function AdminLayout({ children }) {
@@ -35,6 +37,12 @@ export default function AdminLayout({ children }) {
             label: "User Management",
             destination: "admin.users.index",
             activeCheck: "admin.users.*",
+        },
+        {
+            icon: <UserPlus size={18} />,
+            label: "Teacher Registrations",
+            destination: "admin.teacher-registrations.index",
+            activeCheck: "admin.teacher-registrations.*",
         },
         {
             icon: <Key size={18} />,
@@ -185,13 +193,27 @@ export default function AdminLayout({ children }) {
                                             <div className="font-medium text-sm text-gray-500 dark:text-gray-400">
                                                 {auth.user.email}
                                             </div>
-                                            <span className="mt-1 inline-flex items-center px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded-full">
-                                                <Shield
-                                                    size={10}
-                                                    className="mr-1"
-                                                />
-                                                Administrator
-                                            </span>
+                                            <div className="mt-2 flex flex-col gap-1">
+                                                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded-full w-fit">
+                                                    <Shield
+                                                        size={10}
+                                                        className="mr-1"
+                                                    />
+                                                    Administrator
+                                                </span>
+                                                {auth.user.department && (
+                                                    <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full w-fit">
+                                                        <Building2
+                                                            size={10}
+                                                            className="mr-1"
+                                                        />
+                                                        {
+                                                            auth.user.department
+                                                                .name
+                                                        }
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                         <Dropdown.Link
                                             href={route("profile.edit")}
@@ -282,10 +304,18 @@ export default function AdminLayout({ children }) {
                             <div className="font-medium text-sm text-gray-500">
                                 {auth.user.email}
                             </div>
-                            <span className="mt-1 inline-flex items-center px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded-full">
-                                <Shield size={10} className="mr-1" />
-                                Administrator
-                            </span>
+                            <div className="mt-2 flex flex-col gap-1">
+                                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded-full w-fit">
+                                    <Shield size={10} className="mr-1" />
+                                    Administrator
+                                </span>
+                                {auth.user.department && (
+                                    <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full w-fit">
+                                        <Building2 size={10} className="mr-1" />
+                                        {auth.user.department.name}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                         <div className="mt-3 space-y-1">
                             <ResponsiveNavLink href={route("profile.edit")}>

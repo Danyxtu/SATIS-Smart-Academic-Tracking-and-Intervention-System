@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\Intervention;
 use App\Models\StudentNotification;
+use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 
 class StudentDashboardController extends Controller
@@ -18,7 +19,13 @@ class StudentDashboardController extends Controller
         $user = $request->user();
         $student = $user->student;
 
-        $enrollments = Enrollment::with([
+        // Get current and selected semester
+        $currentSemester = SystemSetting::getCurrentSemester();
+        $selectedSemester = $request->query('semester', $currentSemester);
+        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
+
+        // Get all enrollments for this student with related data
+        $allEnrollments = Enrollment::with([
             'subject',
             'grades',
             'attendanceRecords',
@@ -26,6 +33,16 @@ class StudentDashboardController extends Controller
         ])
             ->where('user_id', $user->id)
             ->get();
+
+        // Filter enrollments by semester
+        $enrollments = $allEnrollments->filter(function ($enrollment) use ($selectedSemester) {
+            $subjectSemester = $enrollment->subject?->semester;
+            return $subjectSemester == $selectedSemester;
+        });
+
+        // Count enrollments per semester for navigation
+        $semester1Count = $allEnrollments->filter(fn($e) => ($e->subject?->semester ?? '1') == '1')->count();
+        $semester2Count = $allEnrollments->filter(fn($e) => ($e->subject?->semester ?? '1') == '2')->count();
 
         $totalSubjects = $enrollments->count();
 
@@ -178,6 +195,13 @@ class StudentDashboardController extends Controller
             'unreadNotificationCount' => $unreadCount,
             'upcomingTasks' => $upcomingTasks,
             'gradeTrend' => $recentGrades,
+            'semesters' => [
+                'current' => (int) $currentSemester,
+                'selected' => (int) $selectedSemester,
+                'schoolYear' => $currentSchoolYear,
+                'semester1Count' => $semester1Count,
+                'semester2Count' => $semester2Count,
+            ],
         ]);
     }
 }

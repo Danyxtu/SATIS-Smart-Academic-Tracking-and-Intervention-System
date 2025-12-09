@@ -206,6 +206,9 @@ const TaskItem = ({ task }) => {
 // --- Intervention Card Component ---
 const InterventionCard = ({ intervention }) => {
     const [isExpanded, setIsExpanded] = useState(true);
+    const [showCompletionModal, setShowCompletionModal] = useState(false);
+    const [completionNotes, setCompletionNotes] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const gradeColor =
         intervention.currentGrade !== null
@@ -223,6 +226,24 @@ const InterventionCard = ({ intervention }) => {
             ? "yellow"
             : "green";
 
+    const handleRequestCompletion = () => {
+        setIsSubmitting(true);
+        router.post(
+            route("interventions.request-completion", {
+                intervention: intervention.id,
+            }),
+            { notes: completionNotes },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setShowCompletionModal(false);
+                    setCompletionNotes("");
+                },
+                onFinish: () => setIsSubmitting(false),
+            }
+        );
+    };
+
     return (
         <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
             {/* Header */}
@@ -234,6 +255,11 @@ const InterventionCard = ({ intervention }) => {
                                 {intervention.subjectName}
                             </h3>
                             <StatusBadge status={intervention.status} />
+                            {intervention.isTier3 && (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+                                    Tier 3
+                                </span>
+                            )}
                         </div>
                         {intervention.subjectSection && (
                             <p className="text-xs text-gray-500 mt-0.5">
@@ -259,6 +285,41 @@ const InterventionCard = ({ intervention }) => {
                     </span>
                 </div>
             </div>
+
+            {/* Completion Status Banner for Tier 3 */}
+            {intervention.isTier3 && intervention.isPendingApproval && (
+                <div className="bg-yellow-50 border-b border-yellow-200 px-5 py-3">
+                    <div className="flex items-center gap-2 text-yellow-700">
+                        <Clock size={16} className="animate-pulse" />
+                        <p className="text-sm font-medium">
+                            Completion request pending teacher approval
+                        </p>
+                    </div>
+                    {intervention.completionRequestNotes && (
+                        <p className="text-xs text-yellow-600 mt-1 pl-6">
+                            Your notes: "{intervention.completionRequestNotes}"
+                        </p>
+                    )}
+                </div>
+            )}
+
+            {intervention.isTier3 &&
+                intervention.rejectedAt &&
+                !intervention.completionRequestedAt && (
+                    <div className="bg-red-50 border-b border-red-200 px-5 py-3">
+                        <div className="flex items-center gap-2 text-red-700">
+                            <AlertCircle size={16} />
+                            <p className="text-sm font-medium">
+                                Previous completion request was not approved
+                            </p>
+                        </div>
+                        {intervention.rejectionReason && (
+                            <p className="text-xs text-red-600 mt-1 pl-6">
+                                Reason: "{intervention.rejectionReason}"
+                            </p>
+                        )}
+                    </div>
+                )}
 
             {/* Content */}
             <div className="p-5">
@@ -344,7 +405,114 @@ const InterventionCard = ({ intervention }) => {
                         No action plan assigned yet.
                     </p>
                 )}
+
+                {/* Tier 3 Completion Request Button */}
+                {intervention.isTier3 && intervention.canRequestCompletion && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                        <button
+                            onClick={() => setShowCompletionModal(true)}
+                            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-3 rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all font-medium shadow-lg shadow-green-200"
+                        >
+                            <CheckCircle2 size={18} />
+                            Request Intervention Completion
+                        </button>
+                        <p className="text-xs text-gray-500 text-center mt-2">
+                            Your teacher will review and approve your completion
+                            request
+                        </p>
+                    </div>
+                )}
+
+                {/* Completed Badge */}
+                {intervention.status === "completed" &&
+                    intervention.approvedAt && (
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                                <div className="flex items-center gap-2 text-green-700">
+                                    <CheckCircle2 size={20} />
+                                    <p className="font-semibold">
+                                        Intervention Completed!
+                                    </p>
+                                </div>
+                                <p className="text-sm text-green-600 mt-1">
+                                    Approved on {intervention.approvedAt}
+                                </p>
+                            </div>
+                        </div>
+                    )}
             </div>
+
+            {/* Completion Request Modal */}
+            {showCompletionModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                        <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-4">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <CheckCircle2 size={20} />
+                                Request Completion
+                            </h3>
+                            <p className="text-green-100 text-sm">
+                                {intervention.subjectName}
+                            </p>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-gray-600 text-sm mb-4">
+                                You're requesting to mark this Tier 3
+                                intervention as complete. Your teacher will
+                                review and approve your request.
+                            </p>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Notes for your teacher (optional)
+                                </label>
+                                <textarea
+                                    value={completionNotes}
+                                    onChange={(e) =>
+                                        setCompletionNotes(e.target.value)
+                                    }
+                                    placeholder="Describe what you've accomplished or any additional information..."
+                                    className="w-full border border-gray-300 rounded-xl p-3 text-sm resize-none h-24 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                    maxLength={1000}
+                                />
+                                <p className="text-xs text-gray-400 text-right mt-1">
+                                    {completionNotes.length}/1000
+                                </p>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowCompletionModal(false);
+                                        setCompletionNotes("");
+                                    }}
+                                    className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleRequestCompletion}
+                                    disabled={isSubmitting}
+                                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    {isSubmitting ? (
+                                        <>
+                                            <Loader2
+                                                size={16}
+                                                className="animate-spin"
+                                            />
+                                            Submitting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircle2 size={16} />
+                                            Submit Request
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -1,263 +1,330 @@
 import { useState } from "react";
+import ApplicationLogo from "@/Components/ApplicationLogo";
+import Dropdown from "@/Components/Dropdown";
+import NavLink from "@/Components/NavLink";
+import ResponsiveNavLink from "@/Components/ResponsiveNavLink";
+import DarkModeToggle from "@/Components/DarkModeToggle";
 import { Link, usePage } from "@inertiajs/react";
+import UserPicture from "../../assets/user.png";
 import {
-    LayoutDashboard,
-    Building2,
-    Users,
-    BookOpen,
-    Settings,
-    ChevronDown,
+    House,
+    LogOut,
     Menu,
     X,
-    LogOut,
-    User,
-    Bell,
+    Users,
     Shield,
-    Sparkles,
+    Settings,
+    Building2,
+    BookOpen,
 } from "lucide-react";
 
-const navigation = [
-    {
-        name: "Dashboard",
-        href: route("superadmin.dashboard"),
-        icon: LayoutDashboard,
-    },
-    {
-        name: "Departments",
-        href: route("superadmin.departments.index"),
-        icon: Building2,
-    },
-    {
-        name: "Admins",
-        href: route("superadmin.admins.index"),
-        icon: Users,
-    },
-    {
-        name: "Curriculum",
-        href: route("superadmin.curriculum.index"),
-        icon: BookOpen,
-    },
-    {
-        name: "Settings",
-        href: route("superadmin.settings.index"),
-        icon: Settings,
-    },
-];
-
 export default function SuperAdminLayout({ children }) {
-    const { auth } = usePage().props;
-    const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [userMenuOpen, setUserMenuOpen] = useState(false);
+    const { auth, flash } = usePage().props;
+    const [showingNavigationDropdown, setShowingNavigationDropdown] =
+        useState(false);
 
-    const currentPath = window.location.pathname;
-
-    const isActive = (href) => {
-        const url = new URL(href, window.location.origin);
-        return currentPath.startsWith(url.pathname);
-    };
+    // Super Admin Navigation Items
+    const menuItems = [
+        {
+            icon: <House size={18} />,
+            label: "Dashboard",
+            destination: "superadmin.dashboard",
+            activeCheck: "superadmin.dashboard",
+        },
+        {
+            icon: <Building2 size={18} />,
+            label: "Departments",
+            destination: "superadmin.departments.index",
+            activeCheck: "superadmin.departments.*",
+        },
+        {
+            icon: <Users size={18} />,
+            label: "Admins",
+            destination: "superadmin.admins.index",
+            activeCheck: "superadmin.admins.*",
+        },
+        {
+            icon: <BookOpen size={18} />,
+            label: "Curriculum",
+            destination: "superadmin.curriculum.index",
+            activeCheck: "superadmin.curriculum.*",
+        },
+        {
+            icon: <Settings size={18} />,
+            label: "Settings",
+            destination: "superadmin.settings.index",
+            activeCheck: "superadmin.settings.*",
+        },
+    ];
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
-            {/* Mobile sidebar backdrop */}
-            {sidebarOpen && (
-                <div
-                    className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm lg:hidden"
-                    onClick={() => setSidebarOpen(false)}
-                />
-            )}
-
-            {/* Sidebar */}
-            <aside
-                className={`fixed inset-y-0 left-0 z-50 w-72 transform bg-gradient-to-b from-slate-900 via-slate-900 to-slate-800 transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-                    sidebarOpen ? "translate-x-0" : "-translate-x-full"
-                }`}
-            >
-                <div className="flex h-full flex-col">
-                    {/* Logo Section */}
-                    <div className="flex h-20 items-center justify-between px-5 border-b border-slate-700/50">
-                        <Link
-                            href={route("superadmin.dashboard")}
-                            className="flex items-center gap-3 group"
+        <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+            {/* Flash Messages */}
+            {flash?.success && (
+                <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg animate-fade-in-down">
+                    <div className="flex items-center gap-2">
+                        <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
                         >
-                            <div className="relative">
-                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-indigo-500/30 group-hover:shadow-indigo-500/50 transition-all duration-300">
-                                    <Shield className="h-6 w-6 text-white" />
-                                </div>
-                                <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-400 border-2 border-slate-900 animate-pulse" />
-                            </div>
-                            <div>
-                                <span className="text-lg font-bold text-white tracking-tight">
-                                    SATIS
-                                </span>
-                                <p className="text-[10px] text-slate-400 font-medium tracking-wide uppercase">
-                                    Super Admin Panel
-                                </p>
-                            </div>
-                        </Link>
-                        <button
-                            onClick={() => setSidebarOpen(false)}
-                            className="rounded-lg p-2 text-slate-400 hover:bg-slate-700/50 hover:text-white lg:hidden transition-colors"
-                        >
-                            <X size={20} />
-                        </button>
-                    </div>
-
-                    {/* Navigation */}
-                    <nav className="flex-1 space-y-1.5 px-4 py-6 overflow-y-auto">
-                        <p className="px-3 mb-3 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            Main Menu
-                        </p>
-                        {navigation.map((item) => {
-                            const Icon = item.icon;
-                            const active = isActive(item.href);
-                            return (
-                                <Link
-                                    key={item.name}
-                                    href={item.href}
-                                    className={`group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
-                                        active
-                                            ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/25"
-                                            : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
-                                    }`}
-                                >
-                                    <div
-                                        className={`p-1 rounded-lg transition-colors ${
-                                            active
-                                                ? "bg-white/20"
-                                                : "bg-slate-800/50 group-hover:bg-slate-700/50"
-                                        }`}
-                                    >
-                                        <Icon size={18} />
-                                    </div>
-                                    {item.name}
-                                    {active && (
-                                        <Sparkles
-                                            size={14}
-                                            className="ml-auto text-blue-200"
-                                        />
-                                    )}
-                                </Link>
-                            );
-                        })}
-                    </nav>
-
-                    {/* User section */}
-                    <div className="border-t border-slate-700/50 p-4">
-                        <div className="rounded-xl bg-slate-800/50 p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="relative">
-                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-semibold">
-                                        {auth.user?.name
-                                            ?.charAt(0)
-                                            .toUpperCase() || "U"}
-                                    </div>
-                                    <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-emerald-400 border-2 border-slate-800" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="truncate text-sm font-semibold text-white">
-                                        {auth.user?.name}
-                                    </p>
-                                    <p className="truncate text-xs text-slate-400 flex items-center gap-1">
-                                        <Shield size={10} />
-                                        Super Administrator
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M5 13l4 4L19 7"
+                            />
+                        </svg>
+                        {flash.success}
                     </div>
                 </div>
-            </aside>
-
-            {/* Main content */}
-            <div className="lg:pl-72">
-                {/* Top navbar */}
-                <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white/80 backdrop-blur-md px-4 lg:px-8">
-                    <div className="flex items-center gap-4">
-                        <button
-                            onClick={() => setSidebarOpen(true)}
-                            className="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 lg:hidden transition-colors"
+            )}
+            {flash?.error && (
+                <div className="fixed top-4 right-4 z-50 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg animate-fade-in-down">
+                    <div className="flex items-center gap-2">
+                        <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
                         >
-                            <Menu size={22} />
-                        </button>
-                        <div className="hidden md:block">
-                            <h2 className="text-sm font-medium text-slate-600">
-                                Welcome back,
-                            </h2>
-                            <p className="text-lg font-semibold text-slate-900">
-                                {auth.user?.name}
-                            </p>
-                        </div>
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                            />
+                        </svg>
+                        {flash.error}
                     </div>
+                </div>
+            )}
 
-                    <div className="flex items-center gap-3">
-                        {/* Notifications */}
-                        <button className="relative rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 transition-colors">
-                            <Bell size={20} />
-                            <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-rose-500" />
-                        </button>
-
-                        {/* User dropdown */}
-                        <div className="relative">
-                            <button
-                                onClick={() => setUserMenuOpen(!userMenuOpen)}
-                                className="flex items-center gap-3 rounded-xl p-2 pr-3 text-slate-700 hover:bg-slate-100 transition-colors"
-                            >
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-medium text-sm">
-                                    {auth.user?.name?.charAt(0).toUpperCase() ||
-                                        "U"}
+            {/* Top Navigation Bar */}
+            <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 z-40">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex justify-between h-16">
+                        {/* Logo & Main Nav Links */}
+                        <div className="flex">
+                            {/* Logo */}
+                            <div className="flex-shrink-0 flex items-center">
+                                <Link href={route("superadmin.dashboard")}>
+                                    <ApplicationLogo className="block h-10 w-auto fill-current text-gray-800" />
+                                </Link>
+                                <div className="ml-3 hidden sm:flex items-center">
+                                    <span className="font-semibold text-xl text-gray-700 dark:text-gray-200">
+                                        SATIS
+                                    </span>
+                                    <span className="ml-2 px-2 py-0.5 text-xs font-bold bg-indigo-100 text-indigo-700 rounded-full flex items-center gap-1">
+                                        <Shield size={12} />
+                                        Super Admin
+                                    </span>
                                 </div>
-                                <span className="hidden text-sm font-medium md:block">
-                                    {auth.user?.name?.split(" ")[0]}
-                                </span>
-                                <ChevronDown
-                                    size={16}
-                                    className={`transition-transform ${
-                                        userMenuOpen ? "rotate-180" : ""
-                                    }`}
-                                />
-                            </button>
+                            </div>
 
-                            {userMenuOpen && (
-                                <>
-                                    <div
-                                        className="fixed inset-0 z-40"
-                                        onClick={() => setUserMenuOpen(false)}
-                                    />
-                                    <div className="absolute right-0 z-50 mt-2 w-56 rounded-xl bg-white p-2 shadow-xl shadow-slate-200/50 ring-1 ring-slate-100">
-                                        <div className="px-3 py-2 border-b border-slate-100 mb-2">
-                                            <p className="text-sm font-semibold text-slate-900">
-                                                {auth.user?.name}
-                                            </p>
-                                            <p className="text-xs text-slate-500">
-                                                {auth.user?.email}
-                                            </p>
-                                        </div>
-                                        <Link
-                                            href={route("profile.edit")}
-                                            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                            {/* Desktop Nav Links */}
+                            <div className="hidden space-x-4 sm:-my-px sm:ml-10 sm:flex">
+                                {menuItems.map((item) => {
+                                    const routeExists = route().has(
+                                        item.destination
+                                    );
+                                    const isActive = routeExists
+                                        ? route().current(item.activeCheck)
+                                        : false;
+
+                                    return (
+                                        <NavLink
+                                            key={item.label}
+                                            href={
+                                                routeExists
+                                                    ? route(item.destination)
+                                                    : "#"
+                                            }
+                                            active={isActive}
+                                            className={`relative inline-flex items-center gap-2 px-1 pt-1 border-b-2 text-sm font-medium transition-colors
+                                                ${
+                                                    isActive
+                                                        ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                                                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200"
+                                                }
+                                                ${
+                                                    !routeExists
+                                                        ? "cursor-not-allowed opacity-50"
+                                                        : ""
+                                                }
+                                            `}
                                         >
-                                            <User size={16} />
-                                            Profile Settings
-                                        </Link>
-                                        <Link
+                                            {item.icon}
+                                            {item.label}
+                                        </NavLink>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Right Side: User Dropdown */}
+                        <div className="hidden sm:flex sm:items-center sm:ml-6">
+                            <DarkModeToggle className="mr-3" />
+
+                            <div className="ml-3 relative">
+                                <Dropdown>
+                                    <Dropdown.Trigger>
+                                        <button
+                                            type="button"
+                                            className="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                        >
+                                            <div className="relative">
+                                                <img
+                                                    className="w-10 h-10 rounded-full border-2 border-indigo-300"
+                                                    src={UserPicture}
+                                                    alt="User"
+                                                />
+                                                <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-indigo-500 rounded-full border-2 border-white flex items-center justify-center">
+                                                    <Shield
+                                                        size={8}
+                                                        className="text-white"
+                                                    />
+                                                </span>
+                                            </div>
+                                        </button>
+                                    </Dropdown.Trigger>
+
+                                    <Dropdown.Content>
+                                        <div className="px-4 py-3 border-b border-gray-100">
+                                            <div className="font-medium text-base text-gray-800 dark:text-gray-200">
+                                                {auth.user.name}
+                                            </div>
+                                            <div className="font-medium text-sm text-gray-500 dark:text-gray-400">
+                                                {auth.user.email}
+                                            </div>
+                                            <div className="mt-2 flex flex-col gap-1">
+                                                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-full w-fit">
+                                                    <Shield
+                                                        size={10}
+                                                        className="mr-1"
+                                                    />
+                                                    Super Administrator
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <Dropdown.Link
+                                            href={route("profile.edit")}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <Settings size={16} />
+                                                Profile Settings
+                                            </div>
+                                        </Dropdown.Link>
+                                        <Dropdown.Link
                                             href={route("logout")}
                                             method="post"
                                             as="button"
-                                            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-rose-600 hover:bg-rose-50 transition-colors"
+                                            className="text-red-600 hover:bg-red-50"
                                         >
-                                            <LogOut size={16} />
-                                            Sign Out
-                                        </Link>
-                                    </div>
-                                </>
-                            )}
+                                            <div className="flex items-center gap-2">
+                                                <LogOut size={16} />
+                                                Log Out
+                                            </div>
+                                        </Dropdown.Link>
+                                    </Dropdown.Content>
+                                </Dropdown>
+                            </div>
+                        </div>
+
+                        {/* Hamburger Menu (Mobile) */}
+                        <div className="-mr-2 flex items-center sm:hidden">
+                            <button
+                                onClick={() =>
+                                    setShowingNavigationDropdown(
+                                        (previousState) => !previousState
+                                    )
+                                }
+                                className="inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none transition-colors"
+                            >
+                                {showingNavigationDropdown ? (
+                                    <X size={24} />
+                                ) : (
+                                    <Menu size={24} />
+                                )}
+                            </button>
                         </div>
                     </div>
-                </header>
+                </div>
 
-                {/* Page content */}
-                <main className="p-4 lg:p-8">{children}</main>
-            </div>
+                {/* Responsive Navigation Menu (Mobile) */}
+                <div
+                    className={
+                        (showingNavigationDropdown ? "block" : "hidden") +
+                        " sm:hidden border-t"
+                    }
+                >
+                    <div className="pt-2 pb-3 space-y-1">
+                        {menuItems.map((item) => {
+                            const routeExists = route().has(item.destination);
+                            const isActive = routeExists
+                                ? route().current(item.activeCheck)
+                                : false;
+                            return (
+                                <ResponsiveNavLink
+                                    key={item.label}
+                                    href={
+                                        routeExists
+                                            ? route(item.destination)
+                                            : "#"
+                                    }
+                                    active={isActive}
+                                    className={
+                                        !routeExists
+                                            ? "cursor-not-allowed opacity-50"
+                                            : ""
+                                    }
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {item.icon} {item.label}
+                                    </div>
+                                </ResponsiveNavLink>
+                            );
+                        })}
+                    </div>
+
+                    {/* Responsive User Settings */}
+                    <div className="pt-4 pb-1 border-t border-gray-200">
+                        <div className="px-4">
+                            <div className="font-medium text-base text-gray-800 dark:text-gray-200">
+                                {auth.user.name}
+                            </div>
+                            <div className="font-medium text-sm text-gray-500">
+                                {auth.user.email}
+                            </div>
+                            <div className="mt-2 flex flex-col gap-1">
+                                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-full w-fit">
+                                    <Shield size={10} className="mr-1" />
+                                    Super Administrator
+                                </span>
+                            </div>
+                        </div>
+                        <div className="mt-3 space-y-1">
+                            <ResponsiveNavLink href={route("profile.edit")}>
+                                Profile Settings
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink
+                                method="post"
+                                href={route("logout")}
+                                as="button"
+                                className="text-red-600"
+                            >
+                                Log Out
+                            </ResponsiveNavLink>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            {/* Page Content */}
+            <main className="flex-1 p-6">
+                <div className="max-w-7xl mx-auto">{children}</div>
+            </main>
         </div>
     );
 }

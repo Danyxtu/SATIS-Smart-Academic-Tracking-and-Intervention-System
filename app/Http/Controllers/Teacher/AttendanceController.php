@@ -375,7 +375,28 @@ class AttendanceController extends Controller
     }
 
     /**
+     * Check if attendance already exists for a class on a given date.
+     */
+    public function checkExists(Request $request)
+    {
+        $data = $request->validate([
+            'classId' => ['required', 'integer', 'exists:subjects,id'],
+            'date' => ['required', 'date'],
+        ]);
+
+        $subject = Subject::findOrFail($data['classId']);
+
+        $exists = AttendanceRecord::whereHas('enrollment', function ($query) use ($subject) {
+            $query->where('subject_id', $subject->id);
+        })->where('date', $data['date'])->exists();
+
+        return response()->json(['exists' => $exists]);
+    }
+
+    /**
      * Persist attendance records for a class on a given date.
+     * Attendance can only be saved once per day per class.
+     * Cannot take attendance on Sundays.
      */
     public function store(Request $request)
     {
@@ -397,6 +418,27 @@ class AttendanceController extends Controller
         }
 
         $date = $data['date'];
+        $dateObj = new \DateTime($date);
+
+        // Check if the date is a Sunday (0 = Sunday in PHP)
+        if ((int)$dateObj->format('w') === 0) {
+            return response()->json([
+                'message' => 'Cannot take attendance on Sunday. Classes are not held on Sundays.',
+                'is_sunday' => true
+            ], 422);
+        }
+
+        // Check if attendance already exists for this class on this date
+        $existingAttendance = AttendanceRecord::whereHas('enrollment', function ($query) use ($subject) {
+            $query->where('subject_id', $subject->id);
+        })->where('date', $date)->exists();
+
+        if ($existingAttendance) {
+            return response()->json([
+                'message' => 'Attendance has already been recorded for this class on ' . $date . '. You can only save attendance once per day.',
+                'already_saved' => true
+            ], 422);
+        }
 
         foreach ($data['students'] as $s) {
             $enrollment = $subject->enrollments->firstWhere('id', $s['id']);
@@ -406,18 +448,14 @@ class AttendanceController extends Controller
                 continue;
             }
 
-            AttendanceRecord::updateOrCreate(
-                [
-                    'enrollment_id' => $enrollment->id,
-                    'date' => $date,
-                ],
-                [
-                    'status' => $s['status'],
-                ]
-            );
+            AttendanceRecord::create([
+                'enrollment_id' => $enrollment->id,
+                'date' => $date,
+                'status' => $s['status'],
+            ]);
         }
 
-        return response()->json(['message' => 'Attendance saved'], 200);
+        return response()->json(['message' => 'Attendance saved successfully!'], 200);
     }
 
     private function avatarFor(string $fullName): string

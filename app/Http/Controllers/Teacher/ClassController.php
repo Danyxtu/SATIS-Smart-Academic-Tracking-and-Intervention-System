@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
+use App\Models\MasterSubject;
 use App\Models\Student;
 use App\Models\StudentNotification;
 use App\Models\Subject;
+use App\Models\SystemSetting;
 use App\Models\User;
 use App\Support\Concerns\HasDefaultAssignments;
 use Illuminate\Http\RedirectResponse;
@@ -40,12 +42,26 @@ class ClassController extends Controller
     {
         $teacher = $request->user();
 
-        $subjects = Subject::with([
+        // Get current system semester and allow user to select which semester to view
+        $currentSemester = SystemSetting::getCurrentSemester();
+        $selectedSemester = $request->query('semester', $currentSemester);
+
+        // Get ALL subjects for this teacher (for counting)
+        $allSubjects = Subject::with([
             'enrollments.user.student',
             'enrollments.grades',
         ])->where('user_id', $teacher->id)
             ->orderBy('grade_level')
             ->get();
+
+        // Filter subjects by selected semester for display
+        $subjects = $allSubjects->filter(function ($subject) use ($selectedSemester) {
+            return $subject->semester == $selectedSemester;
+        });
+
+        // Count classes per semester for the toggle UI
+        $semester1Count = $allSubjects->filter(fn($s) => $s->semester == '1')->count();
+        $semester2Count = $allSubjects->filter(fn($s) => $s->semester == '2')->count();
 
         $gradeStructures = $subjects->mapWithKeys(function ($subject) {
             $structure = $this->buildGradeStructure($subject->grade_categories);
@@ -53,6 +69,24 @@ class ClassController extends Controller
 
             return [$subject->id => $structure];
         });
+
+        // Get master subjects filtered by selected semester for the dropdown
+        $masterSubjects = MasterSubject::where('is_active', true)
+            ->where('semester', $selectedSemester)
+            ->orderBy('grade_level')
+            ->orderBy('strand')
+            ->orderBy('name')
+            ->get()
+            ->map(fn($subject) => [
+                'id' => $subject->id,
+                'code' => $subject->code,
+                'name' => $subject->name,
+                'description' => $subject->description,
+                'grade_level' => $subject->grade_level,
+                'strand' => $subject->strand,
+                'track' => $subject->track,
+                'semester' => $subject->semester,
+            ]);
 
         return Inertia::render('Teacher/MyClasses', [
             'classes' => $subjects->map(fn($subject) => [
@@ -65,6 +99,7 @@ class ClassController extends Controller
                 'track' => $subject->track,
                 'student_count' => $subject->enrollments->count(),
                 'current_quarter' => $subject->current_quarter ?? 1,
+                'semester' => $subject->semester,
             ])->values(),
             'rosters' => $subjects->mapWithKeys(fn($subject) => [
                 $subject->id => $subject->enrollments->map(function ($enrollment) use ($subject) {
@@ -94,12 +129,20 @@ class ClassController extends Controller
             ])->all(),
             'gradeStructures' => $gradeStructures->all(),
             'defaultSchoolYear' => $this->currentSchoolYear(),
+            'currentSemester' => $currentSemester,
+            'selectedSemester' => (int) $selectedSemester,
+            'semester1Count' => $semester1Count,
+            'semester2Count' => $semester2Count,
+            'masterSubjects' => $masterSubjects,
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
         $teacher = $request->user();
+
+        // Get current semester from system settings
+        $currentSemester = SystemSetting::getCurrentSemester();
 
         $data = $request->validate([
             'grade_level' => 'required|string|max:255',
@@ -121,6 +164,7 @@ class ClassController extends Controller
             'track' => $data['track'] ?? null,
             'color' => $data['color'],
             'school_year' => $data['school_year'],
+            'semester' => (string) $currentSemester,
             'grade_categories' => $this->defaultGradeCategories(),
         ]);
 

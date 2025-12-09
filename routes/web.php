@@ -5,6 +5,7 @@ use App\Http\Controllers\Teacher\ClassController;
 use App\Http\Controllers\Teacher\GradeController;
 use App\Http\Controllers\Teacher\DashboardController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Admin\TeacherRegistrationController as AdminTeacherRegistrationController;
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
 use App\Http\Controllers\SuperAdmin\DepartmentController;
 use App\Http\Controllers\SuperAdmin\AdminController as SuperAdminAdminController;
@@ -63,6 +64,9 @@ Route::middleware(['auth', 'verified', 'can:access-student-portal'])->group(func
     Route::post('/interventions/tasks/{task}/complete', [App\Http\Controllers\Student\InterventionController::class, 'completeTask'])
         ->name('interventions.tasks.complete');
 
+    Route::post('/interventions/{intervention}/request-completion', [App\Http\Controllers\Student\InterventionController::class, 'requestCompletion'])
+        ->name('interventions.request-completion');
+
     Route::post('/feedback/{notification}/read', [App\Http\Controllers\Student\InterventionController::class, 'markFeedbackRead'])
         ->name('feedback.read');
 
@@ -94,6 +98,16 @@ Route::middleware(['auth', 'verified', 'can:access-student-portal'])->group(func
 |
 */
 
+// Pending Approval Route (accessible to pending teachers)
+Route::middleware(['auth'])
+    ->prefix('teacher')
+    ->name('teacher.')
+    ->group(function () {
+        Route::get('/pending-approval', function () {
+            return Inertia::render('Teacher/PendingApproval');
+        })->name('pending-approval');
+    });
+
 // All routes in this group are protected by the 'can:access-teacher-portal' gate
 Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
     ->prefix('teacher') // All URLs will start with /teacher
@@ -121,6 +135,9 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
         // Server-side PDF export (requires barryvdh/laravel-dompdf package)
         Route::get('/attendance/log/{subject}/export/pdf', [AttendanceController::class, 'exportPdf'])
             ->name('attendance.log.export.pdf');
+        // Check if attendance exists for a class on a date
+        Route::get('/attendance/check', [AttendanceController::class, 'checkExists'])
+            ->name('attendance.check');
         // Save attendance (persist records)
         Route::post('/attendance', [AttendanceController::class, 'store'])
             ->name('attendance.store');
@@ -158,6 +175,12 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
         // Bulk intervention for multiple students
         Route::post('/interventions/bulk', [App\Http\Controllers\Teacher\InterventionController::class, 'bulkStore'])
             ->name('interventions.bulk');
+
+        // Approve/Reject completion requests for Tier 3 interventions
+        Route::post('/interventions/{intervention}/approve', [App\Http\Controllers\Teacher\InterventionController::class, 'approveCompletion'])
+            ->name('interventions.approve');
+        Route::post('/interventions/{intervention}/reject', [App\Http\Controllers\Teacher\InterventionController::class, 'rejectCompletion'])
+            ->name('interventions.reject');
     });
 
 /*
@@ -188,6 +211,8 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal'])
         Route::resource('admins', SuperAdminAdminController::class);
         Route::post('/admins/{admin}/reset-password', [SuperAdminAdminController::class, 'resetPassword'])
             ->name('admins.reset-password');
+        Route::post('/admins/{admin}/resend-credentials', [SuperAdminAdminController::class, 'resendCredentials'])
+            ->name('admins.resend-credentials');
 
         // Curriculum Management (Master Subjects & Prerequisites)
         Route::resource('curriculum', CurriculumController::class);
@@ -251,6 +276,16 @@ Route::middleware(['auth', 'verified', 'can:access-admin-portal'])
             ->name('password-reset-requests.approve');
         Route::post('/password-reset-requests/{passwordResetRequest}/reject', [AdminUserController::class, 'rejectPasswordResetRequest'])
             ->name('password-reset-requests.reject');
+
+        // Teacher Registration Management
+        Route::get('/teacher-registrations', [AdminTeacherRegistrationController::class, 'index'])
+            ->name('teacher-registrations.index');
+        Route::post('/teacher-registrations/{registration}/approve', [AdminTeacherRegistrationController::class, 'approve'])
+            ->name('teacher-registrations.approve');
+        Route::post('/teacher-registrations/{registration}/reject', [AdminTeacherRegistrationController::class, 'reject'])
+            ->name('teacher-registrations.reject');
+        Route::get('/teacher-registrations/{registration}/document', [AdminTeacherRegistrationController::class, 'downloadDocument'])
+            ->name('teacher-registrations.document');
     });
 
 /*

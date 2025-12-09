@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { X, Copy, Check, Key, AlertTriangle, User, Mail } from "lucide-react";
 
-TemporaryPasswordModal = ({ studentInfo, onClose }) => {
+const TemporaryPasswordModal = ({ studentInfo, onClose }) => {
     const [copied, setCopied] = useState(false);
 
     if (!studentInfo) return null;

@@ -33,5 +33,8 @@ class DatabaseSeeder extends Seeder
             'password' => bcrypt('password'),
             'role' => 'teacher',
         ]);
+
+        // Seed master subjects with prerequisites
+        $this->call(MasterSubjectSeeder::class);
     }
 }

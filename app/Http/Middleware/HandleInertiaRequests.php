@@ -34,10 +34,22 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
 
+        // Build user data with department for admin users
+        $userData = $user;
+        if ($user && $user->role === 'admin') {
+            $userData = array_merge($user->toArray(), [
+                'department' => $user->department ? [
+                    'id' => $user->department->id,
+                    'name' => $user->department->name,
+                    'code' => $user->department->code,
+                ] : null,
+            ]);
+        }
+
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $user,
+                'user' => $userData,
             ],
             'flash' => [
                 'success' => fn() => $request->session()->get('success'),

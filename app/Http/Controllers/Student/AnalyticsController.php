@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Student;
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\Subject;
+use App\Models\SystemSetting;
 use App\Services\PredictionService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -25,10 +26,13 @@ class AnalyticsController extends Controller
     public function index(Request $request): Response
     {
         $user = $request->user();
+        $selectedSemester = $request->query('semester', SystemSetting::getCurrentSemester());
+        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
 
         // Get all enrollments for this student with related data
         $enrollments = Enrollment::with([
             'subject.teacher',
+            'subject.masterSubject',
             'grades',
             'attendanceRecords',
             'intervention',
@@ -36,8 +40,18 @@ class AnalyticsController extends Controller
             ->where('user_id', $user->id)
             ->get();
 
+        // Filter enrollments by semester (if master subject exists)
+        $filteredEnrollments = $enrollments->filter(function ($enrollment) use ($selectedSemester) {
+            $masterSubject = $enrollment->subject?->masterSubject;
+            // If no master subject, show in both semesters
+            if (!$masterSubject) {
+                return true;
+            }
+            return $masterSubject->semester == $selectedSemester;
+        });
+
         // Build subjects data with calculated grades and predictions
-        $subjects = $enrollments->map(function ($enrollment) {
+        $subjects = $filteredEnrollments->map(function ($enrollment) {
             $grades = $enrollment->grades;
             $totalScore = $grades->sum('score');
             $totalPossible = $grades->sum('total_score');
@@ -87,6 +101,8 @@ class AnalyticsController extends Controller
                 'predictedGrade' => $prediction['predicted_grade'],
                 'gradeTrend' => $prediction['trend'],
                 'trendDirection' => $prediction['trend_direction'],
+                // Semester info
+                'semester' => $enrollment->subject?->masterSubject?->semester ?? null,
             ];
         })->sortByDesc('grade')->values();
 
@@ -97,6 +113,15 @@ class AnalyticsController extends Controller
         $subjectsAtRisk = $subjects->filter(fn($s) => in_array($s['riskCategory'], ['at_risk', 'critical']))->count();
         $subjectsNeedingAttention = $subjects->filter(fn($s) => $s['riskCategory'] === 'needs_attention')->count();
 
+        // Calculate stats for each semester for navigation display
+        $semester1Subjects = $enrollments->filter(function ($e) {
+            $semester = $e->subject?->masterSubject?->semester;
+            return $semester === 1 || $semester === null;
+        });
+        $semester2Subjects = $enrollments->filter(function ($e) {
+            return $e->subject?->masterSubject?->semester === 2;
+        });
+
         return Inertia::render('Student/Analytics/Index', [
             'subjects' => $subjects,
             'stats' => [
@@ -106,6 +131,12 @@ class AnalyticsController extends Controller
                 'subjectsNeedingAttention' => $subjectsNeedingAttention,
                 'subjectsExcelling' => $subjects->filter(fn($s) => $s['grade'] !== null && $s['grade'] >= 90)->count(),
                 'subjectsOnTrack' => $subjects->filter(fn($s) => $s['riskCategory'] === 'on_track')->count(),
+            ],
+            'semesters' => [
+                'current' => (int) $selectedSemester,
+                'schoolYear' => $currentSchoolYear,
+                'semester1Count' => $semester1Subjects->count(),
+                'semester2Count' => $semester2Subjects->count(),
             ],
         ]);
     }

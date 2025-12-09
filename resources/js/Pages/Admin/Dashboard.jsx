@@ -10,6 +10,7 @@ import {
     UserPlus,
     ArrowRight,
     Clock,
+    Building2,
 } from "lucide-react";
 
 // Stat Card Component
@@ -115,7 +116,7 @@ const MiniTrendChart = ({ data }) => {
     );
 };
 
-export default function Dashboard({ auth, stats, userTrends }) {
+export default function Dashboard({ auth, stats, userTrends, department }) {
     const currentDate = new Date().toLocaleDateString("en-US", {
         weekday: "long",
         month: "long",
@@ -129,7 +130,9 @@ export default function Dashboard({ auth, stats, userTrends }) {
             value: stats.totalUsers,
             icon: Users,
             iconBgColor: "bg-indigo-500",
-            subtitle: "All registered accounts",
+            subtitle: department
+                ? `In ${department.name}`
+                : "All registered accounts",
         },
         {
             title: "Students",
@@ -145,9 +148,11 @@ export default function Dashboard({ auth, stats, userTrends }) {
             value: stats.totalTeachers,
             icon: UserCog,
             iconBgColor: "bg-green-500",
-            subtitle: `${(
-                (stats.totalTeachers / stats.totalUsers) * 100 || 0
-            ).toFixed(1)}% of users`,
+            subtitle: department
+                ? `In ${department.name}`
+                : `${(
+                      (stats.totalTeachers / stats.totalUsers) * 100 || 0
+                  ).toFixed(1)}% of users`,
         },
         {
             title: "Administrators",
@@ -161,6 +166,28 @@ export default function Dashboard({ auth, stats, userTrends }) {
     return (
         <AdminLayout>
             <Head title="Admin Dashboard" />
+
+            {/* Department Header Banner */}
+            {department && (
+                <div className="mb-6 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg p-4 text-white">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-white/20 rounded-lg">
+                            <Building2 size={24} />
+                        </div>
+                        <div>
+                            <p className="text-sm text-blue-100">
+                                Your Department
+                            </p>
+                            <h2 className="text-xl font-bold">
+                                {department.name}
+                            </h2>
+                            <p className="text-sm text-blue-100">
+                                Code: {department.code}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Header */}
             <div className="mb-8">

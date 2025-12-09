@@ -15,6 +15,7 @@ import {
     ChevronRight,
     X,
     AlertTriangle,
+    Eye,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -227,10 +228,21 @@ export default function Index({ admins, departments, filters }) {
                                                 <div className="flex items-center justify-end gap-1">
                                                     <Link
                                                         href={route(
+                                                            "superadmin.admins.show",
+                                                            admin.id
+                                                        )}
+                                                        className="rounded-lg p-2 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+                                                        title="View Details"
+                                                    >
+                                                        <Eye size={16} />
+                                                    </Link>
+                                                    <Link
+                                                        href={route(
                                                             "superadmin.admins.edit",
                                                             admin.id
                                                         )}
                                                         className="rounded-lg p-2 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                                                        title="Edit Admin"
                                                     >
                                                         <Pencil size={16} />
                                                     </Link>
@@ -242,6 +254,7 @@ export default function Index({ admins, departments, filters }) {
                                                             })
                                                         }
                                                         className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                                                        title="Delete Admin"
                                                     >
                                                         <Trash2 size={16} />
                                                     </button>

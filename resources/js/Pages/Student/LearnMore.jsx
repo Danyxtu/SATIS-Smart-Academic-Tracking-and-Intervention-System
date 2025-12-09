@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, Link } from "@inertiajs/react";
+import TutorialCard from "@/Components/TutorialCard";
+import TutorialModal from "@/Components/TutorialModal";
+import { getTutorialCards, getTutorialById } from "@/Data/tutorialData";
+import { BookOpen } from "lucide-react";
 
 // --- FAQ Accordion Item ---
 const FAQItem = ({ question, answer, icon, isOpen, onClick }) => (
@@ -138,6 +142,26 @@ const ContactCard = ({
 // --- Main Component ---
 const LearnMore = () => {
     const [openFAQ, setOpenFAQ] = useState(0);
+    const [activeTutorial, setActiveTutorial] = useState(null);
+    const [tutorialVisible, setTutorialVisible] = useState(false);
+
+    // Get tutorial cards data
+    const tutorialCards = getTutorialCards();
+
+    // Handle tutorial card press
+    const handleTutorialPress = (tutorialId) => {
+        const tutorial = getTutorialById(tutorialId);
+        if (tutorial) {
+            setActiveTutorial(tutorial);
+            setTutorialVisible(true);
+        }
+    };
+
+    // Handle tutorial close
+    const handleTutorialClose = () => {
+        setTutorialVisible(false);
+        setTimeout(() => setActiveTutorial(null), 300);
+    };
 
     const faqs = [
         {
@@ -481,6 +505,38 @@ const LearnMore = () => {
                         </div>
                     </section>
 
+                    {/* Tutorials Section */}
+                    <section>
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center">
+                                <BookOpen className="w-5 h-5 text-pink-600" />
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900">
+                                    Step-by-Step Tutorials
+                                </h2>
+                                <p className="text-gray-500">
+                                    Learn how to use each feature of SATIS
+                                </p>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {tutorialCards.map((tutorial) => (
+                                <TutorialCard
+                                    key={tutorial.id}
+                                    title={tutorial.title}
+                                    description={tutorial.description}
+                                    icon={tutorial.icon}
+                                    color={tutorial.color}
+                                    stepCount={tutorial.stepCount}
+                                    onPress={() =>
+                                        handleTutorialPress(tutorial.id)
+                                    }
+                                />
+                            ))}
+                        </div>
+                    </section>
+
                     {/* FAQ Section */}
                     <section>
                         <div className="flex items-center gap-3 mb-6">
@@ -806,6 +862,17 @@ const LearnMore = () => {
                     </section>
                 </div>
             </div>
+
+            {/* Tutorial Modal */}
+            {activeTutorial && (
+                <TutorialModal
+                    visible={tutorialVisible}
+                    onClose={handleTutorialClose}
+                    steps={activeTutorial.steps}
+                    title={activeTutorial.title}
+                    accentColor={activeTutorial.color}
+                />
+            )}
         </AuthenticatedLayout>
     );
 };

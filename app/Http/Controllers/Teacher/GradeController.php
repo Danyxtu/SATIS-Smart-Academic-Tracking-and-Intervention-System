@@ -258,30 +258,51 @@ class GradeController extends Controller
 
         foreach ($headerRow as $index => $value) {
             $normalized = $this->normalizeHeaderValue($value);
+            $originalValue = trim((string) $value);
 
+            // Check for student column aliases (name, lrn)
             foreach (self::STUDENT_COLUMN_ALIASES as $key => $aliases) {
                 if (in_array($normalized, $aliases, true)) {
                     $map[$key] = $index;
                 }
             }
 
-            foreach ($assignmentsByLabel as $assignment) {
-                $labelNormalized = $this->normalizeHeaderValue($assignment['label']);
-
-                if ($normalized === $labelNormalized) {
+            // Match assignments by normalized label
+            foreach ($assignmentsByLabel as $normalizedLabel => $assignment) {
+                if ($normalized === $normalizedLabel) {
                     $map['assignments'][$assignment['id']] = $index;
+                    break;
                 }
             }
 
-            foreach ($assignmentsById as $assignmentId => $assignment) {
-                if ($normalized === $assignmentId) {
-                    $map['assignments'][$assignmentId] = $index;
+            // If not matched yet, try matching by assignment ID directly
+            if (!isset($map['assignments'][$normalized])) {
+                foreach ($assignmentsById as $assignmentId => $assignment) {
+                    if ($normalized === $this->normalizeHeaderValue($assignmentId)) {
+                        $map['assignments'][$assignmentId] = $index;
+                        break;
+                    }
+                }
+            }
+
+            // Additional fallback: match by original label (case-insensitive)
+            if (empty(array_filter($map['assignments'], fn($colIdx) => $colIdx === $index))) {
+                foreach ($assignmentsById as $assignmentId => $assignment) {
+                    $assignmentLabel = strtolower(trim($assignment['label']));
+                    $headerLabel = strtolower($originalValue);
+
+                    if ($assignmentLabel === $headerLabel) {
+                        $map['assignments'][$assignmentId] = $index;
+                        break;
+                    }
                 }
             }
         }
 
         if (empty($map['assignments'])) {
-            throw new RuntimeException('No assignment columns detected. Include at least one matching assignment header.');
+            $availableAssignments = collect($assignmentsById)->pluck('label')->implode(', ');
+            $csvHeaders = implode(', ', array_map('trim', $headerRow));
+            throw new RuntimeException("No assignment columns detected. CSV headers: [{$csvHeaders}]. Expected assignments: [{$availableAssignments}]. Make sure your CSV column names match your assignment/task names.");
         }
 
         return $map;

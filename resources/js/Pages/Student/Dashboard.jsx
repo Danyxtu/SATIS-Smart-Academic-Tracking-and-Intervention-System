@@ -486,6 +486,7 @@ export default function Dashboard({
     unreadNotificationCount = 0,
     upcomingTasks = [],
     gradeTrend = [],
+    semesters = {},
 }) {
     const [showAllNotifications, setShowAllNotifications] = useState(false);
     const { url } = usePage();
@@ -493,6 +494,15 @@ export default function Dashboard({
     // Extract highlight parameter from URL
     const urlParams = new URLSearchParams(url.split("?")[1] || "");
     const highlightId = urlParams.get("highlight");
+
+    // Semester navigation handler
+    const handleSemesterChange = (semester) => {
+        router.get(
+            window.location.pathname,
+            { semester },
+            { preserveState: true, preserveScroll: true }
+        );
+    };
 
     const handleMarkRead = (notificationId) => {
         router.post(
@@ -719,6 +729,117 @@ export default function Dashboard({
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Left Column - Subject Performance */}
                         <div className="lg:col-span-2 space-y-6">
+                            {/* Semester Toggle */}
+                            {(semesters?.semester1Count > 0 ||
+                                semesters?.semester2Count > 0) && (
+                                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <svg
+                                                className="w-5 h-5 text-pink-600"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                                />
+                                            </svg>
+                                            <span className="font-semibold text-gray-700">
+                                                Academic Year{" "}
+                                                {semesters?.schoolYear || ""}
+                                            </span>
+                                        </div>
+                                        {semesters?.selected !==
+                                            semesters?.current && (
+                                            <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                                                Viewing past semester
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {[
+                                            {
+                                                id: 1,
+                                                label: "1st Semester",
+                                                count:
+                                                    semesters?.semester1Count ||
+                                                    0,
+                                            },
+                                            {
+                                                id: 2,
+                                                label: "2nd Semester",
+                                                count:
+                                                    semesters?.semester2Count ||
+                                                    0,
+                                            },
+                                        ].map((sem) => {
+                                            const isActive =
+                                                semesters?.selected === sem.id;
+                                            const isCurrentSem =
+                                                semesters?.current === sem.id;
+                                            return (
+                                                <button
+                                                    key={sem.id}
+                                                    onClick={() =>
+                                                        handleSemesterChange(
+                                                            sem.id
+                                                        )
+                                                    }
+                                                    className={`flex-1 relative flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-medium transition-all ${
+                                                        isActive
+                                                            ? "bg-pink-600 text-white shadow-md"
+                                                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                                    }`}
+                                                >
+                                                    <svg
+                                                        className="w-4 h-4"
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                        stroke="currentColor"
+                                                    >
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                                                        />
+                                                    </svg>
+                                                    <span className="hidden sm:inline">
+                                                        {sem.label}
+                                                    </span>
+                                                    <span className="sm:hidden">
+                                                        Sem {sem.id}
+                                                    </span>
+                                                    <span
+                                                        className={`ml-1 px-2 py-0.5 rounded-full text-xs font-bold ${
+                                                            isActive
+                                                                ? "bg-white/20 text-white"
+                                                                : "bg-gray-200 text-gray-600"
+                                                        }`}
+                                                    >
+                                                        {sem.count}
+                                                    </span>
+                                                    {isCurrentSem && (
+                                                        <span
+                                                            className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${
+                                                                isActive
+                                                                    ? "bg-green-400"
+                                                                    : "bg-green-500"
+                                                            } border-2 border-white`}
+                                                            title="Current Semester"
+                                                        />
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Subject Performance Section */}
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                                 <div className="flex items-center justify-between mb-6">

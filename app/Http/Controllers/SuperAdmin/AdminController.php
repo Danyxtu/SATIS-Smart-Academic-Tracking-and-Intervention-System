@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\AdminCredentials;
 use App\Models\Department;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules;
@@ -76,7 +78,7 @@ class AdminController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'department_id' => ['required', 'exists:departments,id'],
-            'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
+            'password' => ['nullable', Rules\Password::defaults()],
         ]);
 
         // Generate password if not provided
@@ -92,6 +94,16 @@ class AdminController extends Controller
             'department_id' => $validated['department_id'],
             'created_by' => Auth::id(),
         ]);
+
+        // Load the department relationship for the email
+        $admin->load('department');
+
+        // Send credentials email to the new admin
+        Mail::to($admin->email)->send(new AdminCredentials(
+            admin: $admin,
+            plainPassword: $plainPassword,
+            createdBy: Auth::user()
+        ));
 
         return redirect()
             ->route('superadmin.admins.index')
@@ -247,5 +259,40 @@ class AdminController extends Controller
                 'email' => $admin->email,
                 'password' => $plainPassword,
             ]);
+    }
+
+    /**
+     * Resend credentials email to admin.
+     */
+    public function resendCredentials(User $admin): RedirectResponse
+    {
+        if ($admin->role !== 'admin') {
+            abort(404);
+        }
+
+        // If no temp_password exists, generate a new one
+        $plainPassword = $admin->temp_password;
+
+        if (!$plainPassword) {
+            $plainPassword = Str::random(12);
+            $admin->update([
+                'password' => $plainPassword,
+                'temp_password' => $plainPassword,
+                'must_change_password' => true,
+                'password_changed_at' => null,
+            ]);
+        }
+
+        // Load the department relationship for the email
+        $admin->load('department');
+
+        // Send credentials email
+        Mail::to($admin->email)->send(new AdminCredentials(
+            admin: $admin,
+            plainPassword: $plainPassword,
+            createdBy: Auth::user()
+        ));
+
+        return back()->with('success', 'Credentials email has been resent to ' . $admin->email);
     }
 }

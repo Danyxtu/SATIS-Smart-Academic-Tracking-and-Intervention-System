@@ -12,6 +12,7 @@ import {
     CheckCircle,
     Save,
     Calendar,
+    Building2,
 } from "lucide-react";
 
 // Role Selection Card
@@ -71,7 +72,7 @@ const RoleCard = ({
     </button>
 );
 
-export default function Edit({ user }) {
+export default function Edit({ user, department }) {
     const { data, setData, put, processing, errors } = useForm({
         name: user.name,
         email: user.email,
@@ -83,6 +84,7 @@ export default function Edit({ user }) {
         put(route("admin.users.update", user.id));
     };
 
+    // Only student and teacher roles - admins cannot change roles to admin
     const roles = [
         {
             value: "student",
@@ -95,21 +97,37 @@ export default function Edit({ user }) {
             value: "teacher",
             icon: UserCog,
             label: "Teacher",
-            description:
-                "Can manage classes, grades, attendance, and create interventions.",
-        },
-        {
-            value: "admin",
-            icon: Shield,
-            label: "Administrator",
-            description:
-                "Full access to user management. No access to academic features.",
+            description: department
+                ? `Will be assigned to ${department.name} department.`
+                : "Can manage classes, grades, attendance, and create interventions.",
         },
     ];
 
     return (
         <AdminLayout>
             <Head title={`Edit User - ${user.name}`} />
+
+            {/* Department Info Banner */}
+            {department && (
+                <div className="mb-6 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg p-4 text-white">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-white/20 rounded-lg">
+                            <Building2 size={24} />
+                        </div>
+                        <div>
+                            <p className="text-sm text-blue-100">
+                                Editing user for
+                            </p>
+                            <h2 className="text-lg font-bold">
+                                {department.name}
+                            </h2>
+                            <p className="text-xs text-blue-100">
+                                Teachers will be assigned to this department
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Header */}
             <div className="mb-6">
@@ -156,7 +174,7 @@ export default function Edit({ user }) {
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                             User Role *
                         </label>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {roles.map((role) => (
                                 <RoleCard
                                     key={role.value}

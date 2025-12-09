@@ -28,6 +28,7 @@ import {
     CheckCircle,
     User,
     Mail,
+    Building2,
 } from "lucide-react";
 
 // Role Badge Component
@@ -671,7 +672,13 @@ const UserActions = ({ user, onResetPassword, onDelete }) => {
 };
 
 // Main Component
-export default function Index({ users, filters, roleCounts, sections = [] }) {
+export default function Index({
+    users,
+    filters,
+    roleCounts,
+    sections = [],
+    department,
+}) {
     const { flash } = usePage().props;
     const [search, setSearch] = useState(filters.search);
     const [selectedUsers, setSelectedUsers] = useState([]);
@@ -790,6 +797,29 @@ export default function Index({ users, filters, roleCounts, sections = [] }) {
         <AdminLayout>
             <Head title="User Management" />
 
+            {/* Department Info Banner */}
+            {department && (
+                <div className="mb-6 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg p-4 text-white">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-white/20 rounded-lg">
+                            <Building2 size={24} />
+                        </div>
+                        <div>
+                            <p className="text-sm text-blue-100">
+                                Managing users for
+                            </p>
+                            <h2 className="text-lg font-bold">
+                                {department.name}
+                            </h2>
+                            <p className="text-xs text-blue-100">
+                                You can manage teachers in your department and
+                                all students
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
@@ -798,7 +828,9 @@ export default function Index({ users, filters, roleCounts, sections = [] }) {
                         User Management
                     </h1>
                     <p className="text-gray-600 dark:text-gray-400 mt-1">
-                        Manage all students, teachers, and administrators
+                        {department
+                            ? `Manage students and teachers in ${department.name}`
+                            : "Manage all students, teachers, and administrators"}
                     </p>
                 </div>
                 <Link
