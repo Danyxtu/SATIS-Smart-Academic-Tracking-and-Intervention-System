@@ -444,4 +444,148 @@ class StudentPerformanceController extends Controller
 
         return $difference > 0 ? 'improving' : 'declining';
     }
+
+    /**
+     * Export subject analytics as PDF for mobile app.
+     */
+    public function exportPdf(Request $request, $enrollmentId)
+    {
+        $user = $request->user();
+
+        $enrollment = Enrollment::with([
+            'subject.teacher',
+            'grades',
+            'attendanceRecords',
+            'intervention.tasks',
+            'user.student',
+        ])
+            ->where('user_id', $user->id)
+            ->where('id', $enrollmentId)
+            ->firstOrFail();
+
+        $subject = $enrollment->subject;
+        $grades = $enrollment->grades;
+
+        $totalScore = $grades->sum('score');
+        $totalPossible = $grades->sum('total_score');
+        $overallGrade = $totalPossible > 0 ? round(($totalScore / $totalPossible) * 100) : null;
+
+        // Group grades by quarter
+        $quarterlyData = $grades->groupBy('quarter')->map(function ($quarterGrades, $quarter) use ($enrollment) {
+            $qScore = $quarterGrades->sum('score');
+            $qTotal = $quarterGrades->sum('total_score');
+            $qGrade = $qTotal > 0 ? round(($qScore / $qTotal) * 100) : null;
+
+            $attendance = $enrollment->attendanceRecords;
+            $totalDays = $attendance->count();
+            $presentDays = $attendance->whereIn('status', ['present', 'excused'])->count();
+            $attendanceRate = $totalDays > 0 ? round(($presentDays / $totalDays) * 100) : 100;
+
+            return [
+                'quarterNum' => $quarter,
+                'grade' => $qGrade,
+                'attendance' => "{$attendanceRate}%",
+                'assignmentCount' => $quarterGrades->count(),
+            ];
+        })->sortBy('quarterNum')->values();
+
+        $gradeBreakdown = $grades->map(function ($grade) {
+            $percentage = $grade->total_score > 0
+                ? round(($grade->score / $grade->total_score) * 100)
+                : null;
+            return [
+                'name' => $grade->assignment_name,
+                'score' => $grade->score,
+                'totalScore' => $grade->total_score,
+                'percentage' => $percentage,
+                'quarter' => (int) $grade->quarter,
+            ];
+        })->values();
+
+        $attendanceRecords = $enrollment->attendanceRecords;
+        $totalDays = $attendanceRecords->count();
+        $presentDays = $attendanceRecords->where('status', 'present')->count();
+        $absentDays = $attendanceRecords->where('status', 'absent')->count();
+        $lateDays = $attendanceRecords->where('status', 'late')->count();
+        $excusedDays = $attendanceRecords->where('status', 'excused')->count();
+        $attendanceRate = $totalDays > 0
+            ? round((($presentDays + $excusedDays + ($lateDays * 0.5)) / $totalDays) * 100)
+            : 100;
+
+        // Determine risk level
+        $riskLabel = 'On Track';
+        if ($overallGrade !== null) {
+            if ($overallGrade < 70) {
+                $riskLabel = 'Critical';
+            } elseif ($overallGrade < 75) {
+                $riskLabel = 'At Risk';
+            } elseif ($overallGrade < 80) {
+                $riskLabel = 'Needs Attention';
+            }
+        }
+
+        // Generate suggestions based on performance
+        $suggestions = [];
+        if ($overallGrade !== null && $overallGrade < 75) {
+            $suggestions[] = 'Focus on completing all assignments on time';
+            $suggestions[] = 'Consider seeking help from the teacher during office hours';
+        }
+        if ($attendanceRate < 90) {
+            $suggestions[] = 'Improve attendance to avoid missing important lessons';
+        }
+        if ($absentDays > 3) {
+            $suggestions[] = 'Catch up on missed work from absent days';
+        }
+        if (empty($suggestions)) {
+            $suggestions[] = 'Keep up the good work!';
+            $suggestions[] = 'Continue maintaining your study habits';
+        }
+
+        // Check if PDF package is present
+        $pdfClass = 'Barryvdh\\DomPDF\\Facade\\Pdf';
+        if (!class_exists($pdfClass)) {
+            return response()->json([
+                'message' => 'PDF export not available. Please install barryvdh/laravel-dompdf.',
+            ], 501);
+        }
+
+        $dataForView = [
+            'student' => [
+                'name' => $enrollment->user->name,
+                'lrn' => $enrollment->user->student->lrn ?? null,
+                'gradeLevel' => $enrollment->user->student->grade_level ?? null,
+                'strand' => $enrollment->user->student->strand ?? null,
+            ],
+            'subject' => [
+                'name' => $subject->name,
+                'section' => $subject->section,
+                'grade_level' => $subject->grade_level,
+                'teacher' => $subject->teacher?->name ?? 'N/A',
+                'current_quarter' => $subject->current_quarter ?? 1,
+            ],
+            'performance' => [
+                'overallGrade' => $overallGrade,
+                'quarterlyGrades' => $quarterlyData,
+                'gradeBreakdown' => $gradeBreakdown,
+            ],
+            'attendance' => [
+                'rate' => $attendanceRate,
+                'totalDays' => $totalDays,
+                'presentDays' => $presentDays,
+                'absentDays' => $absentDays,
+                'lateDays' => $lateDays,
+                'excusedDays' => $excusedDays,
+            ],
+            'risk' => [
+                'label' => $riskLabel,
+            ],
+            'suggestions' => $suggestions,
+            'generatedAt' => now()->format('F d, Y h:i A'),
+        ];
+
+        $pdf = $pdfClass::loadView('pdf.mobile_student_analytics', $dataForView);
+        $filename = sprintf('analytics_%s_%s.pdf', $enrollment->id, now()->format('Y-m-d'));
+
+        return $pdf->download($filename);
+    }
 }

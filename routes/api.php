@@ -48,6 +48,9 @@ Route::middleware('auth:sanctum')->post('student/feedback/{notification}/read', 
 Route::middleware('auth:sanctum')->get('student/profile', [\App\Http\Controllers\Api\StudentProfileController::class, 'index']);
 Route::middleware('auth:sanctum')->put('student/password', [\App\Http\Controllers\Api\StudentProfileController::class, 'updatePassword']);
 
+// Export PDF endpoint for mobile app
+Route::middleware('auth:sanctum')->get('student/performance/{enrollment}/export/pdf', [\App\Http\Controllers\Api\StudentPerformanceController::class, 'exportPdf']);
+
 Route::middleware('auth:sanctum')->get('user', function (Request $req) {
     return $req->user();
 });
