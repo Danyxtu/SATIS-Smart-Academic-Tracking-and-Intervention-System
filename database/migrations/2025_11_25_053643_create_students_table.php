@@ -17,6 +17,11 @@ return new class extends Migration
             $table->string('first_name');
             $table->string('last_name');
             $table->string('middle_name')->nullable();
+            $table->string('lrn')->nullable()->after('middle_name');
+            $table->string('grade_level')->nullable()->after('trend');
+            $table->string('section')->nullable()->after('grade_level');
+            $table->string('strand')->nullable()->after('section');
+            $table->string('track')->nullable()->after('strand');
             $table->string('subject');
             $table->integer('grade');
             $table->string('trend');

@@ -44,8 +44,8 @@ class DashboardController extends Controller
 
             return [
                 'id' => optional($studentProfile)->id ?? $enrollment->user->id,
-                'first_name' => optional($studentProfile)->first_name ?? $enrollment->user->name,
-                'last_name' => optional($studentProfile)->last_name ?? '',
+                'first_name' => optional($studentProfile)->first_name ?? $enrollment->user->first_name,
+                'last_name' => optional($studentProfile)->last_name ?? $enrollment->user->last_name,
                 'avatar' => optional($studentProfile)->avatar,
                 'subject' => optional($enrollment->subject)->name,
                 'grade' => $hasGrades ? round($averageGrade) : null,

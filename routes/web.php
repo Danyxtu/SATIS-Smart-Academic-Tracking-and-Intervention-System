@@ -1,23 +1,36 @@
 <?php
 
-use App\Http\Controllers\Teacher\AttendanceController;
+// Teacher Controllers
+use App\Http\Controllers\Teacher\AttendanceController; // Start -> In progress
 use App\Http\Controllers\Teacher\ClassController;
 use App\Http\Controllers\Teacher\GradeController;
 use App\Http\Controllers\Teacher\DashboardController;
+
+// Admin Controllers
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\TeacherRegistrationController as AdminTeacherRegistrationController;
+
+// Super Admin Controllers
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
 use App\Http\Controllers\SuperAdmin\DepartmentController;
 use App\Http\Controllers\SuperAdmin\AdminController as SuperAdminAdminController;
 use App\Http\Controllers\SuperAdmin\SettingsController;
 use App\Http\Controllers\SuperAdmin\CurriculumController;
+
+// Student Controller
+use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
+use App\Http\Controllers\Student\InterventionController as StudentInterventionController;
+use App\Http\Controllers\Student\SubjectRiskController as StudentSubjectRiskController;
+use App\Http\Controllers\Student\AttendanceController as StudentAttendanceController;
+use App\Http\Controllers\Student\AnalyticsController as StudentAnalyticsController;
+
+
+// Profile 
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\TeacherController;
-use Illuminate\Foundation\Application;
+
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
-use App\Models\User;
 
 /*
 |--------------------------------------------------------------------------
@@ -32,8 +45,6 @@ Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
         'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
     ]);
 });
 
@@ -49,43 +60,43 @@ Route::get('/', function () {
 // All routes in this group are protected by the 'can:access-student-portal' gate
 Route::middleware(['auth', 'verified', 'can:access-student-portal'])->group(function () {
 
-    Route::get('/dashboard', [App\Http\Controllers\Student\DashboardController::class, 'index'])
+    Route::get('/dashboard', [StudentDashboardController::class, 'index'])
         ->name('dashboard');
 
-    Route::post('/notifications/{notification}/read', [App\Http\Controllers\Student\DashboardController::class, 'markNotificationRead'])
+    Route::post('/notifications/{notification}/read', [StudentDashboardController::class, 'markNotificationRead'])
         ->name('notifications.read');
 
-    Route::post('/notifications/read-all', [App\Http\Controllers\Student\DashboardController::class, 'markAllNotificationsRead'])
+    Route::post('/notifications/read-all', [StudentDashboardController::class, 'markAllNotificationsRead'])
         ->name('notifications.read-all');
 
-    Route::get('/interventions-feed', [App\Http\Controllers\Student\InterventionController::class, 'index'])
+    Route::get('/interventions-feed', [StudentInterventionController::class, 'index'])
         ->name('interventions-feed');
 
-    Route::post('/interventions/tasks/{task}/complete', [App\Http\Controllers\Student\InterventionController::class, 'completeTask'])
+    Route::post('/interventions/tasks/{task}/complete', [StudentInterventionController::class, 'completeTask'])
         ->name('interventions.tasks.complete');
 
-    Route::post('/interventions/{intervention}/request-completion', [App\Http\Controllers\Student\InterventionController::class, 'requestCompletion'])
+    Route::post('/interventions/{intervention}/request-completion', [StudentInterventionController::class, 'requestCompletion'])
         ->name('interventions.request-completion');
 
-    Route::post('/feedback/{notification}/read', [App\Http\Controllers\Student\InterventionController::class, 'markFeedbackRead'])
+    Route::post('/feedback/{notification}/read', [StudentInterventionController::class, 'markFeedbackRead'])
         ->name('feedback.read');
 
-    Route::get('/subject-at-risk', [App\Http\Controllers\Student\SubjectRiskController::class, 'index'])
+    Route::get('/subject-at-risk', [StudentSubjectRiskController::class, 'index'])
         ->name('subject-at-risk');
 
     Route::get('/learn-more', function () {
         return Inertia::render('Student/LearnMore');
     })->name('learn-more');
 
-    Route::get('/attendance', [App\Http\Controllers\Student\AttendanceController::class, 'index'])
+    Route::get('/attendance', [StudentAttendanceController::class, 'index'])
         ->name('attendance');
 
-    Route::get('/analytics', [App\Http\Controllers\Student\AnalyticsController::class, 'index'])
+    Route::get('/analytics', [StudentAnalyticsController::class, 'index'])
         ->name('analytics.index');
 
-    Route::get('/analytics/{enrollment}', [App\Http\Controllers\Student\AnalyticsController::class, 'show'])
+    Route::get('/analytics/{enrollment}', [StudentAnalyticsController::class, 'show'])
         ->name('analytics.show');
-    Route::get('/analytics/{enrollment}/export/pdf', [App\Http\Controllers\Student\AnalyticsController::class, 'exportPdf'])
+    Route::get('/analytics/{enrollment}/export/pdf', [StudentAnalyticsController::class, 'exportPdf'])
         ->name('analytics.show.pdf');
 });
 

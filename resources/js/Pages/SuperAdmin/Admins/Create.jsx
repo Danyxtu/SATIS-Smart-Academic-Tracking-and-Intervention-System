@@ -22,7 +22,9 @@ export default function Create({ departments }) {
     const [copied, setCopied] = useState(false);
 
     const { data, setData, post, processing, errors } = useForm({
-        name: "",
+        first_name: "",
+        last_name: "",
+        middle_name: "",
         email: "",
         password: "",
         department_id: "",
@@ -35,7 +37,7 @@ export default function Create({ departments }) {
         let password = "";
         for (let i = 0; i < length; i++) {
             password += charset.charAt(
-                Math.floor(Math.random() * charset.length)
+                Math.floor(Math.random() * charset.length),
             );
         }
         setData("password", password);
@@ -95,30 +97,88 @@ export default function Create({ departments }) {
                     </div>
 
                     <div className="p-6 space-y-5">
-                        {/* Name */}
+                        {/* First Name */}
                         <div>
                             <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
                                 <Shield size={14} className="text-slate-400" />
-                                Full Name
+                                First Name
                                 <span className="text-rose-500">*</span>
                             </label>
                             <input
                                 type="text"
-                                value={data.name}
+                                value={data.first_name}
                                 onChange={(e) =>
-                                    setData("name", e.target.value)
+                                    setData("first_name", e.target.value)
                                 }
-                                placeholder="e.g., John Smith"
+                                placeholder="e.g., John"
                                 className={`w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors ${
-                                    errors.name
+                                    errors.first_name
                                         ? "border-rose-300 bg-rose-50/50"
                                         : ""
                                 }`}
                             />
-                            {errors.name && (
+                            {errors.first_name && (
                                 <p className="mt-2 text-sm text-rose-600 flex items-center gap-1">
                                     <Info size={14} />
-                                    {errors.name}
+                                    {errors.first_name}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Last Name */}
+                        <div>
+                            <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
+                                <Shield size={14} className="text-slate-400" />
+                                Last Name
+                                <span className="text-rose-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={data.last_name}
+                                onChange={(e) =>
+                                    setData("last_name", e.target.value)
+                                }
+                                placeholder="e.g., Smith"
+                                className={`w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors ${
+                                    errors.last_name
+                                        ? "border-rose-300 bg-rose-50/50"
+                                        : ""
+                                }`}
+                            />
+                            {errors.last_name && (
+                                <p className="mt-2 text-sm text-rose-600 flex items-center gap-1">
+                                    <Info size={14} />
+                                    {errors.last_name}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Middle Name (Optional) */}
+                        <div>
+                            <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
+                                <Shield size={14} className="text-slate-400" />
+                                Middle Name{" "}
+                                <span className="text-slate-400 text-xs">
+                                    (Optional)
+                                </span>
+                            </label>
+                            <input
+                                type="text"
+                                value={data.middle_name}
+                                onChange={(e) =>
+                                    setData("middle_name", e.target.value)
+                                }
+                                placeholder="e.g., Michael"
+                                className={`w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors ${
+                                    errors.middle_name
+                                        ? "border-rose-300 bg-rose-50/50"
+                                        : ""
+                                }`}
+                            />
+                            {errors.middle_name && (
+                                <p className="mt-2 text-sm text-rose-600 flex items-center gap-1">
+                                    <Info size={14} />
+                                    {errors.middle_name}
                                 </p>
                             )}
                         </div>

@@ -19,7 +19,7 @@ class ForcePasswordChangeController extends Controller
     public function create(): Response
     {
         return Inertia::render('Auth/ForceChangePassword', [
-            'user' => Auth::user()->only(['name', 'email']),
+            'user' => Auth::user()->only(['first_name', 'last_name', 'email']),
         ]);
     }
 
@@ -52,6 +52,9 @@ class ForcePasswordChangeController extends Controller
 
         if ($user->role === 'teacher') {
             return redirect()->route('teacher.dashboard')->with('success', 'Password changed successfully!');
+        }
+        if ($user->role === 'super_admin') {
+            return redirect()->route('superadmin.dashboard')->with('success', 'Password changed successfully!');
         }
 
         return redirect()->route('admin.dashboard')->with('success', 'Password changed successfully!');

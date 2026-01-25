@@ -74,7 +74,9 @@ const RoleCard = ({
 
 export default function Edit({ user, department }) {
     const { data, setData, put, processing, errors } = useForm({
-        name: user.name,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        middle_name: user.middle_name || "",
         email: user.email,
         role: user.role,
     });
@@ -193,13 +195,13 @@ export default function Edit({ user, department }) {
 
                     <hr className="border-gray-200 dark:border-gray-700" />
 
-                    {/* Name */}
+                    {/* First Name */}
                     <div>
                         <label
-                            htmlFor="name"
+                            htmlFor="first_name"
                             className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                         >
-                            Full Name *
+                            First Name *
                         </label>
                         <div className="relative">
                             <User
@@ -207,19 +209,84 @@ export default function Edit({ user, department }) {
                                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                             />
                             <input
-                                id="name"
+                                id="first_name"
                                 type="text"
-                                value={data.name}
+                                value={data.first_name}
                                 onChange={(e) =>
-                                    setData("name", e.target.value)
+                                    setData("first_name", e.target.value)
                                 }
                                 className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                placeholder="Enter full name"
+                                placeholder="Enter first name"
                             />
                         </div>
-                        {errors.name && (
+                        {errors.first_name && (
                             <p className="mt-1 text-sm text-red-600">
-                                {errors.name}
+                                {errors.first_name}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Last Name */}
+                    <div>
+                        <label
+                            htmlFor="last_name"
+                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        >
+                            Last Name *
+                        </label>
+                        <div className="relative">
+                            <User
+                                size={18}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                            />
+                            <input
+                                id="last_name"
+                                type="text"
+                                value={data.last_name}
+                                onChange={(e) =>
+                                    setData("last_name", e.target.value)
+                                }
+                                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                placeholder="Enter last name"
+                            />
+                        </div>
+                        {errors.last_name && (
+                            <p className="mt-1 text-sm text-red-600">
+                                {errors.last_name}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Middle Name (Optional) */}
+                    <div>
+                        <label
+                            htmlFor="middle_name"
+                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        >
+                            Middle Name{" "}
+                            <span className="text-gray-400 text-xs">
+                                (Optional)
+                            </span>
+                        </label>
+                        <div className="relative">
+                            <User
+                                size={18}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                            />
+                            <input
+                                id="middle_name"
+                                type="text"
+                                value={data.middle_name}
+                                onChange={(e) =>
+                                    setData("middle_name", e.target.value)
+                                }
+                                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                placeholder="Enter middle name"
+                            />
+                        </div>
+                        {errors.middle_name && (
+                            <p className="mt-1 text-sm text-red-600">
+                                {errors.middle_name}
                             </p>
                         )}
                     </div>

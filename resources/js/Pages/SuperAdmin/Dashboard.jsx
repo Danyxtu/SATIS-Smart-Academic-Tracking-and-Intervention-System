@@ -258,13 +258,14 @@ export default function Dashboard({
                                         >
                                             <div className="flex items-center gap-3">
                                                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-white font-semibold shadow-sm">
-                                                    {admin.name
+                                                    {(admin.name || "A")
                                                         .charAt(0)
                                                         .toUpperCase()}
                                                 </div>
                                                 <div>
                                                     <p className="font-semibold text-slate-900">
-                                                        {admin.name}
+                                                        {admin.name ||
+                                                            "Unknown"}
                                                     </p>
                                                     <p className="text-xs text-slate-500">
                                                         {admin.email}
@@ -321,7 +322,7 @@ export default function Dashboard({
                                     </p>
                                     <Link
                                         href={route(
-                                            "superadmin.departments.create"
+                                            "superadmin.departments.create",
                                         )}
                                         className="text-sm font-medium text-blue-600 hover:text-blue-700"
                                     >

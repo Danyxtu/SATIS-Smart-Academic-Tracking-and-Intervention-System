@@ -221,10 +221,20 @@ class AdminController extends Controller
     /**
      * Remove the specified admin.
      */
-    public function destroy(User $admin): RedirectResponse
+    public function destroy(Request $request, User $admin): RedirectResponse
     {
         if ($admin->role !== 'admin') {
             abort(404);
+        }
+
+        // Validate the super admin's password
+        $validated = $request->validate([
+            'password' => 'required|string',
+        ]);
+
+        // Check if the password matches the current super admin's password
+        if (!Hash::check($validated['password'], $request->user()->password)) {
+            return back()->withErrors(['password' => 'The password is incorrect.']);
         }
 
         $admin->delete();
