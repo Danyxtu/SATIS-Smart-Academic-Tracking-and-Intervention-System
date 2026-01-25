@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Teacher;
 
+use App\Services\Teacher\AttendanceService;
+
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceRecord;
 use App\Models\Subject;
@@ -9,11 +11,22 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
+
 class AttendanceController extends Controller
 {
+    protected $attendanceService;
+
+    public function __construct(AttendanceService $attendanceService)
+    {
+        $this->attendanceService = $attendanceService;
+    }
+
+    // Render the attendance taking interface
     public function index(Request $request): Response
     {
         $teacher = $request->user();
+
+        $results = $this->attendanceService->index($teacher);
 
         $subjects = Subject::with(['enrollments.user.student'])
             ->where('user_id', $teacher->id)
@@ -21,6 +34,7 @@ class AttendanceController extends Controller
             ->get();
 
         return Inertia::render('Teacher/Attendance', [
+            // This is for the class selection dropdown
             'classes' => $subjects->map(fn($subject) => [
                 'id' => $subject->id,
                 'label' => sprintf(
@@ -33,6 +47,7 @@ class AttendanceController extends Controller
                 'section' => $subject->section,
                 'subject' => $subject->name,
             ])->values(),
+            // This is for the rosters
             'rosters' => $subjects->mapWithKeys(fn($subject) => [
                 $subject->id => $subject->enrollments->map(function ($enrollment) {
                     $user = $enrollment->user;

@@ -37,7 +37,14 @@ class UserController extends Controller
             'totalStudents' => (clone $departmentUsersQuery)->where('role', 'student')->count(),
             'totalTeachers' => (clone $departmentUsersQuery)->where('role', 'teacher')->count(),
             'totalAdmins' => (clone $departmentUsersQuery)->where('role', 'admin')->count(),
-            'recentUsers' => (clone $departmentUsersQuery)->latest()->take(5)->get(['id', 'name', 'email', 'role', 'created_at']),
+            'recentUsers' => (clone $departmentUsersQuery)->latest()->take(5)->get(['id', 'first_name', 'last_name', 'email', 'role', 'created_at'])
+                ->map(fn($user) => [
+                    'id' => $user->id,
+                    'name' => $user->first_name . ' ' . $user->last_name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'created_at' => $user->created_at,
+                ]),
         ];
 
         // Get user creation trends (last 7 days) scoped to department
@@ -217,7 +224,9 @@ class UserController extends Controller
         // Admin can only create teachers (not other admins)
         // Different validation rules based on role
         $rules = [
-            'name' => 'required|string|max:255',
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'role' => 'required|in:student,teacher', // Admin cannot create other admins
         ];
@@ -240,7 +249,9 @@ class UserController extends Controller
 
         // Create user with department assignment for teachers
         $userData = [
-            'name' => $validated['name'],
+            'first_name' => $validated['first_name'],
+            'last_name' => $validated['last_name'],
+            'middle_name' => $validated['middle_name'] ?? null,
             'email' => $validated['email'],
             'password' => Hash::make($password),
             'role' => $validated['role'],
@@ -266,7 +277,7 @@ class UserController extends Controller
                 ->with('success', 'Student created successfully.')
                 ->with('tempPassword', $tempPassword)
                 ->with('createdUser', [
-                    'name' => $user->name,
+                    'name' => $user->first_name . ' ' . $user->last_name,
                     'email' => $user->email,
                 ]);
         }

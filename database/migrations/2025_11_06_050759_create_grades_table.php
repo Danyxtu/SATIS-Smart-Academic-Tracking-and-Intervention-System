@@ -3,6 +3,8 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 return new class extends Migration
 {
@@ -19,7 +21,25 @@ return new class extends Migration
             $table->float('total_score');
             $table->integer('quarter');
             $table->timestamps();
+            if (! Schema::hasColumn('grades', 'assignment_key')) {
+                $table->string('assignment_key')->nullable()->after('assignment_name');
+            }
+
+            $table->unique(['enrollment_id', 'assignment_key', 'quarter'], 'grades_assignment_unique');
         });
+
+        DB::table('grades')
+            ->select('id', 'assignment_name')
+            ->orderBy('id')
+            ->chunkById(500, function ($grades) {
+                foreach ($grades as $grade) {
+                    DB::table('grades')
+                        ->where('id', $grade->id)
+                        ->update([
+                            'assignment_key' => Str::slug($grade->assignment_name ?? 'assignment', '_'),
+                        ]);
+                }
+            });
     }
 
     /**

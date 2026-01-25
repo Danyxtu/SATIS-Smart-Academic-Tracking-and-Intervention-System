@@ -193,7 +193,9 @@ class ClassController extends Controller
         $this->ensureTeacherOwnsSubject($request->user()->id, $subject);
 
         $data = $request->validate([
-            'name' => 'required|string|max:255',
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
             'lrn' => 'required|string|max:255',
             'email' => 'nullable|email|max:255',
         ]);
@@ -210,7 +212,8 @@ class ClassController extends Controller
 
         if (is_array($result) && ! empty($result['password'])) {
             $redirect = $redirect->with('new_student_password', [
-                'name' => $data['name'],
+                'first_name' => $data['first_name'],
+                'last_name' => $data['last_name'],
                 'lrn' => $data['lrn'],
                 'email' => $data['email'] ?? null,
                 'password' => $result['password'],
@@ -403,7 +406,8 @@ class ClassController extends Controller
 
                 if (!empty($result['password'])) {
                     $summary['created_students'][] = [
-                        'name' => $payload['name'] ?? null,
+                        'first_name' => $payload['first_name'] ?? null,
+                        'last_name' => $payload['last_name'] ?? null,
                         'lrn' => $payload['lrn'] ?? null,
                         'email' => $payload['email'] ?? null,
                         'password' => $result['password'],
@@ -427,7 +431,9 @@ class ClassController extends Controller
     private function persistStudentRecord(Subject $subject, array $payload): array
     {
         $validator = Validator::make($payload, [
-            'name' => 'required|string|max:255',
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
             'lrn' => 'required|string|max:255',
             'grade_level' => 'required|string|max:255',
             'section' => 'nullable|string|max:255',
@@ -441,8 +447,10 @@ class ClassController extends Controller
         }
 
         $lrn = $this->sanitizeLrn($payload['lrn']);
-        $fullName = trim($payload['name']);
-        [$firstName, $lastName] = $this->splitName($fullName);
+        $firstName = trim($payload['first_name']);
+        $lastName = trim($payload['last_name']);
+        $middleName = isset($payload['middle_name']) ? trim($payload['middle_name']) : null;
+        $fullName = trim("{$firstName} {$lastName}" . ($middleName ? " {$middleName}" : ''));
 
         $student = null;
 
@@ -454,15 +462,19 @@ class ClassController extends Controller
             $user = $student->user;
 
             if (! $user) {
-                $created = $this->createStudentUser($fullName, $payload['email'] ?? null);
+                $created = $this->createStudentUser($firstName, $lastName, $middleName, $payload['email'] ?? null);
                 $user = $created['user'];
                 $generatedPlainPassword = $created['password'];
                 $student->user()->associate($user);
             } else {
-                $user->update(['name' => $fullName]);
+                $user->update([
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'middle_name' => $middleName,
+                ]);
             }
         } else {
-            $created = $this->createStudentUser($fullName, $payload['email'] ?? null);
+            $created = $this->createStudentUser($firstName, $lastName, $middleName, $payload['email'] ?? null);
             $user = $created['user'];
             $generatedPlainPassword = $created['password'];
             $student = Student::firstOrNew(['user_id' => $user->id]);
@@ -476,6 +488,7 @@ class ClassController extends Controller
 
         $student->first_name = $firstName;
         $student->last_name = $lastName;
+        $student->middle_name = $middleName;
         $student->subject = $subject->name;
         $student->grade = $student->grade ?? 75;
         $student->trend = $student->trend ?? 'Stable';
@@ -566,6 +579,14 @@ class ClassController extends Controller
             $payload['lrn'] = $this->sanitizeLrn($payload['lrn']);
         }
 
+        // If 'name' is provided but first_name/last_name are not, split the name
+        if (isset($payload['name']) && !isset($payload['first_name'])) {
+            [$firstName, $lastName] = $this->splitName($payload['name']);
+            $payload['first_name'] = $firstName;
+            $payload['last_name'] = $lastName;
+            unset($payload['name']);
+        }
+
         return $payload;
     }
 
@@ -585,8 +606,9 @@ class ClassController extends Controller
         return $digits !== '' ? $digits : null;
     }
 
-    private function createStudentUser(string $fullName, ?string $preferredEmail = null): array
+    private function createStudentUser(string $firstName, string $lastName, ?string $middleName = null, ?string $preferredEmail = null): array
     {
+        $fullName = trim("{$firstName} {$lastName}" . ($middleName ? " {$middleName}" : ''));
         $email = strtolower($preferredEmail ?: $this->generateSchoolEmail($fullName));
 
         $plainPassword = Str::random(12);
@@ -594,7 +616,9 @@ class ClassController extends Controller
         $user = User::firstOrCreate(
             ['email' => $email],
             [
-                'name' => $fullName,
+                'first_name' => $firstName,
+                'last_name' => $lastName,
+                'middle_name' => $middleName,
                 'password' => $plainPassword, // Store plain text initially - will be hashed on first login change
                 'temp_password' => $plainPassword, // Store for teacher to view
                 'must_change_password' => true,

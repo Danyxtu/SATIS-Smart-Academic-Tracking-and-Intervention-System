@@ -11,9 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('subjects', function (Blueprint $table) {
-            $table->string('strand')->nullable()->after('section');
-            $table->string('track')->nullable()->after('strand');
+        Schema::table('departments', function (Blueprint $table) {
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
         });
     }
 
@@ -22,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('subjects', function (Blueprint $table) {
-            $table->dropColumn(['strand', 'track']);
+        Schema::table('departments', function (Blueprint $table) {
+            $table->dropForeignIdFor('users', 'created_by');
         });
     }
 };

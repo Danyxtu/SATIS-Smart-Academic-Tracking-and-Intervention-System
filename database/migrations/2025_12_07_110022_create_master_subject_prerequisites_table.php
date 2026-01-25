@@ -17,7 +17,6 @@ return new class extends Migration
             $table->foreignId('prerequisite_id')->constrained('master_subjects')->onDelete('cascade');
             $table->integer('minimum_grade')->default(75); // Minimum passing grade required
             $table->timestamps();
-
             $table->unique(['master_subject_id', 'prerequisite_id'], 'subject_prerequisite_unique');
         });
     }

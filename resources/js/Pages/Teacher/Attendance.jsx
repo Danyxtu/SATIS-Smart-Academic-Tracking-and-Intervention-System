@@ -1,13 +1,19 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import TeacherLayout from "../../Layouts/TeacherLayout";
+import TeacherLayout from "@/Layouts/TeacherLayout";
 import { Head } from "@inertiajs/react";
 import { useLoading } from "@/Context/LoadingContext";
+
+// Icons
 import { LayoutGrid, List, Check, XIcon, Clock, History } from "lucide-react";
+
+// Utils
+import showToast from "@/Utils/toast";
+
+// Components
 import NavLink from "@/Components/NavLink";
 import SeatingGrid from "@/Components/SeatingGrid";
 import StudentList from "@/Components/StudentList";
-import showToast from "@/Utils/toast";
 
 const GRID_ROWS = 5;
 const GRID_COLS = 10;
@@ -27,12 +33,18 @@ const buildSeatLayout = (students) => {
     }));
 };
 
-const Attendance = ({ classes = [], rosters = {} }) => {
+const Attendance = (props) => {
+    // Props from the server
+    const { classes, rosters } = props;
+    console.log("Rosters:", rosters);
+    console.log("Classes:", classes);
+
     const { startLoading, stopLoading } = useLoading();
     const [viewMode, setViewMode] = useState("grid");
     const [selectedClassId, setSelectedClassId] = useState(
         classes[0]?.id ?? null
     );
+
     const [currentDate, setCurrentDate] = useState(
         new Date().toISOString().split("T")[0]
     );
@@ -132,6 +144,7 @@ const Attendance = ({ classes = [], rosters = {} }) => {
         }, 150);
     };
 
+    // Update students helper
     const updateStudents = (updater) => {
         if (!selectedClassId) return;
 
@@ -149,6 +162,7 @@ const Attendance = ({ classes = [], rosters = {} }) => {
         });
     };
 
+    // Update seat layout
     const updateSeatLayout = (updater) => {
         if (!selectedClassId) return;
 
@@ -166,6 +180,7 @@ const Attendance = ({ classes = [], rosters = {} }) => {
         });
     };
 
+    // Handle grid item click
     const handleGridClick = (studentId) => {
         if (isDraggingEnabled || !selectedClassId) return;
 
@@ -188,6 +203,7 @@ const Attendance = ({ classes = [], rosters = {} }) => {
         );
     };
 
+    // Handle list item click
     const handleListClick = (studentId, newStatus) => {
         updateStudents((currentStudents) =>
             currentStudents.map((student) =>
@@ -198,6 +214,7 @@ const Attendance = ({ classes = [], rosters = {} }) => {
         );
     };
 
+    // Handle seat drag and drop
     const handleSeatDrop = (draggedSeatInfo, targetCoords) => {
         updateSeatLayout((prevLayout) => {
             const newLayout = [...prevLayout];
@@ -233,6 +250,7 @@ const Attendance = ({ classes = [], rosters = {} }) => {
         });
     };
 
+    // Submit attendance
     const handleSubmit = async () => {
         if (!selectedClassId) return;
 

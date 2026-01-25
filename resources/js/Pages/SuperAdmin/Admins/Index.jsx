@@ -22,19 +22,21 @@ import { useState } from "react";
 export default function Index({ admins, departments, filters }) {
     const [search, setSearch] = useState(filters?.search || "");
     const [departmentFilter, setDepartmentFilter] = useState(
-        filters?.department || ""
+        filters?.department || "",
     );
     const [deleteModal, setDeleteModal] = useState({
         open: false,
         admin: null,
+        password: "",
     });
+    const [deleteErrors, setDeleteErrors] = useState({});
 
     const handleSearch = (e) => {
         e.preventDefault();
         router.get(
             route("superadmin.admins.index"),
             { search, department: departmentFilter },
-            { preserveState: true }
+            { preserveState: true },
         );
     };
 
@@ -43,7 +45,7 @@ export default function Index({ admins, departments, filters }) {
         router.get(
             route("superadmin.admins.index"),
             { search, department: value },
-            { preserveState: true }
+            { preserveState: true },
         );
     };
 
@@ -52,9 +54,19 @@ export default function Index({ admins, departments, filters }) {
             router.delete(
                 route("superadmin.admins.destroy", deleteModal.admin.id),
                 {
-                    onSuccess: () =>
-                        setDeleteModal({ open: false, admin: null }),
-                }
+                    data: { password: deleteModal.password },
+                    onSuccess: () => {
+                        setDeleteModal({
+                            open: false,
+                            admin: null,
+                            password: "",
+                        });
+                        setDeleteErrors({});
+                    },
+                    onError: (errors) => {
+                        setDeleteErrors(errors);
+                    },
+                },
             );
         }
     };
@@ -219,7 +231,7 @@ export default function Index({ admins, departments, filters }) {
                                                     />
                                                     <span className="text-sm text-slate-500">
                                                         {new Date(
-                                                            admin.created_at
+                                                            admin.created_at,
                                                         ).toLocaleDateString()}
                                                     </span>
                                                 </div>
@@ -229,7 +241,7 @@ export default function Index({ admins, departments, filters }) {
                                                     <Link
                                                         href={route(
                                                             "superadmin.admins.show",
-                                                            admin.id
+                                                            admin.id,
                                                         )}
                                                         className="rounded-lg p-2 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
                                                         title="View Details"
@@ -239,7 +251,7 @@ export default function Index({ admins, departments, filters }) {
                                                     <Link
                                                         href={route(
                                                             "superadmin.admins.edit",
-                                                            admin.id
+                                                            admin.id,
                                                         )}
                                                         className="rounded-lg p-2 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                                                         title="Edit Admin"
@@ -247,12 +259,14 @@ export default function Index({ admins, departments, filters }) {
                                                         <Pencil size={16} />
                                                     </Link>
                                                     <button
-                                                        onClick={() =>
+                                                        onClick={() => {
                                                             setDeleteModal({
                                                                 open: true,
                                                                 admin,
-                                                            })
-                                                        }
+                                                                password: "",
+                                                            });
+                                                            setDeleteErrors({});
+                                                        }}
                                                         className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
                                                         title="Delete Admin"
                                                     >
@@ -317,8 +331,8 @@ export default function Index({ admins, departments, filters }) {
                                             link.active
                                                 ? "bg-blue-600 text-white"
                                                 : link.url
-                                                ? "text-slate-600 hover:bg-slate-100"
-                                                : "text-slate-300 cursor-not-allowed"
+                                                  ? "text-slate-600 hover:bg-slate-100"
+                                                  : "text-slate-300 cursor-not-allowed"
                                         }`}
                                         dangerouslySetInnerHTML={{
                                             __html: link.label,
@@ -337,14 +351,23 @@ export default function Index({ admins, departments, filters }) {
                     <div
                         className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
                         onClick={() =>
-                            setDeleteModal({ open: false, admin: null })
+                            setDeleteModal({
+                                open: false,
+                                admin: null,
+                                password: "",
+                            })
                         }
                     />
                     <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
                         <button
-                            onClick={() =>
-                                setDeleteModal({ open: false, admin: null })
-                            }
+                            onClick={() => {
+                                setDeleteModal({
+                                    open: false,
+                                    admin: null,
+                                    password: "",
+                                });
+                                setDeleteErrors({});
+                            }}
                             className="absolute top-4 right-4 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
                         >
                             <X size={20} />
@@ -359,15 +382,49 @@ export default function Index({ admins, departments, filters }) {
                         <p className="text-slate-500 mb-6">
                             Are you sure you want to delete{" "}
                             <span className="font-semibold text-slate-700">
-                                {deleteModal.admin?.name}
+                                {deleteModal.admin?.first_name}{" "}
+                                {deleteModal.admin?.last_name}
                             </span>
                             ? This action cannot be undone.
                         </p>
+
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                Enter your password to confirm deletion *
+                            </label>
+                            <input
+                                type="password"
+                                value={deleteModal.password}
+                                onChange={(e) =>
+                                    setDeleteModal({
+                                        ...deleteModal,
+                                        password: e.target.value,
+                                    })
+                                }
+                                placeholder="Your password"
+                                className={`w-full px-4 py-2.5 rounded-lg border transition-colors focus:outline-none focus:ring-2 ${
+                                    deleteErrors.password
+                                        ? "border-rose-500 focus:ring-rose-500/50"
+                                        : "border-slate-200 focus:ring-blue-500/50"
+                                }`}
+                            />
+                            {deleteErrors.password && (
+                                <p className="text-sm text-rose-600 mt-2">
+                                    {deleteErrors.password}
+                                </p>
+                            )}
+                        </div>
+
                         <div className="flex justify-end gap-3">
                             <button
-                                onClick={() =>
-                                    setDeleteModal({ open: false, admin: null })
-                                }
+                                onClick={() => {
+                                    setDeleteModal({
+                                        open: false,
+                                        admin: null,
+                                        password: "",
+                                    });
+                                    setDeleteErrors({});
+                                }}
                                 className="rounded-xl px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
                             >
                                 Cancel

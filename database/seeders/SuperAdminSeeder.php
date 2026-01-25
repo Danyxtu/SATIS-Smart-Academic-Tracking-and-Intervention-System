@@ -16,7 +16,8 @@ class SuperAdminSeeder extends Seeder
         User::updateOrCreate(
             ['email' => 'superadmin@satis.edu'],
             [
-                'name' => 'Super Admin',
+                'first_name' => 'Super',
+                'last_name' => 'Admin',
                 'password' => 'superadmin123',
                 'temp_password' => 'superadmin123',
                 'must_change_password' => true,

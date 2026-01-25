@@ -286,7 +286,7 @@ const ResetPasswordModal = ({ isOpen, onClose, user }) => {
                                                 onChange={(e) =>
                                                     setData(
                                                         "password",
-                                                        e.target.value
+                                                        e.target.value,
                                                     )
                                                 }
                                                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white pr-10"
@@ -296,7 +296,7 @@ const ResetPasswordModal = ({ isOpen, onClose, user }) => {
                                                 type="button"
                                                 onClick={() =>
                                                     setShowPassword(
-                                                        !showPassword
+                                                        !showPassword,
                                                     )
                                                 }
                                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
@@ -329,7 +329,7 @@ const ResetPasswordModal = ({ isOpen, onClose, user }) => {
                                             onChange={(e) =>
                                                 setData(
                                                     "password_confirmation",
-                                                    e.target.value
+                                                    e.target.value,
                                                 )
                                             }
                                             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
@@ -557,7 +557,7 @@ const TempPasswordModal = ({ isOpen, onClose, user, tempPassword }) => {
                                             <button
                                                 onClick={() =>
                                                     copyToClipboard(
-                                                        tempPassword
+                                                        tempPassword,
                                                     )
                                                 }
                                                 className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
@@ -713,7 +713,7 @@ export default function Index({
         router.get(
             route("admin.users.index"),
             { ...filters, search },
-            { preserveState: true }
+            { preserveState: true },
         );
     };
 
@@ -721,7 +721,7 @@ export default function Index({
         router.get(
             route("admin.users.index"),
             { ...filters, role, section: "all", search: filters.search },
-            { preserveState: true }
+            { preserveState: true },
         );
     };
 
@@ -729,7 +729,7 @@ export default function Index({
         router.get(
             route("admin.users.index"),
             { ...filters, section, role: "student", search: filters.search },
-            { preserveState: true }
+            { preserveState: true },
         );
     };
 
@@ -741,7 +741,7 @@ export default function Index({
         router.get(
             route("admin.users.index"),
             { ...filters, sort: field, direction },
-            { preserveState: true }
+            { preserveState: true },
         );
     };
 
@@ -757,7 +757,7 @@ export default function Index({
         setSelectedUsers((prev) =>
             prev.includes(userId)
                 ? prev.filter((id) => id !== userId)
-                : [...prev, userId]
+                : [...prev, userId],
         );
     };
 
@@ -778,7 +778,7 @@ export default function Index({
         if (selectedUsers.length === 0) return;
         if (
             confirm(
-                `Are you sure you want to delete ${selectedUsers.length} user(s)?`
+                `Are you sure you want to delete ${selectedUsers.length} user(s)?`,
             )
         ) {
             router.post(
@@ -788,7 +788,7 @@ export default function Index({
                     onSuccess: () => {
                         setSelectedUsers([]);
                     },
-                }
+                },
             );
         }
     };
@@ -1023,7 +1023,7 @@ export default function Index({
                                             <input
                                                 type="checkbox"
                                                 checked={selectedUsers.includes(
-                                                    user.id
+                                                    user.id,
                                                 )}
                                                 onChange={() =>
                                                     handleSelect(user.id)
@@ -1035,13 +1035,17 @@ export default function Index({
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
                                                     <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">
-                                                        {user.name
+                                                        {(
+                                                            user.first_name ||
+                                                            "U"
+                                                        )
                                                             .charAt(0)
                                                             .toUpperCase()}
                                                     </span>
                                                 </div>
                                                 <span className="font-medium text-gray-900 dark:text-white">
-                                                    {user.name}
+                                                    {user.first_name}{" "}
+                                                    {user.last_name}
                                                 </span>
                                             </div>
                                         </td>
@@ -1064,7 +1068,7 @@ export default function Index({
                                         </td>
                                         <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
                                             {new Date(
-                                                user.created_at
+                                                user.created_at,
                                             ).toLocaleDateString()}
                                         </td>
                                         <td className="px-4 py-4 text-right">

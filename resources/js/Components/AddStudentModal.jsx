@@ -4,20 +4,23 @@ import { X } from "lucide-react";
 
 const AddStudentModal = ({ subjectId, subjectLabel, onClose }) => {
     const { data, setData, post, processing, errors, reset } = useForm({
-        name: "",
+        first_name: "",
+        last_name: "",
+        middle_name: "",
         lrn: "",
         email: "",
     });
 
     useEffect(() => {
-        if (!data.name) {
+        if (!data.first_name || !data.last_name) {
             setData("email", "");
             return;
         }
 
-        setData("email", generateEmail(data.name));
+        const fullName = `${data.first_name} ${data.last_name}`;
+        setData("email", generateEmail(fullName));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [data.name]);
+    }, [data.first_name, data.last_name]);
 
     const handleClose = () => {
         reset();
@@ -35,7 +38,9 @@ const AddStudentModal = ({ subjectId, subjectLabel, onClose }) => {
         });
     };
 
-    const canSubmit = Boolean(subjectId && data.name && data.lrn);
+    const canSubmit = Boolean(
+        subjectId && data.first_name && data.last_name && data.lrn,
+    );
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
@@ -64,22 +69,68 @@ const AddStudentModal = ({ subjectId, subjectLabel, onClose }) => {
                     <div className="p-6 space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700">
-                                Student Name
+                                First Name *
                             </label>
                             <input
                                 type="text"
-                                name="name"
+                                name="first_name"
                                 required
                                 className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                                value={data.name}
+                                value={data.first_name}
                                 onChange={(e) =>
-                                    setData("name", e.target.value)
+                                    setData("first_name", e.target.value)
                                 }
-                                placeholder="e.g., Juan Dela Cruz"
+                                placeholder="e.g., Juan"
                             />
-                            {errors.name && (
+                            {errors.first_name && (
                                 <p className="text-sm text-red-600 mt-1">
-                                    {errors.name}
+                                    {errors.first_name}
+                                </p>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                                Last Name *
+                            </label>
+                            <input
+                                type="text"
+                                name="last_name"
+                                required
+                                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                                value={data.last_name}
+                                onChange={(e) =>
+                                    setData("last_name", e.target.value)
+                                }
+                                placeholder="e.g., Dela Cruz"
+                            />
+                            {errors.last_name && (
+                                <p className="text-sm text-red-600 mt-1">
+                                    {errors.last_name}
+                                </p>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                                Middle Name{" "}
+                                <span className="text-xs text-gray-400">
+                                    (Optional)
+                                </span>
+                            </label>
+                            <input
+                                type="text"
+                                name="middle_name"
+                                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                                value={data.middle_name}
+                                onChange={(e) =>
+                                    setData("middle_name", e.target.value)
+                                }
+                                placeholder="e.g., Miguel"
+                            />
+                            {errors.middle_name && (
+                                <p className="text-sm text-red-600 mt-1">
+                                    {errors.middle_name}
                                 </p>
                             )}
                         </div>

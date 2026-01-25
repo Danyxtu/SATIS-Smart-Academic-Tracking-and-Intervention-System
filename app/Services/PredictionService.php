@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Enrollment;
-use App\Models\Grade;
 use Illuminate\Support\Collection;
 
 class PredictionService

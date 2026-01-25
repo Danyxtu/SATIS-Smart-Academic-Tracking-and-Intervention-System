@@ -19,13 +19,13 @@ class DepartmentController extends Controller
     public function index(Request $request): Response
     {
         $query = Department::withCount(['admins', 'teachers', 'students'])
-            ->with('creator:id,name');
+            ->with('creator:id,first_name,last_name');
 
         // Search
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
+                $q->where('first_name', 'like', "%{$search}%")
                     ->orWhere('code', 'like', "%{$search}%");
             });
         }
@@ -77,7 +77,7 @@ class DepartmentController extends Controller
      */
     public function show(Department $department): Response
     {
-        $department->load(['creator:id,name']);
+        $department->load(['creator:id,first_name,last_name']);
         $department->loadCount(['admins', 'teachers', 'students']);
 
         $admins = $department->admins()
@@ -85,7 +85,7 @@ class DepartmentController extends Controller
             ->get()
             ->map(fn($user) => [
                 'id' => $user->id,
-                'name' => $user->name,
+                'name' => $user->first_name . ' ' . $user->last_name,
                 'email' => $user->email,
                 'created_at' => $user->created_at->format('M d, Y'),
             ]);
