@@ -4,7 +4,8 @@ import Dropdown from "@/Components/Dropdown";
 import NavLink from "@/Components/NavLink";
 import ResponsiveNavLink from "@/Components/ResponsiveNavLink";
 import DarkModeToggle from "@/Components/DarkModeToggle";
-import { Link, usePage } from "@inertiajs/react";
+import ConfirmationDialog from "@/Components/ConfirmationDialog";
+import { Link, usePage, router } from "@inertiajs/react";
 import UserPicture from "../../assets/user.png";
 import {
     House,
@@ -22,6 +23,17 @@ export default function SuperAdminLayout({ children }) {
     const { auth, flash } = usePage().props;
     const [showingNavigationDropdown, setShowingNavigationDropdown] =
         useState(false);
+    const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
+
+    // Handle logout confirmation
+    const handleLogoutClick = () => {
+        setShowLogoutConfirmation(true);
+    };
+
+    const handleConfirmLogout = () => {
+        // Use Inertia router to post the logout request
+        router.post(route("logout"));
+    };
 
     // Super Admin Navigation Items
     const menuItems = [
@@ -127,7 +139,7 @@ export default function SuperAdminLayout({ children }) {
                             <div className="hidden space-x-4 sm:-my-px sm:ml-10 sm:flex">
                                 {menuItems.map((item) => {
                                     const routeExists = route().has(
-                                        item.destination
+                                        item.destination,
                                     );
                                     const isActive = routeExists
                                         ? route().current(item.activeCheck)
@@ -216,17 +228,15 @@ export default function SuperAdminLayout({ children }) {
                                                 Profile Settings
                                             </div>
                                         </Dropdown.Link>
-                                        <Dropdown.Link
-                                            href={route("logout")}
-                                            method="post"
-                                            as="button"
-                                            className="text-red-600 hover:bg-red-50"
+                                        <button
+                                            onClick={handleLogoutClick}
+                                            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 dark:text-red-400"
                                         >
                                             <div className="flex items-center gap-2">
                                                 <LogOut size={16} />
                                                 Log Out
                                             </div>
-                                        </Dropdown.Link>
+                                        </button>
                                     </Dropdown.Content>
                                 </Dropdown>
                             </div>
@@ -237,7 +247,7 @@ export default function SuperAdminLayout({ children }) {
                             <button
                                 onClick={() =>
                                     setShowingNavigationDropdown(
-                                        (previousState) => !previousState
+                                        (previousState) => !previousState,
                                     )
                                 }
                                 className="inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none transition-colors"
@@ -308,14 +318,12 @@ export default function SuperAdminLayout({ children }) {
                             <ResponsiveNavLink href={route("profile.edit")}>
                                 Profile Settings
                             </ResponsiveNavLink>
-                            <ResponsiveNavLink
-                                method="post"
-                                href={route("logout")}
-                                as="button"
-                                className="text-red-600"
+                            <button
+                                onClick={handleLogoutClick}
+                                className="block w-full text-left px-4 py-2 text-base font-medium text-red-600 hover:bg-red-50 hover:text-red-700 rounded-md"
                             >
                                 Log Out
-                            </ResponsiveNavLink>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -325,6 +333,18 @@ export default function SuperAdminLayout({ children }) {
             <main className="flex-1 p-6">
                 <div className="max-w-7xl mx-auto">{children}</div>
             </main>
+
+            {/* Logout Confirmation Dialog */}
+            <ConfirmationDialog
+                show={showLogoutConfirmation}
+                title="Log Out"
+                message="Are you sure you want to log out of your account?"
+                dangerButtonText="Log Out"
+                cancelButtonText="Cancel"
+                onConfirm={handleConfirmLogout}
+                onCancel={() => setShowLogoutConfirmation(false)}
+                isDangerous={true}
+            />
         </div>
     );
 }
