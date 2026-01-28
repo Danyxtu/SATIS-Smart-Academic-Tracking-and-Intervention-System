@@ -1,6 +1,4 @@
-import ApplicationLogo from "@/Components/ApplicationLogo";
 import Background from "../../assets/background.png";
-import { Link } from "@inertiajs/react";
 
 export default function GuestLayout({ children }) {
     return (

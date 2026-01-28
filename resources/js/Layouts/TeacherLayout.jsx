@@ -18,9 +18,9 @@ import {
     LogOut,
     Menu,
     X,
-    ClipboardList, // For Interventions
-    CalendarCheck, // For Attendance
-    BookOpen, // For My Classes
+    ClipboardList,
+    CalendarCheck,
+    BookOpen,
 } from "lucide-react";
 
 export default function TeacherLayout({ children }) {
@@ -38,11 +38,10 @@ export default function TeacherLayout({ children }) {
     };
 
     const handleConfirmLogout = () => {
-        // Use Inertia router to post the logout request
         router.post(route("logout"));
     };
 
-    // --- (NEW) Teacher Navigation Items (Based on our discussion) ---
+    // Navigations
     const menuItems = [
         {
             icon: <House size={18} />,
@@ -54,7 +53,6 @@ export default function TeacherLayout({ children }) {
         {
             icon: <BookOpen size={18} />,
             label: "My Classes",
-            // We will need to create this route
             destination: "teacher.classes.index",
             activeCheck: "teacher.classes.*",
             showBadge: false,
@@ -62,7 +60,6 @@ export default function TeacherLayout({ children }) {
         {
             icon: <CalendarCheck size={18} />,
             label: "Attendance",
-            // We will need to create this route
             destination: "teacher.attendance.index",
             activeCheck: "teacher.attendance.*",
             showBadge: false,
@@ -71,10 +68,9 @@ export default function TeacherLayout({ children }) {
         {
             icon: <ClipboardList size={18} />,
             label: "Interventions",
-            // We will need to create this route
             destination: "teacher.interventions.index",
             activeCheck: "teacher.interventions.*",
-            showBadge: true, // Show notification badge on interventions
+            showBadge: true,
             badgeCount: pendingInterventions,
         },
     ];
@@ -86,7 +82,7 @@ export default function TeacherLayout({ children }) {
                 <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 z-50">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex justify-between h-16">
-                            {/* 1. Logo & Main Nav Links */}
+                            {/* Logo & Main Nav Links */}
                             <div className="flex">
                                 {/* Logo */}
                                 <div className="flex-shrink-0 flex items-center">
@@ -120,12 +116,11 @@ export default function TeacherLayout({ children }) {
                                                         : "#"
                                                 }
                                                 active={isActive}
-                                                // This className logic is correct for the Breeze NavLink
                                                 className={`relative inline-flex items-center gap-2 px-1 pt-1 border-b-2 text-sm font-medium
                                                 ${
                                                     isActive
-                                                        ? "border-indigo-500 text-indigo-600" // Active
-                                                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" // Inactive
+                                                        ? "border-indigo-500 text-indigo-600"
+                                                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                                                 }
                                                 ${
                                                     !routeExists
@@ -151,7 +146,7 @@ export default function TeacherLayout({ children }) {
                                 </div>
                             </div>
 
-                            {/* 2. Right Side: Bell & Profile */}
+                            {/*Right Side: Bell & Profile */}
                             <div className="hidden sm:flex sm:items-center sm:ml-6">
                                 <Link
                                     href={
@@ -213,7 +208,7 @@ export default function TeacherLayout({ children }) {
                                 </div>
                             </div>
 
-                            {/* 3. Hamburger Menu (Mobile) */}
+                            {/*Hamburger Menu (Mobile) */}
                             <div className="-mr-2 flex items-center sm:hidden">
                                 <button
                                     onClick={() =>
@@ -304,9 +299,8 @@ export default function TeacherLayout({ children }) {
                     </div>
                 </nav>
 
-                {/* --- (NEW) Page Content (Full Width) --- */}
+                {/* --- Page Content (Full Width) --- */}
                 <main className="flex-1 p-6">
-                    {/* We use max-w-full to allow tables to use the whole screen */}
                     <div className="max-w-full mx-auto">{children}</div>
                 </main>
                 <LoadingOverlay />
