@@ -1,11 +1,9 @@
 import { useState } from "react";
 import ApplicationLogo from "@/Components/ApplicationLogo";
 import Dropdown from "@/Components/Dropdown";
-import NavLink from "@/Components/NavLink"; // This is the Breeze NavLink
+import NavLink from "@/Components/NavLink";
 import ResponsiveNavLink from "@/Components/ResponsiveNavLink";
-import NotificationBadge, {
-    NotificationDot,
-} from "@/Components/NotificationBadge";
+import { NotificationDot } from "@/Components/NotificationBadge";
 import NotificationDropdown from "@/Components/NotificationDropdown";
 import DarkModeToggle from "@/Components/DarkModeToggle";
 import ConfirmationDialog from "@/Components/ConfirmationDialog";
@@ -18,11 +16,10 @@ import {
     Lightbulb,
     LogOut,
     Newspaper,
-    NotebookPen,
     PenLine,
     Menu,
     X,
-    BarChart3, // Added for Analytics
+    BarChart3,
 } from "lucide-react";
 
 export default function AuthenticatedLayout({ children }) {
@@ -40,13 +37,9 @@ export default function AuthenticatedLayout({ children }) {
     };
 
     const handleConfirmLogout = () => {
-        // Use Inertia router to post the logout request
         router.post(route("logout"));
     };
 
-    // --- Sidebar Menu Items (FIXED) ---
-    // I've added 'activeCheck' for robust highlighting (e.g., 'analytics.*')
-    // And updated 'destination' to the correct route name.
     const menuItems = [
         {
             icon: <House size={24} />,
@@ -61,19 +54,19 @@ export default function AuthenticatedLayout({ children }) {
             destination: "learn-more",
             activeCheck: "learn-more",
             showBadge: false,
-        }, // Assuming this is a route
+        },
         {
             icon: <PenLine size={24} />,
             label: "Attendance",
             destination: "attendance",
             activeCheck: "attendance",
             showBadge: false,
-        }, // Assuming this is a route
+        },
         {
-            icon: <BarChart3 size={24} />, // Changed icon
-            label: "Performance Analytics", // Changed label
-            destination: "analytics.index", // 1. FIXED DESTINATION
-            activeCheck: "analytics.*", // 2. FIXED ACTIVE CHECK
+            icon: <BarChart3 size={24} />,
+            label: "Performance Analytics",
+            destination: "analytics.index",
+            activeCheck: "analytics.*",
             showBadge: false,
         },
         {
@@ -81,7 +74,7 @@ export default function AuthenticatedLayout({ children }) {
             label: "Interventions & Feed",
             destination: "interventions-feed",
             activeCheck: "interventions-feed",
-            showBadge: true, // Show notification badge on interventions
+            showBadge: true,
             badgeCount: unreadCount,
         },
         {
@@ -93,7 +86,6 @@ export default function AuthenticatedLayout({ children }) {
         },
     ];
 
-    // ✅ Optimized Sidebar Component
     const Sidebar = () => (
         <aside className="fixed left-0 top-0 w-64 h-screen flex-col bg-white dark:bg-gray-800 text-black dark:text-gray-100 shadow-lg z-40 hidden lg:flex">
             {/* Logo Section */}
@@ -124,7 +116,6 @@ export default function AuthenticatedLayout({ children }) {
             {/* Menu Items (FIXED) */}
             <nav className="flex-1 px-4 py-6 space-y-2">
                 {menuItems.map((item, i) => {
-                    // Check if the current route matches the 'activeCheck' pattern
                     const isActive = route().current(item.activeCheck);
 
                     return (
@@ -132,13 +123,11 @@ export default function AuthenticatedLayout({ children }) {
                             key={i}
                             href={route(item.destination)}
                             active={isActive}
-                            // --- 3. FIXED STYLING ---
-                            // We use the `active` prop to conditionally apply classes
                             className={`flex items-center gap-3 px-4 py-3 text-gray-600 w-full rounded-lg transition-all duration-150
                                 ${
                                     isActive
-                                        ? "bg-pink-100 text-pink-700 font-medium" // Active styles
-                                        : "hover:bg-gray-100" // Inactive styles
+                                        ? "bg-pink-100 text-pink-700 font-medium"
+                                        : "hover:bg-gray-100"
                                 }
                             `}
                         >
@@ -177,7 +166,7 @@ export default function AuthenticatedLayout({ children }) {
         </aside>
     );
 
-    // ✅ Main Layout
+    // Main Layout
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
             <Sidebar />
@@ -252,7 +241,7 @@ export default function AuthenticatedLayout({ children }) {
                         </div>
                     </div>
 
-                    {/* Responsive Navigation Menu (Mobile) (FIXED) */}
+                    {/* Responsive Navigation Menu (Mobile)*/}
                     <div
                         className={
                             (showingNavigationDropdown ? "block" : "hidden") +
@@ -264,7 +253,7 @@ export default function AuthenticatedLayout({ children }) {
                                 <ResponsiveNavLink
                                     key={item.label}
                                     href={route(item.destination)}
-                                    active={route().current(item.activeCheck)} // Use activeCheck here too
+                                    active={route().current(item.activeCheck)}
                                 >
                                     <div className="flex items-center justify-between w-full">
                                         <span>{item.label}</span>

@@ -32,7 +32,6 @@ export default function AdminLayout({ children }) {
     };
 
     const handleConfirmLogout = () => {
-        // Use Inertia router to post the logout request
         router.post(route("logout"));
     };
 
