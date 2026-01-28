@@ -7,7 +7,8 @@ import NotificationBadge, {
     NotificationDot,
 } from "../Components/NotificationBadge";
 import DarkModeToggle from "@/Components/DarkModeToggle";
-import { Link, usePage } from "@inertiajs/react";
+import ConfirmationDialog from "@/Components/ConfirmationDialog";
+import { Link, usePage, router } from "@inertiajs/react";
 import UserPicture from "../../assets/user.png";
 import { LoadingProvider } from "../Context/LoadingContext";
 import LoadingOverlay from "../Components/LoadingOverlay";
@@ -26,9 +27,20 @@ export default function TeacherLayout({ children }) {
     const { auth, notifications } = usePage().props;
     const [showingNavigationDropdown, setShowingNavigationDropdown] =
         useState(false);
+    const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
 
     // Get pending interventions count from shared notifications
     const pendingInterventions = notifications?.pendingInterventions || 0;
+
+    // Handle logout confirmation
+    const handleLogoutClick = () => {
+        setShowLogoutConfirmation(true);
+    };
+
+    const handleConfirmLogout = () => {
+        // Use Inertia router to post the logout request
+        router.post(route("logout"));
+    };
 
     // --- (NEW) Teacher Navigation Items (Based on our discussion) ---
     const menuItems = [
@@ -39,7 +51,7 @@ export default function TeacherLayout({ children }) {
             activeCheck: "teacher.dashboard",
             showBadge: false,
         },
-         {
+        {
             icon: <BookOpen size={18} />,
             label: "My Classes",
             // We will need to create this route
@@ -55,7 +67,7 @@ export default function TeacherLayout({ children }) {
             activeCheck: "teacher.attendance.*",
             showBadge: false,
         },
-       
+
         {
             icon: <ClipboardList size={18} />,
             label: "Interventions",
@@ -91,7 +103,7 @@ export default function TeacherLayout({ children }) {
                                     {menuItems.map((item) => {
                                         // Check if the route exists before trying to render a link
                                         const routeExists = route().has(
-                                            item.destination
+                                            item.destination,
                                         );
                                         const isActive = routeExists
                                             ? route().current(item.activeCheck)
@@ -103,7 +115,7 @@ export default function TeacherLayout({ children }) {
                                                 href={
                                                     routeExists
                                                         ? route(
-                                                              item.destination
+                                                              item.destination,
                                                           )
                                                         : "#"
                                                 }
@@ -144,10 +156,10 @@ export default function TeacherLayout({ children }) {
                                 <Link
                                     href={
                                         route().has(
-                                            "teacher.interventions.index"
+                                            "teacher.interventions.index",
                                         )
                                             ? route(
-                                                  "teacher.interventions.index"
+                                                  "teacher.interventions.index",
                                               )
                                             : "#"
                                     }
@@ -190,13 +202,12 @@ export default function TeacherLayout({ children }) {
                                             >
                                                 Profile
                                             </Dropdown.Link>
-                                            <Dropdown.Link
-                                                href={route("logout")}
-                                                method="post"
-                                                as="button"
+                                            <button
+                                                onClick={handleLogoutClick}
+                                                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-300"
                                             >
                                                 Log Out
-                                            </Dropdown.Link>
+                                            </button>
                                         </Dropdown.Content>
                                     </Dropdown>
                                 </div>
@@ -207,7 +218,7 @@ export default function TeacherLayout({ children }) {
                                 <button
                                     onClick={() =>
                                         setShowingNavigationDropdown(
-                                            (previousState) => !previousState
+                                            (previousState) => !previousState,
                                         )
                                     }
                                     className="inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none"
@@ -232,7 +243,7 @@ export default function TeacherLayout({ children }) {
                         <div className="pt-2 pb-3 space-y-1">
                             {menuItems.map((item) => {
                                 const routeExists = route().has(
-                                    item.destination
+                                    item.destination,
                                 );
                                 const isActive = routeExists
                                     ? route().current(item.activeCheck)
@@ -282,13 +293,12 @@ export default function TeacherLayout({ children }) {
                                 <ResponsiveNavLink href={route("profile.edit")}>
                                     Profile
                                 </ResponsiveNavLink>
-                                <ResponsiveNavLink
-                                    method="post"
-                                    href={route("logout")}
-                                    as="button"
+                                <button
+                                    onClick={handleLogoutClick}
+                                    className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800 rounded-md"
                                 >
                                     Log Out
-                                </ResponsiveNavLink>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -300,6 +310,18 @@ export default function TeacherLayout({ children }) {
                     <div className="max-w-full mx-auto">{children}</div>
                 </main>
                 <LoadingOverlay />
+
+                {/* Logout Confirmation Dialog */}
+                <ConfirmationDialog
+                    show={showLogoutConfirmation}
+                    title="Log Out"
+                    message="Are you sure you want to log out of your account?"
+                    dangerButtonText="Log Out"
+                    cancelButtonText="Cancel"
+                    onConfirm={handleConfirmLogout}
+                    onCancel={() => setShowLogoutConfirmation(false)}
+                    isDangerous={true}
+                />
             </div>
         </LoadingProvider>
     );
