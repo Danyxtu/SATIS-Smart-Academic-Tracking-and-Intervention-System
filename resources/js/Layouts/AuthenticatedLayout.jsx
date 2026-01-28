@@ -8,7 +8,8 @@ import NotificationBadge, {
 } from "@/Components/NotificationBadge";
 import NotificationDropdown from "@/Components/NotificationDropdown";
 import DarkModeToggle from "@/Components/DarkModeToggle";
-import { Link, usePage } from "@inertiajs/react";
+import ConfirmationDialog from "@/Components/ConfirmationDialog";
+import { Link, usePage, router } from "@inertiajs/react";
 import UserPicture from "../../assets/user.png";
 import {
     Bell,
@@ -28,9 +29,20 @@ export default function AuthenticatedLayout({ children }) {
     const { auth, notifications } = usePage().props;
     const [showingNavigationDropdown, setShowingNavigationDropdown] =
         useState(false);
+    const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
 
     // Get unread notification count from shared notifications
     const unreadCount = notifications?.unreadCount || 0;
+
+    // Handle logout confirmation
+    const handleLogoutClick = () => {
+        setShowLogoutConfirmation(true);
+    };
+
+    const handleConfirmLogout = () => {
+        // Use Inertia router to post the logout request
+        router.post(route("logout"));
+    };
 
     // --- Sidebar Menu Items (FIXED) ---
     // I've added 'activeCheck' for robust highlighting (e.g., 'analytics.*')
@@ -154,15 +166,13 @@ export default function AuthenticatedLayout({ children }) {
 
             {/* Logout Button */}
             <div className="border-t-2 border-primary p-2">
-                <Link
-                    href={route("logout")}
-                    method="post"
-                    as="button"
+                <button
+                    onClick={handleLogoutClick}
                     className="w-full px-4 h-[50px] flex items-center justify-start gap-3 rounded-lg text-gray-600 hover:bg-red-600 hover:text-white cursor-pointer transition-all duration-150"
                 >
                     <LogOut size={24} />
                     <p className="font-medium">Log out</p>
-                </Link>
+                </button>
             </div>
         </aside>
     );
@@ -211,13 +221,12 @@ export default function AuthenticatedLayout({ children }) {
                                             >
                                                 Profile
                                             </Dropdown.Link>
-                                            <Dropdown.Link
-                                                href={route("logout")}
-                                                method="post"
-                                                as="button"
+                                            <button
+                                                onClick={handleLogoutClick}
+                                                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-300"
                                             >
                                                 Log Out
-                                            </Dropdown.Link>
+                                            </button>
                                         </Dropdown.Content>
                                     </Dropdown>
                                 </div>
@@ -228,7 +237,7 @@ export default function AuthenticatedLayout({ children }) {
                                 <button
                                     onClick={() =>
                                         setShowingNavigationDropdown(
-                                            (previousState) => !previousState
+                                            (previousState) => !previousState,
                                         )
                                     }
                                     className="inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none"
@@ -286,13 +295,12 @@ export default function AuthenticatedLayout({ children }) {
                                 <ResponsiveNavLink href={route("profile.edit")}>
                                     Profile
                                 </ResponsiveNavLink>
-                                <ResponsiveNavLink
-                                    method="post"
-                                    href={route("logout")}
-                                    as="button"
+                                <button
+                                    onClick={handleLogoutClick}
+                                    className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800 rounded-md"
                                 >
                                     Log Out
-                                </ResponsiveNavLink>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -303,6 +311,18 @@ export default function AuthenticatedLayout({ children }) {
                     {children}
                 </main>
             </div>
+
+            {/* Logout Confirmation Dialog */}
+            <ConfirmationDialog
+                show={showLogoutConfirmation}
+                title="Log Out"
+                message="Are you sure you want to log out of your account?"
+                dangerButtonText="Log Out"
+                cancelButtonText="Cancel"
+                onConfirm={handleConfirmLogout}
+                onCancel={() => setShowLogoutConfirmation(false)}
+                isDangerous={true}
+            />
         </div>
     );
 }
