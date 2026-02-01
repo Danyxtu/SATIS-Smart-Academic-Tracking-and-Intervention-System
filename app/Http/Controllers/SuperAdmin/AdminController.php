@@ -30,7 +30,9 @@ class AdminController extends Controller
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
+                $q->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('middle_name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
             });
         }
@@ -75,7 +77,9 @@ class AdminController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'middle_name' => ['nullable', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'department_id' => ['required', 'exists:departments,id'],
             'password' => ['nullable', Rules\Password::defaults()],
@@ -85,7 +89,9 @@ class AdminController extends Controller
         $plainPassword = $validated['password'] ?? Str::random(12);
 
         $admin = User::create([
-            'name' => $validated['name'],
+            'first_name' => $validated['first_name'],
+            'last_name' => $validated['last_name'],
+            'middle_name' => $validated['middle_name'] ?? null,
             'email' => $validated['email'],
             'password' => $plainPassword, // Will be hashed on first login
             'temp_password' => $plainPassword,
@@ -109,7 +115,9 @@ class AdminController extends Controller
             ->route('superadmin.admins.index')
             ->with('success', 'Admin created successfully.')
             ->with('new_admin_password', [
-                'name' => $admin->name,
+                'first_name' => $admin->first_name,
+                'last_name' => $admin->last_name,
+                'middle_name' => $admin->middle_name,
                 'email' => $admin->email,
                 'password' => $plainPassword,
             ]);
@@ -138,7 +146,9 @@ class AdminController extends Controller
         return Inertia::render('SuperAdmin/Admins/Show', [
             'admin' => [
                 'id' => $admin->id,
-                'name' => $admin->name,
+                'first_name' => $admin->first_name,
+                'last_name' => $admin->last_name,
+                'middle_name' => $admin->middle_name,
                 'email' => $admin->email,
                 'department' => $admin->department ? [
                     'id' => $admin->department->id,
@@ -171,7 +181,9 @@ class AdminController extends Controller
         return Inertia::render('SuperAdmin/Admins/Edit', [
             'admin' => [
                 'id' => $admin->id,
-                'name' => $admin->name,
+                'first_name' => $admin->first_name,
+                'last_name' => $admin->last_name,
+                'middle_name' => $admin->middle_name,
                 'email' => $admin->email,
                 'department_id' => $admin->department_id,
                 'created_at' => $admin->created_at->toISOString(),
@@ -191,14 +203,18 @@ class AdminController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'middle_name' => ['nullable', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($admin->id)],
             'department_id' => ['required', 'exists:departments,id'],
             'password' => ['nullable', 'string', 'min:8'],
         ]);
 
         $updateData = [
-            'name' => $validated['name'],
+            'first_name' => $validated['first_name'],
+            'last_name' => $validated['last_name'],
+            'middle_name' => $validated['middle_name'],
             'email' => $validated['email'],
             'department_id' => $validated['department_id'],
         ];
@@ -265,7 +281,9 @@ class AdminController extends Controller
         return back()
             ->with('success', 'Password reset successfully.')
             ->with('new_admin_password', [
-                'name' => $admin->name,
+                'first_name' => $admin->first_name,
+                'last_name' => $admin->last_name,
+                'middle_name' => $admin->middle_name,
                 'email' => $admin->email,
                 'password' => $plainPassword,
             ]);

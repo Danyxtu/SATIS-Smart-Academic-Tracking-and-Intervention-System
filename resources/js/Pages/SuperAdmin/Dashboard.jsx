@@ -65,16 +65,16 @@ export default function Dashboard({
             textColor: "text-amber-600",
             href: "#",
         },
-        {
-            name: "Subjects",
-            value: stats.total_subjects,
-            subtext: `${stats.active_subjects} active`,
-            icon: BookOpen,
-            gradient: "from-rose-500 to-pink-600",
-            bgLight: "bg-rose-50",
-            textColor: "text-rose-600",
-            href: route("superadmin.curriculum.index"),
-        },
+        // {
+        //     name: "Subjects",
+        //     value: stats.total_subjects,
+        //     subtext: `${stats.active_subjects} active`,
+        //     icon: BookOpen,
+        //     gradient: "from-rose-500 to-pink-600",
+        //     bgLight: "bg-rose-50",
+        //     textColor: "text-rose-600",
+        //     href: route("superadmin.curriculum.index"),
+        // },
     ];
 
     const quickActions = [
@@ -92,13 +92,13 @@ export default function Dashboard({
             href: route("superadmin.admins.create"),
             color: "from-violet-500 to-purple-600",
         },
-        {
-            name: "Add Subject",
-            description: "Add to master curriculum",
-            icon: BookOpen,
-            href: route("superadmin.curriculum.create"),
-            color: "from-emerald-500 to-teal-600",
-        },
+        // {
+        //     name: "Add Subject",
+        //     description: "Add to master curriculum",
+        //     icon: BookOpen,
+        //     href: route("superadmin.curriculum.create"),
+        //     color: "from-emerald-500 to-teal-600",
+        // },
         {
             name: "Settings",
             description: "Configure system settings",

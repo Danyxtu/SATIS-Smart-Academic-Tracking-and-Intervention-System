@@ -40,9 +40,9 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal'])
             ->name('admins.resend-credentials');
 
         // Curriculum Management (Master Subjects & Prerequisites)
-        Route::resource('curriculum', CurriculumController::class);
-        Route::post('/curriculum/{curriculum}/toggle-status', [CurriculumController::class, 'toggleStatus'])
-            ->name('curriculum.toggle-status');
+        // Route::resource('curriculum', CurriculumController::class);
+        // Route::post('/curriculum/{curriculum}/toggle-status', [CurriculumController::class, 'toggleStatus'])
+        //     ->name('curriculum.toggle-status');
 
         // System Settings
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
