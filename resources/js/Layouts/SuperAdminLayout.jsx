@@ -55,12 +55,12 @@ export default function SuperAdminLayout({ children }) {
             destination: "superadmin.admins.index",
             activeCheck: "superadmin.admins.*",
         },
-        {
-            icon: <BookOpen size={18} />,
-            label: "Curriculum",
-            destination: "superadmin.curriculum.index",
-            activeCheck: "superadmin.curriculum.*",
-        },
+        // {
+        //     icon: <BookOpen size={18} />,
+        //     label: "Curriculum",
+        //     destination: "superadmin.curriculum.index",
+        //     activeCheck: "superadmin.curriculum.*",
+        // },
         {
             icon: <Settings size={18} />,
             label: "Settings",
