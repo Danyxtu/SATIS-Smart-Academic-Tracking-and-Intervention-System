@@ -69,8 +69,11 @@ class TeacherRegistration extends Model
     /**
      * Scope to get registrations for a specific department.
      */
-    public function scopeForDepartment($query, int $departmentId)
+    public function scopeForDepartment($query, ?int $departmentId)
     {
+        if ($departmentId === null) {
+            return $query;
+        }
         return $query->where('department_id', $departmentId);
     }
 
