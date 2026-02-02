@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('code')->unique(); // e.g., "ICT", "STEM"
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('created_by')->nullable()->after('is_active');
             $table->timestamps();
         });
     }
