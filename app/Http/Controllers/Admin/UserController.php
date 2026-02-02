@@ -417,7 +417,14 @@ class UserController extends Controller
         $validated = $request->validate([
             'ids' => 'required|array',
             'ids.*' => 'exists:users,id',
+            'password' => 'required|string',
         ]);
+
+        // Verify the admin's password
+        $currentUser = Auth::user();
+        if (!Hash::check($validated['password'], $currentUser->password)) {
+            return back()->withErrors(['password' => 'The password you entered is incorrect.']);
+        }
 
         // Filter out the current admin user
         $currentUserId = Auth::id();
