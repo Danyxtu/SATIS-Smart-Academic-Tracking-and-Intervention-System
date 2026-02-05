@@ -23,6 +23,8 @@ import {
     Sparkles,
     Filter,
     Eye,
+    FileDown,
+    Printer,
 } from "lucide-react";
 
 import StudentRiskCard from "@/Components/StudentRiskCard";
@@ -30,6 +32,7 @@ import StatCard from "@/Components/StatCard";
 import ActivityFeedItem from "@/Components/ActivityFeedItem";
 import GradeUploader from "@/Components/GradeUploader";
 import PrimaryButton from "@/Components/PrimaryButton";
+import PriorityStudentsReportModal from "@/Components/PriorityStudentsReportModal";
 
 // --- Main Dashboard Page Component ---
 export default function Dashboard({
@@ -43,6 +46,7 @@ export default function Dashboard({
     const [showTutorial, setShowTutorial] = useState(false);
     const [currentStep, setCurrentStep] = useState(0);
     const [studentFilter, setStudentFilter] = useState("all");
+    const [showReportModal, setShowReportModal] = useState(false);
 
     const tutorialSteps = [
         {
@@ -160,8 +164,6 @@ export default function Dashboard({
                 return "1st Semester";
             case 2:
                 return "2nd Semester";
-            case 3:
-                return "Summer";
             default:
                 return `Semester ${semester}`;
         }
@@ -175,13 +177,13 @@ export default function Dashboard({
             iconBgColor: "bg-red-500",
             label: "grade < 75",
         },
-        {
-            title: "Average Grade",
-            value: `${stats.averageGrade}%`,
-            icon: Users,
-            iconBgColor: "bg-indigo-500",
-            label: "class avg",
-        },
+        // {
+        //     title: "Average Grade",
+        //     value: `${stats.averageGrade}%`,
+        //     icon: Users,
+        //     iconBgColor: "bg-indigo-500",
+        //     label: "class avg",
+        // },
         {
             title: "Needs Attention",
             value: stats.needsAttention,
@@ -224,7 +226,7 @@ export default function Dashboard({
     const filteredStudents = useMemo(() => {
         if (studentFilter === "all") return allStudentsWithRisk;
         return allStudentsWithRisk.filter(
-            (student) => student.riskLevel === studentFilter
+            (student) => student.riskLevel === studentFilter,
         );
     }, [allStudentsWithRisk, studentFilter]);
 
@@ -329,7 +331,7 @@ export default function Dashboard({
                                         </p>
                                         <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
                                             {getSemesterLabel(
-                                                academicPeriod.semester
+                                                academicPeriod.semester,
                                             )}
                                         </p>
                                     </div>
@@ -359,6 +361,14 @@ export default function Dashboard({
                         >
                             <HelpCircle size={18} />
                             How to Create a Class
+                        </button>
+                        {/* Print Report Button */}
+                        <button
+                            onClick={() => setShowReportModal(true)}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all hover:-translate-y-0.5 font-medium text-sm"
+                        >
+                            <Printer size={18} />
+                            Print Report
                         </button>
                     </div>
                 </div>
@@ -455,7 +465,7 @@ export default function Dashboard({
                             {filteredStudents.length > 0 ? (
                                 filteredStudents.map((student, index) => {
                                     const riskStyle = getRiskLevelBadge(
-                                        student.riskLevel
+                                        student.riskLevel,
                                     );
                                     const RiskIcon = riskStyle.icon;
 
@@ -489,7 +499,8 @@ export default function Dashboard({
                                             : `No ${
                                                   filterTabs.find(
                                                       (t) =>
-                                                          t.id === studentFilter
+                                                          t.id ===
+                                                          studentFilter,
                                                   )?.label
                                               } Students`}
                                     </h3>
@@ -543,7 +554,7 @@ export default function Dashboard({
                                         icon={ClipboardList}
                                         text={`Intervention for <strong>${item.enrollment.user.name}</strong> was created.`}
                                         time={new Date(
-                                            item.created_at
+                                            item.created_at,
                                         ).toLocaleDateString()}
                                         iconBgColor="bg-yellow-500"
                                     />
@@ -609,7 +620,7 @@ export default function Dashboard({
                                             {
                                                 size: 40,
                                                 className: "text-white",
-                                            }
+                                            },
                                         )}
                                     </div>
                                 </div>
@@ -646,7 +657,7 @@ export default function Dashboard({
                                                     />
                                                     {tip}
                                                 </li>
-                                            )
+                                            ),
                                         )}
                                     </ul>
                                 </div>
@@ -663,8 +674,8 @@ export default function Dashboard({
                                                 index === currentStep
                                                     ? "w-8 bg-indigo-500"
                                                     : index < currentStep
-                                                    ? "w-2 bg-indigo-300"
-                                                    : "w-2 bg-gray-300 dark:bg-gray-600"
+                                                      ? "w-2 bg-indigo-300"
+                                                      : "w-2 bg-gray-300 dark:bg-gray-600"
                                             }`}
                                         />
                                     ))}
@@ -720,6 +731,15 @@ export default function Dashboard({
                     </div>
                 </div>
             )}
+
+            {/* Priority Students Report Modal */}
+            <PriorityStudentsReportModal
+                show={showReportModal}
+                onClose={() => setShowReportModal(false)}
+                priorityStudents={priorityStudents}
+                academicPeriod={academicPeriod}
+                department={department}
+            />
         </TeacherLayout>
     );
 }

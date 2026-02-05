@@ -100,4 +100,10 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
             ->name('interventions.approve');
         Route::post('/interventions/{intervention}/reject', [App\Http\Controllers\Teacher\InterventionController::class, 'rejectCompletion'])
             ->name('interventions.reject');
+
+        // --- PRIORITY STUDENTS REPORT PDF EXPORT ---
+        // URL: /teacher/dashboard/priority-students/export/pdf
+        // Name: route('teacher.dashboard.priority-students.pdf')
+        Route::get('/dashboard/priority-students/export/pdf', [DashboardController::class, 'exportPriorityStudentsPdf'])
+            ->name('dashboard.priority-students.pdf');
     });

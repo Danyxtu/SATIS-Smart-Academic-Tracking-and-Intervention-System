@@ -35,5 +35,8 @@ class DatabaseSeeder extends Seeder
 
         // Seed master subjects with prerequisites
         $this->call(MasterSubjectSeeder::class);
+
+        // Seed subjects (classlists)
+        $this->call(SubjectSeeder::class);
     }
 }

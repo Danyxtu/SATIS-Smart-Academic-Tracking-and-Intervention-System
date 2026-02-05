@@ -126,4 +126,105 @@ class DashboardController extends Controller
             ] : null,
         ]);
     }
+
+    /**
+     * Export priority students report as PDF.
+     */
+    public function exportPriorityStudentsPdf(Request $request)
+    {
+        $teacher = Auth::user();
+        $teacher->load('department');
+
+        // Check if dompdf is available
+        if (! class_exists('Barryvdh\\DomPDF\\Facade\\Pdf')) {
+            return response()->json([
+                'message' => 'PDF export not available. Please install barryvdh/laravel-dompdf via Composer: composer require barryvdh/laravel-dompdf',
+            ], 501);
+        }
+
+        // Get filter options from request
+        $includeCritical = $request->boolean('critical', true);
+        $includeWarning = $request->boolean('warning', true);
+        $includeWatchlist = $request->boolean('watchlist', true);
+
+        // Get current academic period
+        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
+        $currentSemester = SystemSetting::getCurrentSemester();
+
+        // Get all enrollments for the teacher's subjects
+        $enrollments = Enrollment::whereHas('subject', function ($query) use ($teacher) {
+            $query->where('user_id', $teacher->id);
+        })->with([
+            'user',
+            'grades',
+            'student',
+            'subject',
+            'attendanceRecords',
+            'intervention',
+        ])->get();
+
+        $students = $enrollments->map(function ($enrollment) {
+            $grades = $enrollment->grades;
+            $hasGrades = $grades->isNotEmpty();
+            $averageGrade = $hasGrades ? $grades->avg('score') : null;
+            $studentProfile = $enrollment->student;
+
+            return [
+                'id' => optional($studentProfile)->id ?? $enrollment->user->id,
+                'first_name' => optional($studentProfile)->first_name ?? $enrollment->user->first_name,
+                'last_name' => optional($studentProfile)->last_name ?? $enrollment->user->last_name,
+                'avatar' => optional($studentProfile)->avatar,
+                'subject' => optional($enrollment->subject)->name,
+                'grade' => $hasGrades ? round($averageGrade) : null,
+                'has_grades' => $hasGrades,
+                'trend' => optional($studentProfile)->trend,
+                'enrollment_id' => $enrollment->id,
+                'intervention' => $enrollment->intervention ? [
+                    'id' => $enrollment->intervention->id,
+                    'type' => $enrollment->intervention->type,
+                    'status' => $enrollment->intervention->status,
+                    'notes' => $enrollment->intervention->notes,
+                ] : null,
+            ];
+        });
+
+        // Only consider students WITH grades for risk calculations
+        $studentsWithGrades = $students->filter(fn($s) => $s['has_grades'] === true);
+
+        // Priority Students categories
+        $criticalStudents = $studentsWithGrades->filter(fn($s) => $s['grade'] < 70)->values()->toArray();
+        $warningStudents = $studentsWithGrades->filter(fn($s) => $s['grade'] >= 70 && $s['grade'] < 75)->values()->toArray();
+        $watchlistStudents = $studentsWithGrades->filter(fn($s) => $s['grade'] >= 75 && $s['grade'] < 80 && $s['trend'] === 'Declining')->values()->toArray();
+
+        // Prepare view data
+        $viewData = [
+            'teacher' => [
+                'name' => $teacher->name,
+            ],
+            'department' => $teacher->department ? [
+                'id' => $teacher->department->id,
+                'name' => $teacher->department->name,
+                'code' => $teacher->department->code,
+            ] : null,
+            'academicPeriod' => [
+                'schoolYear' => $currentSchoolYear,
+                'semester' => $currentSemester,
+            ],
+            'criticalStudents' => $criticalStudents,
+            'warningStudents' => $warningStudents,
+            'watchlistStudents' => $watchlistStudents,
+            'includeCritical' => $includeCritical,
+            'includeWarning' => $includeWarning,
+            'includeWatchlist' => $includeWatchlist,
+        ];
+
+        /** @var \Barryvdh\DomPDF\PDF $pdf */
+        $pdf = app('dompdf.wrapper')->loadView('pdf.priority_students', $viewData);
+        $filename = sprintf(
+            'priority_students_report_%s.pdf',
+            now()->format('Y-m-d_His')
+        );
+
+        return $pdf->download($filename);
+    }
 }
