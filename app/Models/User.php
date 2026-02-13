@@ -63,6 +63,19 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the user's full name.
+     */
+    public function getNameAttribute(): string
+    {
+        $parts = array_filter([
+            $this->first_name,
+            $this->middle_name,
+            $this->last_name,
+        ]);
+        return implode(' ', $parts) ?: $this->email;
+    }
+
+    /**
      * Get the student profile.
      */
     public function student(): HasOne

@@ -80,7 +80,7 @@ class HandleInertiaRequests extends Middleware
         // For students: get unread notifications with details
         if ($user->role === 'student') {
             $notifications = StudentNotification::where('user_id', $user->id)
-                ->with(['sender:id,name', 'intervention:id,type,status'])
+                ->with(['sender:id,first_name,last_name', 'intervention:id,type,status'])
                 ->orderBy('created_at', 'desc')
                 ->limit(10)
                 ->get();

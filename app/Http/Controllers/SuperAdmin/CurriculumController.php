@@ -18,7 +18,7 @@ class CurriculumController extends Controller
      */
     public function index(Request $request): Response
     {
-        $query = MasterSubject::with(['prerequisites:id,code,name', 'creator:id,name'])
+        $query = MasterSubject::with(['prerequisites:id,code,name', 'creator:id,first_name,last_name'])
             ->withCount('subjects');
 
         // Search
@@ -141,7 +141,7 @@ class CurriculumController extends Controller
         $curriculum->load([
             'prerequisites:id,code,name,grade_level',
             'requiredFor:id,code,name,grade_level',
-            'creator:id,name',
+            'creator:id,first_name,last_name',
         ]);
         $curriculum->loadCount('subjects');
 

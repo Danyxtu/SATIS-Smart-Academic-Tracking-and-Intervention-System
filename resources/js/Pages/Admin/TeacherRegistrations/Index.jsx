@@ -359,7 +359,7 @@ const RejectModal = ({
     );
 };
 
-export default function Index({ registrations, pendingCount }) {
+export default function Index({ registrations = [], pendingCount = 0, error }) {
     const { flash } = usePage().props;
     const [searchQuery, setSearchQuery] = useState("");
     const [approveModal, setApproveModal] = useState({
@@ -373,11 +373,11 @@ export default function Index({ registrations, pendingCount }) {
     const [processing, setProcessing] = useState(false);
 
     // Filter registrations based on search
-    const filteredRegistrations = registrations.filter((reg) => {
+    const filteredRegistrations = (registrations || []).filter((reg) => {
         const query = searchQuery.toLowerCase();
         return (
-            reg.full_name.toLowerCase().includes(query) ||
-            reg.email.toLowerCase().includes(query) ||
+            (reg.full_name || "").toLowerCase().includes(query) ||
+            (reg.email || "").toLowerCase().includes(query) ||
             reg.department?.name?.toLowerCase().includes(query)
         );
     });
@@ -391,7 +391,7 @@ export default function Index({ registrations, pendingCount }) {
         router.post(
             route(
                 "admin.teacher-registrations.approve",
-                approveModal.registration.id
+                approveModal.registration.id,
             ),
             {},
             {
@@ -400,7 +400,7 @@ export default function Index({ registrations, pendingCount }) {
                     setApproveModal({ isOpen: false, registration: null });
                 },
                 onFinish: () => setProcessing(false),
-            }
+            },
         );
     };
 
@@ -413,7 +413,7 @@ export default function Index({ registrations, pendingCount }) {
         router.post(
             route(
                 "admin.teacher-registrations.reject",
-                rejectModal.registration.id
+                rejectModal.registration.id,
             ),
             { rejection_reason: reason },
             {
@@ -422,14 +422,14 @@ export default function Index({ registrations, pendingCount }) {
                     setRejectModal({ isOpen: false, registration: null });
                 },
                 onFinish: () => setProcessing(false),
-            }
+            },
         );
     };
 
     const handleViewDocument = (registration) => {
         window.open(
             route("admin.teacher-registrations.document", registration.id),
-            "_blank"
+            "_blank",
         );
     };
 
@@ -462,6 +462,16 @@ export default function Index({ registrations, pendingCount }) {
                         </div>
                     </div>
                 </div>
+
+                {/* Error Message (e.g., admin has no department) */}
+                {error && (
+                    <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-center gap-3">
+                        <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                        <span className="text-red-700 dark:text-red-300">
+                            {error}
+                        </span>
+                    </div>
+                )}
 
                 {/* Flash Messages */}
                 {flash?.success && (
