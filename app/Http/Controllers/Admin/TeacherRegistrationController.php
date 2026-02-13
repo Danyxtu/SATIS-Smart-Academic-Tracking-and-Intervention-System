@@ -41,6 +41,7 @@ class TeacherRegistrationController extends Controller
                     'first_name' => $registration->first_name,
                     'last_name' => $registration->last_name,
                     'middle_name' => $registration->middle_name,
+                    'full_name' => $registration->full_name,
                     'email' => $registration->email,
                     'department' => $registration->department ? [
                         'id' => $registration->department->id,
