@@ -19,7 +19,8 @@ class AttendanceController extends Controller
 
         // Get all enrollments for this student with attendance and subject data
         $enrollments = Enrollment::with([
-            'subject.teacher',
+            'subjectTeacher.subject',
+            'subjectTeacher.teacher',
             'attendanceRecords',
         ])
             ->where('user_id', $user->id)
@@ -63,9 +64,11 @@ class AttendanceController extends Controller
 
             return [
                 'id' => $enrollment->id,
-                'subjectId' => $enrollment->subject_id,
-                'subject' => $enrollment->subject?->name ?? 'Unknown Subject',
-                'instructor' => $enrollment->subject?->teacher?->name ?? 'N/A',
+                'subjectId' => $enrollment->subjectTeacher?->subject_id,
+                'subject' => $enrollment->subjectTeacher?->subject?->subject_name ?? 'Unknown Subject',
+                'instructor' => $enrollment->subjectTeacher?->teacher
+                    ? $enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name
+                    : 'N/A',
                 'rate' => $rate,
                 'total' => $total,
                 'present' => $present,
@@ -84,8 +87,8 @@ class AttendanceController extends Controller
                     'date' => $record->date->format('M d, Y'),
                     'dateRaw' => $record->date->format('Y-m-d'),
                     'time' => $record->created_at->format('h:i A'),
-                    'subject' => $enrollment?->subject?->name ?? 'Unknown Subject',
-                    'subjectId' => $enrollment?->subject_id,
+                    'subject' => $enrollment?->subjectTeacher?->subject?->subject_name ?? 'Unknown Subject',
+                    'subjectId' => $enrollment?->subjectTeacher?->subject_id,
                     'status' => ucfirst($record->status),
                     'statusRaw' => $record->status,
                 ];

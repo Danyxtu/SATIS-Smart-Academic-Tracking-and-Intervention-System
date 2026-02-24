@@ -39,9 +39,7 @@ class ProfileController extends Controller
             'status' => session('status'),
             'student' => $student ? [
                 'id' => $student->id,
-                'first_name' => $student->first_name,
-                'last_name' => $student->last_name,
-                'middle_name' => $student->middle_name,
+                'student_name' => $student->student_name,
                 'lrn' => $student->lrn,
                 'grade_level' => $student->grade_level,
                 'section' => $student->section,
@@ -70,9 +68,7 @@ class ProfileController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             // Student-specific fields (optional)
-            'first_name' => ['nullable', 'string', 'max:255'],
-            'last_name' => ['nullable', 'string', 'max:255'],
-            'middle_name' => ['nullable', 'string', 'max:255'],
+            'student_name' => ['nullable', 'string', 'max:255'],
             'lrn' => ['nullable', 'string', 'max:20'],
             'grade_level' => ['nullable', 'string', 'max:50'],
             'section' => ['nullable', 'string', 'max:50'],
@@ -98,9 +94,7 @@ class ProfileController extends Controller
 
             if ($student) {
                 $student->update([
-                    'first_name' => $validated['first_name'] ?? $student->first_name,
-                    'last_name' => $validated['last_name'] ?? $student->last_name,
-                    'middle_name' => $validated['middle_name'] ?? $student->middle_name,
+                    'student_name' => $validated['student_name'] ?? $student->student_name,
                     'lrn' => $validated['lrn'] ?? $student->lrn,
                     'grade_level' => $validated['grade_level'] ?? $student->grade_level,
                     'section' => $validated['section'] ?? $student->section,

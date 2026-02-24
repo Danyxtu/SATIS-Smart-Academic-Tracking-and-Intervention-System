@@ -26,7 +26,8 @@ class StudentDashboardController extends Controller
 
         // Get all enrollments for this student with related data
         $allEnrollments = Enrollment::with([
-            'subject',
+            'subjectTeacher.subject',
+            'subjectTeacher.teacher',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
@@ -36,13 +37,13 @@ class StudentDashboardController extends Controller
 
         // Filter enrollments by semester
         $enrollments = $allEnrollments->filter(function ($enrollment) use ($selectedSemester) {
-            $subjectSemester = $enrollment->subject?->semester;
+            $subjectSemester = $enrollment->subjectTeacher?->subject?->semester;
             return $subjectSemester == $selectedSemester;
         });
 
         // Count enrollments per semester for navigation
-        $semester1Count = $allEnrollments->filter(fn($e) => ($e->subject?->semester ?? '1') == '1')->count();
-        $semester2Count = $allEnrollments->filter(fn($e) => ($e->subject?->semester ?? '1') == '2')->count();
+        $semester1Count = $allEnrollments->filter(fn($e) => ($e->subjectTeacher?->subject?->semester ?? '1') == '1')->count();
+        $semester2Count = $allEnrollments->filter(fn($e) => ($e->subjectTeacher?->subject?->semester ?? '1') == '2')->count();
 
         $totalSubjects = $enrollments->count();
 
@@ -124,10 +125,12 @@ class StudentDashboardController extends Controller
 
             return [
                 'id' => $enrollment->id,
-                'subjectId' => $enrollment->subject_id,
-                'name' => $enrollment->subject?->name ?? 'Unknown Subject',
-                'section' => $enrollment->subject?->section,
-                'teacher' => $enrollment->subject?->user?->name ?? 'N/A',
+                'subjectId' => $enrollment->subjectTeacher?->subject_id,
+                'subject_name' => $enrollment->subjectTeacher?->subject?->subject_name ?? 'Unknown Subject',
+                'section' => $enrollment->subjectTeacher?->subject?->section,
+                'teacher_name' => $enrollment->subjectTeacher?->teacher
+                    ? $enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name
+                    : 'N/A',
                 'grade' => $percentage,
                 'gradeDisplay' => $percentage !== null ? "{$percentage}%" : 'N/A',
                 'attendance' => $attendanceRate,
@@ -144,7 +147,7 @@ class StudentDashboardController extends Controller
                     'id' => $task->id,
                     'description' => $task->description,
                     'isCompleted' => $task->is_completed,
-                    'subject' => $enrollment?->subject?->name ?? 'Unknown',
+                    'subject' => $enrollment?->subjectTeacher?->subject?->subject_name ?? 'Unknown',
                     'interventionId' => $intervention->id,
                 ]);
             })

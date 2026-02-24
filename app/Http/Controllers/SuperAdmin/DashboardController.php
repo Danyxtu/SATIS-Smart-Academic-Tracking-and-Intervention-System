@@ -4,7 +4,7 @@ namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Department;
-use App\Models\MasterSubject;
+use App\Models\Subject;
 use App\Models\SystemSetting;
 use App\Models\User;
 use Inertia\Inertia;
@@ -23,8 +23,8 @@ class DashboardController extends Controller
             'total_admins' => User::role('admin')->count(),
             'total_teachers' => User::role('teacher')->count(),
             'total_students' => User::role('student')->count(),
-            'total_subjects' => MasterSubject::count(),
-            'active_subjects' => MasterSubject::active()->count(),
+            'total_subjects' => Subject::count(),
+            'active_subjects' => Subject::count(), // All subjects are considered active
         ];
 
         $recentAdmins = User::role('admin')

@@ -204,8 +204,8 @@ class PredictionService
     private function estimateRemainingAssignments(Enrollment $enrollment): int
     {
         // Get the subject's grade structure
-        $subject = $enrollment->subject;
-        $gradeCategories = $subject?->grade_categories ?? [];
+        $subjectTeacher = $enrollment->subjectTeacher;
+        $gradeCategories = $subjectTeacher?->grade_categories ?? [];
 
         // Count total expected assignments from structure
         $totalExpected = 0;

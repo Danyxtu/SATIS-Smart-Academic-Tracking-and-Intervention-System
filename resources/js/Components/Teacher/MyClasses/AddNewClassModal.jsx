@@ -72,14 +72,12 @@ const AddNewClassModal = ({
     defaultSchoolYear,
     currentSemester = 1,
     initialFile = null,
-    masterSubjects = [],
 }) => {
     const { data, setData, post, processing, errors, reset, progress } =
         useForm({
             grade_level: "",
             section: "",
             subject_name: "",
-            master_subject_id: "",
             color: "indigo",
             school_year: defaultSchoolYear,
             strand: "",
@@ -205,86 +203,20 @@ const AddNewClassModal = ({
                                 <label className="block text-sm font-medium text-gray-700">
                                     Subject
                                 </label>
-                                <select
-                                    name="master_subject_id"
+                                <input
+                                    type="text"
+                                    name="subject_name"
                                     required
                                     className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-                                    value={data.master_subject_id}
-                                    onChange={(e) => {
-                                        const selectedId = e.target.value;
-                                        const selectedSubject =
-                                            masterSubjects.find(
-                                                (s) =>
-                                                    s.id.toString() ===
-                                                    selectedId
-                                            );
-                                        setData({
-                                            ...data,
-                                            master_subject_id: selectedId,
-                                            subject_name: selectedSubject
-                                                ? selectedSubject.name
-                                                : "",
-                                        });
-                                    }}
-                                >
-                                    <option value="" disabled>
-                                        Select Subject
-                                    </option>
-                                    {masterSubjects.map((subject) => (
-                                        <option
-                                            key={subject.id}
-                                            value={subject.id}
-                                        >
-                                            {subject.code} - {subject.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                    value={data.subject_name}
+                                    onChange={handleChange}
+                                    placeholder="e.g., General Mathematics"
+                                />
                                 {errors.subject_name && (
                                     <p className="text-sm text-red-600 mt-1">
                                         {errors.subject_name}
                                     </p>
                                 )}
-                                {errors.master_subject_id && (
-                                    <p className="text-sm text-red-600 mt-1">
-                                        {errors.master_subject_id}
-                                    </p>
-                                )}
-                                {/* Show selected subject details */}
-                                {data.master_subject_id &&
-                                    (() => {
-                                        const selected = masterSubjects.find(
-                                            (s) =>
-                                                s.id.toString() ===
-                                                data.master_subject_id
-                                        );
-                                        return selected ? (
-                                            <div className="mt-2 p-2 bg-gray-50 rounded-lg text-xs text-gray-600">
-                                                {selected.description && (
-                                                    <p>
-                                                        <strong>
-                                                            Description:
-                                                        </strong>{" "}
-                                                        {selected.description}
-                                                    </p>
-                                                )}
-                                                {selected.prerequisites &&
-                                                    selected.prerequisites
-                                                        .length > 0 && (
-                                                        <p className="mt-1">
-                                                            <strong>
-                                                                Prerequisites:
-                                                            </strong>{" "}
-                                                            {selected.prerequisites
-                                                                .map(
-                                                                    (p) =>
-                                                                        p.code
-                                                                )
-                                                                .join(", ")}
-                                                        </p>
-                                                    )}
-                                            </div>
-                                        ) : null;
-                                    })()}
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">

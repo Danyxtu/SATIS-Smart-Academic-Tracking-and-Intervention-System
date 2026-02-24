@@ -4,10 +4,8 @@ import { useForm } from "@inertiajs/react";
 
 const StudentRiskCard = ({ student }) => {
     const fullName = useMemo(() => {
-        const first = student?.first_name ?? "";
-        const last = student?.last_name ?? "";
-        return `${first} ${last}`.trim();
-    }, [student?.first_name, student?.last_name]);
+        return student?.student_name ?? student?.name ?? "";
+    }, [student?.student_name, student?.name]);
 
     const hasEnrollment = Boolean(student?.enrollment_id);
     const hasActiveIntervention = Boolean(student?.intervention);
@@ -40,7 +38,7 @@ const StudentRiskCard = ({ student }) => {
                         src={
                             student?.avatar ||
                             `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                fullName
+                                fullName,
                             )}`
                         }
                         alt={fullName || "Student avatar"}
@@ -82,8 +80,8 @@ const StudentRiskCard = ({ student }) => {
                     {processing
                         ? "Starting..."
                         : hasActiveIntervention
-                        ? "Update Intervention"
-                        : "Start Intervention"}
+                          ? "Update Intervention"
+                          : "Start Intervention"}
                 </button>
             </div>
         </div>

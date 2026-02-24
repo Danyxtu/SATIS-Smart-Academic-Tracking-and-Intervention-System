@@ -11,11 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('departments', function (Blueprint $table) {
-            $table->foreign('created_by')
-                ->references('id')
-                ->on('users')
-                ->nullOnDelete();
+        Schema::table('subject_teachers', function (Blueprint $table) {
+            $table->string('section')->nullable()->after('grade_level');
         });
     }
 
@@ -24,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('departments', function (Blueprint $table) {
-            $table->dropForeignIdFor('users', 'created_by');
+        Schema::table('subject_teachers', function (Blueprint $table) {
+            $table->dropColumn('section');
         });
     }
 };

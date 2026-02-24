@@ -1,3 +1,5 @@
+import StudentListItem from "./StudentListItem";
+
 const StudentList = ({ students, onClick }) => (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         <ul className="divide-y divide-gray-200">
