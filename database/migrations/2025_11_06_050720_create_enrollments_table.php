@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('enrollments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade'); // The Student
-            $table->foreignId('subject_teacher_id')->constrained()->onDelete('cascade'); // The Subject
+            $table->foreignId('subject_teachers_id')->constrained()->onDelete('cascade');
             $table->string('risk_status')->default('low'); // 'low', 'medium', 'high'
             $table->float('current_grade')->nullable();
             $table->float('current_attendance_rate')->nullable();

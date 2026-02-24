@@ -22,7 +22,8 @@ class InterventionController extends Controller
 
         // Get all enrollments for this student with interventions
         $enrollments = Enrollment::with([
-            'subject.user', // Teacher
+            'subjectTeacher.subject',
+            'subjectTeacher.teacher',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
@@ -35,8 +36,8 @@ class InterventionController extends Controller
             ->filter(fn($e) => $e->intervention !== null)
             ->map(function ($enrollment) {
                 $intervention = $enrollment->intervention;
-                $subject = $enrollment->subject;
-                $teacher = $subject?->user;
+                $subject = $enrollment->subjectTeacher?->subject;
+                $teacher = $enrollment->subjectTeacher?->teacher;
 
                 // Calculate current grade
                 $grades = $enrollment->grades;
@@ -229,7 +230,7 @@ class InterventionController extends Controller
         ]);
 
         // Create notification for the teacher
-        $teacher = $enrollment->subject?->user;
+        $teacher = $enrollment->subjectTeacher?->teacher;
         if ($teacher) {
             StudentNotification::create([
                 'user_id' => $teacher->id,

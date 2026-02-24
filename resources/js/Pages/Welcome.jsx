@@ -1,74 +1,10 @@
 import { useState } from "react";
-import { Head, Link, router } from "@inertiajs/react";
+import { Head, router } from "@inertiajs/react";
 import ApplicationLogo from "@/Components/ApplicationLogo";
 import Background from "../../assets/background.png";
-import {
-    BookOpen,
-    Users,
-    TrendingUp,
-    ChevronRight,
-    ChevronLeft,
-    Sparkles,
-} from "lucide-react";
-
-const screens = [
-    {
-        title: "Welcome to SATIS",
-        description:
-            "Smart Academic Tracking and Intervention System (SATIS) is designed to empower educators and support students effectively. We provide comprehensive tools to monitor academic progress, identify at-risk students, and implement timely interventions.",
-        icon: BookOpen,
-        gradient: "from-primary/20 to-pink-500/20",
-    },
-    {
-        title: "Unlock Student Potential",
-        description:
-            "With SATIS, you can gain insights into student performance through intuitive dashboards and analytics. Proactively address learning gaps and foster an environment where every student has the opportunity to succeed.",
-        icon: Users,
-        gradient: "from-blue-500/20 to-primary/20",
-    },
-    {
-        title: "Streamline Interventions",
-        description:
-            "Our system simplifies the process of creating, tracking, and managing intervention plans. Collaborate with ease, assign tasks, and monitor the effectiveness of support strategies, all in one place.",
-        icon: TrendingUp,
-        gradient: "from-primary/20 to-purple-500/20",
-    },
-];
-
-const WelcomeScreen = ({
-    title,
-    description,
-    screenNumber,
-    totalScreens,
-    icon: Icon,
-    gradient,
-}) => (
-    <div className="flex flex-col items-center justify-center text-center p-6 sm:p-10 animate-fade-in">
-        <div
-            className={`w-20 h-20 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center mb-6 shadow-lg`}
-        >
-            <Icon className="w-10 h-10 text-primary" />
-        </div>
-        <h2 className="text-3xl sm:text-4xl font-bold text-gray-800 mb-4 font-poppins">
-            {title}
-        </h2>
-        <p className="text-base sm:text-lg text-gray-600 max-w-xl mb-8 leading-relaxed">
-            {description}
-        </p>
-        <div className="flex items-center gap-2">
-            {[...Array(totalScreens)].map((_, i) => (
-                <div
-                    key={i}
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                        i + 1 === screenNumber
-                            ? "w-8 bg-primary"
-                            : "w-2 bg-gray-300 hover:bg-gray-400"
-                    }`}
-                />
-            ))}
-        </div>
-    </div>
-);
+import { ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
+import { WelcomeScreens as screens } from "@/Data/welcomeScreens";
+import WelcomeScreen from "@/Components/WelcomeScreen";
 
 export default function Welcome() {
     const [screen, setScreen] = useState(1);
@@ -90,10 +26,6 @@ export default function Welcome() {
 
     const handleLoginClick = () => {
         router.visit(route("login"));
-    };
-
-    const goToScreen = (num) => {
-        setScreen(num);
     };
 
     const currentScreen = screens[screen - 1];
@@ -188,7 +120,8 @@ export default function Welcome() {
                     {/* Footer */}
                     <div className="mt-6 text-center">
                         <p className="text-sm text-gray-500">
-                            © 2025 SATIS - Smart Academic Tracking System
+                            © 2025 SATIS - Smart Academic Tracking and
+                            Intervention System
                         </p>
                     </div>
                 </div>

@@ -1,3 +1,6 @@
+import { Check, X as XIcon, Clock } from "lucide-react";
+import StatusButton from "./StatusButton";
+
 const StudentListItem = ({ student, onClick }) => (
     <li className="p-4 flex flex-col sm:flex-row items-center justify-between">
         {/* Student Info */}
@@ -16,8 +19,8 @@ const StudentListItem = ({ student, onClick }) => (
                         student.status === "present"
                             ? "text-green-600"
                             : student.status === "absent"
-                            ? "text-red-600"
-                            : "text-yellow-600"
+                              ? "text-red-600"
+                              : "text-yellow-600"
                     }`}
                 >
                     Status: <span className="uppercase">{student.status}</span>

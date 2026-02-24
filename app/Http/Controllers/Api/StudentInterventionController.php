@@ -15,7 +15,8 @@ class StudentInterventionController extends Controller
         $user = $request->user();
 
         $enrollments = Enrollment::with([
-            'subject.user',
+            'subjectTeacher.subject',
+            'subjectTeacher.teacher',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
@@ -27,8 +28,8 @@ class StudentInterventionController extends Controller
             ->filter(fn($e) => $e->intervention !== null)
             ->map(function ($enrollment) {
                 $intervention = $enrollment->intervention;
-                $subject = $enrollment->subject;
-                $teacher = $subject?->user;
+                $subject = $enrollment->subjectTeacher?->subject;
+                $teacher = $enrollment->subjectTeacher?->teacher;
 
                 $grades = $enrollment->grades;
                 $totalScore = $grades->sum('score');

@@ -2,7 +2,7 @@
 
 namespace App\Services\Teacher;
 
-use App\Models\Subject;
+use App\Models\SubjectTeacher;
 
 class AttendanceService
 {
@@ -16,15 +16,15 @@ class AttendanceService
 
     public function index($teacher): array
     {
-        $subjects = Subject::with(['enrollments.user.student'])
-            ->where('user_id', $teacher->id)
+        $subjectTeachers = SubjectTeacher::with(['subject', 'enrollments.user.student'])
+            ->where('teacher_id', $teacher->id)
             ->orderBy('grade_level')
             ->get();
 
         $attendanceRecords = [];
 
-        if ($subjects->isNotEmpty()) {
-            $attendanceRecords = ['subjects' => $subjects];
+        if ($subjectTeachers->isNotEmpty()) {
+            $attendanceRecords = ['subjectTeachers' => $subjectTeachers];
         }
         return $attendanceRecords;
     }

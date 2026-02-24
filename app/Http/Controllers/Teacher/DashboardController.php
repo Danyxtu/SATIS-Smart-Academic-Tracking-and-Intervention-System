@@ -6,10 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Enrollment;
-use App\Models\Student;
-use App\Models\Grade;
 use App\Models\Intervention;
-use App\Models\User;
 use App\Models\SystemSetting;
 use Inertia\Inertia;
 
@@ -17,7 +14,8 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        $teacher = Auth::user();
+        $teacher = Auth::user(); // For the name of the teacher
+
         $teacher->load('department');
 
         // Get current academic period
@@ -25,13 +23,13 @@ class DashboardController extends Controller
         $currentSemester = SystemSetting::getCurrentSemester();
 
         // Get all enrollments for the teacher's subjects
-        $enrollments = Enrollment::whereHas('subject', function ($query) use ($teacher) {
-            $query->where('user_id', $teacher->id);
+        $enrollments = Enrollment::whereHas('subjectTeacher', function ($query) use ($teacher) {
+            $query->where('teacher_id', $teacher->id);
         })->with([
             'user',
             'grades',
             'student',
-            'subject',
+            'subjectTeacher.subject',
             'attendanceRecords',
             'intervention',
         ])->get();
@@ -44,10 +42,10 @@ class DashboardController extends Controller
 
             return [
                 'id' => optional($studentProfile)->id ?? $enrollment->user->id,
-                'first_name' => optional($studentProfile)->first_name ?? $enrollment->user->first_name,
-                'last_name' => optional($studentProfile)->last_name ?? $enrollment->user->last_name,
+                'student_name' => optional($studentProfile)->student_name ?? $enrollment->user?->name ?? 'Student',
+                'name' => optional($studentProfile)->student_name ?? $enrollment->user?->name ?? 'Student',
                 'avatar' => optional($studentProfile)->avatar,
-                'subject' => optional($enrollment->subject)->name,
+                'subject' => optional(optional($enrollment->subjectTeacher)->subject)->name,
                 'grade' => $hasGrades ? round($averageGrade) : null,
                 'has_grades' => $hasGrades,
                 'trend' => optional($studentProfile)->trend,
@@ -152,13 +150,13 @@ class DashboardController extends Controller
         $currentSemester = SystemSetting::getCurrentSemester();
 
         // Get all enrollments for the teacher's subjects
-        $enrollments = Enrollment::whereHas('subject', function ($query) use ($teacher) {
-            $query->where('user_id', $teacher->id);
+        $enrollments = Enrollment::whereHas('subjectTeacher', function ($query) use ($teacher) {
+            $query->where('teacher_id', $teacher->id);
         })->with([
             'user',
             'grades',
             'student',
-            'subject',
+            'subjectTeacher.subject',
             'attendanceRecords',
             'intervention',
         ])->get();
@@ -171,10 +169,10 @@ class DashboardController extends Controller
 
             return [
                 'id' => optional($studentProfile)->id ?? $enrollment->user->id,
-                'first_name' => optional($studentProfile)->first_name ?? $enrollment->user->first_name,
-                'last_name' => optional($studentProfile)->last_name ?? $enrollment->user->last_name,
+                'student_name' => optional($studentProfile)->student_name ?? $enrollment->user?->name ?? 'Student',
+                'name' => optional($studentProfile)->student_name ?? $enrollment->user?->name ?? 'Student',
                 'avatar' => optional($studentProfile)->avatar,
-                'subject' => optional($enrollment->subject)->name,
+                'subject' => optional(optional($enrollment->subjectTeacher)->subject)->name,
                 'grade' => $hasGrades ? round($averageGrade) : null,
                 'has_grades' => $hasGrades,
                 'trend' => optional($studentProfile)->trend,

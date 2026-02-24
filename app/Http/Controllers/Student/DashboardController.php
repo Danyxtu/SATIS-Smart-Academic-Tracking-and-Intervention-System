@@ -28,7 +28,8 @@ class DashboardController extends Controller
 
         // Get all enrollments for this student with related data
         $allEnrollments = Enrollment::with([
-            'subject.masterSubject',
+            'subjectTeacher.subject',
+            'subjectTeacher.teacher',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
@@ -38,14 +39,14 @@ class DashboardController extends Controller
 
         // Filter enrollments by semester
         $enrollments = $allEnrollments->filter(function ($enrollment) use ($selectedSemester) {
-            $subjectSemester = $enrollment->subject?->semester;
+            $subjectSemester = $enrollment->subjectTeacher?->semester;
             // If subject has semester field, use it; otherwise default to 1
             return $subjectSemester == $selectedSemester;
         });
 
         // Count enrollments per semester for navigation
-        $semester1Count = $allEnrollments->filter(fn($e) => ($e->subject?->semester ?? '1') == '1')->count();
-        $semester2Count = $allEnrollments->filter(fn($e) => ($e->subject?->semester ?? '1') == '2')->count();
+        $semester1Count = $allEnrollments->filter(fn($e) => ($e->subjectTeacher?->semester ?? '1') == '1')->count();
+        $semester2Count = $allEnrollments->filter(fn($e) => ($e->subjectTeacher?->semester ?? '1') == '2')->count();
 
         // Calculate overall statistics
         $totalSubjects = $enrollments->count();
@@ -136,10 +137,12 @@ class DashboardController extends Controller
 
             return [
                 'id' => $enrollment->id,
-                'subjectId' => $enrollment->subject_id,
-                'name' => $enrollment->subject?->name ?? 'Unknown Subject',
+                'subjectId' => $enrollment->subjectTeacher?->subject_id,
+                'name' => $enrollment->subject?->subject_name ?? 'Unknown Subject',
                 'section' => $enrollment->subject?->section,
-                'teacher' => $enrollment->subject?->user?->name ?? 'N/A',
+                'teacher' => $enrollment->subjectTeacher?->teacher
+                    ? $enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name
+                    : 'N/A',
                 'grade' => $percentage,
                 'gradeDisplay' => $percentage !== null ? "{$percentage}%" : 'N/A',
                 'attendance' => $attendanceRate,

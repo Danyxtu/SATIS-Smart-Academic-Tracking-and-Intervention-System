@@ -33,26 +33,25 @@ class InterventionController extends Controller
     {
         $teacher = $request->user();
 
-        // Get all subjects belonging to this teacher
-        $subjectIds = Subject::where('user_id', $teacher->id)->pluck('id');
-
         // Get enrollments with students who might need intervention
         // Include their grades, attendance, and any existing interventions
         $enrollments = Enrollment::with([
             'user.student',
-            'subject',
+            'subjectTeacher.subject',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
         ])
-            ->whereIn('subject_id', $subjectIds)
+            ->whereHas('subjectTeacher', function ($query) use ($teacher) {
+                $query->where('teacher_id', $teacher->id);
+            })
             ->get();
 
         // Build the student watchlist based on risk factors
         $watchlist = $enrollments->map(function ($enrollment) {
             $user = $enrollment->user;
             $student = $user?->student;
-            $subject = $enrollment->subject;
+            $subject = $enrollment->subjectTeacher?->subject;
 
             // Calculate current grade percentage
             $grades = $enrollment->grades;
@@ -104,12 +103,12 @@ class InterventionController extends Controller
                 'id' => $enrollment->id,
                 'student_id' => $student?->id,
                 'user_id' => $user?->id,
-                'name' => $user?->name ?? trim(($student?->first_name ?? '') . ' ' . ($student?->last_name ?? '')),
+                'name' => $student?->student_name ?? $user?->name ?? 'Student',
                 'lrn' => $student?->lrn,
                 'email' => $user?->email,
                 'avatar' => $student?->avatar,
                 'subject' => $subject?->name . ' - ' . $subject?->section,
-                'subject_id' => $subject?->id,
+                'subject_id' => $enrollment->subjectTeacher?->subject_id,
                 'grade_level' => $student?->grade_level ?? $subject?->grade_level,
                 'section' => $student?->section ?? $subject?->section,
                 'currentGrade' => $gradePercentage !== null ? "{$gradePercentage}%" : 'N/A',
@@ -249,7 +248,7 @@ class InterventionController extends Controller
             return [
                 $enrollment->id => [
                     'id' => $enrollment->id,
-                    'name' => $user?->name ?? trim(($student?->first_name ?? '') . ' ' . ($student?->last_name ?? '')),
+                    'name' => $student?->student_name ?? $user?->name ?? 'Student',
                     'currentGrade' => $gradePercentage !== null ? "{$gradePercentage}%" : 'N/A',
                     'gradeTrend' => $gradeTrend,
                     'specialPrograms' => [],
@@ -296,9 +295,9 @@ class InterventionController extends Controller
             'send_email' => 'nullable|boolean',
         ]);
 
-        $enrollment = Enrollment::with(['subject', 'user'])->findOrFail($validated['enrollment_id']);
+        $enrollment = Enrollment::with(['subjectTeacher', 'user'])->findOrFail($validated['enrollment_id']);
 
-        if (optional($enrollment->subject)->user_id !== $request->user()->id) {
+        if (optional($enrollment->subjectTeacher)->teacher_id !== $request->user()->id) {
             abort(403, 'You are not authorized to start an intervention for this student.');
         }
 
@@ -345,10 +344,10 @@ class InterventionController extends Controller
         $failedCount = 0;
 
         foreach ($validated['enrollment_ids'] as $enrollmentId) {
-            $enrollment = Enrollment::with(['subject', 'user'])->find($enrollmentId);
+            $enrollment = Enrollment::with(['subjectTeacher', 'user'])->find($enrollmentId);
 
             // Skip if enrollment not found or teacher doesn't own the subject
-            if (!$enrollment || optional($enrollment->subject)->user_id !== $teacher->id) {
+            if (!$enrollment || optional($enrollment->subjectTeacher)->teacher_id !== $teacher->id) {
                 $failedCount++;
                 continue;
             }
@@ -417,8 +416,8 @@ class InterventionController extends Controller
      */
     private function createNotification(Enrollment $enrollment, Intervention $intervention, $teacher, string $notificationType)
     {
-        $studentName = optional($enrollment->user)->name ?? 'Student';
-        $subjectName = optional($enrollment->subject)->name ?? 'your class';
+        $studentName = $enrollment->user?->name ?? 'Student';
+        $subjectName = $enrollment->subjectTeacher?->subject?->subject_name ?? 'your class';
         $teacherName = $teacher->name ?? 'Your Teacher';
 
         $titles = [
@@ -482,7 +481,7 @@ class InterventionController extends Controller
     private function sendEmailNotification(Enrollment $enrollment, Intervention $intervention, $teacher, string $notificationType)
     {
         try {
-            $subjectName = optional($enrollment->subject)->name ?? 'your class';
+            $subjectName = $enrollment->subjectTeacher?->subject?->subject_name ?? 'your class';
 
             Mail::to($enrollment->user->email)->queue(
                 new InterventionNotification(
@@ -525,10 +524,9 @@ class InterventionController extends Controller
     {
         $teacher = $request->user();
         $enrollment = $intervention->enrollment;
-        $subject = $enrollment->subject;
 
         // Verify the intervention belongs to this teacher's subject
-        if ($subject->user_id !== $teacher->id) {
+        if ($enrollment->subjectTeacher?->teacher_id !== $teacher->id) {
             abort(403, 'Unauthorized');
         }
 
@@ -569,10 +567,9 @@ class InterventionController extends Controller
     {
         $teacher = $request->user();
         $enrollment = $intervention->enrollment;
-        $subject = $enrollment->subject;
 
         // Verify the intervention belongs to this teacher's subject
-        if ($subject->user_id !== $teacher->id) {
+        if ($enrollment->subjectTeacher?->teacher_id !== $teacher->id) {
             abort(403, 'Unauthorized');
         }
 

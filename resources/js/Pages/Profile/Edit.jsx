@@ -270,18 +270,14 @@ export default function Edit({ status, student }) {
 
     // Get the full name for display
     const fullName =
-        isStudent && student
-            ? `${student.first_name || ""} ${
-                  student.middle_name ? student.middle_name + " " : ""
-              }${student.last_name || ""}`.trim()
-            : user.name;
+        isStudent && student ? student.student_name || "" : user.name;
 
     // Determine the correct layout based on user role
     const Layout = isTeacher
         ? TeacherLayout
         : isAdmin
-        ? AdminLayout
-        : AuthenticatedLayout;
+          ? AdminLayout
+          : AuthenticatedLayout;
 
     return (
         <Layout>
@@ -388,18 +384,8 @@ export default function Edit({ status, student }) {
                             >
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                                     <InfoField
-                                        label="First Name"
-                                        value={student.first_name}
-                                        icon={User}
-                                    />
-                                    <InfoField
-                                        label="Last Name"
-                                        value={student.last_name}
-                                        icon={User}
-                                    />
-                                    <InfoField
-                                        label="Middle Name"
-                                        value={student.middle_name}
+                                        label="Student Name"
+                                        value={student.student_name}
                                         icon={User}
                                     />
                                     <InfoField

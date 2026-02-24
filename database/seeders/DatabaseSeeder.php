@@ -33,9 +33,6 @@ class DatabaseSeeder extends Seeder
             'role' => 'teacher',
         ]);
 
-        // Seed master subjects with prerequisites
-        $this->call(MasterSubjectSeeder::class);
-
         // Seed subjects (classlists)
         $this->call(SubjectSeeder::class);
     }
