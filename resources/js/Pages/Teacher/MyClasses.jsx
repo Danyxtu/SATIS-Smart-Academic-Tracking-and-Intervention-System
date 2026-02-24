@@ -244,7 +244,7 @@ const hasQuarterlyExamScores = (grades = {}, categories = [], quarter = 1) => {
     const quarterlyExamCategory = categories.find(
         (cat) =>
             cat.id === "quarterly_exam" ||
-            cat.label?.toLowerCase().includes("quarterly exam")
+            cat.label?.toLowerCase().includes("quarterly exam"),
     );
 
     if (!quarterlyExamCategory || !quarterlyExamCategory.tasks?.length) {
@@ -306,7 +306,7 @@ const calculateOverallFinalGrade = (grades = {}, categories = []) => {
 const calculateExpectedQuarterlyGrade = (
     grades = {},
     categories = [],
-    quarter = 1
+    quarter = 1,
 ) => {
     if (!categories.length) return "N/A";
 
@@ -600,7 +600,7 @@ const MyClasses = ({
 
     const selectedClass = useMemo(
         () => classes.find((cls) => cls.id === selectedClassId) || null,
-        [classes, selectedClassId]
+        [classes, selectedClassId],
     );
 
     const selectedGradeStructure = useMemo(() => {
@@ -630,7 +630,7 @@ const MyClasses = ({
 
         return (
             gradeCategories.find(
-                (category) => category.id === activeGradeCategoryId
+                (category) => category.id === activeGradeCategoryId,
             ) || null
         );
     }, [gradeCategories, activeGradeCategoryId]);
@@ -679,7 +679,7 @@ const MyClasses = ({
 
                     return acc;
                 },
-                {}
+                {},
             );
         });
 
@@ -729,32 +729,32 @@ const MyClasses = ({
                     gradeA = calculateFinalGrade(
                         a.grades,
                         selectedClass.categories,
-                        selectedQuarter
+                        selectedQuarter,
                     );
                     gradeB = calculateFinalGrade(
                         b.grades,
                         selectedClass.categories,
-                        selectedQuarter
+                        selectedQuarter,
                     );
                 } else if (sortConfig.column === "expected") {
                     gradeA = calculateExpectedQuarterlyGrade(
                         a.grades,
                         selectedClass.categories,
-                        selectedQuarter
+                        selectedQuarter,
                     );
                     gradeB = calculateExpectedQuarterlyGrade(
                         b.grades,
                         selectedClass.categories,
-                        selectedQuarter
+                        selectedQuarter,
                     );
                 } else if (sortConfig.column === "final") {
                     gradeA = calculateOverallFinalGrade(
                         a.grades,
-                        selectedClass.categories
+                        selectedClass.categories,
                     );
                     gradeB = calculateOverallFinalGrade(
                         b.grades,
-                        selectedClass.categories
+                        selectedClass.categories,
                     );
                 }
 
@@ -830,7 +830,7 @@ const MyClasses = ({
         enrollmentId,
         assignmentId,
         maxScore,
-        rawValue
+        rawValue,
     ) => {
         let nextValue = rawValue;
 
@@ -887,9 +887,9 @@ const MyClasses = ({
                                     : Number(value),
                             quarter: selectedQuarter,
                         });
-                    }
+                    },
                 );
-            }
+            },
         );
 
         if (!payload.length) {
@@ -910,7 +910,7 @@ const MyClasses = ({
                 onFinish: () => {
                     setIsSavingGrades(false);
                 },
-            }
+            },
         );
     };
 
@@ -940,7 +940,7 @@ const MyClasses = ({
                     setIsImportingGrades(false);
                     event.target.value = "";
                 },
-            }
+            },
         );
     };
 
@@ -967,7 +967,7 @@ const MyClasses = ({
                 selectedClass
                     ? `${selectedClass.name}-${selectedClass.section}`
                     : "grades"
-            }-template.csv`
+            }-template.csv`,
         );
         document.body.appendChild(anchor);
         anchor.click();
@@ -990,7 +990,7 @@ const MyClasses = ({
         }));
 
         const targetCategory = categoriesPayload.find(
-            (category) => category.id === selectedTaskCategory.id
+            (category) => category.id === selectedTaskCategory.id,
         );
 
         if (!targetCategory) return;
@@ -1017,7 +1017,7 @@ const MyClasses = ({
                 onFinish: () => {
                     setIsSavingCategoryTask(false);
                 },
-            }
+            },
         );
     };
 
@@ -1032,7 +1032,7 @@ const MyClasses = ({
                 onChange={handleGradesFileSelected}
             />
 
-            <header className="mb-8 space-y-4">
+            <header className="mb-6 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="space-y-2">
                         {hasSelectedClass && (
@@ -1124,7 +1124,7 @@ const MyClasses = ({
                                         {importSummaryErrors.map(
                                             (error, index) => (
                                                 <li key={index}>{error}</li>
-                                            )
+                                            ),
                                         )}
                                     </ul>
                                 </details>
@@ -1165,7 +1165,7 @@ const MyClasses = ({
                                                             type="button"
                                                             onClick={() =>
                                                                 navigator.clipboard.writeText(
-                                                                    s.password
+                                                                    s.password,
                                                                 )
                                                             }
                                                             className="text-sm text-indigo-700 hover:underline"
@@ -1174,7 +1174,7 @@ const MyClasses = ({
                                                         </button>
                                                     </div>
                                                 </li>
-                                            )
+                                            ),
                                         )}
                                     </ul>
                                 </details>
@@ -1214,7 +1214,7 @@ const MyClasses = ({
                                             type="button"
                                             onClick={() =>
                                                 navigator.clipboard.writeText(
-                                                    newStudentPassword.password
+                                                    newStudentPassword.password,
                                                 )
                                             }
                                             className="text-sm text-emerald-700 hover:underline"
@@ -1260,7 +1260,7 @@ const MyClasses = ({
                                         {gradeUpdateSummary.errors.map(
                                             (error, index) => (
                                                 <li key={index}>{error}</li>
-                                            )
+                                            ),
                                         )}
                                     </ul>
                                 </details>
@@ -1298,7 +1298,7 @@ const MyClasses = ({
                                         {gradeImportSummary.errors.map(
                                             (error, index) => (
                                                 <li key={index}>{error}</li>
-                                            )
+                                            ),
                                         )}
                                     </ul>
                                 </details>
@@ -1369,7 +1369,7 @@ const MyClasses = ({
                                                 {
                                                     preserveState: true,
                                                     preserveScroll: true,
-                                                }
+                                                },
                                             );
                                         }}
                                         className={`
@@ -1568,8 +1568,8 @@ const MyClasses = ({
                                     {isSavingGrades
                                         ? "Saving…"
                                         : hasGradeChanges
-                                        ? `Save Grades (${dirtyGradeCount})`
-                                        : "Save Grades"}
+                                          ? `Save Grades (${dirtyGradeCount})`
+                                          : "Save Grades"}
                                 </button>
                             )}
                             <button
@@ -1620,7 +1620,7 @@ const MyClasses = ({
                                     {filteredStudents.map((student, index) => {
                                         const studentKey = buildStudentKey(
                                             student,
-                                            index
+                                            index,
                                         );
 
                                         return (
@@ -1629,10 +1629,10 @@ const MyClasses = ({
                                                 className="hover:bg-gray-50 cursor-pointer"
                                                 onClick={() => {
                                                     setSelectedStudentForStatus(
-                                                        student
+                                                        student,
                                                     );
                                                     setIsStudentStatusModalOpen(
-                                                        true
+                                                        true,
                                                     );
                                                 }}
                                             >
@@ -1641,11 +1641,11 @@ const MyClasses = ({
                                                         {student.name}
                                                     </div>
                                                     {formatAcademicMeta(
-                                                        student
+                                                        student,
                                                     ) && (
                                                         <div className="text-xs text-gray-500">
                                                             {formatAcademicMeta(
-                                                                student
+                                                                student,
                                                             )}
                                                         </div>
                                                     )}
@@ -1702,8 +1702,8 @@ const MyClasses = ({
                                                                 hasQuarterlyExamScores(
                                                                     student.grades,
                                                                     gradeCategories,
-                                                                    1
-                                                                )
+                                                                    1,
+                                                                ),
                                                         );
                                                     const canOpenQ2 =
                                                         selectedClass?.current_quarter >=
@@ -1721,8 +1721,8 @@ const MyClasses = ({
                                                                 hasQuarterlyExamScores(
                                                                     student.grades,
                                                                     gradeCategories,
-                                                                    1
-                                                                )
+                                                                    1,
+                                                                ),
                                                         )
                                                     )
                                                 }
@@ -1730,19 +1730,19 @@ const MyClasses = ({
                                                     selectedQuarter === 2
                                                         ? "bg-white text-indigo-700 shadow-sm"
                                                         : !(
-                                                              selectedClass?.current_quarter >=
-                                                                  2 ||
-                                                              students.some(
-                                                                  (student) =>
-                                                                      hasQuarterlyExamScores(
-                                                                          student.grades,
-                                                                          gradeCategories,
-                                                                          1
-                                                                      )
-                                                              )
-                                                          )
-                                                        ? "text-gray-400 cursor-not-allowed"
-                                                        : "text-gray-600 hover:bg-gray-200"
+                                                                selectedClass?.current_quarter >=
+                                                                    2 ||
+                                                                students.some(
+                                                                    (student) =>
+                                                                        hasQuarterlyExamScores(
+                                                                            student.grades,
+                                                                            gradeCategories,
+                                                                            1,
+                                                                        ),
+                                                                )
+                                                            )
+                                                          ? "text-gray-400 cursor-not-allowed"
+                                                          : "text-gray-600 hover:bg-gray-200"
                                                 }`}
                                                 title={
                                                     !(
@@ -1753,8 +1753,8 @@ const MyClasses = ({
                                                                 hasQuarterlyExamScores(
                                                                     student.grades,
                                                                     gradeCategories,
-                                                                    1
-                                                                )
+                                                                    1,
+                                                                ),
                                                         )
                                                     )
                                                         ? "Complete Quarter 1 quarterly exam first or start Quarter 2"
@@ -1772,21 +1772,21 @@ const MyClasses = ({
                                                     if (!selectedClass) return;
                                                     if (
                                                         !confirm(
-                                                            "Start Quarter 2 for this class?\nThis will allow you to view Q2 grades and begin entering Q2 data."
+                                                            "Start Quarter 2 for this class?\nThis will allow you to view Q2 grades and begin entering Q2 data.",
                                                         )
                                                     )
                                                         return;
                                                     router.post(
                                                         route(
                                                             "teacher.classes.quarter.start",
-                                                            selectedClass.id
+                                                            selectedClass.id,
                                                         ),
                                                         { quarter: 2 },
                                                         {
                                                             preserveScroll: true,
                                                             onSuccess: () => {
                                                                 setSelectedQuarter(
-                                                                    2
+                                                                    2,
                                                                 );
                                                                 router.reload({
                                                                     only: [
@@ -1795,7 +1795,7 @@ const MyClasses = ({
                                                                     ],
                                                                 });
                                                             },
-                                                        }
+                                                        },
                                                     );
                                                 }}
                                                 className="ml-2 px-3 py-1.5 rounded-md text-sm bg-emerald-600 text-white hover:bg-emerald-700"
@@ -1810,7 +1810,7 @@ const MyClasses = ({
                                         <button
                                             onClick={() =>
                                                 setIsEditCategoriesModalOpen(
-                                                    true
+                                                    true,
                                                 )
                                             }
                                             className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
@@ -1824,7 +1824,7 @@ const MyClasses = ({
                                         <button
                                             onClick={() =>
                                                 setGradesExpanded(
-                                                    !gradesExpanded
+                                                    !gradesExpanded,
                                                 )
                                             }
                                             className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
@@ -1847,8 +1847,8 @@ const MyClasses = ({
                                         hasQuarterlyExamScores(
                                             student.grades,
                                             gradeCategories,
-                                            1
-                                        )
+                                            1,
+                                        ),
                                     ) && (
                                         <p className="text-sm text-amber-600">
                                             Quarter 2 is locked until Quarter 1
@@ -1879,22 +1879,22 @@ const MyClasses = ({
                                                         const percent =
                                                             Math.round(
                                                                 (category.weight ??
-                                                                    0) * 100
+                                                                    0) * 100,
                                                             );
                                                         const tasks =
                                                             category.tasks ??
                                                             [];
                                                         const isCollapsed =
                                                             isCategoryCollapsed(
-                                                                category.id
+                                                                category.id,
                                                             );
                                                         const isQE =
                                                             isQuarterlyExam(
-                                                                category
+                                                                category,
                                                             );
                                                         const latestTask =
                                                             getLatestTask(
-                                                                category
+                                                                category,
                                                             );
 
                                                         // Determine colspan based on collapse state
@@ -1904,7 +1904,7 @@ const MyClasses = ({
                                                                 ? 1
                                                                 : Math.max(
                                                                       tasks.length,
-                                                                      1
+                                                                      1,
                                                                   );
 
                                                         return (
@@ -1926,7 +1926,7 @@ const MyClasses = ({
                                                                                 type="button"
                                                                                 onClick={() =>
                                                                                     toggleCategoryCollapse(
-                                                                                        category.id
+                                                                                        category.id,
                                                                                     )
                                                                                 }
                                                                                 className="p-0.5 text-gray-500 hover:text-gray-700 transition"
@@ -1978,7 +1978,7 @@ const MyClasses = ({
                                                                             type="button"
                                                                             onClick={() =>
                                                                                 setActiveGradeCategoryId(
-                                                                                    category.id
+                                                                                    category.id,
                                                                                 )
                                                                             }
                                                                             className="text-xs font-semibold text-indigo-600 transition hover:text-indigo-700"
@@ -1990,7 +1990,7 @@ const MyClasses = ({
                                                                 </div>
                                                             </th>
                                                         );
-                                                    }
+                                                    },
                                                 )}
 
                                                 {/* Fixed Right: Grade Columns (Collapsible) */}
@@ -2000,7 +2000,7 @@ const MyClasses = ({
                                                             className="sticky right-[200px] z-20 bg-indigo-50 px-4 py-3 text-left text-xs font-semibold text-indigo-700 uppercase tracking-wider border-l border-indigo-200 min-w-[100px] cursor-pointer hover:bg-indigo-100 transition-colors select-none"
                                                             onClick={() =>
                                                                 handleSortToggle(
-                                                                    "quarterly"
+                                                                    "quarterly",
                                                                 )
                                                             }
                                                             title="Click to sort by quarterly grade"
@@ -2075,7 +2075,7 @@ const MyClasses = ({
                                                             className="sticky right-[100px] z-20 bg-indigo-50 px-4 py-3 text-left text-xs font-semibold text-indigo-700 uppercase tracking-wider border-l border-indigo-100 min-w-[100px] cursor-pointer hover:bg-indigo-100 transition-colors select-none"
                                                             onClick={() =>
                                                                 handleSortToggle(
-                                                                    "expected"
+                                                                    "expected",
                                                                 )
                                                             }
                                                             title="Click to sort by expected grade"
@@ -2146,7 +2146,7 @@ const MyClasses = ({
                                                             className="sticky right-0 z-20 bg-indigo-50 px-4 py-3 text-left text-xs font-semibold text-indigo-700 uppercase tracking-wider border-l border-indigo-100 min-w-[100px] cursor-pointer hover:bg-indigo-100 transition-colors select-none"
                                                             onClick={() =>
                                                                 handleSortToggle(
-                                                                    "final"
+                                                                    "final",
                                                                 )
                                                             }
                                                             title="Click to sort by final grade"
@@ -2238,11 +2238,11 @@ const MyClasses = ({
                                                             [];
                                                         const isCollapsed =
                                                             isCategoryCollapsed(
-                                                                category.id
+                                                                category.id,
                                                             );
                                                         const latestTask =
                                                             getLatestTask(
-                                                                category
+                                                                category,
                                                             );
 
                                                         if (!tasks.length) {
@@ -2288,7 +2288,7 @@ const MyClasses = ({
                                                         return tasks.map(
                                                             (
                                                                 task,
-                                                                taskIndex
+                                                                taskIndex,
                                                             ) => (
                                                                 <th
                                                                     key={
@@ -2315,9 +2315,9 @@ const MyClasses = ({
                                                                         pts
                                                                     </span>
                                                                 </th>
-                                                            )
+                                                            ),
                                                         );
-                                                    }
+                                                    },
                                                 )}
 
                                                 {/* Empty cells for grade columns */}
@@ -2344,7 +2344,7 @@ const MyClasses = ({
                                                     const studentKey =
                                                         buildStudentKey(
                                                             student,
-                                                            index
+                                                            index,
                                                         );
                                                     const studentDraft =
                                                         gradeDrafts[
@@ -2356,11 +2356,11 @@ const MyClasses = ({
                                                         calculateExpectedQuarterlyGrade(
                                                             draftValues,
                                                             gradeCategories,
-                                                            selectedQuarter
+                                                            selectedQuarter,
                                                         );
                                                     const gradeColors =
                                                         getGradeRowColors(
-                                                            currentGrade
+                                                            currentGrade,
                                                         );
 
                                                     return (
@@ -2383,11 +2383,11 @@ const MyClasses = ({
                                                                     }
                                                                 </div>
                                                                 {formatAcademicMeta(
-                                                                    student
+                                                                    student,
                                                                 ) && (
                                                                     <div className="text-xs text-gray-500">
                                                                         {formatAcademicMeta(
-                                                                            student
+                                                                            student,
                                                                         )}
                                                                     </div>
                                                                 )}
@@ -2407,11 +2407,11 @@ const MyClasses = ({
                                                                         [];
                                                                     const isCollapsed =
                                                                         isCategoryCollapsed(
-                                                                            category.id
+                                                                            category.id,
                                                                         );
                                                                     const latestTask =
                                                                         getLatestTask(
-                                                                            category
+                                                                            category,
                                                                         );
 
                                                                     if (
@@ -2463,7 +2463,7 @@ const MyClasses = ({
                                                                                         inputValue
                                                                                     }
                                                                                     onChange={(
-                                                                                        event
+                                                                                        event,
                                                                                     ) =>
                                                                                         handleGradeChange(
                                                                                             student.id,
@@ -2471,7 +2471,7 @@ const MyClasses = ({
                                                                                             latestTask.total,
                                                                                             event
                                                                                                 .target
-                                                                                                .value
+                                                                                                .value,
                                                                                         )
                                                                                     }
                                                                                     className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300"
@@ -2489,7 +2489,7 @@ const MyClasses = ({
                                                                     return tasks.map(
                                                                         (
                                                                             task,
-                                                                            taskIndex
+                                                                            taskIndex,
                                                                         ) => {
                                                                             const rawValue =
                                                                                 studentDraft[
@@ -2528,7 +2528,7 @@ const MyClasses = ({
                                                                                             inputValue
                                                                                         }
                                                                                         onChange={(
-                                                                                            event
+                                                                                            event,
                                                                                         ) =>
                                                                                             handleGradeChange(
                                                                                                 student.id,
@@ -2536,7 +2536,7 @@ const MyClasses = ({
                                                                                                 task.total,
                                                                                                 event
                                                                                                     .target
-                                                                                                    .value
+                                                                                                    .value,
                                                                                             )
                                                                                         }
                                                                                         className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300"
@@ -2549,9 +2549,9 @@ const MyClasses = ({
                                                                                     </span>
                                                                                 </td>
                                                                             );
-                                                                        }
+                                                                        },
                                                                     );
-                                                                }
+                                                                },
                                                             )}
 
                                                             {/* Fixed Right: Grade Columns */}
@@ -2563,12 +2563,12 @@ const MyClasses = ({
                                                                         {hasQuarterlyExamScores(
                                                                             draftValues,
                                                                             gradeCategories,
-                                                                            selectedQuarter
+                                                                            selectedQuarter,
                                                                         )
                                                                             ? calculateFinalGrade(
                                                                                   draftValues,
                                                                                   gradeCategories,
-                                                                                  selectedQuarter
+                                                                                  selectedQuarter,
                                                                               )
                                                                             : "—"}
                                                                     </td>
@@ -2584,7 +2584,7 @@ const MyClasses = ({
                                                                     >
                                                                         {calculateOverallFinalGrade(
                                                                             draftValues,
-                                                                            gradeCategories
+                                                                            gradeCategories,
                                                                         )}
                                                                     </td>
                                                                 </>
@@ -2594,13 +2594,13 @@ const MyClasses = ({
                                                                 >
                                                                     {calculateOverallFinalGrade(
                                                                         draftValues,
-                                                                        gradeCategories
+                                                                        gradeCategories,
                                                                     )}
                                                                 </td>
                                                             )}
                                                         </tr>
                                                     );
-                                                }
+                                                },
                                             )}
                                         </tbody>
                                     </table>
