@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->foreignId('enrollment_id')->constrained()->onDelete('cascade');
             $table->enum('status', ['active', 'completed', 'cancelled'])->default('active');
-
             $table->enum('type', [
                 'academic_quiz',      // Tier 1
                 'automated_nudge',    // Tier 1

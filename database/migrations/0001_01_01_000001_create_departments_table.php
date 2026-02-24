@@ -17,7 +17,6 @@ return new class extends Migration
             $table->string('department_code')->unique();
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
-            $table->foreignId('created_by')->nullable()->after('is_active')->constrained('users')->nullOnDelete();
             $table->timestamps();
         });
     }

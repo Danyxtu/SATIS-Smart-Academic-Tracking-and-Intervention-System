@@ -29,7 +29,6 @@ class InterventionSeeder extends Seeder
         ];
 
         foreach ($enrollments as $enrollment) {
-            $subject = Subject::find($enrollment->subject_id);
             $intervention = Intervention::create([
                 'enrollment_id' => $enrollment->id,
                 'status' => 'active',

@@ -7,6 +7,7 @@ use App\Services\Teacher\AttendanceService;
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceRecord;
 use App\Models\Subject;
+use App\Models\SubjectTeacher;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -28,37 +29,35 @@ class AttendanceController extends Controller
 
         $results = $this->attendanceService->index($teacher);
 
-        $subjects = Subject::with(['enrollments.user.student'])
-            ->where('user_id', $teacher->id)
+        $subjectTeachers = SubjectTeacher::with(['subject', 'enrollments.user.student'])
+            ->where('teacher_id', $teacher->id)
             ->orderBy('grade_level')
             ->get();
 
         return Inertia::render('Teacher/Attendance', [
             // This is for the class selection dropdown
-            'classes' => $subjects->map(fn($subject) => [
-                'id' => $subject->id,
+            'classes' => $subjectTeachers->map(fn($st) => [
+                'id' => $st->id,
                 'label' => sprintf(
                     '%s - %s (%s)',
-                    $subject->grade_level,
-                    $subject->section,
-                    $subject->name
+                    $st->grade_level,
+                    $st->section,
+                    $st->subject?->subject_name ?? $st->name
                 ),
-                'grade_level' => $subject->grade_level,
-                'section' => $subject->section,
-                'subject' => $subject->name,
+                'grade_level' => $st->grade_level,
+                'section' => $st->section,
+                'subject' => $st->subject?->subject_name ?? $st->name,
             ])->values(),
             // This is for the rosters
-            'rosters' => $subjects->mapWithKeys(fn($subject) => [
-                $subject->id => $subject->enrollments->map(function ($enrollment) {
+            'rosters' => $subjectTeachers->mapWithKeys(fn($st) => [
+                $st->id => $st->enrollments->map(function ($enrollment) {
                     $user = $enrollment->user;
                     $studentProfile = $user?->student;
-                    $fullName = $user?->name ?? trim(
-                        ($studentProfile->first_name ?? '') . ' ' . ($studentProfile->last_name ?? '')
-                    );
+                    $fullName = $studentProfile?->student_name ?? $user?->name ?? 'Student';
 
                     return [
                         'id' => $enrollment->id,
-                        'name' => $fullName ?: 'Student',
+                        'name' => $fullName,
                         'avatar' => $studentProfile?->avatar ?? $this->avatarFor($fullName),
                         'email' => $user?->email,
                         'status' => 'present',
@@ -75,19 +74,20 @@ class AttendanceController extends Controller
     {
         $teacher = $request->user();
 
-        // Get all subjects belonging to this teacher
-        $subjects = Subject::with([
+        // Get all subject-teacher assignments belonging to this teacher
+        $subjectTeachers = SubjectTeacher::with([
+            'subject',
             'enrollments.user.student',
             'enrollments.attendanceRecords',
         ])
-            ->where('user_id', $teacher->id)
+            ->where('teacher_id', $teacher->id)
             ->orderBy('grade_level')
             ->orderBy('section')
             ->get();
 
         // Build sections list with attendance summary
-        $sections = $subjects->map(function ($subject) {
-            $allRecords = $subject->enrollments->flatMap(fn($e) => $e->attendanceRecords);
+        $sections = $subjectTeachers->map(function ($st) {
+            $allRecords = $st->enrollments->flatMap(fn($e) => $e->attendanceRecords);
 
             // Get unique dates
             $dates = $allRecords->pluck('date')->unique()->sort()->values();
@@ -99,19 +99,19 @@ class AttendanceController extends Controller
             $lateCount = $allRecords->where('status', 'late')->count();
 
             return [
-                'id' => $subject->id,
-                'name' => $subject->name,
-                'grade_level' => $subject->grade_level,
-                'section' => $subject->section,
-                'label' => sprintf('%s - %s (%s)', $subject->grade_level, $subject->section, $subject->name),
-                'student_count' => $subject->enrollments->count(),
+                'id' => $st->id,
+                'name' => $st->subject?->subject_name ?? $st->name,
+                'grade_level' => $st->grade_level,
+                'section' => $st->section,
+                'label' => sprintf('%s - %s (%s)', $st->grade_level, $st->section, $st->subject?->subject_name ?? $st->name),
+                'student_count' => $st->enrollments->count(),
                 'total_days' => $dates->count(),
                 'stats' => [
                     'present' => $presentCount,
                     'absent' => $absentCount,
                     'late' => $lateCount,
                 ],
-                'color' => $subject->color ?? 'indigo',
+                'color' => $st->color ?? 'indigo',
             ];
         });
 
@@ -123,20 +123,20 @@ class AttendanceController extends Controller
     /**
      * Get detailed attendance data for a specific section.
      */
-    public function show(Request $request, Subject $subject): Response
+    public function show(Request $request, SubjectTeacher $subjectTeacher): Response
     {
         $teacher = $request->user();
 
-        // Ensure teacher owns this subject
-        if ($subject->user_id !== $teacher->id) {
+        // Ensure teacher owns this subject-teacher assignment
+        if ($subjectTeacher->teacher_id !== $teacher->id) {
             abort(403, 'You are not authorized to view this attendance.');
         }
 
         // Load enrollments with attendance records
-        $subject->load(['enrollments.user.student', 'enrollments.attendanceRecords']);
+        $subjectTeacher->load(['subject', 'enrollments.user.student', 'enrollments.attendanceRecords']);
 
         // Get all unique dates from attendance records, sorted
-        $allDates = $subject->enrollments
+        $allDates = $subjectTeacher->enrollments
             ->flatMap(fn($e) => $e->attendanceRecords->pluck('date'))
             ->unique()
             ->sort()
@@ -145,13 +145,11 @@ class AttendanceController extends Controller
             ->toArray();
 
         // Build student attendance data - sorted alphabetically by name
-        $students = $subject->enrollments
+        $students = $subjectTeacher->enrollments
             ->map(function ($enrollment) use ($allDates) {
                 $user = $enrollment->user;
                 $student = $user?->student;
-                $fullName = $user?->name ?? trim(
-                    ($student?->first_name ?? '') . ' ' . ($student?->last_name ?? '')
-                );
+                $fullName = $student?->student_name ?? $user?->name ?? 'Student';
 
                 // Build attendance map for each date
                 $attendance = [];
@@ -171,7 +169,7 @@ class AttendanceController extends Controller
 
                 return [
                     'id' => $enrollment->id,
-                    'name' => $fullName ?: 'Student',
+                    'name' => $fullName,
                     'lrn' => $student?->lrn,
                     'attendance' => $attendance,
                     'stats' => [
@@ -187,13 +185,15 @@ class AttendanceController extends Controller
             ->values()
             ->toArray();
 
+        $subjectName = $subjectTeacher->subject?->subject_name ?? 'N/A';
+
         return Inertia::render('Teacher/AttendanceLogDetail', [
             'section' => [
-                'id' => $subject->id,
-                'name' => $subject->name,
-                'grade_level' => $subject->grade_level,
-                'section' => $subject->section,
-                'label' => sprintf('%s - %s (%s)', $subject->grade_level, $subject->section, $subject->name),
+                'id' => $subjectTeacher->id,
+                'subject_name' => $subjectName,
+                'grade_level' => $subjectTeacher->grade_level,
+                'section' => $subjectTeacher->section,
+                'label' => sprintf('%s - %s (%s)', $subjectTeacher->grade_level, $subjectTeacher->section, $subjectName),
             ],
             'dates' => $allDates,
             'students' => $students,
@@ -203,20 +203,20 @@ class AttendanceController extends Controller
     /**
      * Export attendance data as CSV.
      */
-    public function export(Request $request, Subject $subject)
+    public function export(Request $request, SubjectTeacher $subjectTeacher)
     {
         $teacher = $request->user();
 
-        // Ensure teacher owns this subject
-        if ($subject->user_id !== $teacher->id) {
+        // Ensure teacher owns this subject-teacher assignment
+        if ($subjectTeacher->teacher_id !== $teacher->id) {
             abort(403, 'You are not authorized to export this attendance.');
         }
 
         // Load enrollments with attendance records
-        $subject->load(['enrollments.user.student', 'enrollments.attendanceRecords']);
+        $subjectTeacher->load(['subject', 'enrollments.user.student', 'enrollments.attendanceRecords']);
 
         // Get all unique dates
-        $allDates = $subject->enrollments
+        $allDates = $subjectTeacher->enrollments
             ->flatMap(fn($e) => $e->attendanceRecords->pluck('date'))
             ->unique()
             ->sort()
@@ -227,16 +227,14 @@ class AttendanceController extends Controller
         // Build CSV content
         $headers = array_merge(['Name', 'LRN'], $allDates, ['Present', 'Absent', 'Late', 'Rate (%)']);
 
-        $rows = $subject->enrollments
+        $rows = $subjectTeacher->enrollments
             ->map(function ($enrollment) use ($allDates) {
                 $user = $enrollment->user;
                 $student = $user?->student;
-                $fullName = $user?->name ?? trim(
-                    ($student?->first_name ?? '') . ' ' . ($student?->last_name ?? '')
-                );
+                $fullName = $student?->student_name ?? $user?->name ?? 'Student';
 
                 $row = [
-                    $fullName ?: 'Student',
+                    $fullName,
                     $student?->lrn ?? '',
                 ];
 
@@ -278,8 +276,8 @@ class AttendanceController extends Controller
         // Generate CSV
         $filename = sprintf(
             'attendance_%s_%s_%s.csv',
-            str_replace(' ', '_', $subject->grade_level),
-            str_replace(' ', '_', $subject->section),
+            str_replace(' ', '_', $subjectTeacher->grade_level),
+            str_replace(' ', '_', $subjectTeacher->section ?? 'section'),
             now()->format('Y-m-d')
         );
 
@@ -301,11 +299,11 @@ class AttendanceController extends Controller
     /**
      * Export attendance data as a PDF using dompdf.
      */
-    public function exportPdf(Request $request, Subject $subject)
+    public function exportPdf(Request $request, SubjectTeacher $subjectTeacher)
     {
         $teacher = $request->user();
 
-        if ($subject->user_id !== $teacher->id) {
+        if ($subjectTeacher->teacher_id !== $teacher->id) {
             abort(403, 'You are not authorized to export this attendance.');
         }
 
@@ -318,9 +316,9 @@ class AttendanceController extends Controller
         }
 
         // Same data preparation as export() function
-        $subject->load(['enrollments.user.student', 'enrollments.attendanceRecords']);
+        $subjectTeacher->load(['subject', 'enrollments.user.student', 'enrollments.attendanceRecords']);
 
-        $allDates = $subject->enrollments
+        $allDates = $subjectTeacher->enrollments
             ->flatMap(fn($e) => $e->attendanceRecords->pluck('date'))
             ->unique()
             ->sort()
@@ -328,11 +326,11 @@ class AttendanceController extends Controller
             ->map(fn($date) => $date->format('Y-m-d'))
             ->toArray();
 
-        $students = $subject->enrollments
+        $students = $subjectTeacher->enrollments
             ->map(function ($enrollment) use ($allDates) {
                 $user = $enrollment->user;
                 $student = $user?->student;
-                $fullName = $user?->name ?? trim(($student?->first_name ?? '') . ' ' . ($student?->last_name ?? ''));
+                $fullName = $student?->student_name ?? $user?->name ?? 'Student';
 
                 $attendance = [];
                 foreach ($allDates as $date) {
@@ -348,7 +346,7 @@ class AttendanceController extends Controller
 
                 return [
                     'id' => $enrollment->id,
-                    'name' => $fullName ?: 'Student',
+                    'name' => $fullName,
                     'lrn' => $student?->lrn,
                     'attendance' => $attendance,
                     'stats' => [
@@ -364,14 +362,16 @@ class AttendanceController extends Controller
             ->values()
             ->toArray();
 
+        $subjectName = $subjectTeacher->subject?->subject_name ?? 'N/A';
+
         // Prepare view data
         $viewData = [
             'section' => [
-                'id' => $subject->id,
-                'name' => $subject->name,
-                'grade_level' => $subject->grade_level,
-                'section' => $subject->section,
-                'label' => sprintf('%s - %s (%s)', $subject->grade_level, $subject->section, $subject->name),
+                'id' => $subjectTeacher->id,
+                'subject_name' => $subjectName,
+                'grade_level' => $subjectTeacher->grade_level,
+                'section' => $subjectTeacher->section,
+                'label' => sprintf('%s - %s (%s)', $subjectTeacher->grade_level, $subjectTeacher->section ?? 'section', $subjectName),
             ],
             'dates' => $allDates,
             'students' => $students,
@@ -381,8 +381,8 @@ class AttendanceController extends Controller
         $pdf = app('dompdf.wrapper')->loadView('pdf.attendance', $viewData);
         $filename = sprintf(
             'attendance_%s_%s_%s.pdf',
-            str_replace(' ', '_', $subject->grade_level),
-            str_replace(' ', '_', $subject->section),
+            str_replace(' ', '_', $subjectTeacher->grade_level),
+            str_replace(' ', '_', $subjectTeacher->section ?? 'section'),
             now()->format('Y-m-d')
         );
 
@@ -395,15 +395,16 @@ class AttendanceController extends Controller
     public function checkExists(Request $request)
     {
         $data = $request->validate([
-            'classId' => ['required', 'integer', 'exists:subjects,id'],
+            'classId' => ['required', 'integer', 'exists:subject_teachers,id'],
             'date' => ['required', 'date'],
         ]);
 
-        $subject = Subject::findOrFail($data['classId']);
+        $subjectTeacher = SubjectTeacher::findOrFail($data['classId']);
 
-        $exists = AttendanceRecord::whereHas('enrollment', function ($query) use ($subject) {
-            $query->where('subject_id', $subject->id);
-        })->where('date', $data['date'])->exists();
+        $exists = AttendanceRecord::where('date', $data['date'])
+            ->whereHas('enrollment', function ($query) use ($subjectTeacher) {
+                $query->where('subject_teachers_id', $subjectTeacher->id);
+            })->exists();
 
         return response()->json(['exists' => $exists]);
     }
@@ -418,17 +419,17 @@ class AttendanceController extends Controller
         $teacher = $request->user();
 
         $data = $request->validate([
-            'classId' => ['required', 'integer', 'exists:subjects,id'],
+            'classId' => ['required', 'integer', 'exists:subject_teachers,id'],
             'date' => ['required', 'date'],
             'students' => ['required', 'array'],
             'students.*.id' => ['required', 'integer', 'exists:enrollments,id'],
             'students.*.status' => ['required', 'string'],
         ]);
 
-        $subject = Subject::findOrFail($data['classId']);
+        $subjectTeacher = SubjectTeacher::with('enrollments')->findOrFail($data['classId']);
 
-        // Ensure the teacher owns this subject
-        if ($subject->user_id !== $teacher->id) {
+        // Ensure the teacher owns this subject-teacher assignment
+        if ($subjectTeacher->teacher_id !== $teacher->id) {
             return response()->json(['message' => 'Unauthorized to modify attendance for this class.'], 403);
         }
 
@@ -444,9 +445,10 @@ class AttendanceController extends Controller
         }
 
         // Check if attendance already exists for this class on this date
-        $existingAttendance = AttendanceRecord::whereHas('enrollment', function ($query) use ($subject) {
-            $query->where('subject_id', $subject->id);
-        })->where('date', $date)->exists();
+        $existingAttendance = AttendanceRecord::where('date', $date)
+            ->whereHas('enrollment', function ($query) use ($subjectTeacher) {
+                $query->where('subject_teachers_id', $subjectTeacher->id);
+            })->exists();
 
         if ($existingAttendance) {
             return response()->json([
@@ -456,9 +458,9 @@ class AttendanceController extends Controller
         }
 
         foreach ($data['students'] as $s) {
-            $enrollment = $subject->enrollments->firstWhere('id', $s['id']);
+            $enrollment = $subjectTeacher->enrollments->firstWhere('id', $s['id']);
 
-            // If the enrollment does not belong to this subject, skip it
+            // If the enrollment does not belong to this subject-teacher, skip it
             if (!$enrollment) {
                 continue;
             }

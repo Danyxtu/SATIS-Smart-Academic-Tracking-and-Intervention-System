@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\Grade;
 use App\Models\Subject;
+use App\Models\SubjectTeacher;
 use App\Support\Concerns\HasDefaultAssignments;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,11 +23,11 @@ class GradeController extends Controller
         'lrn' => ['lrn', 'student_lrn', 'student lrn', 'learner_reference_number', 'learner reference number'],
     ];
 
-    public function bulkStore(Request $request, Subject $subject): RedirectResponse
+    public function bulkStore(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
     {
-        $this->ensureTeacherOwnsSubject($request->user()->id, $subject);
+        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
-        $structure = $this->buildGradeStructure($subject->grade_categories);
+        $structure = $this->buildGradeStructure($subjectTeacher->grade_categories);
         $assignments = collect($structure['assignments'])->keyBy('id');
 
         if ($assignments->isEmpty()) {
@@ -58,7 +59,7 @@ class GradeController extends Controller
 
         $enrollmentIds = collect($data['grades'])->pluck('enrollment_id')->unique()->values();
 
-        $enrollments = Enrollment::where('subject_id', $subject->id)
+        $enrollments = Enrollment::where('subject_teachers_id', $subjectTeacher->id)
             ->whereIn('id', $enrollmentIds)
             ->get()
             ->keyBy('id');
@@ -128,15 +129,15 @@ class GradeController extends Controller
             ->with('grade_update_summary', $summary);
     }
 
-    public function import(Request $request, Subject $subject): RedirectResponse
+    public function import(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
     {
-        $this->ensureTeacherOwnsSubject($request->user()->id, $subject);
+        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
         $request->validate([
             'grades_file' => 'required|file|mimes:csv,txt|max:4096',
         ]);
 
-        $structure = $this->buildGradeStructure($subject->grade_categories);
+        $structure = $this->buildGradeStructure($subjectTeacher->grade_categories);
         $assignments = collect($structure['assignments']);
 
         if ($assignments->isEmpty()) {
@@ -146,7 +147,7 @@ class GradeController extends Controller
         }
 
         try {
-            $summary = $this->importGradesFromCsv($subject, $request->file('grades_file'), $structure);
+            $summary = $this->importGradesFromCsv($subjectTeacher, $request->file('grades_file'), $structure);
         } catch (RuntimeException $exception) {
             return back()->withErrors(['grades_file' => $exception->getMessage()]);
         }
@@ -157,7 +158,7 @@ class GradeController extends Controller
             ->with('grade_import_summary', $summary);
     }
 
-    private function importGradesFromCsv(Subject $subject, UploadedFile $file, array $structure): array
+    private function importGradesFromCsv(SubjectTeacher $subjectTeacher, UploadedFile $file, array $structure): array
     {
         $rows = $this->readSpreadsheetRows($file);
 
@@ -193,7 +194,7 @@ class GradeController extends Controller
             $lrn = $this->sanitizeLrn($row[$columnMap['lrn']] ?? null);
             $name = isset($columnMap['name']) ? trim((string) ($row[$columnMap['name']] ?? '')) : null;
 
-            $enrollment = $this->locateEnrollment($subject, $lrn, $name);
+            $enrollment = $this->locateEnrollment($subjectTeacher, $lrn, $name);
 
             if (! $enrollment) {
                 $summary['skipped']++;
@@ -308,10 +309,10 @@ class GradeController extends Controller
         return $map;
     }
 
-    private function locateEnrollment(Subject $subject, ?string $lrn, ?string $name): ?Enrollment
+    private function locateEnrollment(SubjectTeacher $subjectTeacher, ?string $lrn, ?string $name): ?Enrollment
     {
         $query = Enrollment::with(['user.student'])
-            ->where('subject_id', $subject->id);
+            ->where('subject_teachers_id', $subjectTeacher->id);
 
         if ($lrn) {
             return (clone $query)
@@ -329,7 +330,7 @@ class GradeController extends Controller
                             $q->whereRaw('LOWER(TRIM(name)) = ?', [$normalized]);
                         })
                         ->orWhereHas('user.student', function ($q) use ($normalized) {
-                            $q->whereRaw('LOWER(TRIM(CONCAT(first_name, " ", last_name))) = ?', [$normalized]);
+                            $q->whereRaw('LOWER(TRIM(CONCAT(first_name, \' \', last_name))) = ?', [$normalized]);
                         });
                 })
                 ->first();
@@ -394,9 +395,9 @@ class GradeController extends Controller
         return true;
     }
 
-    private function ensureTeacherOwnsSubject(int $teacherId, Subject $subject): void
+    private function ensureTeacherOwnsSubjectTeacher(int $teacherId, SubjectTeacher $subjectTeacher): void
     {
-        if ($subject->user_id !== $teacherId) {
+        if ($subjectTeacher->teacher_id !== $teacherId) {
             abort(403, 'You are not allowed to modify this class.');
         }
     }

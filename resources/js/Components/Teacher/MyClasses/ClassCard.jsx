@@ -1,4 +1,4 @@
-import { Users, Book, Megaphone } from "lucide-react";
+import { Users, Book, Megaphone, Loader2 } from "lucide-react";
 
 const normalizeLabel = (value) => {
     if (value === null || value === undefined) return "";
@@ -7,7 +7,13 @@ const normalizeLabel = (value) => {
         .toLowerCase();
 };
 
-const ClassCard = ({ handleClassSelect, cls, colors, onSendNudge }) => {
+const ClassCard = ({
+    handleClassSelect,
+    cls,
+    colors,
+    onSendNudge,
+    isLoading = false,
+}) => {
     const className = cls?.name?.trim?.() ?? cls?.name ?? "";
     const classSection = cls?.section?.trim?.() ?? cls?.section ?? "";
     const badgeLabel = className || classSection || "Class";
@@ -23,10 +29,13 @@ const ClassCard = ({ handleClassSelect, cls, colors, onSendNudge }) => {
     };
 
     return (
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden transition-all hover:shadow-xl hover:scale-105 group">
+        <div
+            className={`bg-white rounded-xl shadow-lg overflow-hidden transition-all hover:shadow-xl hover:scale-105 group ${isLoading ? "opacity-75" : ""}`}
+        >
             <button
                 onClick={() => handleClassSelect(cls)}
                 className="w-full p-6 text-left"
+                disabled={isLoading}
             >
                 <div className="flex items-center justify-between mb-4">
                     <span
@@ -34,7 +43,11 @@ const ClassCard = ({ handleClassSelect, cls, colors, onSendNudge }) => {
                     >
                         {badgeLabel}
                     </span>
-                    <Book className={colors.icon} />
+                    {isLoading ? (
+                        <Loader2 className={`${colors.icon} animate-spin`} />
+                    ) : (
+                        <Book className={colors.icon} />
+                    )}
                 </div>
                 {showSectionLine && (
                     <h2 className="text-2xl font-bold text-gray-900">

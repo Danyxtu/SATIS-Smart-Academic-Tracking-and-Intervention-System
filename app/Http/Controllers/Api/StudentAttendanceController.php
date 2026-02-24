@@ -13,7 +13,7 @@ class StudentAttendanceController extends Controller
     {
         $user = $request->user();
 
-        $enrollments = Enrollment::with(['subject', 'attendanceRecords'])
+        $enrollments = Enrollment::with(['subjectTeacher.subject', 'attendanceRecords'])
             ->where('user_id', $user->id)
             ->get();
 
@@ -55,7 +55,7 @@ class StudentAttendanceController extends Controller
 
             return [
                 'id' => $enrollment->id,
-                'name' => $enrollment->subject?->name ?? 'Unknown',
+                'name' => $enrollment->subjectTeacher?->subject?->name ?? 'Unknown',
                 'attended' => $presentDays,
                 'total' => $totalDays,
                 'attendanceRate' => $attendanceRate,
@@ -86,7 +86,7 @@ class StudentAttendanceController extends Controller
                     : date('Y-n-j', strtotime($record->date));
                 $events[$dateKey][] = [
                     'type' => 'attendance',
-                    'title' => ($enrollment->subject?->name ?? 'Class') . ' - ' . ucfirst($record->status),
+                    'title' => ($enrollment->subjectTeacher?->subject?->name ?? 'Class') . ' - ' . ucfirst($record->status),
                     'status' => $record->status === 'present' ? 'completed' : 'pending',
                 ];
             }

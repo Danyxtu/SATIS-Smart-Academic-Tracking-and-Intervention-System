@@ -4,17 +4,16 @@ namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
-use App\Models\MasterSubject;
 use App\Models\Student;
 use App\Models\StudentNotification;
 use App\Models\Subject;
+use App\Models\SubjectTeacher;
 use App\Models\SystemSetting;
 use App\Models\User;
 use App\Support\Concerns\HasDefaultAssignments;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -27,18 +26,55 @@ class ClassController extends Controller
     use HasDefaultAssignments;
 
     private const COLOR_OPTIONS = ['indigo', 'blue', 'red', 'green', 'amber', 'purple', 'teal'];
-    private const REQUIRED_ROW_FIELDS = ['name', 'lrn', 'grade_level'];
+    private const REQUIRED_ROW_FIELDS = ['student_name', 'lrn', 'grade_level'];
     private const COLUMN_ALIASES = [
-        'name' => ['name', 'student_name', 'student name', 'full_name', 'full name'],
+        // Name columns - various formats teachers might use
+        'student_name' => [
+            'name',
+            'student_name',
+            'student name',
+            'full_name',
+            'full name',
+            'learner_name',
+            'learner name',
+            'pupil_name',
+            'pupil name',
+        ],
+        'first_name' => [
+            'first_name',
+            'first name',
+            'firstname',
+            'given_name',
+            'given name',
+            'fname',
+            'f_name',
+        ],
+        'last_name' => [
+            'last_name',
+            'last name',
+            'lastname',
+            'family_name',
+            'family name',
+            'surname',
+            'lname',
+            'l_name',
+        ],
+        'middle_name' => [
+            'middle_name',
+            'middle name',
+            'middlename',
+            'mname',
+            'm_name',
+        ],
         'lrn' => ['lrn', 'student_lrn', 'student lrn', 'learner_reference_number', 'learner reference number'],
-        'grade_level' => ['grade_level', 'grade level', 'grade'],
+        'grade_level' => ['grade_level', 'grade level', 'grade', 'year_level', 'year level'],
         'section' => ['section', 'class_section', 'class section'],
         'strand' => ['strand', 'track_strand', 'track strand'],
         'track' => ['track', 'tvl_track', 'tvl track', 'program', 'specialization'],
-        'email' => ['email', 'student_email', 'student email'],
+        'email' => ['email', 'student_email', 'student email', 'email_address', 'email address'],
     ];
 
-    public function index(Request $request): Response
+    public function goToMyClasses(Request $request): Response
     {
         $teacher = $request->user();
 
@@ -46,94 +82,80 @@ class ClassController extends Controller
         $currentSemester = SystemSetting::getCurrentSemester();
         $selectedSemester = $request->query('semester', $currentSemester);
 
-        // Get ALL subjects for this teacher (for counting)
-        $allSubjects = Subject::with([
+        // Get ALL subject-teacher assignments for this teacher (for counting)
+        $allSubjectTeachers = SubjectTeacher::with([
+            'subject',
             'enrollments.user.student',
             'enrollments.grades',
-        ])->where('user_id', $teacher->id)
+        ])->where('teacher_id', $teacher->id)
             ->orderBy('grade_level')
             ->get();
 
-        // Filter subjects by selected semester for display
-        $subjects = $allSubjects->filter(function ($subject) use ($selectedSemester) {
-            return $subject->semester == $selectedSemester;
+        // Filter subject-teachers by selected semester for display
+        $subjectTeachers = $allSubjectTeachers->filter(function ($st) use ($selectedSemester) {
+            return $st->semester == $selectedSemester;
         });
 
         // Count classes per semester for the toggle UI
-        $semester1Count = $allSubjects->filter(fn($s) => $s->semester == '1')->count();
-        $semester2Count = $allSubjects->filter(fn($s) => $s->semester == '2')->count();
+        $semester1Count = $allSubjectTeachers->filter(fn($s) => $s->semester == '1')->count();
+        $semester2Count = $allSubjectTeachers->filter(fn($s) => $s->semester == '2')->count();
 
-        $gradeStructures = $subjects->mapWithKeys(function ($subject) {
-            $structure = $this->buildGradeStructure($subject->grade_categories);
-            $structure = $this->ensureStructureCoversExistingGrades($subject, $structure);
+        // $gradeStructures = $subjectTeachers->mapWithKeys(function ($subjectTeacher) {
+        //     $structure = $this->buildGradeStructure($subjectTeacher->grade_categories);
+        //     $structure = $this->ensureStructureCoversExistingGrades($subjectTeacher, $structure);
 
-            return [$subject->id => $structure];
-        });
+        //     return [$subjectTeacher->id => $structure];
+        // });
+        // Classes
+        $classes = $subjectTeachers->map(fn($st) => [
+            'id' => $st->id,
+            'name' => $st->grade_level,
+            'section' => $st->section,
+            'subject_name' => $st->subject?->subject_name ?? 'N/A',
+            'color' => $st->color,
+            'strand' => $st->strand,
+            'track' => $st->track,
+            'student_count' => $st->enrollments->count(),
+            'current_quarter' => $st->current_quarter ?? 1,
+            'semester' => $st->semester,
+        ])->values();
+        // Rosters with enriched student info and grades for easier frontend consumption
+        // $rosters = $subjectTeachers->mapWithKeys(fn($st) => [
+        //     $st->id => $st->enrollments->map(function ($enrollment) use ($st) {
+        //         $user = $enrollment->user;
+        //         $studentProfile = $user?->student;
+        //         $fullName = $user?->name ?? trim(
+        //             ($studentProfile->first_name ?? '') . ' ' . ($studentProfile->last_name ?? '')
+        //         );
 
-        // Get master subjects filtered by selected semester for the dropdown
-        $masterSubjects = MasterSubject::where('is_active', true)
-            ->where('semester', $selectedSemester)
-            ->orderBy('grade_level')
-            ->orderBy('strand')
-            ->orderBy('name')
-            ->get()
-            ->map(fn($subject) => [
-                'id' => $subject->id,
-                'code' => $subject->code,
-                'name' => $subject->name,
-                'description' => $subject->description,
-                'grade_level' => $subject->grade_level,
-                'strand' => $subject->strand,
-                'track' => $subject->track,
-                'semester' => $subject->semester,
-            ]);
+        //         return [
+        //             'id' => $enrollment->id,
+        //             'name' => $fullName ?: 'Student',
+        //             'lrn' => $studentProfile?->lrn,
+        //             'email' => $user?->email,
+        //             'avatar' => $studentProfile?->avatar,
+        //             'grade_level' => $studentProfile?->grade_level ?? $st->grade_level,
+        //             'section' => $studentProfile?->section ?? $st->section,
+        //             'strand' => $studentProfile?->strand ?? $st->strand,
+        //             'track' => $studentProfile?->track ?? $st->track,
+        //             'temp_password' => $user?->temp_password,
+        //             'must_change_password' => $user?->must_change_password ?? true,
+        //             'grades' => $enrollment->grades->mapWithKeys(fn($grade) => [
+        //                 $grade->assignment_key ?: Str::slug($grade->assignment_name, '_') => $grade->score,
+        //             ])->all(),
+        //         ];
+        //     })->values(),
+        // ])->all();
 
         return Inertia::render('Teacher/MyClasses', [
-            'classes' => $subjects->map(fn($subject) => [
-                'id' => $subject->id,
-                'name' => $subject->grade_level,
-                'section' => $subject->section,
-                'subject' => $subject->name,
-                'color' => $subject->color,
-                'strand' => $subject->strand,
-                'track' => $subject->track,
-                'student_count' => $subject->enrollments->count(),
-                'current_quarter' => $subject->current_quarter ?? 1,
-                'semester' => $subject->semester,
-            ])->values(),
-            'rosters' => $subjects->mapWithKeys(fn($subject) => [
-                $subject->id => $subject->enrollments->map(function ($enrollment) use ($subject) {
-                    $user = $enrollment->user;
-                    $studentProfile = $user?->student;
-                    $fullName = $user?->name ?? trim(
-                        ($studentProfile->first_name ?? '') . ' ' . ($studentProfile->last_name ?? '')
-                    );
-
-                    return [
-                        'id' => $enrollment->id,
-                        'name' => $fullName ?: 'Student',
-                        'lrn' => $studentProfile?->lrn,
-                        'email' => $user?->email,
-                        'avatar' => $studentProfile?->avatar,
-                        'grade_level' => $studentProfile?->grade_level ?? $subject->grade_level,
-                        'section' => $studentProfile?->section ?? $subject->section,
-                        'strand' => $studentProfile?->strand ?? $subject->strand,
-                        'track' => $studentProfile?->track ?? $subject->track,
-                        'temp_password' => $user?->temp_password,
-                        'must_change_password' => $user?->must_change_password ?? true,
-                        'grades' => $enrollment->grades->mapWithKeys(fn($grade) => [
-                            $grade->assignment_key ?: Str::slug($grade->assignment_name, '_') => $grade->score,
-                        ])->all(),
-                    ];
-                })->values(),
-            ])->all(),
-            'gradeStructures' => $gradeStructures->all(),
+            'classes' => $classes,
+            // 'rosters' => $rosters,
+            // 'gradeStructures' => $gradeStructures->all(),
             'defaultSchoolYear' => $this->currentSchoolYear(),
             'currentSemester' => $currentSemester,
             'selectedSemester' => (int) $selectedSemester,
             'semester1Count' => $semester1Count,
             'semester2Count' => $semester2Count,
-            'masterSubjects' => $masterSubjects,
         ]);
     }
 
@@ -155,9 +177,17 @@ class ClassController extends Controller
             'classlist' => 'nullable|file|mimes:csv,txt,xls,xlsx|max:4096',
         ]);
 
-        $subject = Subject::create([
-            'user_id' => $teacher->id,
-            'name' => $data['subject_name'],
+        // First, find or create the subject
+        $subjectCode = Str::slug($data['subject_name'], '_') . '_' . Str::random(6);
+        $subject = Subject::firstOrCreate(
+            ['subject_name' => $data['subject_name']],
+            ['subject_code' => $subjectCode]
+        );
+
+        // Create the SubjectTeacher (teacher's class assignment)
+        $subjectTeacher = SubjectTeacher::create([
+            'subject_id' => $subject->id,
+            'teacher_id' => $teacher->id,
             'grade_level' => $data['grade_level'],
             'section' => $data['section'],
             'strand' => $data['strand'] ?? null,
@@ -172,9 +202,9 @@ class ClassController extends Controller
 
         if ($request->hasFile('classlist')) {
             try {
-                $summary = $this->importClasslist($subject, $request->file('classlist'));
+                $summary = $this->importClasslist($subjectTeacher, $request->file('classlist'));
             } catch (RuntimeException $exception) {
-                $subject->delete();
+                $subjectTeacher->delete();
 
                 return back()
                     ->withErrors(['classlist' => $exception->getMessage()])
@@ -188,32 +218,35 @@ class ClassController extends Controller
             ->with('import_summary', $summary);
     }
 
-    public function enrollStudent(Request $request, Subject $subject): RedirectResponse
+    public function enrollStudent(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
     {
-        $this->ensureTeacherOwnsSubject($request->user()->id, $subject);
+        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
         $data = $request->validate([
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'middle_name' => 'nullable|string|max:255',
+            'student_name' => 'required|string|max:255',
             'lrn' => 'required|string|max:255',
             'email' => 'nullable|email|max:255',
         ]);
 
-        $result = $this->persistStudentRecord($subject, array_merge([
-            'grade_level' => $subject->grade_level,
-            'section' => $subject->section,
-            'strand' => $subject->strand,
-            'track' => $subject->track,
-        ], $data));
+        // Normalize the student name (remove extra spaces)
+        $studentName = preg_replace('/\s+/', ' ', trim($data['student_name']));
+
+        $result = $this->persistStudentRecord($subjectTeacher, [
+            'student_name' => $studentName,
+            'grade_level' => $subjectTeacher->grade_level,
+            'section' => $subjectTeacher->section,
+            'strand' => $subjectTeacher->strand,
+            'track' => $subjectTeacher->track,
+            'lrn' => $data['lrn'],
+            'email' => $data['email'] ?? null,
+        ]);
 
         // Prepare flash with generated password if created
         $redirect = redirect()->route('teacher.classes.index')->with('success', 'Student added to class.');
 
         if (is_array($result) && ! empty($result['password'])) {
             $redirect = $redirect->with('new_student_password', [
-                'first_name' => $data['first_name'],
-                'last_name' => $data['last_name'],
+                'student_name' => $studentName,
                 'lrn' => $data['lrn'],
                 'email' => $data['email'] ?? null,
                 'password' => $result['password'],
@@ -223,16 +256,16 @@ class ClassController extends Controller
         return $redirect;
     }
 
-    public function uploadClasslist(Request $request, Subject $subject): RedirectResponse
+    public function uploadClasslist(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
     {
-        $this->ensureTeacherOwnsSubject($request->user()->id, $subject);
+        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
         $request->validate([
             'classlist' => 'required|file|mimes:csv,txt,xls,xlsx|max:4096',
         ]);
 
         try {
-            $summary = $this->importClasslist($subject, $request->file('classlist'));
+            $summary = $this->importClasslist($subjectTeacher, $request->file('classlist'));
         } catch (RuntimeException $exception) {
             return back()->withErrors(['classlist' => $exception->getMessage()]);
         }
@@ -243,11 +276,11 @@ class ClassController extends Controller
             ->with('import_summary', $summary);
     }
 
-    private function ensureStructureCoversExistingGrades(Subject $subject, array $structure): array
+    private function ensureStructureCoversExistingGrades(SubjectTeacher $subjectTeacher, array $structure): array
     {
         $assignments = collect($structure['assignments']);
 
-        $existingAssignments = $subject->enrollments
+        $existingAssignments = $subjectTeacher->enrollments
             ->flatMap(function ($enrollment) {
                 return $enrollment->grades->map(function ($grade) {
                     $assignmentId = $grade->assignment_key ?: Str::slug($grade->assignment_name ?? 'assignment', '_');
@@ -291,7 +324,7 @@ class ClassController extends Controller
         }
 
         $updatedStructure = $this->buildGradeStructure($categories);
-        $subject->update(['grade_categories' => $updatedStructure['categories']]);
+        $subjectTeacher->update(['grade_categories' => $updatedStructure['categories']]);
 
         return $updatedStructure;
     }
@@ -323,9 +356,9 @@ class ClassController extends Controller
         return $fallback;
     }
 
-    public function updateGradeStructure(Request $request, Subject $subject): RedirectResponse
+    public function updateGradeStructure(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
     {
-        $this->ensureTeacherOwnsSubject($request->user()->id, $subject);
+        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
         $data = $request->validate([
             'categories' => 'required|array|min:1',
@@ -340,7 +373,7 @@ class ClassController extends Controller
 
         $structure = $this->buildGradeStructure($data['categories']);
 
-        $subject->update([
+        $subjectTeacher->update([
             'grade_categories' => $structure['categories'],
         ]);
 
@@ -349,7 +382,7 @@ class ClassController extends Controller
             ->with('success', 'Grade structure updated.');
     }
 
-    private function importClasslist(Subject $subject, UploadedFile $file): array
+    private function importClasslist(SubjectTeacher $subjectTeacher, UploadedFile $file): array
     {
         $rows = $this->readSpreadsheetRows($file);
 
@@ -382,9 +415,9 @@ class ClassController extends Controller
 
             $rowNumber = $index + 2; // account for header
             $payload = $this->buildPayloadFromRow($row, $columnMap);
-            $payload['section'] = $payload['section'] ?? $subject->section;
-            $payload['strand'] = $payload['strand'] ?? $subject->strand;
-            $payload['track'] = $payload['track'] ?? $subject->track;
+            $payload['section'] = $payload['section'] ?? $subjectTeacher->section;
+            $payload['strand'] = $payload['strand'] ?? $subjectTeacher->strand;
+            $payload['track'] = $payload['track'] ?? $subjectTeacher->track;
 
             if (! empty($payload['lrn'])) {
                 if (isset($seenLrns[$payload['lrn']])) {
@@ -397,7 +430,7 @@ class ClassController extends Controller
             }
 
             try {
-                $result = $this->persistStudentRecord($subject, $payload);
+                $result = $this->persistStudentRecord($subjectTeacher, $payload);
                 if ($result['status'] === 'created') {
                     $summary['imported']++;
                 } else {
@@ -406,8 +439,7 @@ class ClassController extends Controller
 
                 if (!empty($result['password'])) {
                     $summary['created_students'][] = [
-                        'first_name' => $payload['first_name'] ?? null,
-                        'last_name' => $payload['last_name'] ?? null,
+                        'name' => $payload['student_name'] ?? null,
                         'lrn' => $payload['lrn'] ?? null,
                         'email' => $payload['email'] ?? null,
                         'password' => $result['password'],
@@ -428,12 +460,10 @@ class ClassController extends Controller
         return $summary;
     }
 
-    private function persistStudentRecord(Subject $subject, array $payload): array
+    private function persistStudentRecord(SubjectTeacher $subjectTeacher, array $payload): array
     {
         $validator = Validator::make($payload, [
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'middle_name' => 'nullable|string|max:255',
+            'student_name' => 'required|string|max:255',
             'lrn' => 'required|string|max:255',
             'grade_level' => 'required|string|max:255',
             'section' => 'nullable|string|max:255',
@@ -447,12 +477,19 @@ class ClassController extends Controller
         }
 
         $lrn = $this->sanitizeLrn($payload['lrn']);
-        $firstName = trim($payload['first_name']);
-        $lastName = trim($payload['last_name']);
-        $middleName = isset($payload['middle_name']) ? trim($payload['middle_name']) : null;
-        $fullName = trim("{$firstName} {$lastName}" . ($middleName ? " {$middleName}" : ''));
+        $studentName = trim($payload['student_name']);
+
+        // Extract first/last name for user creation (User table may have separate fields)
+        $firstName = $payload['first_name'] ?? null;
+        $lastName = $payload['last_name'] ?? null;
+        $middleName = $payload['middle_name'] ?? null;
+
+        if (!$firstName || !$lastName) {
+            [$firstName, $lastName] = $this->splitName($studentName);
+        }
 
         $student = null;
+        $generatedPlainPassword = null;
 
         if ($lrn) {
             $student = Student::where('lrn', $lrn)->first();
@@ -461,7 +498,7 @@ class ClassController extends Controller
         if ($student) {
             $user = $student->user;
 
-            if (! $user) {
+            if (!$user) {
                 $created = $this->createStudentUser($firstName, $lastName, $middleName, $payload['email'] ?? null);
                 $user = $created['user'];
                 $generatedPlainPassword = $created['password'];
@@ -480,31 +517,30 @@ class ClassController extends Controller
             $student = Student::firstOrNew(['user_id' => $user->id]);
         }
 
-        if (! $student->user_id) {
+        if (!$student->user_id) {
             $student->user_id = $user->id;
         }
 
         $wasExisting = $student->exists;
 
-        $student->first_name = $firstName;
-        $student->last_name = $lastName;
-        $student->middle_name = $middleName;
-        $student->subject = $subject->name;
+        // Update student record - use student_name (single field)
+        $student->student_name = $studentName;
+        $student->subject = $subjectTeacher->subject?->subject_name ?? 'N/A';
         $student->grade = $student->grade ?? 75;
         $student->trend = $student->trend ?? 'Stable';
-        $student->avatar = $student->avatar ?? $this->avatarFor($fullName);
+        $student->avatar = $student->avatar ?? $this->avatarFor($studentName);
         $student->lrn = $lrn;
-        $student->grade_level = $payload['grade_level'] ?? $subject->grade_level;
-        $student->section = $payload['section'] ?? $subject->section;
-        $student->strand = $payload['strand'] ?? $subject->strand;
-        $student->track = $payload['track'] ?? $subject->track;
+        $student->grade_level = $payload['grade_level'] ?? $subjectTeacher->grade_level;
+        $student->section = $payload['section'] ?? $subjectTeacher->section;
+        $student->strand = $payload['strand'] ?? $subjectTeacher->strand ?? 'N/A';
+        $student->track = $payload['track'] ?? $subjectTeacher->track ?? 'N/A';
 
         $student->save();
 
         Enrollment::firstOrCreate(
             [
                 'user_id' => $student->user_id,
-                'subject_id' => $subject->id,
+                'subject_teachers_id' => $subjectTeacher->id,
             ],
             [
                 'risk_status' => 'low',
@@ -513,7 +549,11 @@ class ClassController extends Controller
             ]
         );
 
-        return ['status' => $wasExisting ? 'updated' : 'created', 'password' => $generatedPlainPassword ?? null, 'user' => $user];
+        return [
+            'status' => $wasExisting ? 'updated' : 'created',
+            'password' => $generatedPlainPassword,
+            'user' => $user,
+        ];
     }
 
     private function readSpreadsheetRows(UploadedFile $file): array
@@ -555,6 +595,13 @@ class ClassController extends Controller
             }
         }
 
+        // If we have first_name and last_name but no student_name, we'll construct student_name later
+        // If we have student_name, that takes precedence
+        // Mark that we need to construct student_name from parts
+        if (!isset($map['student_name']) && (isset($map['first_name']) || isset($map['last_name']))) {
+            $map['_construct_name_from_parts'] = true;
+        }
+
         return $map;
     }
 
@@ -572,6 +619,10 @@ class ClassController extends Controller
         $payload = [];
 
         foreach ($columnMap as $key => $index) {
+            // Skip internal flags
+            if (str_starts_with($key, '_')) {
+                continue;
+            }
             $payload[$key] = isset($row[$index]) ? trim((string) $row[$index]) : null;
         }
 
@@ -579,12 +630,26 @@ class ClassController extends Controller
             $payload['lrn'] = $this->sanitizeLrn($payload['lrn']);
         }
 
-        // If 'name' is provided but first_name/last_name are not, split the name
-        if (isset($payload['name']) && !isset($payload['first_name'])) {
-            [$firstName, $lastName] = $this->splitName($payload['name']);
+        // Construct student_name from parts if needed
+        if (!empty($columnMap['_construct_name_from_parts']) || !isset($payload['student_name'])) {
+            $firstName = $payload['first_name'] ?? '';
+            $lastName = $payload['last_name'] ?? '';
+            $middleName = $payload['middle_name'] ?? '';
+
+            // Build full name from parts
+            $nameParts = array_filter([trim($firstName), trim($middleName), trim($lastName)]);
+            $fullName = implode(' ', $nameParts);
+
+            if (!empty($fullName)) {
+                $payload['student_name'] = $fullName;
+            }
+        }
+
+        // If student_name exists but no first/last name, split it for user creation
+        if (!empty($payload['student_name']) && empty($payload['first_name'])) {
+            [$firstName, $lastName] = $this->splitName($payload['student_name']);
             $payload['first_name'] = $firstName;
-            $payload['last_name'] = $lastName;
-            unset($payload['name']);
+            $payload['last_name'] = $lastName ?: $firstName; // Use first name as last if no last name
         }
 
         return $payload;
@@ -676,9 +741,9 @@ class ClassController extends Controller
         return true;
     }
 
-    private function ensureTeacherOwnsSubject(int $teacherId, Subject $subject): void
+    private function ensureTeacherOwnsSubjectTeacher(int $teacherId, SubjectTeacher $subjectTeacher): void
     {
-        if ($subject->user_id !== $teacherId) {
+        if ($subjectTeacher->teacher_id !== $teacherId) {
             abort(403, 'You are not allowed to modify this class.');
         }
     }
@@ -694,9 +759,9 @@ class ClassController extends Controller
     /**
      * Send a nudge notification to all students in a class.
      */
-    public function sendNudge(Request $request, Subject $subject): RedirectResponse
+    public function sendNudge(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
     {
-        $this->ensureTeacherOwnsSubject($request->user()->id, $subject);
+        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
         $data = $request->validate([
             'message' => 'required|string|max:500',
@@ -704,13 +769,14 @@ class ClassController extends Controller
         ]);
 
         $teacher = $request->user();
-        $enrollments = $subject->enrollments()->with('user')->get();
+        $enrollments = $subjectTeacher->enrollments()->with('user')->get();
 
         if ($enrollments->isEmpty()) {
             return back()->with('error', 'No students enrolled in this class.');
         }
 
         $sentCount = 0;
+        $subjectName = $subjectTeacher->subject?->subject_name ?? 'N/A';
 
         foreach ($enrollments as $enrollment) {
             if (!$enrollment->user_id) {
@@ -731,15 +797,15 @@ class ClassController extends Controller
             $sentCount++;
         }
 
-        return back()->with('success', "Nudge sent to {$sentCount} student(s) in {$subject->name}!");
+        return back()->with('success', "Nudge sent to {$sentCount} student(s) in {$subjectName}!");
     }
 
     /**
      * Start or advance the active quarter for the class.
      */
-    public function startQuarter(Request $request, Subject $subject): RedirectResponse
+    public function startQuarter(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
     {
-        $this->ensureTeacherOwnsSubject($request->user()->id, $subject);
+        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
         $data = $request->validate([
             'quarter' => 'required|integer|min:1|max:4',
@@ -748,12 +814,75 @@ class ClassController extends Controller
         $quarter = (int) $data['quarter'];
 
         // Only allow advancing forward, not going backward
-        if ($quarter <= ($subject->current_quarter ?? 1)) {
+        if ($quarter <= ($subjectTeacher->current_quarter ?? 1)) {
             return back()->with('error', 'Cannot set to a previous or same quarter.');
         }
 
-        $subject->update(['current_quarter' => $quarter]);
+        $subjectTeacher->update(['current_quarter' => $quarter]);
 
-        return back()->with('success', "Quarter {$quarter} started for {$subject->name}.");
+        $subjectName = $subjectTeacher->subject?->subject_name ?? $subjectTeacher->name;
+
+        return back()->with('success', "Quarter {$quarter} started for {$subjectName}.");
+    }
+
+    public function myClass(Request $request, SubjectTeacher $subjectTeacher)
+    {
+        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
+
+        $subjectTeacher->load([
+            'subject',
+            'enrollments.user.student',
+            'enrollments.grades',
+        ]);
+
+        $gradeStructure = $this->buildGradeStructure($subjectTeacher->grade_categories);
+        $gradeStructure = $this->ensureStructureCoversExistingGrades($subjectTeacher, $gradeStructure);
+
+        $classData = [
+            'id' => $subjectTeacher->id,
+            'name' => $subjectTeacher->grade_level,
+            'section' => $subjectTeacher->section,
+            'subject_name' => $subjectTeacher->subject?->subject_name ?? 'N/A',
+            'color' => $subjectTeacher->color,
+            'strand' => $subjectTeacher->strand,
+            'track' => $subjectTeacher->track,
+            'student_count' => $subjectTeacher->enrollments->count(),
+            'current_quarter' => $subjectTeacher->current_quarter ?? 1,
+            'semester' => $subjectTeacher->semester,
+            'school_year' => $subjectTeacher->school_year,
+        ];
+
+        $roster = $subjectTeacher->enrollments->map(function ($enrollment) use ($subjectTeacher) {
+            $user = $enrollment->user;
+            $studentProfile = $user?->student;
+
+            // Get name from student_name field, or fallback to user name
+            $fullName = $studentProfile?->student_name
+                ?? $user?->name
+                ?? 'Student';
+
+            return [
+                'id' => $enrollment->id,
+                'name' => $fullName,
+                'lrn' => $studentProfile?->lrn,
+                'email' => $user?->email,
+                'avatar' => $studentProfile?->avatar,
+                'grade_level' => $studentProfile?->grade_level ?? $subjectTeacher->grade_level,
+                'section' => $studentProfile?->section ?? $subjectTeacher->section,
+                'strand' => $studentProfile?->strand ?? $subjectTeacher->strand,
+                'track' => $studentProfile?->track ?? $subjectTeacher->track,
+                'temp_password' => $user?->temp_password,
+                'must_change_password' => $user?->must_change_password ?? true,
+                'grades' => $enrollment->grades->mapWithKeys(fn($grade) => [
+                    $grade->assignment_key ?: Str::slug($grade->assignment_name, '_') => $grade->score,
+                ])->all(),
+            ];
+        })->values();
+
+        return response()->json([
+            'class' => $classData,
+            'roster' => $roster,
+            'gradeStructure' => $gradeStructure,
+        ]);
     }
 }

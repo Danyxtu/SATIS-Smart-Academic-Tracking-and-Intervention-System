@@ -18,9 +18,9 @@ class InterventionController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        $enrollment = Enrollment::with(['subject', 'user'])->findOrFail($validated['enrollment_id']);
+        $enrollment = Enrollment::with(['subjectTeacher', 'user'])->findOrFail($validated['enrollment_id']);
 
-        if (optional($enrollment->subject)->user_id !== $request->user()->id) {
+        if (optional($enrollment->subjectTeacher)->teacher_id !== $request->user()->id) {
             abort(403, 'You are not authorized to start an intervention for this student.');
         }
 

@@ -37,7 +37,7 @@ return new class extends Migration
                 'tasks' => [],
             ],
         ];
-        Schema::create('subject_teacher', function (Blueprint $table) {
+        Schema::create('subject_teachers', function (Blueprint $table) {
             $table->id();
             $table->foreignId('subject_id')->constrained()->onDelete('cascade');
             $table->foreignId('teacher_id')->constrained('users')->onDelete('cascade');
@@ -53,7 +53,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        DB::table('subject_teacher')
+        DB::table('subject_teachers')
             ->whereNull('grade_categories')
             ->update(['grade_categories' => json_encode($defaultCategories)]);
     }
