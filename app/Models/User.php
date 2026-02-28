@@ -26,6 +26,7 @@ class User extends Authenticatable
         'last_name',
         'middle_name',
         'email',
+        'personal_email',
         'password',
         'role',
         'status',
@@ -60,6 +61,19 @@ class User extends Authenticatable
             'must_change_password' => 'boolean',
             'password_changed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Get the user's full name.
+     */
+    public function getNameAttribute(): string
+    {
+        $parts = array_filter([
+            $this->first_name,
+            $this->middle_name,
+            $this->last_name,
+        ]);
+        return implode(' ', $parts) ?: $this->email;
     }
 
     /**

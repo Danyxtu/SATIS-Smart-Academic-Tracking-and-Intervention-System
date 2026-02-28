@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->foreignId('enrollment_id')->constrained()->onDelete('cascade');
             $table->enum('status', ['active', 'completed', 'cancelled'])->default('active');
-            $table->timestamps();
             $table->enum('type', [
                 'academic_quiz',      // Tier 1
                 'automated_nudge',    // Tier 1
@@ -37,6 +36,7 @@ return new class extends Migration
             // Track rejection if any
             $table->timestamp('rejected_at')->nullable();
             $table->text('rejection_reason')->nullable();
+            $table->timestamps();
         });
     }
 

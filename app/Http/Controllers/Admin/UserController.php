@@ -142,13 +142,13 @@ class UserController extends Controller
 
                 // Get teachers for this student's subjects
                 $enrollments = Enrollment::where('user_id', $user->id)
-                    ->with(['subject.teacher'])
+                    ->with(['subjectTeacher.subject', 'subjectTeacher.teacher'])
                     ->get();
 
                 $user->subjects = $enrollments->map(function ($enrollment) {
                     return [
-                        'name' => $enrollment->subject->name ?? 'N/A',
-                        'teacher' => $enrollment->subject->teacher->name ?? 'N/A',
+                        'name' => $enrollment->subjectTeacher?->subject?->name ?? 'N/A',
+                        'teacher' => $enrollment->subjectTeacher?->teacher?->name ?? 'N/A',
                     ];
                 });
             }
@@ -417,7 +417,14 @@ class UserController extends Controller
         $validated = $request->validate([
             'ids' => 'required|array',
             'ids.*' => 'exists:users,id',
+            'password' => 'required|string',
         ]);
+
+        // Verify the admin's password
+        $currentUser = Auth::user();
+        if (!Hash::check($validated['password'], $currentUser->password)) {
+            return back()->withErrors(['password' => 'The password you entered is incorrect.']);
+        }
 
         // Filter out the current admin user
         $currentUserId = Auth::id();

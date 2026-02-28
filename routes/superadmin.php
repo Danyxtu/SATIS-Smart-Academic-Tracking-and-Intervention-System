@@ -5,7 +5,6 @@ use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardCo
 use App\Http\Controllers\SuperAdmin\DepartmentController;
 use App\Http\Controllers\SuperAdmin\AdminController as SuperAdminAdminController;
 use App\Http\Controllers\SuperAdmin\SettingsController;
-use App\Http\Controllers\SuperAdmin\CurriculumController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -14,7 +13,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 |
 | These routes are only for users with the 'super_admin' role.
-| Super Admin manages departments, admins, curriculum, and system settings.
+| Super Admin manages departments, admins, and system settings.
 |
 */
 
@@ -38,11 +37,6 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal'])
             ->name('admins.reset-password');
         Route::post('/admins/{admin}/resend-credentials', [SuperAdminAdminController::class, 'resendCredentials'])
             ->name('admins.resend-credentials');
-
-        // Curriculum Management (Master Subjects & Prerequisites)
-        Route::resource('curriculum', CurriculumController::class);
-        Route::post('/curriculum/{curriculum}/toggle-status', [CurriculumController::class, 'toggleStatus'])
-            ->name('curriculum.toggle-status');
 
         // System Settings
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');

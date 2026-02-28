@@ -6,32 +6,100 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Enrollment;
-use App\Models\Student;
-use App\Models\Grade;
 use App\Models\Intervention;
-use App\Models\User;
 use App\Models\SystemSetting;
 use Inertia\Inertia;
+use App\Services\Teacher\DashboardServices;
 
 class DashboardController extends Controller
 {
-    public function index()
+    protected $dashboardServices;
+
+    public function __construct(DashboardServices $dashboardServices)
+    {
+        $this->dashboardServices = $dashboardServices;
+    }
+    public function Dashboard()
+    {
+
+        $dashboardData = $this->dashboardServices->getDashboardData();
+        /**
+         * The Dashboard Data
+         */
+
+        // School Year and Semester from System Settings
+        $academicPeriod = [
+            'schoolYear' => $dashboardData['currentSchoolYear'],
+            'semester' => $dashboardData['currentSemester'],
+        ];
+
+        // Priority Students sorted with critical, warning, and under watchlists
+        $priorityStudents = [
+            'critical' => $dashboardData['criticalStudents'],
+            'warning' => $dashboardData['warningStudents'],
+            'watchlist' => $dashboardData['watchlistsStudents'],
+        ];
+
+        // Dashboard Stats
+        $stats = [
+            'studentsAtRisk' => $dashboardData['studentsAtRisk'],
+            'needsAttention' => $dashboardData['needsAttention'],
+            'recentDeclines' => $dashboardData['recentDeclines'],
+            'totalStudents' => $dashboardData['totalStudents'],
+            'studentsWithGrades' => $dashboardData['studentsWithGrades'],
+        ];
+
+        // Grade Distribution
+        $gradeDistribution = $dashboardData['gradeDistribution'];
+
+        // Recent Activity
+        $recentActivity = $dashboardData['recentActivity'];
+
+        // Department Data under Logged in teacher
+        $department = $dashboardData['department'];
+
+        return Inertia::render('Teacher/Dashboard', compact(
+            'stats',
+            'priorityStudents',
+            'gradeDistribution',
+            'recentActivity',
+            'academicPeriod',
+            'department',
+        ));
+    }
+
+    /**
+     * Export priority students report as PDF.
+     */
+    public function exportPriorityStudentsPdf(Request $request)
     {
         $teacher = Auth::user();
         $teacher->load('department');
+
+        // Check if dompdf is available
+        if (! class_exists('Barryvdh\\DomPDF\\Facade\\Pdf')) {
+            return response()->json([
+                'message' => 'PDF export not available. Please install barryvdh/laravel-dompdf via Composer: composer require barryvdh/laravel-dompdf',
+            ], 501);
+        }
+
+        // Get filter options from request
+        $includeCritical = $request->boolean('critical', true);
+        $includeWarning = $request->boolean('warning', true);
+        $includeWatchlist = $request->boolean('watchlist', true);
 
         // Get current academic period
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
         $currentSemester = SystemSetting::getCurrentSemester();
 
         // Get all enrollments for the teacher's subjects
-        $enrollments = Enrollment::whereHas('subject', function ($query) use ($teacher) {
-            $query->where('user_id', $teacher->id);
+        $enrollments = Enrollment::whereHas('subjectTeacher', function ($query) use ($teacher) {
+            $query->where('teacher_id', $teacher->id);
         })->with([
             'user',
             'grades',
             'student',
-            'subject',
+            'subjectTeacher.subject',
             'attendanceRecords',
             'intervention',
         ])->get();
@@ -43,14 +111,14 @@ class DashboardController extends Controller
             $studentProfile = $enrollment->student;
 
             return [
-                'id' => optional($studentProfile)->id ?? $enrollment->user->id,
-                'first_name' => optional($studentProfile)->first_name ?? $enrollment->user->first_name,
-                'last_name' => optional($studentProfile)->last_name ?? $enrollment->user->last_name,
-                'avatar' => optional($studentProfile)->avatar,
-                'subject' => optional($enrollment->subject)->name,
+                'id' => $studentProfile?->id ?? $enrollment->user->id,
+                'student_name' => $studentProfile?->student_name ?? $enrollment->user?->name ?? 'Student',
+                'name' => $studentProfile?->student_name ?? $enrollment->user?->name ?? 'Student',
+                'avatar' => $studentProfile?->avatar,
+                'subject' => $enrollment->subjectTeacher?->subject?->name,
                 'grade' => $hasGrades ? round($averageGrade) : null,
                 'has_grades' => $hasGrades,
-                'trend' => optional($studentProfile)->trend,
+                'trend' => $studentProfile?->trend,
                 'enrollment_id' => $enrollment->id,
                 'intervention' => $enrollment->intervention ? [
                     'id' => $enrollment->intervention->id,
@@ -64,66 +132,40 @@ class DashboardController extends Controller
         // Only consider students WITH grades for risk calculations
         $studentsWithGrades = $students->filter(fn($s) => $s['has_grades'] === true);
 
-        // 1. Students at Risk (only those with grades below 75)
-        $studentsAtRiskCount = $studentsWithGrades->filter(fn($s) => $s['grade'] < 75)->count();
+        // Priority Students categories
+        $criticalStudents = $studentsWithGrades->filter(fn($s) => $s['grade'] < 70)->values()->toArray();
+        $warningStudents = $studentsWithGrades->filter(fn($s) => $s['grade'] >= 70 && $s['grade'] < 75)->values()->toArray();
+        $watchlistStudents = $studentsWithGrades->filter(fn($s) => $s['grade'] >= 75 && $s['grade'] < 80 && $s['trend'] === 'Declining')->values()->toArray();
 
-        // 2. Average Grade (only from students with grades)
-        $averageGrade = $studentsWithGrades->avg('grade') ?? 0;
-
-        // 3. Needs Attention (based on attendance - 2+ absences)
-        $needsAttentionCount = $enrollments->filter(function ($enrollment) {
-            return $enrollment->attendanceRecords->where('status', 'absent')->count() >= 2;
-        })->count();
-
-        // 4. Recent Declines
-        $recentDeclinesCount = $studentsWithGrades->filter(fn($s) => $s['trend'] === 'Declining')->count();
-
-        // 5. Priority Students - Based on expected/actual grade thresholds
-        // Critical: Grade below 70 (failing)
-        // Warning: Grade between 70-74 (at risk of failing)
-        // Watchlist: Grade between 75-79 AND declining trend
-        $criticalStudents = $studentsWithGrades->filter(fn($s) => $s['grade'] < 70);
-        $warningStudents = $studentsWithGrades->filter(fn($s) => $s['grade'] >= 70 && $s['grade'] < 75);
-        $watchListStudents = $studentsWithGrades->filter(fn($s) => $s['grade'] >= 75 && $s['grade'] < 80 && $s['trend'] === 'Declining');
-
-        // 6. Grade Distribution (only students with grades)
-        $gradeDistribution = [
-            '90-100' => $studentsWithGrades->filter(fn($s) => $s['grade'] >= 90)->count(),
-            '80-89' => $studentsWithGrades->filter(fn($s) => $s['grade'] >= 80 && $s['grade'] < 90)->count(),
-            '75-79' => $studentsWithGrades->filter(fn($s) => $s['grade'] >= 75 && $s['grade'] < 80)->count(),
-            '70-74' => $studentsWithGrades->filter(fn($s) => $s['grade'] >= 70 && $s['grade'] < 75)->count(),
-            '<70' => $studentsWithGrades->filter(fn($s) => $s['grade'] < 70)->count(),
-        ];
-
-        // 7. Recent Activity
-        $recentActivity = Intervention::whereIn('enrollment_id', $enrollments->pluck('id'))
-            ->latest()->limit(5)->with('enrollment.user')->get();
-
-        return Inertia::render('Teacher/Dashboard', [
-            'stats' => [
-                'studentsAtRisk' => $studentsAtRiskCount,
-                'averageGrade' => round($averageGrade, 2),
-                'needsAttention' => $needsAttentionCount,
-                'recentDeclines' => $recentDeclinesCount,
-                'totalStudents' => $students->count(),
-                'studentsWithGrades' => $studentsWithGrades->count(),
-            ],
-            'priorityStudents' => [
-                'critical' => $criticalStudents->values(),
-                'warning' => $warningStudents->values(),
-                'watchList' => $watchListStudents->values(),
-            ],
-            'gradeDistribution' => $gradeDistribution,
-            'recentActivity' => $recentActivity,
-            'academicPeriod' => [
-                'schoolYear' => $currentSchoolYear,
-                'semester' => $currentSemester,
+        // Prepare view data
+        $viewData = [
+            'teacher' => [
+                'name' => $teacher->name,
             ],
             'department' => $teacher->department ? [
                 'id' => $teacher->department->id,
                 'name' => $teacher->department->name,
                 'code' => $teacher->department->code,
             ] : null,
-        ]);
+            'academicPeriod' => [
+                'schoolYear' => $currentSchoolYear,
+                'semester' => $currentSemester,
+            ],
+            'criticalStudents' => $criticalStudents,
+            'warningStudents' => $warningStudents,
+            'watchlistStudents' => $watchlistStudents,
+            'includeCritical' => $includeCritical,
+            'includeWarning' => $includeWarning,
+            'includeWatchlist' => $includeWatchlist,
+        ];
+
+        /** @var \Barryvdh\DomPDF\PDF $pdf */
+        $pdf = app('dompdf.wrapper')->loadView('pdf.priority_students', $viewData);
+        $filename = sprintf(
+            'priority_students_report_%s.pdf',
+            now()->format('Y-m-d_His')
+        );
+
+        return $pdf->download($filename);
     }
 }

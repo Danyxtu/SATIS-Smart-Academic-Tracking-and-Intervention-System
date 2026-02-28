@@ -153,14 +153,14 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
     // Export to CSV
     const handleExportCSV = () => {
         window.location.href = route("teacher.attendance.log.export", {
-            subject: section.id,
+            subjectTeacher: section.id,
         });
     };
 
     // Export to PDF
     const handleExportPDF = async () => {
         window.location.href = route("teacher.attendance.log.export.pdf", {
-            subject: section.id,
+            subjectTeacher: section.id,
         });
     };
 
@@ -349,7 +349,7 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
                                             No attendance records for{" "}
                                             {getMonthName(
                                                 selectedMonth.year,
-                                                selectedMonth.month
+                                                selectedMonth.month,
                                             )}
                                             .
                                         </td>
@@ -395,9 +395,9 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
                                                             .rate >= 90
                                                             ? "text-green-600"
                                                             : student.monthStats
-                                                                  .rate >= 75
-                                                            ? "text-yellow-600"
-                                                            : "text-red-600"
+                                                                    .rate >= 75
+                                                              ? "text-yellow-600"
+                                                              : "text-red-600"
                                                     }`}
                                                 >
                                                     {student.monthStats.rate}%
@@ -458,7 +458,7 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
                                             No attendance records for{" "}
                                             {getMonthName(
                                                 selectedMonth.year,
-                                                selectedMonth.month
+                                                selectedMonth.month,
                                             )}
                                             .
                                         </td>

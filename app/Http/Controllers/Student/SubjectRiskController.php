@@ -20,7 +20,8 @@ class SubjectRiskController extends Controller
 
         // Get all enrollments with related data
         $enrollments = Enrollment::with([
-            'subject.teacher',
+            'subjectTeacher.subject',
+            'subjectTeacher.teacher',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
@@ -30,7 +31,7 @@ class SubjectRiskController extends Controller
 
         // Process each enrollment to determine risk status
         $subjects = $enrollments->map(function ($enrollment) {
-            $subject = $enrollment->subject;
+            $subject = $enrollment->subjectTeacher?->subject;
             $grades = $enrollment->grades;
             $attendance = $enrollment->attendanceRecords;
             $intervention = $enrollment->intervention;
@@ -175,10 +176,10 @@ class SubjectRiskController extends Controller
 
             return [
                 'id' => $enrollment->id,
-                'subjectId' => $subject?->id,
+                'subjectId' => $enrollment->subjectTeacher?->subject_id,
                 'subjectName' => $subject?->name ?? 'Unknown Subject',
                 'section' => $subject?->section,
-                'teacherName' => $subject?->teacher?->name ?? 'N/A',
+                'teacherName' => $enrollment->subjectTeacher?->teacher?->name ?? 'N/A',
                 'currentGrade' => $currentGrade,
                 'expectedGrade' => $expectedGrade !== null ? round($expectedGrade, 1) : null,
                 'attendanceRate' => $attendanceRate,

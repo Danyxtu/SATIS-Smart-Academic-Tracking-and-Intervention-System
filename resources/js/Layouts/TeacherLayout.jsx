@@ -7,7 +7,8 @@ import NotificationBadge, {
     NotificationDot,
 } from "../Components/NotificationBadge";
 import DarkModeToggle from "@/Components/DarkModeToggle";
-import { Link, usePage } from "@inertiajs/react";
+import ConfirmationDialog from "@/Components/ConfirmationDialog";
+import { Link, usePage, router } from "@inertiajs/react";
 import UserPicture from "../../assets/user.png";
 import { LoadingProvider } from "../Context/LoadingContext";
 import LoadingOverlay from "../Components/LoadingOverlay";
@@ -17,20 +18,30 @@ import {
     LogOut,
     Menu,
     X,
-    ClipboardList, // For Interventions
-    CalendarCheck, // For Attendance
-    BookOpen, // For My Classes
+    ClipboardList,
+    CalendarCheck,
+    BookOpen,
 } from "lucide-react";
 
 export default function TeacherLayout({ children }) {
     const { auth, notifications } = usePage().props;
     const [showingNavigationDropdown, setShowingNavigationDropdown] =
         useState(false);
+    const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
 
     // Get pending interventions count from shared notifications
     const pendingInterventions = notifications?.pendingInterventions || 0;
 
-    // --- (NEW) Teacher Navigation Items (Based on our discussion) ---
+    // Handle logout confirmation
+    const handleLogoutClick = () => {
+        setShowLogoutConfirmation(true);
+    };
+
+    const handleConfirmLogout = () => {
+        router.post(route("logout"));
+    };
+
+    // Navigations
     const menuItems = [
         {
             icon: <House size={18} />,
@@ -39,10 +50,9 @@ export default function TeacherLayout({ children }) {
             activeCheck: "teacher.dashboard",
             showBadge: false,
         },
-         {
+        {
             icon: <BookOpen size={18} />,
             label: "My Classes",
-            // We will need to create this route
             destination: "teacher.classes.index",
             activeCheck: "teacher.classes.*",
             showBadge: false,
@@ -50,19 +60,17 @@ export default function TeacherLayout({ children }) {
         {
             icon: <CalendarCheck size={18} />,
             label: "Attendance",
-            // We will need to create this route
             destination: "teacher.attendance.index",
             activeCheck: "teacher.attendance.*",
             showBadge: false,
         },
-       
+
         {
             icon: <ClipboardList size={18} />,
             label: "Interventions",
-            // We will need to create this route
             destination: "teacher.interventions.index",
             activeCheck: "teacher.interventions.*",
-            showBadge: true, // Show notification badge on interventions
+            showBadge: true,
             badgeCount: pendingInterventions,
         },
     ];
@@ -74,7 +82,7 @@ export default function TeacherLayout({ children }) {
                 <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 z-50">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex justify-between h-16">
-                            {/* 1. Logo & Main Nav Links */}
+                            {/* Logo & Main Nav Links */}
                             <div className="flex">
                                 {/* Logo */}
                                 <div className="flex-shrink-0 flex items-center">
@@ -91,7 +99,7 @@ export default function TeacherLayout({ children }) {
                                     {menuItems.map((item) => {
                                         // Check if the route exists before trying to render a link
                                         const routeExists = route().has(
-                                            item.destination
+                                            item.destination,
                                         );
                                         const isActive = routeExists
                                             ? route().current(item.activeCheck)
@@ -103,17 +111,16 @@ export default function TeacherLayout({ children }) {
                                                 href={
                                                     routeExists
                                                         ? route(
-                                                              item.destination
+                                                              item.destination,
                                                           )
                                                         : "#"
                                                 }
                                                 active={isActive}
-                                                // This className logic is correct for the Breeze NavLink
                                                 className={`relative inline-flex items-center gap-2 px-1 pt-1 border-b-2 text-sm font-medium
                                                 ${
                                                     isActive
-                                                        ? "border-indigo-500 text-indigo-600" // Active
-                                                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" // Inactive
+                                                        ? "border-indigo-500 text-indigo-600"
+                                                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                                                 }
                                                 ${
                                                     !routeExists
@@ -139,15 +146,15 @@ export default function TeacherLayout({ children }) {
                                 </div>
                             </div>
 
-                            {/* 2. Right Side: Bell & Profile */}
+                            {/*Right Side: Bell & Profile */}
                             <div className="hidden sm:flex sm:items-center sm:ml-6">
                                 <Link
                                     href={
                                         route().has(
-                                            "teacher.interventions.index"
+                                            "teacher.interventions.index",
                                         )
                                             ? route(
-                                                  "teacher.interventions.index"
+                                                  "teacher.interventions.index",
                                               )
                                             : "#"
                                     }
@@ -190,24 +197,23 @@ export default function TeacherLayout({ children }) {
                                             >
                                                 Profile
                                             </Dropdown.Link>
-                                            <Dropdown.Link
-                                                href={route("logout")}
-                                                method="post"
-                                                as="button"
+                                            <button
+                                                onClick={handleLogoutClick}
+                                                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-300"
                                             >
                                                 Log Out
-                                            </Dropdown.Link>
+                                            </button>
                                         </Dropdown.Content>
                                     </Dropdown>
                                 </div>
                             </div>
 
-                            {/* 3. Hamburger Menu (Mobile) */}
+                            {/*Hamburger Menu (Mobile) */}
                             <div className="-mr-2 flex items-center sm:hidden">
                                 <button
                                     onClick={() =>
                                         setShowingNavigationDropdown(
-                                            (previousState) => !previousState
+                                            (previousState) => !previousState,
                                         )
                                     }
                                     className="inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none"
@@ -232,7 +238,7 @@ export default function TeacherLayout({ children }) {
                         <div className="pt-2 pb-3 space-y-1">
                             {menuItems.map((item) => {
                                 const routeExists = route().has(
-                                    item.destination
+                                    item.destination,
                                 );
                                 const isActive = routeExists
                                     ? route().current(item.activeCheck)
@@ -282,24 +288,34 @@ export default function TeacherLayout({ children }) {
                                 <ResponsiveNavLink href={route("profile.edit")}>
                                     Profile
                                 </ResponsiveNavLink>
-                                <ResponsiveNavLink
-                                    method="post"
-                                    href={route("logout")}
-                                    as="button"
+                                <button
+                                    onClick={handleLogoutClick}
+                                    className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800 rounded-md"
                                 >
                                     Log Out
-                                </ResponsiveNavLink>
+                                </button>
                             </div>
                         </div>
                     </div>
                 </nav>
 
-                {/* --- (NEW) Page Content (Full Width) --- */}
+                {/* --- Page Content (Full Width) --- */}
                 <main className="flex-1 p-6">
-                    {/* We use max-w-full to allow tables to use the whole screen */}
                     <div className="max-w-full mx-auto">{children}</div>
                 </main>
                 <LoadingOverlay />
+
+                {/* Logout Confirmation Dialog */}
+                <ConfirmationDialog
+                    show={showLogoutConfirmation}
+                    title="Log Out"
+                    message="Are you sure you want to log out of your account?"
+                    dangerButtonText="Log Out"
+                    cancelButtonText="Cancel"
+                    onConfirm={handleConfirmLogout}
+                    onCancel={() => setShowLogoutConfirmation(false)}
+                    isDangerous={true}
+                />
             </div>
         </LoadingProvider>
     );

@@ -21,19 +21,19 @@ class StudentPerformanceController extends Controller
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
 
         // Get all enrollments for this student with related data
-        $allEnrollments = Enrollment::with(['subject.teacher', 'grades', 'attendanceRecords', 'intervention'])
+        $allEnrollments = Enrollment::with(['subjectTeacher.subject', 'subjectTeacher.teacher', 'grades', 'attendanceRecords', 'intervention'])
             ->where('user_id', $user->id)
             ->get();
 
         // Filter enrollments by semester
         $enrollments = $allEnrollments->filter(function ($enrollment) use ($selectedSemester) {
-            $subjectSemester = $enrollment->subject?->semester;
+            $subjectSemester = $enrollment->subjectTeacher?->semester;
             return $subjectSemester == $selectedSemester;
         });
 
         // Count enrollments per semester for navigation
-        $semester1Count = $allEnrollments->filter(fn($e) => ($e->subject?->semester ?? '1') == '1')->count();
-        $semester2Count = $allEnrollments->filter(fn($e) => ($e->subject?->semester ?? '1') == '2')->count();
+        $semester1Count = $allEnrollments->filter(fn($e) => ($e->subjectTeacher?->semester ?? '1') == '1')->count();
+        $semester2Count = $allEnrollments->filter(fn($e) => ($e->subjectTeacher?->semester ?? '1') == '2')->count();
 
         $totalSubjects = $enrollments->count();
 
@@ -96,10 +96,12 @@ class StudentPerformanceController extends Controller
 
             return [
                 'id' => $enrollment->id,
-                'subjectId' => $enrollment->subject_id,
-                'name' => $enrollment->subject?->name ?? 'Unknown Subject',
-                'section' => $enrollment->subject?->section,
-                'teacher' => $enrollment->subject?->teacher?->name ?? 'N/A',
+                'subjectId' => $enrollment->subjectTeacher?->subject_id,
+                'subject_name' => $enrollment->subjectTeacher?->subject?->subject_name ?? 'Unknown Subject',
+                'section' => $enrollment->subjectTeacher?->section,
+                'teacher' => $enrollment->subjectTeacher?->teacher
+                    ? $enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name
+                    : 'N/A',
                 'grade' => $percentage,
                 'gradeDisplay' => $percentage !== null ? "{$percentage}%" : 'N/A',
                 'remarks' => $remarks,
@@ -186,7 +188,8 @@ class StudentPerformanceController extends Controller
         $user = $request->user();
 
         $enrollment = Enrollment::with([
-            'subject.teacher',
+            'subjectTeacher.subject',
+            'subjectTeacher.teacher',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
@@ -195,7 +198,7 @@ class StudentPerformanceController extends Controller
             ->where('id', $enrollmentId)
             ->firstOrFail();
 
-        $subject = $enrollment->subject;
+        $subject = $enrollment->subjectTeacher?->subject;
         $grades = $enrollment->grades;
 
         // Calculate overall grade
@@ -388,12 +391,14 @@ class StudentPerformanceController extends Controller
         return response()->json([
             'enrollment' => [
                 'id' => $enrollment->id,
-                'subjectId' => $enrollment->subject_id,
+                'subjectId' => $enrollment->subjectTeacher?->subject_id,
             ],
             'subject' => [
                 'id' => $subject?->id,
                 'name' => $subject?->name ?? 'Unknown Subject',
-                'teacher' => $subject?->teacher?->name ?? 'N/A',
+                'teacher' => $enrollment->subjectTeacher?->teacher
+                    ? $enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name
+                    : 'N/A',
                 'section' => $subject?->section,
                 'schoolYear' => $schoolYear,
             ],

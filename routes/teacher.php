@@ -4,7 +4,9 @@
 use App\Http\Controllers\Teacher\AttendanceController;
 use App\Http\Controllers\Teacher\ClassController;
 use App\Http\Controllers\Teacher\GradeController;
+use App\Http\Controllers\Teacher\GradeCalculationController;
 use App\Http\Controllers\Teacher\DashboardController;
+use App\Http\Controllers\Teacher\InterventionController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -29,75 +31,80 @@ Route::middleware(['auth'])
 
 // All routes in this group are protected by the 'can:access-teacher-portal' gate
 Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
-    ->prefix('teacher') // All URLs will start with /teacher
-    ->name('teacher.')  // All route names will start with teacher.
+    ->prefix('teacher')
+    ->name('teacher.')
     ->group(function () {
+        /**
+         * Dashboard Route
+         */
+        Route::get('/dashboard', [DashboardController::class, 'Dashboard'])->name('dashboard');
+        // --- PRIORITY STUDENTS REPORT PDF EXPORT ---
+        // URL: /teacher/dashboard/priority-students/export/pdf
+        // Name: route('teacher.dashboard.priority-students.pdf')
+        Route::get('/dashboard/priority-students/export/pdf', [DashboardController::class, 'exportPriorityStudentsPdf'])
+            ->name('dashboard.priority-students.pdf');
 
-        // Teacher Dashboard
-        // URL: /teacher/dashboard
-        // Name: route('teacher.dashboard')
-        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-
-        // --- (NEW) ATTENDANCE ROUTE ---
-        // URL: /teacher/attendance
-        // Name: route('teacher.attendance.index')
-        Route::get('/attendance', [AttendanceController::class, 'index'])
-            ->name('attendance.index');
-
-        // --- ATTENDANCE LOG ROUTES ---
-        Route::get('/attendance/log', [AttendanceController::class, 'log'])
-            ->name('attendance.log');
-        Route::get('/attendance/log/{subject}', [AttendanceController::class, 'show'])
-            ->name('attendance.log.show');
-        Route::get('/attendance/log/{subject}/export', [AttendanceController::class, 'export'])
-            ->name('attendance.log.export');
-        // Server-side PDF export (requires barryvdh/laravel-dompdf package)
-        Route::get('/attendance/log/{subject}/export/pdf', [AttendanceController::class, 'exportPdf'])
-            ->name('attendance.log.export.pdf');
-        // Check if attendance exists for a class on a date
-        Route::get('/attendance/check', [AttendanceController::class, 'checkExists'])
-            ->name('attendance.check');
-        // Save attendance (persist records)
-        Route::post('/attendance', [AttendanceController::class, 'store'])
-            ->name('attendance.store');
-
-        // --- (NEW) MY CLASSES ROUTE ---
-        // URL: /teacher/classes
-        // Name: route('teacher.classes.index')
-        Route::get('/classes', [ClassController::class, 'index'])->name('classes.index');
-        Route::post('/classes', [ClassController::class, 'store'])->name('classes.store');
-        Route::post('/classes/{subject}/students', [ClassController::class, 'enrollStudent'])
+        /**
+         * My Classes Route
+         */
+        Route::get('/classes', [ClassController::class, 'goToMyClasses'])->name('classes.index');
+        Route::get('/classes/{subjectTeacher}', [ClassController::class, 'myClass'])->name('class');
+        Route::post('/classes', [ClassController::class, 'createAClass'])->name('classes.store');
+        Route::post('/classes/{subjectTeacher}/students', [ClassController::class, 'enrollStudent'])
             ->name('classes.students.store');
-        Route::post('/classes/{subject}/classlist', [ClassController::class, 'uploadClasslist'])
+        Route::post('/classes/{subjectTeacher}/classlist', [ClassController::class, 'uploadClasslist'])
             ->name('classes.classlist.store');
-        Route::post('/classes/{subject}/quarter', [ClassController::class, 'startQuarter'])
+        Route::post('/classes/{subjectTeacher}/quarter', [ClassController::class, 'startQuarter'])
             ->name('classes.quarter.start');
-        Route::post('/classes/{subject}/grades/bulk', [GradeController::class, 'bulkStore'])
+        Route::post('/classes/{subjectTeacher}/grades/bulk', [GradeController::class, 'bulkStore'])
             ->name('classes.grades.bulk');
-        Route::post('/classes/{subject}/grades/import', [GradeController::class, 'import'])
+        Route::post('/classes/{subjectTeacher}/grades/import', [GradeController::class, 'import'])
             ->name('classes.grades.import');
-        Route::post('/classes/{subject}/grade-structure', [ClassController::class, 'updateGradeStructure'])
+        Route::post('/classes/{subjectTeacher}/grade-structure', [ClassController::class, 'updateGradeStructure'])
             ->name('classes.grade-structure.update');
-        Route::post('/classes/{subject}/nudge', [ClassController::class, 'sendNudge'])
+        Route::post('/classes/{subjectTeacher}/nudge', [ClassController::class, 'sendNudge'])
             ->name('classes.nudge');
 
-        // --- (NEW) INTERVENTIONS ROUTE ---
-        // URL: /teacher/interventions
-        // Name: route('teacher.interventions.index')
-        Route::get('/interventions', [App\Http\Controllers\Teacher\InterventionController::class, 'index'])
+        /**
+         * Grade Calculation Routes
+         */
+        Route::get('/classes/{subjectTeacher}/calculate-grades', [GradeCalculationController::class, 'calculateClassGrades'])
+            ->name('classes.calculate-grades');
+        Route::get('/classes/{subjectTeacher}/students/{enrollment}/calculate-grades', [GradeCalculationController::class, 'calculateStudentGrades'])
+            ->name('classes.students.calculate-grades');
+        Route::post('/classes/{subjectTeacher}/recalculate-grades', [GradeCalculationController::class, 'recalculateAfterUpdate'])
+            ->name('classes.recalculate-grades');
+
+        /**
+         * Attendance Routes
+         */
+        Route::get('/attendance', [AttendanceController::class, 'index'])
+            ->name('attendance.index');
+        Route::get('/attendance/log', [AttendanceController::class, 'attendanceLogsGroupedBySection'])
+            ->name('attendance.log');
+        Route::get('/attendance/log/{subjectTeacher}', [AttendanceController::class, 'attendanceLogOfSpecificSection'])
+            ->name('attendance.log.show');
+        Route::get('/attendance/log/{subjectTeacher}/export', [AttendanceController::class, 'exportCSV'])
+            ->name('attendance.log.export');
+        Route::get('/attendance/log/{subjectTeacher}/export/pdf', [AttendanceController::class, 'exportPdf'])
+            ->name('attendance.log.export.pdf');
+        Route::get('/attendance/check', [AttendanceController::class, 'checkExists'])
+            ->name('attendance.check');
+        Route::post('/attendance', [AttendanceController::class, 'createAttendance'])
+            ->name('attendance.create');
+
+
+        /**
+         * Intervention Routes
+         */
+        Route::get('/interventions', [InterventionController::class, 'index'])
             ->name('interventions.index');
-
-        // routes/web.php inside the 'teacher' group
-        Route::post('/interventions', [App\Http\Controllers\Teacher\InterventionController::class, 'store'])
+        Route::post('/interventions', [InterventionController::class, 'store'])
             ->name('interventions.store');
-
-        // Bulk intervention for multiple students
-        Route::post('/interventions/bulk', [App\Http\Controllers\Teacher\InterventionController::class, 'bulkStore'])
+        Route::post('/interventions/bulk', [InterventionController::class, 'bulkStore'])
             ->name('interventions.bulk');
-
-        // Approve/Reject completion requests for Tier 3 interventions
-        Route::post('/interventions/{intervention}/approve', [App\Http\Controllers\Teacher\InterventionController::class, 'approveCompletion'])
+        Route::post('/interventions/{intervention}/approve', [InterventionController::class, 'approveCompletion'])
             ->name('interventions.approve');
-        Route::post('/interventions/{intervention}/reject', [App\Http\Controllers\Teacher\InterventionController::class, 'rejectCompletion'])
+        Route::post('/interventions/{intervention}/reject', [InterventionController::class, 'rejectCompletion'])
             ->name('interventions.reject');
     });

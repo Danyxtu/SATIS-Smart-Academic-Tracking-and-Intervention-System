@@ -13,21 +13,18 @@ return new class extends Migration
     {
         Schema::create('students', function (Blueprint $table) {
             $table->id();
-            // Student Details -> Danny
-            $table->string('first_name');
-            $table->string('last_name');
-            $table->string('middle_name')->nullable();
-            $table->string('lrn')->nullable()->after('middle_name');
-            $table->string('grade_level')->nullable()->after('trend');
-            $table->string('section')->nullable()->after('grade_level');
-            $table->string('strand')->nullable()->after('section');
-            $table->string('track')->nullable()->after('strand');
+            $table->string('student_name');
+            $table->string('lrn')->nullable()->unique();
+            $table->string('grade_level')->nullable();
+            $table->string('section')->nullable();
+            $table->string('strand')->nullable();
+            $table->string('track')->nullable();
             $table->string('subject');
             $table->integer('grade');
             $table->string('trend');
             $table->string('avatar')->nullable();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->timestamps(); // Created at Updated at (Logs)
+            $table->timestamps();
         });
     }
 

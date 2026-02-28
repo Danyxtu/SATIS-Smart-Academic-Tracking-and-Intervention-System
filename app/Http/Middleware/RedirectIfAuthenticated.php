@@ -20,7 +20,7 @@ class RedirectIfAuthenticated
 
         foreach ($guards as $guard) {
             if (Auth::guard($guard)->check()) {
-                
+
                 // --- THIS IS THE MODIFIED PART ---
 
                 // Get the authenticated user
@@ -30,11 +30,11 @@ class RedirectIfAuthenticated
                 if ($user->role === 'teacher') {
                     return redirect(route('teacher.dashboard'));
                 }
-        
+
                 if ($user->role === 'student') {
                     return redirect(route('dashboard'));
                 }
-                
+
                 // Fallback (this should match the one in your controller)
                 return redirect('/');
             }

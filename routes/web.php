@@ -19,6 +19,22 @@ use Inertia\Inertia;
 */
 
 Route::get('/', function () {
+    if (Auth::check()) {
+        $user = Auth::user();
+        if ($user->role === 'teacher') {
+            return redirect()->route('teacher.dashboard');
+        }
+        if ($user->role === 'student') {
+            return redirect()->route('dashboard');
+        }
+        if ($user->role === 'admin') {
+            return redirect()->route('admin.dashboard');
+        }
+        if ($user->role === 'super_admin') {
+            return redirect()->route('superadmin.dashboard');
+        }
+    }
+
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
         'canRegister' => Route::has('register'),
@@ -72,24 +88,14 @@ Route::middleware('auth')->group(function () {
 Route::get('/redirect-after-login', function () {
     $user = Auth::user();
 
-    if ($user->role === 'super_admin') {
-        return redirect()->route('superadmin.dashboard');
-    }
-
-    if ($user->role === 'admin') {
-        return redirect()->route('admin.dashboard');
-    }
-
-    if ($user->role === 'teacher') {
-        return redirect()->route('teacher.dashboard');
-    }
-
-    if ($user->role === 'student') {
-        return redirect()->route('dashboard');
-    }
-
-    // A fallback just in case
-    return redirect('/');
+    $redirect = match ($user->role) {
+        'super_admin' => 'superadmin.dashboard',
+        'admin' => 'admin.dashboard',
+        'teacher' => 'teacher.dashboard',
+        'student' => 'dashboard',
+        default => '/',
+    };
+    return redirect()->route($redirect);
 })->middleware(['auth']);
 
 

@@ -29,6 +29,7 @@ import {
     User,
     Mail,
     Building2,
+    Lock,
 } from "lucide-react";
 
 // Role Badge Component
@@ -429,6 +430,165 @@ const DeleteModal = ({ isOpen, onClose, user, onConfirm, processing }) => (
     </Transition.Root>
 );
 
+// Bulk Delete Confirmation Modal with Password Input
+const BulkDeleteModal = ({
+    isOpen,
+    onClose,
+    selectedCount,
+    onConfirm,
+    processing,
+}) => {
+    const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        if (isOpen) {
+            setPassword("");
+            setError("");
+            setShowPassword(false);
+        }
+    }, [isOpen]);
+
+    const handleConfirm = () => {
+        if (!password.trim()) {
+            setError("Password is required");
+            return;
+        }
+        onConfirm(password);
+        setPassword("");
+        setError("");
+    };
+
+    return (
+        <Transition.Root show={isOpen} as={Fragment}>
+            <Dialog as="div" className="relative z-50" onClose={onClose}>
+                <Transition.Child
+                    as={Fragment}
+                    enter="ease-out duration-300"
+                    enterFrom="opacity-0"
+                    enterTo="opacity-100"
+                    leave="ease-in duration-200"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                >
+                    <div className="fixed inset-0 bg-black/50 transition-opacity" />
+                </Transition.Child>
+
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex min-h-full items-center justify-center p-4">
+                        <Transition.Child
+                            as={Fragment}
+                            enter="ease-out duration-300"
+                            enterFrom="opacity-0 scale-95"
+                            enterTo="opacity-100 scale-100"
+                            leave="ease-in duration-200"
+                            leaveFrom="opacity-100 scale-100"
+                            leaveTo="opacity-0 scale-95"
+                        >
+                            <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-xl transition-all p-6">
+                                <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 dark:bg-red-900/30 rounded-full mb-4">
+                                    <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+                                </div>
+                                <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white text-center">
+                                    Delete {selectedCount} User
+                                    {selectedCount > 1 ? "s" : ""}?
+                                </Dialog.Title>
+                                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 text-center">
+                                    This action cannot be undone. Please enter
+                                    your password to confirm.
+                                </p>
+
+                                <div className="mt-6 space-y-4">
+                                    <div className="relative">
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Admin Password
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                type={
+                                                    showPassword
+                                                        ? "text"
+                                                        : "password"
+                                                }
+                                                value={password}
+                                                onChange={(e) => {
+                                                    setPassword(e.target.value);
+                                                    setError("");
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    if (
+                                                        e.key === "Enter" &&
+                                                        !processing
+                                                    ) {
+                                                        handleConfirm();
+                                                    }
+                                                }}
+                                                placeholder="Enter your password"
+                                                className={`w-full px-4 py-2 pr-10 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 transition-colors ${
+                                                    error
+                                                        ? "border-red-500 dark:border-red-400"
+                                                        : "border-gray-300 dark:border-gray-600 focus:border-purple-500 dark:focus:border-purple-400"
+                                                }`}
+                                                disabled={processing}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setShowPassword(
+                                                        !showPassword,
+                                                    )
+                                                }
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                            >
+                                                {showPassword ? (
+                                                    <EyeOff size={18} />
+                                                ) : (
+                                                    <Eye size={18} />
+                                                )}
+                                            </button>
+                                        </div>
+                                        {error && (
+                                            <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                                                <Lock size={14} />
+                                                {error}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-center gap-3 mt-8">
+                                    <button
+                                        type="button"
+                                        onClick={onClose}
+                                        disabled={processing}
+                                        className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleConfirm}
+                                        disabled={
+                                            processing || !password.trim()
+                                        }
+                                        className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+                                    >
+                                        <Trash2 size={16} />
+                                        {processing
+                                            ? "Deleting..."
+                                            : "Delete Users"}
+                                    </button>
+                                </div>
+                            </Dialog.Panel>
+                        </Transition.Child>
+                    </div>
+                </div>
+            </Dialog>
+        </Transition.Root>
+    );
+};
+
 // Temporary Password Modal - Shows generated password after creating a student
 const TempPasswordModal = ({ isOpen, onClose, user, tempPassword }) => {
     const [copied, setCopied] = useState(false);
@@ -690,6 +850,10 @@ export default function Index({
         isOpen: false,
         user: null,
     });
+    const [bulkDeleteModal, setBulkDeleteModal] = useState({
+        isOpen: false,
+        loading: false,
+    });
     const [isDeleting, setIsDeleting] = useState(false);
     const [tempPasswordModal, setTempPasswordModal] = useState({
         isOpen: false,
@@ -776,21 +940,25 @@ export default function Index({
 
     const handleBulkDelete = () => {
         if (selectedUsers.length === 0) return;
-        if (
-            confirm(
-                `Are you sure you want to delete ${selectedUsers.length} user(s)?`,
-            )
-        ) {
-            router.post(
-                route("admin.users.bulk-destroy"),
-                { ids: selectedUsers },
-                {
-                    onSuccess: () => {
-                        setSelectedUsers([]);
-                    },
+        setBulkDeleteModal({ isOpen: true, loading: false });
+    };
+
+    const handleConfirmBulkDelete = (password) => {
+        if (selectedUsers.length === 0) return;
+        setBulkDeleteModal({ isOpen: true, loading: true });
+        router.post(
+            route("admin.users.bulk-destroy"),
+            { ids: selectedUsers, password },
+            {
+                onSuccess: () => {
+                    setSelectedUsers([]);
+                    setBulkDeleteModal({ isOpen: false, loading: false });
                 },
-            );
-        }
+                onError: (errors) => {
+                    setBulkDeleteModal({ isOpen: true, loading: false });
+                },
+            },
+        );
     };
 
     return (
@@ -1189,6 +1357,15 @@ export default function Index({
                 user={deleteModal.user}
                 onConfirm={handleDelete}
                 processing={isDeleting}
+            />
+            <BulkDeleteModal
+                isOpen={bulkDeleteModal.isOpen}
+                onClose={() =>
+                    setBulkDeleteModal({ isOpen: false, loading: false })
+                }
+                selectedCount={selectedUsers.length}
+                onConfirm={handleConfirmBulkDelete}
+                processing={bulkDeleteModal.loading}
             />
             <TempPasswordModal
                 isOpen={tempPasswordModal.isOpen}

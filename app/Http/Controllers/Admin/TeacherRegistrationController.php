@@ -21,6 +21,15 @@ class TeacherRegistrationController extends Controller
     {
         $admin = Auth::user();
 
+        // Guard: Ensure admin has a department assigned
+        if (!$admin->department_id) {
+            return Inertia::render('Admin/TeacherRegistrations/Index', [
+                'registrations' => [],
+                'pendingCount' => 0,
+                'error' => 'Your admin account does not have a department assigned. Please contact a system administrator.',
+            ]);
+        }
+
         $registrations = TeacherRegistration::with('department')
             ->forDepartment($admin->department_id)
             ->pending()
@@ -31,6 +40,7 @@ class TeacherRegistrationController extends Controller
                     'id' => $registration->id,
                     'first_name' => $registration->first_name,
                     'last_name' => $registration->last_name,
+                    'middle_name' => $registration->middle_name,
                     'full_name' => $registration->full_name,
                     'email' => $registration->email,
                     'department' => $registration->department ? [
