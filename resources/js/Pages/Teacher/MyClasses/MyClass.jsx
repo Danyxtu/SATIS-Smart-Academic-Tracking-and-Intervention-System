@@ -13,7 +13,14 @@ import {
     ChevronRight,
     Users,
 } from "lucide-react";
-
+// Utils
+import {
+    calculateFinalGrade,
+    calculateOverallFinalGrade,
+    calculateExpectedQuarterlyGrade,
+    hasQuarterlyExamScores,
+    isQuarterComplete,
+} from "@/Utils/Teacher/MyClasses/gradeCalculations";
 // Modals
 import {
     AddGradeTaskModal,
@@ -22,6 +29,7 @@ import {
     StudentStatusModal,
     TemporaryPasswordModal,
     ClassList,
+    GradeSubmissionModal,
 } from "@/Components/Teacher/MyClasses";
 
 // Fallback Grade Categories (in case the class doesn't have any defined)
@@ -50,198 +58,6 @@ const buildStudentKey = (student, index) => {
     const fallback = `student-${index}`;
     return `${enrollmentPart ?? idPart ?? lrnPart ?? fallback}:${index}`;
 };
-
-/**
- * Calculate final grade for a quarter based on grades and categories
- */
-const calculateFinalGrade = (grades = {}, categories = [], quarter = 1) => {
-    if (!categories.length) return "N/A";
-
-    // Filter grades for the specific quarter
-    const quarterGrades = {};
-    Object.entries(grades).forEach(([key, value]) => {
-        const isQ1Grade = !key.startsWith("q2_");
-        const isQ2Grade = key.startsWith("q2_");
-
-        if (quarter === 1 && isQ1Grade) {
-            quarterGrades[key] = value;
-        } else if (quarter === 2 && isQ2Grade) {
-            quarterGrades[key.replace("q2_", "")] = value;
-        }
-    });
-
-    let totalWeight = 0;
-    let weightedScore = 0;
-
-    categories.forEach((category) => {
-        const tasks = category?.tasks ?? [];
-        if (!tasks.length || !category.weight) return;
-
-        let earned = 0;
-        let possible = 0;
-
-        tasks.forEach((task) => {
-            const gradeKey = task.id;
-            const value = quarterGrades[gradeKey];
-            if (value !== "" && value !== null && value !== undefined) {
-                earned += parseFloat(value) || 0;
-                possible += parseFloat(task.total) || 0;
-            }
-        });
-
-        if (!possible) return;
-
-        const categoryAverage = earned / possible;
-        weightedScore += categoryAverage * category.weight;
-        totalWeight += category.weight;
-    });
-
-    if (!totalWeight) return "—";
-
-    const percentage = (weightedScore / totalWeight) * 100;
-    return `${percentage.toFixed(1)}%`;
-};
-
-/**
- * Check if a quarter has quarterly exam scores
- */
-const hasQuarterlyExamScores = (grades = {}, categories = [], quarter = 1) => {
-    const quarterlyExamCategory = categories.find(
-        (cat) =>
-            cat.id === "quarterly_exam" ||
-            cat.label?.toLowerCase().includes("quarterly exam"),
-    );
-
-    if (!quarterlyExamCategory || !quarterlyExamCategory.tasks?.length) {
-        return false;
-    }
-
-    return quarterlyExamCategory.tasks.some((task) => {
-        const gradeKey = quarter === 2 ? `q2_${task.id}` : task.id;
-        const value = grades?.[gradeKey];
-        return value !== "" && value !== null && value !== undefined;
-    });
-};
-
-/**
- * Check if quarter is complete (all categories have at least some scores)
- */
-const isQuarterComplete = (grades = {}, categories = [], quarter = 1) => {
-    if (!categories.length) return false;
-
-    return categories.every((category) => {
-        const tasks = category?.tasks ?? [];
-        if (!tasks.length) return true;
-
-        return tasks.some((task) => {
-            const gradeKey = quarter === 2 ? `q2_${task.id}` : task.id;
-            const value = grades?.[gradeKey];
-            return value !== "" && value !== null && value !== undefined;
-        });
-    });
-};
-
-/**
- * Calculate the overall final grade (average of Q1 and Q2)
- */
-const calculateOverallFinalGrade = (grades = {}, categories = []) => {
-    const q1Complete = isQuarterComplete(grades, categories, 1);
-    const q2Complete = isQuarterComplete(grades, categories, 2);
-
-    if (!q1Complete || !q2Complete) return "—";
-
-    const q1Grade = calculateFinalGrade(grades, categories, 1);
-    const q2Grade = calculateFinalGrade(grades, categories, 2);
-
-    if (q1Grade === "—" || q2Grade === "—") return "—";
-
-    const q1Numeric = parseFloat(q1Grade);
-    const q2Numeric = parseFloat(q2Grade);
-
-    if (isNaN(q1Numeric) || isNaN(q2Numeric)) return "—";
-
-    const average = (q1Numeric + q2Numeric) / 2;
-    return `${average.toFixed(1)}%`;
-};
-
-/**
- * Calculate Expected Quarterly Grade - projects grade based on current performance
- */
-const calculateExpectedQuarterlyGrade = (
-    grades = {},
-    categories = [],
-    quarter = 1,
-) => {
-    if (!categories.length) return "N/A";
-
-    const quarterGrades = {};
-    Object.entries(grades).forEach(([key, value]) => {
-        const isQ1Grade = !key.startsWith("q2_");
-        const isQ2Grade = key.startsWith("q2_");
-
-        if (quarter === 1 && isQ1Grade) {
-            quarterGrades[key] = value;
-        } else if (quarter === 2 && isQ2Grade) {
-            quarterGrades[key.replace("q2_", "")] = value;
-        }
-    });
-
-    let totalEarned = 0;
-    let totalPossible = 0;
-    let completedTasksCount = 0;
-
-    categories.forEach((category) => {
-        const tasks = category?.tasks ?? [];
-        tasks.forEach((task) => {
-            const gradeKey = task.id;
-            const value = quarterGrades[gradeKey];
-            if (value !== "" && value !== null && value !== undefined) {
-                totalEarned += parseFloat(value) || 0;
-                totalPossible += parseFloat(task.total) || 0;
-                completedTasksCount++;
-            }
-        });
-    });
-
-    if (!completedTasksCount || !totalPossible) return "N/A";
-
-    const currentPerformanceRate = totalEarned / totalPossible;
-    let weightedScore = 0;
-    let totalWeight = 0;
-
-    categories.forEach((category) => {
-        const tasks = category?.tasks ?? [];
-        if (!tasks.length || !category.weight) return;
-
-        let categoryScore = 0;
-        let categoryTotal = 0;
-
-        tasks.forEach((task) => {
-            const gradeKey = task.id;
-            const value = quarterGrades[gradeKey];
-            const taskTotal = parseFloat(task.total) || 0;
-
-            if (value !== "" && value !== null && value !== undefined) {
-                categoryScore += parseFloat(value) || 0;
-            } else {
-                categoryScore += taskTotal * currentPerformanceRate;
-            }
-            categoryTotal += taskTotal;
-        });
-
-        if (categoryTotal > 0) {
-            const categoryAverage = categoryScore / categoryTotal;
-            weightedScore += categoryAverage * category.weight;
-            totalWeight += category.weight;
-        }
-    });
-
-    if (!totalWeight) return "N/A";
-
-    const percentage = (weightedScore / totalWeight) * 100;
-    return `${percentage.toFixed(1)}%`;
-};
-
 /**
  * Get color classes for grade rows based on the grade value
  */
@@ -331,6 +147,18 @@ const MyClass = (props) => {
         gradeStructure,
     } = props;
 
+    // Debug: Log the props data
+    console.log("=== MyClass Props Debug ===");
+    console.log("selectedClass:", selectedClass);
+    console.log("roster:", roster);
+    console.log("gradeStructure:", gradeStructure);
+    console.log("roster length:", roster.length);
+    if (roster.length > 0) {
+        console.log("First student:", roster[0]);
+        console.log("First student grades:", roster[0]?.grades);
+    }
+    console.log("========================");
+
     // ========================================================================
     // State Management
     // ========================================================================
@@ -357,6 +185,13 @@ const MyClass = (props) => {
     const [activeGradeCategoryId, setActiveGradeCategoryId] = useState(null);
     const [selectedStudentForStatus, setSelectedStudentForStatus] =
         useState(null);
+
+    // Grade submission modal state
+    const [gradeSubmissionModal, setGradeSubmissionModal] = useState({
+        isOpen: false,
+        status: null, // 'success', 'error', or null
+        message: "",
+    });
 
     // Grade management state
     const [dirtyGrades, setDirtyGrades] = useState({});
@@ -473,34 +308,106 @@ const MyClass = (props) => {
      */
     const handleSaveGrades = async () => {
         if (!hasGradeChanges || !selectedClass) return;
-        setIsSavingGrades(true);
-        try {
-            const response = await fetch(
-                `/teacher/classes/${selectedClass.id}/grades/bulk`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRF-TOKEN":
-                            document
-                                .querySelector('meta[name="csrf-token"]')
-                                ?.getAttribute("content") || "",
-                    },
-                    body: JSON.stringify({ grades: dirtyGrades }),
+
+        // Transform dirtyGrades into the format expected by the controller
+        const payload = [];
+
+        Object.entries(dirtyGrades).forEach(([studentId, assignmentValues]) => {
+            Object.entries(assignmentValues).forEach(
+                ([assignmentId, score]) => {
+                    payload.push({
+                        enrollment_id: Number(studentId),
+                        assignment_id: assignmentId,
+                        score:
+                            score === "" ||
+                            score === null ||
+                            score === undefined
+                                ? null
+                                : Number(score),
+                        quarter: selectedQuarter || 1,
+                    });
                 },
             );
+        });
 
-            if (!response.ok) {
-                throw new Error("Failed to save grades");
+        if (!payload.length) {
+            return;
+        }
+
+        setIsSavingGrades(true);
+
+        // Use Inertia router for proper CSRF handling
+        router.post(
+            `/teacher/classes/${selectedClass.id}/grades/bulk`,
+            { grades: payload },
+            {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    setDirtyGrades({});
+                    setGradeSubmissionModal({
+                        isOpen: true,
+                        status: "success",
+                        message: "The grades have been submitted successfully!",
+                    });
+                    // Reload the page data to show updated grades
+                    router.reload({ only: ["roster", "gradeStructure"] });
+                },
+                onError: (errors) => {
+                    console.error("Error saving grades:", errors);
+                    const errorMessage = errors.grades
+                        ? Array.isArray(errors.grades)
+                            ? errors.grades.join(", ")
+                            : errors.grades
+                        : "Please try again.";
+                    setGradeSubmissionModal({
+                        isOpen: true,
+                        status: "error",
+                        message: `Grades could not be submitted. ${errorMessage}`,
+                    });
+                },
+                onFinish: () => {
+                    setIsSavingGrades(false);
+                },
+            },
+        );
+    };
+
+    /**
+     * Handle grade input changes
+     */
+    const handleGradeChange = (studentId, assignmentId, maxScore, rawValue) => {
+        let nextValue;
+
+        if (rawValue === "" || rawValue === null || rawValue === undefined) {
+            nextValue = "";
+        } else {
+            const numericValue = Number(rawValue);
+
+            if (Number.isNaN(numericValue)) {
+                return;
             }
 
-            setDirtyGrades({});
-            console.log("Grades saved successfully");
-        } catch (error) {
-            console.error("Error saving grades:", error);
-        } finally {
-            setIsSavingGrades(false);
+            nextValue = Math.max(0, Math.min(maxScore, numericValue));
         }
+
+        setDirtyGrades((prev) => {
+            const updated = { ...prev };
+            const studentGrades = { ...(updated[studentId] || {}) };
+            studentGrades[assignmentId] = nextValue;
+            updated[studentId] = studentGrades;
+            return updated;
+        });
+    };
+
+    /**
+     * Handle closing the grade submission modal
+     */
+    const handleCloseGradeModal = () => {
+        setGradeSubmissionModal({
+            isOpen: false,
+            status: null,
+            message: "",
+        });
     };
 
     /**
@@ -508,13 +415,57 @@ const MyClass = (props) => {
      */
     const handleCategoryTaskSave = async (categoryId, taskData) => {
         if (!selectedClass) return;
+
         setIsSavingCategoryTask(true);
+
         try {
-            // TODO: Implement actual API call to save the task
-            console.log("Saving task:", { categoryId, taskData });
-            setActiveGradeCategoryId(null);
+            // Build updated categories structure with the new task
+            const updatedCategories = gradeCategories.map((category) => {
+                if (category.id === categoryId) {
+                    // Generate a unique task ID
+                    const taskId = `${categoryId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+                    const newTask = {
+                        id: taskId,
+                        label: taskData.label,
+                        total: taskData.total,
+                    };
+
+                    return {
+                        ...category,
+                        tasks: [...(category.tasks || []), newTask],
+                    };
+                }
+                return {
+                    id: category.id,
+                    label: category.label,
+                    weight: category.weight,
+                    tasks: category.tasks || [],
+                };
+            });
+
+            // Submit to server using Inertia
+            router.post(
+                `/teacher/classes/${selectedClass.id}/grade-structure`,
+                {
+                    categories: updatedCategories,
+                },
+                {
+                    preserveState: false, // Refresh the data
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        setActiveGradeCategoryId(null);
+                        console.log("Task added successfully");
+                    },
+                    onError: (errors) => {
+                        console.error("Failed to add task:", errors);
+                        alert("Failed to add task. Please try again.");
+                    },
+                },
+            );
         } catch (error) {
             console.error("Error saving task:", error);
+            alert("An error occurred while adding the task.");
         } finally {
             setIsSavingCategoryTask(false);
         }
@@ -748,37 +699,39 @@ const MyClass = (props) => {
                                     Current: Q{selectedClass.current_quarter}
                                 </span>
                             )}
+                            <div className="flex items-center p-1 bg-gray-100 rounded-lg">
+                                {/* Classlist */}
+                                <button
+                                    onClick={() =>
+                                        setStudentViewMode("classList")
+                                    }
+                                    className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${
+                                        studentViewMode === "classList"
+                                            ? "bg-white text-indigo-700 shadow-sm"
+                                            : "text-gray-600 hover:bg-gray-200"
+                                    }`}
+                                >
+                                    Student List
+                                </button>
+                                {/* Grade Overview */}
+                                <button
+                                    onClick={() =>
+                                        setStudentViewMode("gradeOverview")
+                                    }
+                                    className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${
+                                        studentViewMode === "gradeOverview"
+                                            ? "bg-white text-indigo-700 shadow-sm"
+                                            : "text-gray-600 hover:bg-gray-200"
+                                    }`}
+                                >
+                                    Grade Overview
+                                </button>
+                            </div>
                         </div>
                         <p className="text-gray-600">{selectedClass.subject}</p>
                     </div>
                     <div className="flex items-center gap-2">
                         {/* Toggle Buttons for Student View Mode */}
-                        <div className="flex items-center p-1 bg-gray-100 rounded-lg">
-                            {/* Classlist */}
-                            <button
-                                onClick={() => setStudentViewMode("classList")}
-                                className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${
-                                    studentViewMode === "classList"
-                                        ? "bg-white text-indigo-700 shadow-sm"
-                                        : "text-gray-600 hover:bg-gray-200"
-                                }`}
-                            >
-                                Student List
-                            </button>
-                            {/* Grade Overview */}
-                            <button
-                                onClick={() =>
-                                    setStudentViewMode("gradeOverview")
-                                }
-                                className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${
-                                    studentViewMode === "gradeOverview"
-                                        ? "bg-white text-indigo-700 shadow-sm"
-                                        : "text-gray-600 hover:bg-gray-200"
-                                }`}
-                            >
-                                Grade Overview
-                            </button>
-                        </div>
 
                         {/* Upload Classlist CSV */}
                         <button
@@ -991,10 +944,7 @@ const MyClass = (props) => {
                                                 )
                                                     return;
                                                 router.post(
-                                                    route(
-                                                        "teacher.classes.quarter.start",
-                                                        selectedClass.id,
-                                                    ),
+                                                    `/teacher/classes/${selectedClass.id}/quarter`,
                                                     { quarter: 2 },
                                                     {
                                                         preserveScroll: true,
@@ -1501,10 +1451,12 @@ const MyClass = (props) => {
                                     <tbody className="bg-white divide-y divide-gray-200">
                                         {filteredStudents.map(
                                             (student, index) => {
-                                                const draftValues =
-                                                    dirtyGrades[student.id] ??
-                                                    student.grades ??
-                                                    {};
+                                                const draftValues = {
+                                                    ...(student.grades ?? {}),
+                                                    ...(dirtyGrades[
+                                                        student.id
+                                                    ] ?? {}),
+                                                };
                                                 const studentKey =
                                                     buildStudentKey(
                                                         student,
@@ -1597,7 +1549,17 @@ const MyClass = (props) => {
                                                                         studentDraft[
                                                                             latestTask
                                                                                 .id
-                                                                        ];
+                                                                        ] !==
+                                                                        undefined
+                                                                            ? studentDraft[
+                                                                                  latestTask
+                                                                                      .id
+                                                                              ]
+                                                                            : student
+                                                                                  .grades?.[
+                                                                                  latestTask
+                                                                                      .id
+                                                                              ];
                                                                     const inputValue =
                                                                         rawValue ===
                                                                             "" ||
@@ -1656,7 +1618,17 @@ const MyClass = (props) => {
                                                                             studentDraft[
                                                                                 task
                                                                                     .id
-                                                                            ];
+                                                                            ] !==
+                                                                            undefined
+                                                                                ? studentDraft[
+                                                                                      task
+                                                                                          .id
+                                                                                  ]
+                                                                                : student
+                                                                                      .grades?.[
+                                                                                      task
+                                                                                          .id
+                                                                                  ];
                                                                         const inputValue =
                                                                             rawValue ===
                                                                                 "" ||
@@ -1813,11 +1785,20 @@ const MyClass = (props) => {
                 />
             )}
             {/* --- Add Grade Task Modal --- */}
+            {console.log("Modal render check:", {
+                selectedTaskCategory,
+                activeGradeCategoryId,
+            })}
             {selectedTaskCategory && selectedClass && (
                 <AddGradeTaskModal
                     category={selectedTaskCategory}
                     onClose={() => setActiveGradeCategoryId(null)}
-                    onSave={handleCategoryTaskSave}
+                    onSave={(taskData) =>
+                        handleCategoryTaskSave(
+                            selectedTaskCategory.id,
+                            taskData,
+                        )
+                    }
                     isSubmitting={isSavingCategoryTask}
                 />
             )}
@@ -1836,6 +1817,13 @@ const MyClass = (props) => {
                     gradeCategories={gradeCategories}
                 />
             )}
+            {/* --- Grade Submission Modal --- */}
+            <GradeSubmissionModal
+                isOpen={gradeSubmissionModal.isOpen}
+                onClose={handleCloseGradeModal}
+                status={gradeSubmissionModal.status}
+                message={gradeSubmissionModal.message}
+            />
         </>
     );
 };

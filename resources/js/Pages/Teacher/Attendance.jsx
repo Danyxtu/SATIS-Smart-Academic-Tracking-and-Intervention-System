@@ -42,11 +42,11 @@ const Attendance = (props) => {
     const { startLoading, stopLoading } = useLoading();
     const [viewMode, setViewMode] = useState("grid");
     const [selectedClassId, setSelectedClassId] = useState(
-        classes[0]?.id ?? null
+        classes[0]?.id ?? null,
     );
 
     const [currentDate, setCurrentDate] = useState(
-        new Date().toISOString().split("T")[0]
+        new Date().toISOString().split("T")[0],
     );
     const [isDraggingEnabled, setIsDraggingEnabled] = useState(false);
     const [attendanceAlreadySaved, setAttendanceAlreadySaved] = useState(false);
@@ -102,7 +102,7 @@ const Attendance = (props) => {
                     route("teacher.attendance.check"),
                     {
                         params: { classId: selectedClassId, date: currentDate },
-                    }
+                    },
                 );
                 setAttendanceAlreadySaved(response.data.exists);
             } catch (error) {
@@ -199,7 +199,7 @@ const Attendance = (props) => {
                 }
 
                 return { ...student, status: "present" };
-            })
+            }),
         );
     };
 
@@ -209,8 +209,8 @@ const Attendance = (props) => {
             currentStudents.map((student) =>
                 student.id === studentId
                     ? { ...student, status: newStatus }
-                    : student
-            )
+                    : student,
+            ),
         );
     };
 
@@ -222,12 +222,12 @@ const Attendance = (props) => {
             const sourceIndex = newLayout.findIndex(
                 (seat) =>
                     seat.row === draggedSeatInfo.row &&
-                    seat.col === draggedSeatInfo.col
+                    seat.col === draggedSeatInfo.col,
             );
             const targetIndex = newLayout.findIndex(
                 (seat) =>
                     seat.row === targetCoords.row &&
-                    seat.col === targetCoords.col
+                    seat.col === targetCoords.col,
             );
 
             if (sourceIndex === -1 || targetIndex === -1) {
@@ -265,12 +265,12 @@ const Attendance = (props) => {
 
         try {
             const response = await axios.post(
-                route("teacher.attendance.store"),
-                payload
+                route("teacher.attendance.create"),
+                payload,
             );
             showToast.success(
                 response.data.message ||
-                    `Attendance saved for ${stats.total} students.`
+                    `Attendance saved for ${stats.total} students.`,
             );
         } catch (error) {
             if (
@@ -319,7 +319,7 @@ const Attendance = (props) => {
                                     value={selectedClassId ?? ""}
                                     onChange={(e) =>
                                         setSelectedClassId(
-                                            Number(e.target.value)
+                                            Number(e.target.value),
                                         )
                                     }
                                 >
@@ -505,10 +505,10 @@ const Attendance = (props) => {
                                     {checkingAttendance
                                         ? "Checking..."
                                         : isSunday
-                                        ? "No Class on Sunday"
-                                        : attendanceAlreadySaved
-                                        ? "Already Saved"
-                                        : "Save Attendance"}
+                                          ? "No Class on Sunday"
+                                          : attendanceAlreadySaved
+                                            ? "Already Saved"
+                                            : "Save Attendance"}
                                 </button>
                             </div>
                         </div>

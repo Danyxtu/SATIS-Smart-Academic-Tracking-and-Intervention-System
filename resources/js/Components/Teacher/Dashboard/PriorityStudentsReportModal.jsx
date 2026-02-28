@@ -6,9 +6,6 @@ import {
     AlertTriangle,
     TrendingDown,
     Eye,
-    CheckSquare,
-    Square,
-    Printer,
     FileDown,
     Loader2,
 } from "lucide-react";
@@ -55,9 +52,10 @@ export default function PriorityStudentsReportModal({
 
     const getSelectedCount = () => {
         let count = 0;
-        if (filters.critical) count += priorityStudents.critical.length;
-        if (filters.warning) count += priorityStudents.warning.length;
-        if (filters.watchlist) count += priorityStudents.watchList.length;
+        if (filters.critical) count += priorityStudents?.critical?.length || 0;
+        if (filters.warning) count += priorityStudents?.warning?.length || 0;
+        if (filters.watchlist)
+            count += priorityStudents?.watchList?.length || 0;
         return count;
     };
 
@@ -95,7 +93,7 @@ export default function PriorityStudentsReportModal({
             key: "critical",
             label: "Students at Risk (Critical)",
             description: "Students with grades below 70%",
-            count: priorityStudents.critical.length,
+            count: priorityStudents?.critical?.length || 0,
             icon: AlertTriangle,
             color: "red",
             bgColor: "bg-red-50 dark:bg-red-900/20",
@@ -108,7 +106,7 @@ export default function PriorityStudentsReportModal({
             key: "warning",
             label: "Needs Attention (Warning)",
             description: "Students with grades between 70-74%",
-            count: priorityStudents.warning.length,
+            count: priorityStudents?.warning?.length || 0,
             icon: Eye,
             color: "amber",
             bgColor: "bg-amber-50 dark:bg-amber-900/20",
@@ -121,7 +119,7 @@ export default function PriorityStudentsReportModal({
             key: "watchlist",
             label: "Recent Declines (Watchlist)",
             description: "Students with grades 75-79% and declining trend",
-            count: priorityStudents.watchList.length,
+            count: priorityStudents?.watchList?.length || 0,
             icon: TrendingDown,
             color: "blue",
             bgColor: "bg-blue-50 dark:bg-blue-900/20",

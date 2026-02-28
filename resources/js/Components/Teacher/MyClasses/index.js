@@ -15,3 +15,4 @@ export { default as TemporaryPasswordModal } from "./TemporaryPasswordModal";
 export { default as EmptyStudentState } from "./EmptyStudentState";
 export { default as AddNewClassModal } from "./AddNewClassModal";
 export { default as ClassList } from "./ClassList";
+export { default as GradeSubmissionModal } from "./GradeSubmissionModal";

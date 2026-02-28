@@ -13,7 +13,7 @@ import {
     Eye,
     Printer,
 } from "lucide-react";
-
+import { getSemesterLabel, getRiskLevelBadge } from "@/Utils/Teacher/Dashboard";
 import {
     StudentRiskCard,
     StatCard,
@@ -42,45 +42,30 @@ const Dashboard = ({
     console.log("Recent Activity:", recentActivity);
     console.log("Auth User:", auth.user);
 
-    const closeTutorial = () => {
-        setShowTutorial(false);
-    };
-
     const currentDate = new Date().toLocaleDateString("en-US", {
         weekday: "long",
         month: "long",
         day: "numeric",
     });
 
-    const getSemesterLabel = (semester) => {
-        switch (semester) {
-            case 1:
-                return "1st Semester";
-            case 2:
-                return "2nd Semester";
-            default:
-                return `Semester ${semester}`;
-        }
-    };
-
     const statCards = [
         {
             title: "Students at Risk",
-            value: stats.studentsAtRisk,
+            value: stats?.studentsAtRisk || 0,
             icon: AlertTriangle,
             iconBgColor: "bg-red-500",
             label: "grade < 75",
         },
         {
             title: "Needs Attention",
-            value: stats.needsAttention,
+            value: stats?.needsAttention || 0,
             icon: ClipboardList,
             iconBgColor: "bg-yellow-500",
             label: "missing work",
         },
         {
             title: "Recent Declines",
-            value: stats.recentDeclines,
+            value: stats?.recentDeclines || 0,
             icon: TrendingDown,
             iconBgColor: "bg-blue-500",
             label: "dropped 10+",
@@ -92,19 +77,25 @@ const Dashboard = ({
         const students = [];
 
         // Add critical students (red)
-        priorityStudents.critical.forEach((student) => {
-            students.push({ ...student, riskLevel: "critical" });
-        });
+        if (priorityStudents?.critical?.length) {
+            priorityStudents.critical.forEach((student) => {
+                students.push({ ...student, riskLevel: "critical" });
+            });
+        }
 
         // Add warning students (yellow/orange)
-        priorityStudents.warning.forEach((student) => {
-            students.push({ ...student, riskLevel: "warning" });
-        });
+        if (priorityStudents?.warning?.length) {
+            priorityStudents.warning.forEach((student) => {
+                students.push({ ...student, riskLevel: "warning" });
+            });
+        }
 
         // Add watchlist students (blue)
-        priorityStudents.watchList.forEach((student) => {
-            students.push({ ...student, riskLevel: "watchlist" });
-        });
+        if (priorityStudents?.watchList?.length) {
+            priorityStudents.watchList.forEach((student) => {
+                students.push({ ...student, riskLevel: "watchlist" });
+            });
+        }
 
         return students;
     }, [priorityStudents]);
@@ -128,50 +119,22 @@ const Dashboard = ({
         {
             id: "critical",
             label: "Critical",
-            count: priorityStudents.critical.length,
+            count: priorityStudents?.critical?.length || 0,
             color: "red",
         },
         {
             id: "warning",
             label: "Warning",
-            count: priorityStudents.warning.length,
+            count: priorityStudents?.warning?.length || 0,
             color: "amber",
         },
         {
             id: "watchlist",
             label: "Watchlist",
-            count: priorityStudents.watchList.length,
+            count: priorityStudents?.watchList?.length || 0,
             color: "blue",
         },
     ];
-
-    // Risk level styling
-    const getRiskLevelBadge = (riskLevel) => {
-        const styles = {
-            critical: {
-                bg: "bg-red-100 dark:bg-red-900/30",
-                text: "text-red-700 dark:text-red-400",
-                border: "border-red-200 dark:border-red-800",
-                label: "Critical",
-                icon: AlertTriangle,
-            },
-            warning: {
-                bg: "bg-amber-100 dark:bg-amber-900/30",
-                text: "text-amber-700 dark:text-amber-400",
-                border: "border-amber-200 dark:border-amber-800",
-                label: "Warning",
-                icon: TrendingDown,
-            },
-            watchlist: {
-                bg: "bg-blue-100 dark:bg-blue-900/30",
-                text: "text-blue-700 dark:text-blue-400",
-                border: "border-blue-200 dark:border-blue-800",
-                label: "Watchlist",
-                icon: Eye,
-            },
-        };
-        return styles[riskLevel] || styles.watchlist;
-    };
 
     // Full Name of the teacher
     const fullname = auth.user.first_name + " " + auth.user.last_name;
@@ -436,7 +399,7 @@ const Dashboard = ({
                             Recent Activity
                         </h2>
                         <div className="bg-white rounded-xl shadow-lg p-6 space-y-5">
-                            {recentActivity.length > 0 ? (
+                            {recentActivity && recentActivity.length > 0 ? (
                                 recentActivity.map((item) => (
                                     <ActivityFeedItem
                                         key={item.id}
@@ -460,7 +423,9 @@ const Dashboard = ({
 
             {/* Tutorial Modal */}
             {showTutorial && (
-                <ShowTutorialModal closeTutorial={closeTutorial} />
+                <ShowTutorialModal
+                    closeTutorial={() => setShowTutorial(false)}
+                />
             )}
 
             {/* Priority Students Report Modal */}
