@@ -4,6 +4,7 @@
 use App\Http\Controllers\Teacher\AttendanceController;
 use App\Http\Controllers\Teacher\ClassController;
 use App\Http\Controllers\Teacher\GradeController;
+use App\Http\Controllers\Teacher\GradeCalculationController;
 use App\Http\Controllers\Teacher\DashboardController;
 use App\Http\Controllers\Teacher\InterventionController;
 use Illuminate\Support\Facades\Route;
@@ -36,14 +37,19 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
         /**
          * Dashboard Route
          */
-        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/dashboard', [DashboardController::class, 'Dashboard'])->name('dashboard');
+        // --- PRIORITY STUDENTS REPORT PDF EXPORT ---
+        // URL: /teacher/dashboard/priority-students/export/pdf
+        // Name: route('teacher.dashboard.priority-students.pdf')
+        Route::get('/dashboard/priority-students/export/pdf', [DashboardController::class, 'exportPriorityStudentsPdf'])
+            ->name('dashboard.priority-students.pdf');
 
         /**
          * My Classes Route
          */
         Route::get('/classes', [ClassController::class, 'goToMyClasses'])->name('classes.index');
         Route::get('/classes/{subjectTeacher}', [ClassController::class, 'myClass'])->name('class');
-        Route::post('/classes', [ClassController::class, 'store'])->name('classes.store');
+        Route::post('/classes', [ClassController::class, 'createAClass'])->name('classes.store');
         Route::post('/classes/{subjectTeacher}/students', [ClassController::class, 'enrollStudent'])
             ->name('classes.students.store');
         Route::post('/classes/{subjectTeacher}/classlist', [ClassController::class, 'uploadClasslist'])
@@ -60,22 +66,32 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
             ->name('classes.nudge');
 
         /**
+         * Grade Calculation Routes
+         */
+        Route::get('/classes/{subjectTeacher}/calculate-grades', [GradeCalculationController::class, 'calculateClassGrades'])
+            ->name('classes.calculate-grades');
+        Route::get('/classes/{subjectTeacher}/students/{enrollment}/calculate-grades', [GradeCalculationController::class, 'calculateStudentGrades'])
+            ->name('classes.students.calculate-grades');
+        Route::post('/classes/{subjectTeacher}/recalculate-grades', [GradeCalculationController::class, 'recalculateAfterUpdate'])
+            ->name('classes.recalculate-grades');
+
+        /**
          * Attendance Routes
          */
         Route::get('/attendance', [AttendanceController::class, 'index'])
             ->name('attendance.index');
-        Route::get('/attendance/log', [AttendanceController::class, 'log'])
+        Route::get('/attendance/log', [AttendanceController::class, 'attendanceLogsGroupedBySection'])
             ->name('attendance.log');
-        Route::get('/attendance/log/{subjectTeacher}', [AttendanceController::class, 'show'])
+        Route::get('/attendance/log/{subjectTeacher}', [AttendanceController::class, 'attendanceLogOfSpecificSection'])
             ->name('attendance.log.show');
-        Route::get('/attendance/log/{subjectTeacher}/export', [AttendanceController::class, 'export'])
+        Route::get('/attendance/log/{subjectTeacher}/export', [AttendanceController::class, 'exportCSV'])
             ->name('attendance.log.export');
         Route::get('/attendance/log/{subjectTeacher}/export/pdf', [AttendanceController::class, 'exportPdf'])
             ->name('attendance.log.export.pdf');
         Route::get('/attendance/check', [AttendanceController::class, 'checkExists'])
             ->name('attendance.check');
-        Route::post('/attendance', [AttendanceController::class, 'store'])
-            ->name('attendance.store');
+        Route::post('/attendance', [AttendanceController::class, 'createAttendance'])
+            ->name('attendance.create');
 
 
         /**
@@ -91,10 +107,4 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
             ->name('interventions.approve');
         Route::post('/interventions/{intervention}/reject', [InterventionController::class, 'rejectCompletion'])
             ->name('interventions.reject');
-
-        // --- PRIORITY STUDENTS REPORT PDF EXPORT ---
-        // URL: /teacher/dashboard/priority-students/export/pdf
-        // Name: route('teacher.dashboard.priority-students.pdf')
-        Route::get('/dashboard/priority-students/export/pdf', [DashboardController::class, 'exportPriorityStudentsPdf'])
-            ->name('dashboard.priority-students.pdf');
     });
