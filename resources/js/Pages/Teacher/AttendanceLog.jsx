@@ -58,7 +58,7 @@ const AttendanceLog = ({ sections = [] }) => {
                         <Link
                             key={section.id}
                             href={route("teacher.attendance.log.show", {
-                                subject: section.id,
+                                subjectTeacher: section.id,
                             })}
                             className="group"
                         >

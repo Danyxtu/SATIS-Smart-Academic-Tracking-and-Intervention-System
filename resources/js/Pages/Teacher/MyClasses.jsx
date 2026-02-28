@@ -10,6 +10,14 @@ import {
     Calendar,
 } from "lucide-react";
 
+// Utils
+import {
+    calculateFinalGrade,
+    calculateOverallFinalGrade,
+    calculateExpectedQuarterlyGrade,
+    hasQuarterlyExamScores,
+    isQuarterComplete,
+} from "@/Utils/Teacher/MyClasses/gradeCalculations";
 /**
  * Components for My Classes page
  */
@@ -36,252 +44,6 @@ const buildStudentKey = (student, index) => {
     return `${enrollmentPart ?? idPart ?? lrnPart ?? fallback}:${index}`;
 };
 
-// Grades for each quarter
-const calculateFinalGrade = (grades = {}, categories = [], quarter = 1) => {
-    if (!categories.length) return "N/A";
-
-    // Filter grades for the specific quarter
-    const quarterGrades = {};
-    Object.entries(grades).forEach(([key, value]) => {
-        // Grades are stored with quarter prefix like "q1_taskId" or just "taskId" for Q1
-        const isQ1Grade = !key.startsWith("q2_");
-        const isQ2Grade = key.startsWith("q2_");
-
-        if (quarter === 1 && isQ1Grade) {
-            quarterGrades[key] = value;
-        } else if (quarter === 2 && isQ2Grade) {
-            quarterGrades[key.replace("q2_", "")] = value;
-        } else if (quarter === 1) {
-            // For backward compatibility, use raw grades for Q1
-            quarterGrades[key] = value;
-        }
-    });
-
-    let totalWeight = 0;
-    let weightedScore = 0;
-
-    categories.forEach((category) => {
-        const tasks = category?.tasks ?? [];
-        if (!tasks.length || !category.weight) {
-            return;
-        }
-
-        let earned = 0;
-        let possible = 0;
-
-        tasks.forEach((task) => {
-            const rawValue = quarterGrades?.[task.id];
-
-            if (
-                rawValue === "" ||
-                rawValue === null ||
-                rawValue === undefined
-            ) {
-                return;
-            }
-
-            const numericValue = Number(rawValue);
-
-            if (Number.isNaN(numericValue)) {
-                return;
-            }
-
-            earned += numericValue;
-            possible += Number(task.total ?? 0);
-        });
-
-        if (!possible) {
-            return;
-        }
-
-        const categoryAverage = earned / possible;
-        weightedScore += categoryAverage * category.weight;
-        totalWeight += category.weight;
-    });
-
-    if (!totalWeight) {
-        return "—";
-    }
-
-    const percentage = (weightedScore / totalWeight) * 100;
-    return `${percentage.toFixed(1)}%`;
-};
-
-// Check if a quarter has quarterly exam scores (indicates quarter is started/finished)
-const hasQuarterlyExamScores = (grades = {}, categories = [], quarter = 1) => {
-    const quarterlyExamCategory = categories.find(
-        (cat) =>
-            cat.id === "quarterly_exam" ||
-            cat.label?.toLowerCase().includes("quarterly exam"),
-    );
-
-    if (!quarterlyExamCategory || !quarterlyExamCategory.tasks?.length) {
-        return false;
-    }
-
-    return quarterlyExamCategory.tasks.some((task) => {
-        const gradeKey = quarter === 2 ? `q2_${task.id}` : task.id;
-        const value = grades?.[gradeKey];
-        return value !== "" && value !== null && value !== undefined;
-    });
-};
-
-// Check if quarter is complete (all categories have at least some scores)
-const isQuarterComplete = (grades = {}, categories = [], quarter = 1) => {
-    if (!categories.length) return false;
-
-    return categories.every((category) => {
-        const tasks = category?.tasks ?? [];
-        if (!tasks.length) return false;
-
-        return tasks.some((task) => {
-            const gradeKey = quarter === 2 ? `q2_${task.id}` : task.id;
-            const value = grades?.[gradeKey];
-            return value !== "" && value !== null && value !== undefined;
-        });
-    });
-};
-
-// Calculate the overall final grade (average of Q1 and Q2)
-const calculateOverallFinalGrade = (grades = {}, categories = []) => {
-    const q1Complete = isQuarterComplete(grades, categories, 1);
-    const q2Complete = isQuarterComplete(grades, categories, 2);
-
-    // Final grade is only available when both quarters are complete
-    if (!q1Complete || !q2Complete) {
-        return "—";
-    }
-
-    const q1Grade = calculateFinalGrade(grades, categories, 1);
-    const q2Grade = calculateFinalGrade(grades, categories, 2);
-
-    if (q1Grade === "—" || q2Grade === "—") {
-        return "—";
-    }
-
-    const q1Numeric = parseFloat(q1Grade);
-    const q2Numeric = parseFloat(q2Grade);
-
-    if (isNaN(q1Numeric) || isNaN(q2Numeric)) {
-        return "—";
-    }
-
-    const average = (q1Numeric + q2Numeric) / 2;
-    return `${average.toFixed(1)}%`;
-};
-
-// Calculate Expected Quarterly Grade - projects what the grade would be if all remaining tasks are completed at current performance level
-const calculateExpectedQuarterlyGrade = (
-    grades = {},
-    categories = [],
-    quarter = 1,
-) => {
-    if (!categories.length) return "N/A";
-
-    // Filter grades for the specific quarter
-    const quarterGrades = {};
-    Object.entries(grades).forEach(([key, value]) => {
-        const isQ1Grade = !key.startsWith("q2_");
-        const isQ2Grade = key.startsWith("q2_");
-
-        if (quarter === 1 && isQ1Grade) {
-            quarterGrades[key] = value;
-        } else if (quarter === 2 && isQ2Grade) {
-            quarterGrades[key.replace("q2_", "")] = value;
-        } else if (quarter === 1) {
-            quarterGrades[key] = value;
-        }
-    });
-
-    let totalEarned = 0;
-    let totalPossible = 0;
-    let completedTasksCount = 0;
-    let totalTasksCount = 0;
-
-    // First pass: calculate current performance rate
-    categories.forEach((category) => {
-        const tasks = category?.tasks ?? [];
-        tasks.forEach((task) => {
-            totalTasksCount++;
-            const rawValue = quarterGrades?.[task.id];
-
-            if (
-                rawValue === "" ||
-                rawValue === null ||
-                rawValue === undefined
-            ) {
-                return;
-            }
-
-            const numericValue = Number(rawValue);
-            if (Number.isNaN(numericValue)) {
-                return;
-            }
-
-            completedTasksCount++;
-            totalEarned += numericValue;
-            totalPossible += Number(task.total ?? 0);
-        });
-    });
-
-    // If no tasks completed yet, return N/A
-    if (!completedTasksCount || !totalPossible) {
-        return "—";
-    }
-
-    // Calculate current performance rate
-    const currentPerformanceRate = totalEarned / totalPossible;
-
-    // Now calculate expected grade assuming same performance on remaining tasks
-    let weightedScore = 0;
-    let totalWeight = 0;
-
-    categories.forEach((category) => {
-        const tasks = category?.tasks ?? [];
-        if (!tasks.length || !category.weight) {
-            return;
-        }
-
-        let earned = 0;
-        let possible = 0;
-
-        tasks.forEach((task) => {
-            const taskTotal = Number(task.total ?? 0);
-            const rawValue = quarterGrades?.[task.id];
-
-            if (
-                rawValue === "" ||
-                rawValue === null ||
-                rawValue === undefined
-            ) {
-                // Project score based on current performance
-                earned += taskTotal * currentPerformanceRate;
-                possible += taskTotal;
-            } else {
-                const numericValue = Number(rawValue);
-                if (!Number.isNaN(numericValue)) {
-                    earned += numericValue;
-                    possible += taskTotal;
-                }
-            }
-        });
-
-        if (!possible) {
-            return;
-        }
-
-        const categoryAverage = earned / possible;
-        weightedScore += categoryAverage * category.weight;
-        totalWeight += category.weight;
-    });
-
-    if (!totalWeight) {
-        return "—";
-    }
-
-    const percentage = (weightedScore / totalWeight) * 100;
-    return `${percentage.toFixed(1)}%`;
-};
 // Functions for this class
 const getColorClasses = (colorName) => {
     const class_color =
@@ -341,7 +103,12 @@ const MyClasses = ({
 
     const { startLoading, stopLoading } = useLoading();
 
-    const [selectedClassId, setSelectedClassId] = useState(null);
+    // Initialize selectedClassId from URL parameters
+    const [selectedClassId, setSelectedClassId] = useState(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const classIdFromUrl = urlParams.get("class");
+        return classIdFromUrl ? parseInt(classIdFromUrl) : null;
+    });
     const [isAddClassModalOpen, setIsAddClassModalOpen] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [droppedFile, setDroppedFile] = useState(null);
@@ -364,20 +131,81 @@ const MyClasses = ({
         }
     }, []);
 
+    // Load class data on component mount if URL has class parameter
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const classIdFromUrl = urlParams.get("class");
+
+        if (classIdFromUrl) {
+            const classId = parseInt(classIdFromUrl);
+            // If we have a class ID in URL but haven't loaded the data yet, load it
+            if (classId && !selectedClassData[classId] && !loadingClassId) {
+                const loadClassData = async () => {
+                    setLoadingClassId(classId);
+                    startLoading();
+
+                    try {
+                        const res = await fetch(`/teacher/classes/${classId}`);
+                        if (!res.ok) {
+                            throw new Error("Failed to fetch class data");
+                        }
+                        const data = await res.json();
+
+                        setSelectedClassData((prev) => ({
+                            ...prev,
+                            [classId]: data,
+                        }));
+                        setSelectedClassId(classId);
+                    } catch (err) {
+                        console.error("Error fetching class data:", err);
+                        // Remove invalid class parameter from URL on error
+                        const urlParams = new URLSearchParams(
+                            window.location.search,
+                        );
+                        urlParams.delete("class");
+                        const newUrl = urlParams.toString()
+                            ? `${window.location.pathname}?${urlParams.toString()}`
+                            : window.location.pathname;
+                        window.history.replaceState({}, "", newUrl);
+                        setSelectedClassId(null);
+                    } finally {
+                        setLoadingClassId(null);
+                        stopLoading();
+                    }
+                };
+
+                loadClassData();
+            }
+        }
+    }, []); // Empty dependency array - only run on mount
+
+    // Handle browser back/forward buttons
+    useEffect(() => {
+        const handlePopState = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const classIdFromUrl = urlParams.get("class");
+
+            if (classIdFromUrl) {
+                const classId = parseInt(classIdFromUrl);
+                setSelectedClassId(classId);
+            } else {
+                setSelectedClassId(null);
+            }
+        };
+
+        window.addEventListener("popstate", handlePopState);
+
+        return () => {
+            window.removeEventListener("popstate", handlePopState);
+        };
+    }, []);
+
     const [dirtyGrades, setDirtyGrades] = useState({});
     const [isImportingGrades, setIsImportingGrades] = useState(false);
     const [activeGradeCategoryId, setActiveGradeCategoryId] = useState(null);
     const [isNudgeModalOpen, setIsNudgeModalOpen] = useState(false);
     const [nudgeTargetClass, setNudgeTargetClass] = useState(null);
     const gradeUploadInputRef = useRef(null);
-
-    // Show password modal when new student is created with password
-    useEffect(() => {
-        if (newStudentPassword) {
-            setPasswordModalData(newStudentPassword);
-            setShowPasswordModal(true);
-        }
-    }, [newStudentPassword]);
 
     // Handle send nudge button click
     const handleSendNudge = (cls) => {
@@ -445,6 +273,12 @@ const MyClasses = ({
         : "Monitor rosters, imports, and grades from a single workspace.";
 
     const handleClassSelect = async (classId) => {
+        // Update URL with selected class ID
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set("class", classId.toString());
+        const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
+        window.history.pushState({}, "", newUrl);
+
         // If already fetched, just select it
         if (selectedClassData[classId]) {
             setSelectedClassId(classId);
@@ -475,6 +309,14 @@ const MyClasses = ({
     };
 
     const handleGoBack = () => {
+        // Remove class parameter from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.delete("class");
+        const newUrl = urlParams.toString()
+            ? `${window.location.pathname}?${urlParams.toString()}`
+            : window.location.pathname;
+        window.history.pushState({}, "", newUrl);
+
         startLoading();
         setTimeout(() => {
             setSelectedClassId(null);
@@ -536,7 +378,6 @@ const MyClasses = ({
 
     return (
         <>
-            <Head title="My Classes" />
             <input
                 ref={gradeUploadInputRef}
                 type="file"
@@ -548,55 +389,66 @@ const MyClasses = ({
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="space-y-2">
                         {hasSelectedClass && (
-                            <div className="flex items-center gap-2 text-sm text-gray-500">
-                                <button
-                                    type="button"
-                                    onClick={handleGoBack}
-                                    className="font-medium text-indigo-600 hover:text-indigo-700"
-                                >
-                                    My Classes
-                                </button>
-                                <ChevronRight
-                                    size={16}
-                                    className="text-gray-400"
-                                />
+                            <div>
+                                <div className="flex items-center gap-2 text-sm text-gray-500">
+                                    <button
+                                        type="button"
+                                        onClick={handleGoBack}
+                                        className="font-medium text-indigo-600 hover:text-indigo-700"
+                                    >
+                                        My Classes
+                                    </button>
+                                    <ChevronRight
+                                        size={16}
+                                        className="text-gray-400"
+                                    />
+                                    <div className="text-gray-500 text-sm">
+                                        My Class
+                                    </div>
+                                </div>
+                                <div className="flex items-center mt-3">
+                                    <h1 className="text-2xl font-bold text-gray-800">
+                                        My Class
+                                    </h1>
+                                </div>
                             </div>
                         )}
-                        <h1 className="text-3xl font-bold text-gray-900">
-                            {pageTitle}
-                        </h1>
-                        {pageSubtitle && (
-                            <p className="text-gray-500">{pageSubtitle}</p>
-                        )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3 w-full">
                         {!hasSelectedClass && (
-                            <button
-                                type="button"
-                                onClick={() => setIsAddClassModalOpen(true)}
-                                className={`flex items-center gap-2 rounded-lg border border-indigo-600 px-4 py-2 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-50 ${
-                                    highlightAddClass
-                                        ? "animate-pulse-twice"
-                                        : ""
-                                }`}
-                                style={
-                                    highlightAddClass
-                                        ? {
-                                              animation:
-                                                  "pulse-highlight 0.5s ease-in-out 4",
-                                              boxShadow:
-                                                  "0 0 20px rgba(99, 102, 241, 0.5)",
-                                          }
-                                        : {}
-                                }
-                            >
-                                <Plus size={16} /> Add New Class
-                            </button>
+                            <div className="flex justify-between w-full">
+                                <div className="flex items-center">
+                                    <h1 className="text-2xl font-bold text-gray-800">
+                                        My Classes
+                                    </h1>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAddClassModalOpen(true)}
+                                    className={`flex items-center gap-2 rounded-lg border border-indigo-600 px-4 py-2 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-50 ${
+                                        highlightAddClass
+                                            ? "animate-pulse-twice"
+                                            : ""
+                                    }`}
+                                    style={
+                                        highlightAddClass
+                                            ? {
+                                                  animation:
+                                                      "pulse-highlight 0.5s ease-in-out 4",
+                                                  boxShadow:
+                                                      "0 0 20px rgba(99, 102, 241, 0.5)",
+                                              }
+                                            : {}
+                                    }
+                                >
+                                    <Plus size={16} /> Add New Class
+                                </button>
+                            </div>
                         )}
                     </div>
                 </div>
             </header>
-
+            {/* This will show when there are import or grade update summaries */}
             {(importSummary || gradeUpdateSummary || gradeImportSummary) && (
                 <section className="mb-8 grid gap-4 lg:grid-cols-2">
                     {importSummary && (

@@ -10,9 +10,11 @@ use App\Models\Subject;
 use App\Models\SubjectTeacher;
 use App\Models\SystemSetting;
 use App\Models\User;
+use App\Services\GradeCalculationService;
 use App\Support\Concerns\HasDefaultAssignments;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -21,14 +23,24 @@ use Inertia\Inertia;
 use Inertia\Response;
 use RuntimeException;
 
+use App\Services\Teacher\ClassesServices;
+
 class ClassController extends Controller
 {
     use HasDefaultAssignments;
 
+    protected $ClassesServices;
+    protected GradeCalculationService $gradeCalculationService;
+
+    public function __construct(ClassesServices $myClassesServices, GradeCalculationService $gradeCalculationService)
+    {
+        $this->ClassesServices = $myClassesServices;
+        $this->gradeCalculationService = $gradeCalculationService;
+    }
+
     private const COLOR_OPTIONS = ['indigo', 'blue', 'red', 'green', 'amber', 'purple', 'teal'];
     private const REQUIRED_ROW_FIELDS = ['student_name', 'lrn', 'grade_level'];
     private const COLUMN_ALIASES = [
-        // Name columns - various formats teachers might use
         'student_name' => [
             'name',
             'student_name',
@@ -74,94 +86,35 @@ class ClassController extends Controller
         'email' => ['email', 'student_email', 'student email', 'email_address', 'email address'],
     ];
 
+
     public function goToMyClasses(Request $request): Response
     {
-        $teacher = $request->user();
+        $classesData = $this->ClassesServices->getClassesData($request);
 
-        // Get current system semester and allow user to select which semester to view
-        $currentSemester = SystemSetting::getCurrentSemester();
-        $selectedSemester = $request->query('semester', $currentSemester);
+        $classes = $classesData['classes'];
+        $defaultSchoolYear = $classesData['defaultSchoolYear'];
+        $currentSemester = $classesData['currentSemester'];
+        $selectedSemester = $classesData['selectedSemester'];
+        $semester1Count = $classesData['semester1Count'];
+        $semester2Count = $classesData['semester2Count'];
+        $roster = $classesData['roster'];
 
-        // Get ALL subject-teacher assignments for this teacher (for counting)
-        $allSubjectTeachers = SubjectTeacher::with([
-            'subject',
-            'enrollments.user.student',
-            'enrollments.grades',
-        ])->where('teacher_id', $teacher->id)
-            ->orderBy('grade_level')
-            ->get();
-
-        // Filter subject-teachers by selected semester for display
-        $subjectTeachers = $allSubjectTeachers->filter(function ($st) use ($selectedSemester) {
-            return $st->semester == $selectedSemester;
-        });
-
-        // Count classes per semester for the toggle UI
-        $semester1Count = $allSubjectTeachers->filter(fn($s) => $s->semester == '1')->count();
-        $semester2Count = $allSubjectTeachers->filter(fn($s) => $s->semester == '2')->count();
-
-        // $gradeStructures = $subjectTeachers->mapWithKeys(function ($subjectTeacher) {
-        //     $structure = $this->buildGradeStructure($subjectTeacher->grade_categories);
-        //     $structure = $this->ensureStructureCoversExistingGrades($subjectTeacher, $structure);
-
-        //     return [$subjectTeacher->id => $structure];
-        // });
-        // Classes
-        $classes = $subjectTeachers->map(fn($st) => [
-            'id' => $st->id,
-            'name' => $st->grade_level,
-            'section' => $st->section,
-            'subject_name' => $st->subject?->subject_name ?? 'N/A',
-            'color' => $st->color,
-            'strand' => $st->strand,
-            'track' => $st->track,
-            'student_count' => $st->enrollments->count(),
-            'current_quarter' => $st->current_quarter ?? 1,
-            'semester' => $st->semester,
-        ])->values();
-        // Rosters with enriched student info and grades for easier frontend consumption
-        // $rosters = $subjectTeachers->mapWithKeys(fn($st) => [
-        //     $st->id => $st->enrollments->map(function ($enrollment) use ($st) {
-        //         $user = $enrollment->user;
-        //         $studentProfile = $user?->student;
-        //         $fullName = $user?->name ?? trim(
-        //             ($studentProfile->first_name ?? '') . ' ' . ($studentProfile->last_name ?? '')
-        //         );
-
-        //         return [
-        //             'id' => $enrollment->id,
-        //             'name' => $fullName ?: 'Student',
-        //             'lrn' => $studentProfile?->lrn,
-        //             'email' => $user?->email,
-        //             'avatar' => $studentProfile?->avatar,
-        //             'grade_level' => $studentProfile?->grade_level ?? $st->grade_level,
-        //             'section' => $studentProfile?->section ?? $st->section,
-        //             'strand' => $studentProfile?->strand ?? $st->strand,
-        //             'track' => $studentProfile?->track ?? $st->track,
-        //             'temp_password' => $user?->temp_password,
-        //             'must_change_password' => $user?->must_change_password ?? true,
-        //             'grades' => $enrollment->grades->mapWithKeys(fn($grade) => [
-        //                 $grade->assignment_key ?: Str::slug($grade->assignment_name, '_') => $grade->score,
-        //             ])->all(),
-        //         ];
-        //     })->values(),
-        // ])->all();
-
-        return Inertia::render('Teacher/MyClasses', [
-            'classes' => $classes,
-            // 'rosters' => $rosters,
-            // 'gradeStructures' => $gradeStructures->all(),
-            'defaultSchoolYear' => $this->currentSchoolYear(),
-            'currentSemester' => $currentSemester,
-            'selectedSemester' => (int) $selectedSemester,
-            'semester1Count' => $semester1Count,
-            'semester2Count' => $semester2Count,
-        ]);
+        return Inertia::render('Teacher/MyClasses', compact(
+            'classes',
+            'defaultSchoolYear',
+            'currentSemester',
+            'selectedSemester',
+            'semester1Count',
+            'semester2Count',
+            'roster',
+        ));
     }
 
-    public function store(Request $request): RedirectResponse
+    public function createAClass(Request $request): RedirectResponse
     {
         $teacher = $request->user();
+
+        $result = $this->ClassesServices->createClass($request);
 
         // Get current semester from system settings
         $currentSemester = SystemSetting::getCurrentSemester();
@@ -274,86 +227,6 @@ class ClassController extends Controller
             ->route('teacher.classes.index')
             ->with('success', 'Classlist uploaded successfully.')
             ->with('import_summary', $summary);
-    }
-
-    private function ensureStructureCoversExistingGrades(SubjectTeacher $subjectTeacher, array $structure): array
-    {
-        $assignments = collect($structure['assignments']);
-
-        $existingAssignments = $subjectTeacher->enrollments
-            ->flatMap(function ($enrollment) {
-                return $enrollment->grades->map(function ($grade) {
-                    $assignmentId = $grade->assignment_key ?: Str::slug($grade->assignment_name ?? 'assignment', '_');
-
-                    return [
-                        'id' => $assignmentId,
-                        'label' => $grade->assignment_name ?? 'Assignment',
-                        'total' => $grade->total_score ?? 100,
-                    ];
-                });
-            })
-            ->filter(fn($assignment) => ! empty($assignment['id']))
-            ->unique('id')
-            ->values();
-
-        $missingAssignments = $existingAssignments->reject(function ($assignment) use ($assignments) {
-            return $assignments->contains('id', $assignment['id']);
-        });
-
-        if ($missingAssignments->isEmpty()) {
-            return $structure;
-        }
-
-        $categories = $structure['categories'];
-
-        foreach ($missingAssignments as $assignment) {
-            $categoryId = $this->guessCategoryForAssignment($assignment['label'], $categories);
-
-            foreach ($categories as &$category) {
-                if ($category['id'] === $categoryId) {
-                    $category['tasks'][] = [
-                        'id' => $assignment['id'],
-                        'label' => $assignment['label'],
-                        'total' => $assignment['total'],
-                        'category_id' => $categoryId,
-                    ];
-                    break;
-                }
-            }
-            unset($category);
-        }
-
-        $updatedStructure = $this->buildGradeStructure($categories);
-        $subjectTeacher->update(['grade_categories' => $updatedStructure['categories']]);
-
-        return $updatedStructure;
-    }
-
-    private function guessCategoryForAssignment(?string $assignmentLabel, array $categories): string
-    {
-        $fallback = $categories[0]['id'] ?? 'written_works';
-        $label = Str::lower($assignmentLabel ?? '');
-
-        if (str_contains($label, 'exam') || str_contains($label, 'periodical')) {
-            return $this->pickCategoryId($categories, 'quarterly_exam', $fallback);
-        }
-
-        if (str_contains($label, 'performance') || str_contains($label, 'project') || str_contains($label, 'lab')) {
-            return $this->pickCategoryId($categories, 'performance_task', $fallback);
-        }
-
-        return $this->pickCategoryId($categories, 'written_works', $fallback);
-    }
-
-    private function pickCategoryId(array $categories, string $preferredId, string $fallback): string
-    {
-        foreach ($categories as $category) {
-            if ($category['id'] === $preferredId) {
-                return $category['id'];
-            }
-        }
-
-        return $fallback;
     }
 
     public function updateGradeStructure(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
@@ -748,13 +621,7 @@ class ClassController extends Controller
         }
     }
 
-    private function currentSchoolYear(): string
-    {
-        $year = now()->year;
-        $next = $year + 1;
 
-        return sprintf('%d-%d', $year, $next);
-    }
 
     /**
      * Send a nudge notification to all students in a class.
@@ -827,62 +694,93 @@ class ClassController extends Controller
 
     public function myClass(Request $request, SubjectTeacher $subjectTeacher)
     {
-        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
+        try {
+            // Add error logging
+            Log::info('Accessing class:', ['class_id' => $subjectTeacher->id, 'user_id' => $request->user()->id]);
 
-        $subjectTeacher->load([
-            'subject',
-            'enrollments.user.student',
-            'enrollments.grades',
-        ]);
+            $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
-        $gradeStructure = $this->buildGradeStructure($subjectTeacher->grade_categories);
-        $gradeStructure = $this->ensureStructureCoversExistingGrades($subjectTeacher, $gradeStructure);
+            $subjectTeacher->load([
+                'subject',
+                'enrollments.user.student',
+                'enrollments.grades',
+            ]);
 
-        $classData = [
-            'id' => $subjectTeacher->id,
-            'name' => $subjectTeacher->grade_level,
-            'section' => $subjectTeacher->section,
-            'subject_name' => $subjectTeacher->subject?->subject_name ?? 'N/A',
-            'color' => $subjectTeacher->color,
-            'strand' => $subjectTeacher->strand,
-            'track' => $subjectTeacher->track,
-            'student_count' => $subjectTeacher->enrollments->count(),
-            'current_quarter' => $subjectTeacher->current_quarter ?? 1,
-            'semester' => $subjectTeacher->semester,
-            'school_year' => $subjectTeacher->school_year,
-        ];
+            // Use a try-catch to handle potential errors
+            try {
+                $gradeStructure = $this->buildGradeStructure($subjectTeacher->grade_categories);
+                $gradeStructure = $this->ClassesServices->ensureStructureCoversExistingGrades($subjectTeacher, $gradeStructure);
+            } catch (\Exception $e) {
+                Log::error('Grade structure error:', ['error' => $e->getMessage()]);
+                // Fallback to default grade structure if there's an error
+                $gradeStructure = $this->buildGradeStructure($this->defaultGradeCategories());
+            }
 
-        $roster = $subjectTeacher->enrollments->map(function ($enrollment) use ($subjectTeacher) {
-            $user = $enrollment->user;
-            $studentProfile = $user?->student;
-
-            // Get name from student_name field, or fallback to user name
-            $fullName = $studentProfile?->student_name
-                ?? $user?->name
-                ?? 'Student';
-
-            return [
-                'id' => $enrollment->id,
-                'name' => $fullName,
-                'lrn' => $studentProfile?->lrn,
-                'email' => $user?->email,
-                'avatar' => $studentProfile?->avatar,
-                'grade_level' => $studentProfile?->grade_level ?? $subjectTeacher->grade_level,
-                'section' => $studentProfile?->section ?? $subjectTeacher->section,
-                'strand' => $studentProfile?->strand ?? $subjectTeacher->strand,
-                'track' => $studentProfile?->track ?? $subjectTeacher->track,
-                'temp_password' => $user?->temp_password,
-                'must_change_password' => $user?->must_change_password ?? true,
-                'grades' => $enrollment->grades->mapWithKeys(fn($grade) => [
-                    $grade->assignment_key ?: Str::slug($grade->assignment_name, '_') => $grade->score,
-                ])->all(),
+            $classData = [
+                'id' => $subjectTeacher->id,
+                'name' => $subjectTeacher->grade_level,
+                'section' => $subjectTeacher->section,
+                'subject_name' => $subjectTeacher->subject?->subject_name ?? 'N/A',
+                'color' => $subjectTeacher->color,
+                'strand' => $subjectTeacher->strand,
+                'track' => $subjectTeacher->track,
+                'student_count' => $subjectTeacher->enrollments->count(),
+                'current_quarter' => $subjectTeacher->current_quarter ?? 1,
+                'semester' => $subjectTeacher->semester,
+                'school_year' => $subjectTeacher->school_year,
             ];
-        })->values();
 
-        return response()->json([
-            'class' => $classData,
-            'roster' => $roster,
-            'gradeStructure' => $gradeStructure,
-        ]);
+            $roster = $subjectTeacher->enrollments->map(function ($enrollment) use ($subjectTeacher) {
+                $user = $enrollment->user;
+                $studentProfile = $user?->student;
+
+                // Get name from student_name field, or fallback to user name
+                $fullName = $studentProfile?->student_name
+                    ?? $user?->name
+                    ?? 'Student';
+
+                return [
+                    'id' => $enrollment->id,
+                    'name' => $fullName,
+                    'lrn' => $studentProfile?->lrn,
+                    'email' => $user?->email,
+                    'avatar' => $studentProfile?->avatar,
+                    'grade_level' => $studentProfile?->grade_level ?? $subjectTeacher->grade_level,
+                    'section' => $studentProfile?->section ?? $subjectTeacher->section,
+                    'strand' => $studentProfile?->strand ?? $subjectTeacher->strand,
+                    'track' => $studentProfile?->track ?? $subjectTeacher->track,
+                    'temp_password' => $user?->temp_password,
+                    'must_change_password' => $user?->must_change_password ?? true,
+                    'grades' => $enrollment->grades->mapWithKeys(fn($grade) => [
+                        $grade->assignment_key ?: Str::slug($grade->assignment_name, '_') => $grade->score,
+                    ])->all(),
+                ];
+            })->values();
+
+            // Calculate grades for all students using the service
+            $calculatedGrades = $this->gradeCalculationService->calculateClassGrades(
+                $subjectTeacher->enrollments,
+                $gradeStructure
+            );
+
+            return response()->json([
+                'class' => $classData,
+                'roster' => $roster,
+                'gradeStructure' => $gradeStructure,
+                'calculatedGrades' => $calculatedGrades,
+                'updated_at' => now()->toISOString(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Class access error:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'class_id' => $subjectTeacher->id ?? 'unknown'
+            ]);
+
+            return response()->json([
+                'error' => 'Unable to load class data',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 }

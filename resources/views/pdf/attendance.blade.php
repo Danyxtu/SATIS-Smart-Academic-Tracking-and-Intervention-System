@@ -27,7 +27,7 @@
     <body>
         <div class="header">
             <div class="title">Monthly Attendance Report</div>
-            <div class="subtitle">{{ $section['grade_level'] }} - {{ $section['section'] }} | {{ $section['name'] }}</div>
+            <div class="subtitle">{{ $section['grade_level'] }} - {{ $section['section'] }} | {{ $section['subject_name'] ?? $section['label'] ?? 'N/A' }}</div>
             <div class="month-year">{{ \Carbon\Carbon::now()->format('F Y') }}</div>
         </div>
 
