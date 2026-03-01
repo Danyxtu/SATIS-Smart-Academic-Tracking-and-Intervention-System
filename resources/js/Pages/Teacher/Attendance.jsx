@@ -9,6 +9,7 @@ import { LayoutGrid, List, Check, XIcon, Clock, History } from "lucide-react";
 
 // Utils
 import showToast from "@/Utils/toast";
+import { buildSeatLayout } from "@/Utils/Teacher/Attendance";
 
 // Components
 import NavLink from "@/Components/NavLink";
@@ -17,21 +18,12 @@ import StudentList from "@/Components/StudentList";
 
 const GRID_ROWS = 5;
 const GRID_COLS = 10;
-
-const buildSeatLayout = (students) => {
-    const totalSeats = GRID_ROWS * GRID_COLS;
-    const assignments = students.map((student) => student.id);
-
-    while (assignments.length < totalSeats) {
-        assignments.push(null);
-    }
-
-    return assignments.map((studentId, index) => ({
-        row: Math.floor(index / GRID_COLS) + 1,
-        col: (index % GRID_COLS) + 1,
-        studentId,
-    }));
-};
+/**
+ * students data
+ * student.id
+ * student.name
+ * student.status (present, absent, late)
+ */
 
 const Attendance = (props) => {
     // Props from the server

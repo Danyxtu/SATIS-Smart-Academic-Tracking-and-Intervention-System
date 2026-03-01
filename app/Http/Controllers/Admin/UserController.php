@@ -256,6 +256,7 @@ class UserController extends Controller
             'password' => Hash::make($password),
             'role' => $validated['role'],
             'created_by' => $admin->id,
+            'email_verified_at' => now(), // Users created by admin are considered verified
         ];
 
         // Assign department for teachers
