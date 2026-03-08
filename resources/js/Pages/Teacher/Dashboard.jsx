@@ -21,6 +21,8 @@ import {
     PriorityStudentsReportModal,
     PrimaryButton,
     ShowTutorialModal,
+    UploadGradesModal,
+    StartInterventionModal,
 } from "@/Components/Teacher/Dashboard";
 
 const Dashboard = ({
@@ -30,10 +32,13 @@ const Dashboard = ({
     recentActivity,
     academicPeriod,
     department,
+    allSubjects,
 }) => {
     const [showTutorial, setShowTutorial] = useState(false);
     const [studentFilter, setStudentFilter] = useState("all");
     const [showReportModal, setShowReportModal] = useState(false);
+    const [showUploadGradesModal, setShowUploadGradesModal] = useState(false);
+    const [showInterventionModal, setShowInterventionModal] = useState(false);
 
     console.log("Academic Period:", academicPeriod);
     console.log("Department:", department);
@@ -41,6 +46,7 @@ const Dashboard = ({
     console.log("Stats:", stats);
     console.log("Recent Activity:", recentActivity);
     console.log("Auth User:", auth.user);
+    console.log("All Subjects:", allSubjects);
 
     const currentDate = new Date().toLocaleDateString("en-US", {
         weekday: "long",
@@ -147,7 +153,7 @@ const Dashboard = ({
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                            Welcome Back, {fullname}!
+                            Welcome Back, Teacher {auth.user.first_name}!
                         </h1>
                         <p className="text-lg text-gray-600 dark:text-gray-400">
                             Here's your overview for {currentDate}.
@@ -375,7 +381,10 @@ const Dashboard = ({
                             Quick Actions
                         </h2>
                         <div className="bg-white rounded-xl shadow-lg p-6 space-y-3">
-                            <PrimaryButton className="w-full justify-center">
+                            <PrimaryButton
+                                className="w-full justify-center"
+                                onClick={() => setShowUploadGradesModal(true)}
+                            >
                                 📤 Upload Grades
                             </PrimaryButton>
                             <Link
@@ -384,12 +393,12 @@ const Dashboard = ({
                             >
                                 📊 View Full Class List
                             </Link>
-                            <Link
-                                href={route("teacher.interventions.index")}
+                            <button
+                                onClick={() => setShowInterventionModal(true)}
                                 className="w-full inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                             >
                                 📝 Create Intervention
-                            </Link>
+                            </button>
                         </div>
                     </div>
 
@@ -404,7 +413,7 @@ const Dashboard = ({
                                     <ActivityFeedItem
                                         key={item.id}
                                         icon={ClipboardList}
-                                        text={`Intervention for <strong>${item.enrollment.user.name}</strong> was created.`}
+                                        text={`Intervention for <strong>${item.enrollment.user.first_name} ${item.enrollment.user.last_name}</strong> was created.`}
                                         time={new Date(
                                             item.created_at,
                                         ).toLocaleDateString()}
@@ -435,6 +444,20 @@ const Dashboard = ({
                 priorityStudents={priorityStudents}
                 academicPeriod={academicPeriod}
                 department={department}
+            />
+
+            {/* Upload Grades Subject Selection Modal */}
+            <UploadGradesModal
+                show={showUploadGradesModal}
+                onClose={() => setShowUploadGradesModal(false)}
+                allSubjects={allSubjects}
+            />
+
+            {/* Start Intervention Modal */}
+            <StartInterventionModal
+                show={showInterventionModal}
+                onClose={() => setShowInterventionModal(false)}
+                priorityStudents={priorityStudents}
             />
         </TeacherLayout>
     );
