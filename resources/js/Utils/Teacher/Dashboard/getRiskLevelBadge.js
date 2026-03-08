@@ -1,3 +1,5 @@
+import { AlertTriangle, TrendingDown, Eye } from "lucide-react";
+
 export const getRiskLevelBadge = (riskLevel) => {
     const styles = {
         critical: {

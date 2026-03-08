@@ -10,3 +10,6 @@ export { default as ActivityFeedItem } from "./ActivityFeedItem";
 export { default as PriorityStudentsReportModal } from "./PriorityStudentsReportModal";
 export { default as PrimaryButton } from "./PrimaryButton";
 export { default as ShowTutorialModal } from "./ShowTutorialModal";
+export { default as UploadGradesModal } from "./UploadGradesModal";
+export { default as StartInterventionModal } from "./StartInterventionModal";
+export { default as StudentInterventionModal } from "./StudentInterventionModal";

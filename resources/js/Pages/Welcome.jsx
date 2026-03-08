@@ -32,7 +32,7 @@ export default function Welcome() {
 
     return (
         <>
-            <Head title={`Welcome - Screen ${screen}`} />
+            <Head title={`Welcome`} />
 
             <div
                 className="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 relative"

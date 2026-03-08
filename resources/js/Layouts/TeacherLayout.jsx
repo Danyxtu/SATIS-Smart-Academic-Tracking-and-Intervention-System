@@ -176,7 +176,7 @@ export default function TeacherLayout({ children }) {
                                                 className="flex items-center text-sm rounded-full focus:outline-none"
                                             >
                                                 <img
-                                                    className="w-10 h-10 rounded-full border-2 border-gray-300"
+                                                    className="w-[45px] h-[45px] rounded-full"
                                                     src={UserPicture}
                                                     alt="User"
                                                 />

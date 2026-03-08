@@ -34,6 +34,8 @@ class DashboardServices
             'intervention',
         ])->get();
 
+        $allSubjects = $this->getAllTeacherSubjects();
+
         $students = $enrollments->map(function ($enrollment) {
             $grades = $enrollment->grades;
             $hasGrades = $grades->isNotEmpty();
@@ -123,6 +125,29 @@ class DashboardServices
             'recentActivity' => $recentActivity,
             'gradeDistribution' => $gradeDistribution,
             'department' => $department,
+            'allSubjects' => $allSubjects,
         ];
+    }
+
+    private function getAllTeacherSubjects(): array
+    {
+        $teacher = Auth::user();
+        $currentSemester = SystemSetting::getCurrentSemester();
+        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
+
+        $subjectTeachers = \App\Models\SubjectTeacher::where('teacher_id', $teacher->id)
+            ->where('semester', $currentSemester)
+            ->where('school_year', $currentSchoolYear)
+            ->with('subject')
+            ->get();
+
+        return $subjectTeachers->map(function ($subjectTeacher) {
+            return [
+                'id' => $subjectTeacher->subject->id,
+                'name' => $subjectTeacher->subject->subject_name,
+                'code' => $subjectTeacher->subject->subject_code ?? null,
+                'subject_teacher_id' => $subjectTeacher->id,
+            ];
+        })->toArray();
     }
 }

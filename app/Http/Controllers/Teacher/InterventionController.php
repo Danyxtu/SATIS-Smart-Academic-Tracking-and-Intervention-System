@@ -317,10 +317,23 @@ class InterventionController extends Controller
         // Handle different intervention types
         $this->processIntervention($enrollment, $intervention, $validated, $request->user(), $sendEmail);
 
-        return Redirect::back()->with(
-            'success',
-            sprintf('Intervention for %s is now active.', optional($enrollment->user)->name ?? 'the student')
+        $successMessage = sprintf(
+            'Intervention for %s is now active.',
+            optional($enrollment->user)->name ?? 'the student'
         );
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => $successMessage,
+                'intervention' => [
+                    'id' => $intervention->id,
+                    'type' => $intervention->type,
+                    'status' => $intervention->status,
+                ],
+            ]);
+        }
+
+        return Redirect::back()->with('success', $successMessage);
     }
 
     /**

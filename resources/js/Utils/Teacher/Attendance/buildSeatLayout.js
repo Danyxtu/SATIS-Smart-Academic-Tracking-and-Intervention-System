@@ -1,3 +1,5 @@
+const GRID_ROWS = 5;
+const GRID_COLS = 10;
 export const buildSeatLayout = (students) => {
     const totalSeats = GRID_ROWS * GRID_COLS;
     const assignments = students.map((student) => student.id);
