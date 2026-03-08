@@ -91,6 +91,7 @@ class TeacherRegistrationController extends Controller
             'department_id' => $registration->department_id,
             'status' => 'active',
             'created_by' => $admin->id,
+            'email_verified_at' => now(), // Teachers are verified on approval
         ]);
 
         // Update registration status

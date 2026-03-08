@@ -129,7 +129,7 @@ class GradeController extends Controller
             ->with('grade_update_summary', $summary);
     }
 
-    public function import(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
+    public function import(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse|\Illuminate\Http\JsonResponse
     {
         $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
@@ -141,6 +141,13 @@ class GradeController extends Controller
         $assignments = collect($structure['assignments']);
 
         if ($assignments->isEmpty()) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Add at least one grading activity before uploading scores.',
+                    'errors' => ['grades_file' => ['Add at least one grading activity before uploading scores.']],
+                ], 422);
+            }
+
             return back()->withErrors([
                 'grades_file' => 'Add at least one grading activity before uploading scores.',
             ]);
@@ -149,7 +156,21 @@ class GradeController extends Controller
         try {
             $summary = $this->importGradesFromCsv($subjectTeacher, $request->file('grades_file'), $structure);
         } catch (RuntimeException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $exception->getMessage(),
+                    'errors' => ['grades_file' => [$exception->getMessage()]],
+                ], 422);
+            }
+
             return back()->withErrors(['grades_file' => $exception->getMessage()]);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Grades uploaded successfully.',
+                'grade_import_summary' => $summary,
+            ]);
         }
 
         return redirect()

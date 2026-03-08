@@ -1,0 +1,1 @@
+export { buildSeatLayout } from "./buildSeatLayout";

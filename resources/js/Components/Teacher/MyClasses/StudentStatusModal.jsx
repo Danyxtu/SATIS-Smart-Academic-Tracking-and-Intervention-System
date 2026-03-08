@@ -36,14 +36,14 @@ const StudentStatusModal = ({
             ? calculateFinalGrade(
                   student.grades,
                   gradeCategories,
-                  selectedQuarter
+                  selectedQuarter,
               )
             : "—";
     const expectedGrade = calculateExpectedQuarterlyGrade
         ? calculateExpectedQuarterlyGrade(
               student.grades,
               gradeCategories,
-              selectedQuarter
+              selectedQuarter,
           )
         : "—";
     const finalGrade = calculateOverallFinalGrade
@@ -314,8 +314,8 @@ const StudentStatusModal = ({
                                                 selectedQuarter === 2
                                                     ? "bg-white text-indigo-700 shadow-sm"
                                                     : !q1Finished
-                                                    ? "text-gray-400 cursor-not-allowed"
-                                                    : "text-gray-600 hover:bg-gray-200"
+                                                      ? "text-gray-400 cursor-not-allowed"
+                                                      : "text-gray-600 hover:bg-gray-200"
                                             }`}
                                             title={
                                                 !q1Finished
@@ -338,7 +338,7 @@ const StudentStatusModal = ({
                                         <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
                                         {category.label} (
                                         {Math.round(
-                                            (category.weight ?? 0) * 100
+                                            (category.weight ?? 0) * 100,
                                         )}
                                         %)
                                     </span>
@@ -381,7 +381,7 @@ const StudentStatusModal = ({
                                                             (
                                                             {Math.round(
                                                                 (assign.category_weight ??
-                                                                    0) * 100
+                                                                    0) * 100,
                                                             )}
                                                             %)
                                                         </span>
