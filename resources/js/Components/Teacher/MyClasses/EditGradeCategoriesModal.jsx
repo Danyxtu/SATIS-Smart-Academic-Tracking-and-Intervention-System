@@ -8,6 +8,7 @@ const EditGradeCategoriesModal = ({
     onClose,
     subjectId,
     categories = [],
+    quarter = 1,
     onSuccess,
 }) => {
     const [localCategories, setLocalCategories] = useState([]);
@@ -19,7 +20,7 @@ const EditGradeCategoriesModal = ({
                 categories.map((cat) => ({
                     ...cat,
                     weight: Math.round((cat.weight || 0) * 100), // Convert to percentage
-                }))
+                })),
             );
         }
     }, [isOpen, categories]);
@@ -28,7 +29,7 @@ const EditGradeCategoriesModal = ({
     const totalPercentage = useMemo(() => {
         return localCategories.reduce(
             (sum, cat) => sum + (parseFloat(cat.weight) || 0),
-            0
+            0,
         );
     }, [localCategories]);
 
@@ -72,7 +73,7 @@ const EditGradeCategoriesModal = ({
         const category = localCategories[index];
         if (category.tasks && category.tasks.length > 0) {
             showToast.error(
-                "Cannot remove category with existing tasks. Remove tasks first."
+                "Cannot remove category with existing tasks. Remove tasks first.",
             );
             return;
         }
@@ -100,7 +101,7 @@ const EditGradeCategoriesModal = ({
             prev.map((cat, index) => ({
                 ...cat,
                 weight: evenWeight + (index === 0 ? remainder : 0),
-            }))
+            })),
         );
     };
 
@@ -115,7 +116,7 @@ const EditGradeCategoriesModal = ({
 
         // Validate labels
         const hasEmptyLabels = localCategories.some(
-            (cat) => !cat.label || cat.label.trim() === ""
+            (cat) => !cat.label || cat.label.trim() === "",
         );
         if (hasEmptyLabels) {
             showToast.error("All categories must have a label");
@@ -135,7 +136,7 @@ const EditGradeCategoriesModal = ({
             route("teacher.classes.grade-structure.update", {
                 subject: subjectId,
             }),
-            { categories: categoriesPayload },
+            { categories: categoriesPayload, quarter },
             {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -147,14 +148,14 @@ const EditGradeCategoriesModal = ({
                 onError: (errors) => {
                     showToast.error(
                         errors.message ||
-                            "Failed to update grade categories. Please try again."
+                            "Failed to update grade categories. Please try again.",
                     );
                     setProcessing(false);
                 },
                 onFinish: () => {
                     setProcessing(false);
                 },
-            }
+            },
         );
     };
 
@@ -247,7 +248,7 @@ const EditGradeCategoriesModal = ({
                                             onChange={(e) =>
                                                 handleLabelChange(
                                                     index,
-                                                    e.target.value
+                                                    e.target.value,
                                                 )
                                             }
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -269,7 +270,7 @@ const EditGradeCategoriesModal = ({
                                                 onChange={(e) =>
                                                     handleWeightChange(
                                                         index,
-                                                        e.target.value
+                                                        e.target.value,
                                                     )
                                                 }
                                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 pr-8"

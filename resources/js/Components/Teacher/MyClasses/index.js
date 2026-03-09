@@ -16,3 +16,4 @@ export { default as EmptyStudentState } from "./EmptyStudentState";
 export { default as AddNewClassModal } from "./AddNewClassModal";
 export { default as ClassList } from "./ClassList";
 export { default as GradeSubmissionModal } from "./GradeSubmissionModal";
+export { default as StartQ2ConfirmModal } from "./StartQ2ConfirmModal";
