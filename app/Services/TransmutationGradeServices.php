@@ -59,8 +59,3 @@ class TransmutationGradeServices
         };
     }
 }
-// Just testing mwheheh
-
-$gradeTransmute = new TransmutationGradeServices;
-
-echo $gradeTransmute->transmuteGrade(5);

@@ -45,13 +45,6 @@ class ClassesServices
         $semester2Count = $allSubjectTeachers->filter(fn($s) => $s->semester == '2')->count();
 
 
-        $gradeStructures = $subjectTeachers->mapWithKeys(function ($subjectTeacher) {
-            $structure = $this->buildGradeStructure($subjectTeacher->grade_categories);
-            $structure = $this->ensureStructureCoversExistingGrades($subjectTeacher, $structure);
-
-            return [$subjectTeacher->id => $structure];
-        });
-
         $classes = $subjectTeachers->map(fn($st) => [
             'id' => $st->id,
             'name' => $st->grade_level,
@@ -89,13 +82,20 @@ class ClassesServices
 
     public function createClass() {}
 
-    public function ensureStructureCoversExistingGrades(SubjectTeacher $subjectTeacher, array $structure): array
+    public function ensureStructureCoversExistingGrades(SubjectTeacher $subjectTeacher, array $structure, ?int $quarter = null): array
     {
         $assignments = collect($structure['assignments']);
 
         $existingAssignments = $subjectTeacher->enrollments
-            ->flatMap(function ($enrollment) {
-                return $enrollment->grades->map(function ($grade) {
+            ->flatMap(function ($enrollment) use ($quarter) {
+                $grades = $enrollment->grades;
+
+                // Filter grades by quarter if specified
+                if ($quarter !== null) {
+                    $grades = $grades->where('quarter', $quarter);
+                }
+
+                return $grades->map(function ($grade) {
                     $assignmentId = $grade->assignment_key ?: Str::slug($grade->assignment_name ?? 'assignment', '_');
 
                     return [
@@ -137,7 +137,18 @@ class ClassesServices
         }
 
         $updatedStructure = $this->buildGradeStructure($categories);
-        $subjectTeacher->update(['grade_categories' => $updatedStructure['categories']]);
+
+        // Persist: merge back into the per-quarter map if quarter was specified
+        if ($quarter !== null) {
+            $perQuarter = $this->buildPerQuarterCategories(
+                $subjectTeacher->grade_categories,
+                $quarter,
+                $updatedStructure['categories'],
+            );
+            $subjectTeacher->update(['grade_categories' => $perQuarter]);
+        } else {
+            $subjectTeacher->update(['grade_categories' => $updatedStructure['categories']]);
+        }
 
         return $updatedStructure;
     }

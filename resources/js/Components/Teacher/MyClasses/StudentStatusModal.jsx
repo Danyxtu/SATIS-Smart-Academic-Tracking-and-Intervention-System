@@ -5,6 +5,7 @@ const StudentStatusModal = ({
     student,
     assignments = [],
     gradeCategories = [],
+    gradeStructure = null,
     calculateFinalGrade,
     calculateExpectedQuarterlyGrade,
     calculateOverallFinalGrade,
@@ -17,6 +18,21 @@ const StudentStatusModal = ({
 
     if (!student) return null;
 
+    // Resolve categories for the selected quarter from per-quarter structure
+    const FALLBACK_CATEGORIES = gradeCategories;
+    const resolveCategories = (quarter) => {
+        if (gradeStructure) {
+            return (
+                gradeStructure?.[quarter]?.categories ??
+                gradeStructure?.[String(quarter)]?.categories ??
+                FALLBACK_CATEGORIES
+            );
+        }
+        return FALLBACK_CATEGORIES;
+    };
+    const currentCategories = resolveCategories(selectedQuarter);
+    const q1Categories = resolveCategories(1);
+
     // Get the temporary password from the student's user record
     const temporaryPassword =
         student.user?.temp_password || student.temp_password || null;
@@ -26,23 +42,27 @@ const StudentStatusModal = ({
 
     // Check if Q1 is finished (has quarterly exam scores)
     const q1Finished = hasQuarterlyExamScores
-        ? hasQuarterlyExamScores(student.grades, gradeCategories, 1)
+        ? hasQuarterlyExamScores(student.grades, q1Categories, 1)
         : false;
 
     // Calculate grades for the selected quarter
     const quarterlyGrade =
         hasQuarterlyExamScores &&
-        hasQuarterlyExamScores(student.grades, gradeCategories, selectedQuarter)
+        hasQuarterlyExamScores(
+            student.grades,
+            currentCategories,
+            selectedQuarter,
+        )
             ? calculateFinalGrade(
                   student.grades,
-                  gradeCategories,
+                  currentCategories,
                   selectedQuarter,
               )
             : "—";
     const expectedGrade = calculateExpectedQuarterlyGrade
         ? calculateExpectedQuarterlyGrade(
               student.grades,
-              gradeCategories,
+              currentCategories,
               selectedQuarter,
           )
         : "—";

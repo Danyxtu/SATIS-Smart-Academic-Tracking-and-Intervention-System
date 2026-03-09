@@ -237,6 +237,12 @@ const MyClasses = ({
         return selectedClassData[selectedClassId].gradeStructure || null;
     }, [selectedClassId, selectedClassData]);
 
+    // Get grade summaries from fetched data (server-computed grades per enrollment)
+    const gradeSummaries = useMemo(() => {
+        if (!selectedClassId || !selectedClassData[selectedClassId]) return {};
+        return selectedClassData[selectedClassId].gradeSummaries || {};
+    }, [selectedClassId, selectedClassData]);
+
     const students = useMemo(() => {
         if (!selectedClass) return [];
         return roster;
@@ -722,11 +728,18 @@ const MyClasses = ({
                                     selectedSemester === semester.id;
                                 const isCurrentSemester =
                                     currentSemester === semester.id;
+                                // Future semester tabs are disabled (e.g., 2nd Sem when current is 1st)
+                                const isFutureSemester =
+                                    semester.id > currentSemester;
+                                // Past semester viewing indicator
+                                const isPastSemester =
+                                    semester.id < currentSemester;
                                 // Semester tab button with count badge and current semester indicator
                                 return (
                                     <button
                                         key={semester.id}
                                         onClick={() => {
+                                            if (isFutureSemester) return;
                                             router.get(
                                                 window.location.pathname,
                                                 { semester: semester.id },
@@ -736,12 +749,15 @@ const MyClasses = ({
                                                 },
                                             );
                                         }}
+                                        disabled={isFutureSemester}
                                         className={`
                                             flex-1 relative flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all
                                             ${
-                                                isActive
-                                                    ? "bg-indigo-600 text-white shadow-md"
-                                                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                                isFutureSemester
+                                                    ? "bg-gray-50 text-gray-400 cursor-not-allowed opacity-60"
+                                                    : isActive
+                                                      ? "bg-indigo-600 text-white shadow-md"
+                                                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                                             }
                                         `}
                                     >
@@ -758,13 +774,17 @@ const MyClasses = ({
                                             className={`
                                                 ml-1 px-2 py-0.5 rounded-full text-xs font-bold
                                                 ${
-                                                    isActive
-                                                        ? "bg-white/20 text-white"
-                                                        : "bg-gray-200 text-gray-600"
+                                                    isFutureSemester
+                                                        ? "bg-gray-200 text-gray-400"
+                                                        : isActive
+                                                          ? "bg-white/20 text-white"
+                                                          : "bg-gray-200 text-gray-600"
                                                 }
                                             `}
                                         >
-                                            {semester.count}
+                                            {isFutureSemester
+                                                ? "—"
+                                                : semester.count}
                                         </span>
 
                                         {/* Current Semester Indicator */}
@@ -777,6 +797,13 @@ const MyClasses = ({
                                                 } border-2 border-white`}
                                                 title="Current Semester"
                                             />
+                                        )}
+
+                                        {/* Past Semester Indicator */}
+                                        {isPastSemester && !isActive && (
+                                            <span className="absolute -top-1 -right-1 text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold border border-amber-200">
+                                                Past
+                                            </span>
                                         )}
                                     </button>
                                 );
@@ -866,6 +893,7 @@ const MyClasses = ({
                     selectedClass={selectedClass}
                     roster={roster}
                     gradeStructure={gradeStructure}
+                    gradeSummaries={gradeSummaries}
                 />
             )}
 
