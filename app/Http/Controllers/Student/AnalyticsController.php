@@ -263,9 +263,12 @@ class AnalyticsController extends Controller
             ],
             'subject' => [
                 'id' => $subject?->id,
-                'name' => $subject?->name ?? 'Unknown Subject',
+                // Subject model uses `subject_name` column; use that to avoid "Unknown Subject"
+                'name' => $subject?->subject_name ?? 'Unknown Subject',
+                // Safely build teacher full name (fixing previous typo)
                 'teacher' => $enrollment->subjectTeacher?->teacher
-                    ? $enrollment->subjectTeacher?->teacher?->first_name . ' ' . $enrollment->subjectTeacher?->teacehr?->last_name : 'N/A',
+                    ? ($enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name)
+                    : 'N/A',
                 'section' => $subject?->section,
                 'schoolYear' => $schoolYear,
                 'current_quarter' => $subject?->current_quarter ?? 1,
@@ -377,10 +380,10 @@ class AnalyticsController extends Controller
                 'lrn' => $enrollment->user->student->lrn ?? null,
             ],
             'subject' => [
-                'name' => $subject->name,
-                'section' => $subject->section,
-                'grade_level' => $subject->grade_level,
-                'current_quarter' => $subject->current_quarter ?? 1,
+                'name' => $subject?->subject_name ?? 'Unknown Subject',
+                'section' => $subject?->section,
+                'grade_level' => $subject?->grade_level,
+                'current_quarter' => $subject?->current_quarter ?? 1,
             ],
             'performance' => [
                 'overallGrade' => $overallGrade,

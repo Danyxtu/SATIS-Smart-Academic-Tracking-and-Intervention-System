@@ -266,9 +266,7 @@ class ClassController extends Controller
             'grade_categories' => $perQuarter,
         ]);
 
-        return redirect()
-            ->route('teacher.classes.index')
-            ->with('success', 'Grade structure updated.');
+        return back()->with('success', 'Grade structure updated.');
     }
 
     private function importClasslist(SubjectTeacher $subjectTeacher, UploadedFile $file): array
@@ -825,6 +823,19 @@ class ClassController extends Controller
 
                 $q1Structure = $this->ClassesServices->ensureStructureCoversExistingGrades($subjectTeacher, $q1Structure, 1);
                 $q2Structure = $this->ClassesServices->ensureStructureCoversExistingGrades($subjectTeacher, $q2Structure, 2);
+
+                // Persist the normalised categories so repaired labels/weights are saved
+                $repairedPerQuarter = $this->buildPerQuarterCategories(
+                    $subjectTeacher->grade_categories,
+                    1,
+                    $q1Structure['categories'],
+                );
+                $repairedPerQuarter = $this->buildPerQuarterCategories(
+                    $repairedPerQuarter,
+                    2,
+                    $q2Structure['categories'],
+                );
+                $subjectTeacher->updateQuietly(['grade_categories' => $repairedPerQuarter]);
 
                 // Combined structure keyed by quarter for the frontend
                 $gradeStructure = [

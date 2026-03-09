@@ -134,10 +134,12 @@ const EditGradeCategoriesModal = ({
         setProcessing(true);
         router.post(
             route("teacher.classes.grade-structure.update", {
-                subject: subjectId,
+                // Ziggy route expects the parameter name `subjectTeacher` (see routes/teacher.php)
+                subjectTeacher: subjectId,
             }),
             { categories: categoriesPayload, quarter },
             {
+                preserveState: true,
                 preserveScroll: true,
                 onSuccess: () => {
                     showToast.success("Grade categories updated successfully!");

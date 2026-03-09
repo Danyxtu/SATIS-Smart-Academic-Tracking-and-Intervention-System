@@ -53,7 +53,10 @@ class SubjectRiskController extends Controller
                 : 100;
 
             // Group grades by category/type for breakdown
-            $gradesByCategory = $grades->groupBy('category')->map(function ($categoryGrades) {
+            $gradesByCategory = $grades->groupBy(function ($grade) {
+                return collect(['written_works', 'performance_task', 'quarterly_exam'])
+                    ->first(fn($cat) => str_contains($grade->assignment_key ?? '', $cat), 'other');
+            })->map(function ($categoryGrades) {
                 $score = $categoryGrades->sum('score');
                 $possible = $categoryGrades->sum('total_score');
                 return [
@@ -165,8 +168,9 @@ class SubjectRiskController extends Controller
             // Get recent grade entries for display
             $recentGradeEntries = $grades->sortByDesc('created_at')->take(5)->map(fn($g) => [
                 'id' => $g->id,
-                'name' => $g->name,
-                'category' => $g->category,
+                'name' => $g->assignment_name,
+                'category' => collect(['written_works', 'performance_task', 'quarterly_exam'])
+                    ->first(fn($cat) => str_contains($g->assignment_key ?? '', $cat), 'other'),
                 'score' => $g->score,
                 'totalScore' => $g->total_score,
                 'percentage' => $g->total_score > 0 ? round(($g->score / $g->total_score) * 100, 1) : 0,
@@ -177,9 +181,11 @@ class SubjectRiskController extends Controller
             return [
                 'id' => $enrollment->id,
                 'subjectId' => $enrollment->subjectTeacher?->subject_id,
-                'subjectName' => $subject?->name ?? 'Unknown Subject',
+                'subjectName' => $subject?->subject_name ?? 'Unknown Subject',
                 'section' => $subject?->section,
-                'teacherName' => $enrollment->subjectTeacher?->teacher?->name ?? 'N/A',
+                'teacherName' => $enrollment->subjectTeacher?->teacher
+                    ? ($enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name)
+                    : 'N/A',
                 'currentGrade' => $currentGrade,
                 'expectedGrade' => $expectedGrade !== null ? round($expectedGrade, 1) : null,
                 'attendanceRate' => $attendanceRate,

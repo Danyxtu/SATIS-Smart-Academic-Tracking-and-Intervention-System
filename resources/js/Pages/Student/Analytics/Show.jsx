@@ -3,8 +3,6 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, Link } from "@inertiajs/react";
 import { Dialog, Transition } from "@headlessui/react";
 import {
-    BarChart,
-    Bar,
     XAxis,
     YAxis,
     Tooltip,
@@ -140,8 +138,8 @@ const QuarterGradeCard = ({
                             grade !== null && grade >= 75
                                 ? "bg-green-100"
                                 : grade !== null
-                                ? "bg-red-100"
-                                : "bg-gray-100"
+                                  ? "bg-red-100"
+                                  : "bg-gray-100"
                         }`}
                     >
                         <span
@@ -149,8 +147,8 @@ const QuarterGradeCard = ({
                                 grade !== null && grade >= 75
                                     ? "text-green-600"
                                     : grade !== null
-                                    ? "text-red-600"
-                                    : "text-gray-400"
+                                      ? "text-red-600"
+                                      : "text-gray-400"
                             }`}
                         >
                             Q{quarterNum}
@@ -314,7 +312,7 @@ const QuarterlyGradesCards = ({ data }) => {
                                 q3HasStarted
                                     ? calculateExpectedGrade(
                                           q3Data.grade,
-                                          q3Data.assignmentCount
+                                          q3Data.assignmentCount,
                                       )
                                     : q2Expected
                             }
@@ -334,14 +332,14 @@ const QuarterlyGradesCards = ({ data }) => {
                                 q4HasStarted
                                     ? calculateExpectedGrade(
                                           q4Data.grade,
-                                          q4Data.assignmentCount
+                                          q4Data.assignmentCount,
                                       )
                                     : q3HasStarted
-                                    ? calculateExpectedGrade(
-                                          q3Data?.grade,
-                                          q3Data?.assignmentCount
-                                      )
-                                    : q2Expected
+                                      ? calculateExpectedGrade(
+                                            q3Data?.grade,
+                                            q3Data?.assignmentCount,
+                                        )
+                                      : q2Expected
                             }
                             attendance={q4HasStarted ? q4Data.attendance : "--"}
                             assignmentCount={
@@ -380,7 +378,7 @@ const GradeBreakdown = ({ data }) => {
         };
 
         writtenWorks = items.filter((it) =>
-            matchBucket(it, ["written", "written works", "written-work"])
+            matchBucket(it, ["written", "written works", "written-work"]),
         );
 
         performanceTasks = items.filter((it) =>
@@ -388,11 +386,11 @@ const GradeBreakdown = ({ data }) => {
                 "performance",
                 "performance task",
                 "performance-t",
-            ])
+            ]),
         );
 
         quarterlyExams = items.filter((it) =>
-            matchBucket(it, ["quarterly exam", "quarterly", "exam"])
+            matchBucket(it, ["quarterly exam", "quarterly", "exam"]),
         );
     }
 
@@ -480,32 +478,74 @@ const GradeBreakdown = ({ data }) => {
                 {renderCard(
                     "Written Works",
                     writtenWorks,
-                    "No written works recorded yet."
+                    "No written works recorded yet.",
                 )}
 
                 {renderCard(
                     "Performance Task",
                     performanceTasks,
-                    "No performance tasks recorded yet."
+                    "No performance tasks recorded yet.",
                 )}
 
                 {renderCard(
                     "Quarterly Exam",
                     quarterlyExams,
-                    "Quarterly exam has not been started yet."
+                    "Quarterly exam has not been started yet.",
                 )}
             </div>
         </div>
     );
 };
 
-// Bar Chart Component - Compact and optimized
-const GradeChart = ({ data }) => {
-    // Filter only quarters that have grades
-    const activeQuarters =
-        data?.filter((q) => q.grade !== null && q.assignmentCount > 0) || [];
+// Category colors for the line chart
+const CATEGORY_COLORS = {
+    written_works: { stroke: "#3b82f6", label: "Written Works" },
+    performance_task: { stroke: "#f59e0b", label: "Performance Task" },
+    quarterly_exam: { stroke: "#ec4899", label: "Quarterly Exam" },
+};
 
-    if (activeQuarters.length === 0) {
+const CATEGORY_KEYWORDS = {
+    written_works: [
+        "written",
+        "written works",
+        "written_works",
+        "written-work",
+    ],
+    performance_task: [
+        "performance",
+        "performance task",
+        "performance_task",
+        "performance-t",
+    ],
+    quarterly_exam: ["quarterly exam", "quarterly_exam", "quarterly", "exam"],
+};
+
+// Detect category from item key/name fields
+const detectCategory = (item) => {
+    const text = (
+        (item.key || "") +
+        " " +
+        (item.name || "") +
+        " " +
+        (item.category || "")
+    ).toLowerCase();
+    for (const [catId, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+        if (keywords.some((k) => text.includes(k))) return catId;
+    }
+    return "other";
+};
+
+// Grade Trend Line Chart - plots each score as a percentage, one line per category
+const GradeChart = ({ data }) => {
+    // data = gradeBreakdown array of { id, name, key, score, totalScore, percentage, quarter, createdAt }
+    const items = Array.isArray(data) ? data : [];
+
+    // Filter items that have valid scores
+    const validItems = items.filter(
+        (item) => item.score !== null && item.totalScore > 0,
+    );
+
+    if (validItems.length === 0) {
         return (
             <div className="bg-white rounded-2xl shadow-md p-4">
                 <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
@@ -519,10 +559,85 @@ const GradeChart = ({ data }) => {
         );
     }
 
-    const chartData = activeQuarters.map((q) => ({
-        name: q.quarter,
-        Grade: q.grade || 0,
+    // Tag each item with its detected category
+    const taggedItems = validItems.map((item) => ({
+        ...item,
+        _category: detectCategory(item),
+        _pct: Math.round((item.score / item.totalScore) * 100),
     }));
+
+    // Group by category, keeping each group in original order (by date / index)
+    const grouped = {};
+    taggedItems.forEach((item) => {
+        if (!grouped[item._category]) grouped[item._category] = [];
+        grouped[item._category].push(item);
+    });
+
+    // Find the category with the most items to determine chart x-axis length
+    const activeCategories = Object.keys(grouped).filter(
+        (cat) => cat !== "other",
+    );
+    // If no recognised categories fall back to all
+    const categoriesToPlot =
+        activeCategories.length > 0 ? activeCategories : Object.keys(grouped);
+
+    const maxLen = Math.max(
+        ...categoriesToPlot.map((cat) => grouped[cat]?.length || 0),
+        1,
+    );
+
+    // Build chart data: one point per index, each category gets its percentage at that index
+    const chartData = [];
+    for (let i = 0; i < maxLen; i++) {
+        const point = { index: i + 1 };
+        categoriesToPlot.forEach((cat) => {
+            const entry = grouped[cat]?.[i];
+            if (entry) {
+                point[cat] = entry._pct;
+                // Store label for tooltip
+                point[`_label_${cat}`] = entry.name;
+            }
+        });
+        chartData.push(point);
+    }
+
+    // Custom tooltip
+    const CustomTooltip = ({ active, payload, label }) => {
+        if (!active || !payload || payload.length === 0) return null;
+        return (
+            <div className="bg-white rounded-lg shadow-lg border border-gray-100 p-3 text-xs">
+                <p className="font-semibold text-gray-700 mb-1.5">
+                    Item #{label}
+                </p>
+                {payload.map((entry) => {
+                    const cat = entry.dataKey;
+                    const catInfo = CATEGORY_COLORS[cat] || {
+                        label: cat,
+                        stroke: "#6b7280",
+                    };
+                    const itemLabel = entry.payload?.[`_label_${cat}`] || "";
+                    return (
+                        <div
+                            key={cat}
+                            className="flex items-center gap-2 mb-0.5"
+                        >
+                            <span
+                                className="inline-block w-2.5 h-2.5 rounded-full"
+                                style={{ backgroundColor: entry.color }}
+                            />
+                            <span className="text-gray-600">
+                                {catInfo.label}
+                                {itemLabel ? ` – ${itemLabel}` : ""}:
+                            </span>
+                            <span className="font-bold text-gray-800">
+                                {entry.value}%
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    };
 
     return (
         <div className="bg-white rounded-2xl shadow-md p-4">
@@ -530,18 +645,49 @@ const GradeChart = ({ data }) => {
                 <TrendingUp size={16} className="text-pink-600" />
                 Grade Trend
             </h3>
-            <div className="h-40">
+
+            {/* Legend */}
+            <div className="flex flex-wrap gap-3 mb-2">
+                {categoriesToPlot.map((cat) => {
+                    const info = CATEGORY_COLORS[cat] || {
+                        label: cat,
+                        stroke: "#6b7280",
+                    };
+                    return (
+                        <div
+                            key={cat}
+                            className="flex items-center gap-1.5 text-xs text-gray-600"
+                        >
+                            <span
+                                className="inline-block w-3 h-0.5 rounded"
+                                style={{ backgroundColor: info.stroke }}
+                            />
+                            {info.label}
+                        </div>
+                    );
+                })}
+            </div>
+
+            <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
+                    <LineChart
                         data={chartData}
                         margin={{ top: 10, right: 10, left: -15, bottom: 0 }}
                     >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                         <XAxis
-                            dataKey="name"
+                            dataKey="index"
                             stroke="#9ca3af"
-                            fontSize={11}
+                            fontSize={10}
                             tickLine={false}
                             axisLine={false}
+                            label={{
+                                value: "Item #",
+                                position: "insideBottomRight",
+                                offset: -5,
+                                fontSize: 10,
+                                fill: "#9ca3af",
+                            }}
                         />
                         <YAxis
                             stroke="#9ca3af"
@@ -549,25 +695,28 @@ const GradeChart = ({ data }) => {
                             domain={[0, 100]}
                             tickLine={false}
                             axisLine={false}
-                            ticks={[0, 50, 75, 100]}
+                            ticks={[0, 25, 50, 75, 100]}
+                            tickFormatter={(v) => `${v}%`}
                         />
-                        <Tooltip
-                            contentStyle={{
-                                borderRadius: "8px",
-                                border: "none",
-                                boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                                fontSize: "12px",
-                                padding: "8px 12px",
-                            }}
-                            formatter={(value) => [`${value}%`, "Grade"]}
-                        />
-                        <Bar
-                            dataKey="Grade"
-                            fill="#ec4899"
-                            radius={[4, 4, 0, 0]}
-                            maxBarSize={40}
-                        />
-                    </BarChart>
+                        <Tooltip content={<CustomTooltip />} />
+                        {categoriesToPlot.map((cat) => {
+                            const info = CATEGORY_COLORS[cat] || {
+                                stroke: "#6b7280",
+                            };
+                            return (
+                                <Line
+                                    key={cat}
+                                    type="monotone"
+                                    dataKey={cat}
+                                    stroke={info.stroke}
+                                    strokeWidth={2}
+                                    dot={{ r: 3, fill: info.stroke }}
+                                    activeDot={{ r: 5 }}
+                                    connectNulls
+                                />
+                            );
+                        })}
+                    </LineChart>
                 </ResponsiveContainer>
             </div>
         </div>
@@ -621,7 +770,7 @@ const InterventionCard = ({ intervention }) => {
     const progressPercent =
         intervention.totalTasks > 0
             ? Math.round(
-                  (intervention.completedTasks / intervention.totalTasks) * 100
+                  (intervention.completedTasks / intervention.totalTasks) * 100,
               )
             : 0;
 
@@ -910,7 +1059,7 @@ const ForYourCaseCard = ({
             (writtenWorksItems.length > 0
                 ? writtenWorksItems.reduce(
                       (sum, i) => sum + (i.percentage || 0),
-                      0
+                      0,
                   ) / writtenWorksItems.length
                 : 0);
         const performanceTaskAvg =
@@ -918,7 +1067,7 @@ const ForYourCaseCard = ({
             (performanceTaskItems.length > 0
                 ? performanceTaskItems.reduce(
                       (sum, i) => sum + (i.percentage || 0),
-                      0
+                      0,
                   ) / performanceTaskItems.length
                 : 0);
         const quarterlyExamAvg =
@@ -926,7 +1075,7 @@ const ForYourCaseCard = ({
             (quarterlyExamItems.length > 0
                 ? quarterlyExamItems.reduce(
                       (sum, i) => sum + (i.percentage || 0),
-                      0
+                      0,
                   ) / quarterlyExamItems.length
                 : 0);
 
@@ -994,7 +1143,7 @@ const ForYourCaseCard = ({
         let trendDirection = "stable";
         let trendChange = 0;
         const validQuarters = quarterlyGrades.filter(
-            (q) => q.grade !== null && q.grade > 0
+            (q) => q.grade !== null && q.grade > 0,
         );
         if (validQuarters.length >= 2) {
             const first = validQuarters[0].grade;
@@ -1122,7 +1271,7 @@ const ForYourCaseCard = ({
             quarterlyExamAvg,
         };
         const validCategoryScores = Object.values(categoryScores).filter(
-            (s) => s > 0
+            (s) => s > 0,
         );
         const avgCategoryScore =
             validCategoryScores.length > 0
@@ -1239,12 +1388,12 @@ const ForYourCaseCard = ({
         if (attendanceRate < 95) {
             const targetAttendance = Math.min(95, attendanceRate + 10);
             const attendanceGain = Math.round(
-                (targetAttendance - attendanceRate) * 0.5
+                (targetAttendance - attendanceRate) * 0.5,
             );
             const remainingDays = Math.max(0, 20 - totalDays);
             const requiredPresentDays =
                 Math.ceil(
-                    (targetAttendance / 100) * (totalDays + remainingDays)
+                    (targetAttendance / 100) * (totalDays + remainingDays),
                 ) -
                 (totalDays - absentDays);
 
@@ -1329,7 +1478,7 @@ const ForYourCaseCard = ({
             const targetCategoryScore = Math.min(90, weakestScore + 15);
             const categoryWeight = categoryWeights[weakestCategory];
             const categoryGain = Math.round(
-                (targetCategoryScore - weakestScore) * categoryWeight
+                (targetCategoryScore - weakestScore) * categoryWeight,
             );
             projectedGradeGain += Math.min(categoryGain, 3);
 
@@ -1374,7 +1523,7 @@ const ForYourCaseCard = ({
         const remainingTasks = 5;
         const requiredAvgScore = Math.min(
             95,
-            expectedGrade + gapToTarget * 1.5
+            expectedGrade + gapToTarget * 1.5,
         );
 
         steps.push({
@@ -1385,7 +1534,7 @@ const ForYourCaseCard = ({
             currentValue: `${currentGrade}% avg`,
             targetValue: `${Math.round(requiredAvgScore)}% avg needed`,
             action: `Score an average of ${Math.round(
-                requiredAvgScore
+                requiredAvgScore,
             )}% on your next ${remainingTasks} graded activities`,
             gradeImpact: `+${
                 gapToTarget - projectedGradeGain > 0
@@ -1396,7 +1545,7 @@ const ForYourCaseCard = ({
             details: [
                 `Current average: ${currentGrade}%`,
                 `Need: ${Math.round(
-                    requiredAvgScore
+                    requiredAvgScore,
                 )}% average on remaining tasks`,
                 `This closes the gap to ${targetGrade}% (Very Satisfactory)`,
             ],
@@ -1405,7 +1554,7 @@ const ForYourCaseCard = ({
         // Calculate projected final grade
         const projectedGrade = Math.min(
             100,
-            expectedGrade + projectedGradeGain
+            expectedGrade + projectedGradeGain,
         );
 
         // CONCLUSION SUMMARY
@@ -1474,7 +1623,7 @@ const ForYourCaseCard = ({
                         </p>
                         <p
                             className={`text-3xl font-bold ${getGradeColorClass(
-                                insights.currentGrade
+                                insights.currentGrade,
                             )}`}
                         >
                             {insights.currentGrade || "--"}%
@@ -1529,8 +1678,8 @@ const ForYourCaseCard = ({
                                         item.impact > 0
                                             ? "text-green-600"
                                             : item.impact < 0
-                                            ? "text-red-600"
-                                            : "text-gray-500"
+                                              ? "text-red-600"
+                                              : "text-gray-500"
                                     }`}
                                 >
                                     {item.impact > 0 ? "+" : ""}
@@ -1574,8 +1723,8 @@ const ForYourCaseCard = ({
                                 insights.attendanceRate >= 90
                                     ? "text-green-600"
                                     : insights.attendanceRate >= 80
-                                    ? "text-yellow-600"
-                                    : "text-red-600"
+                                      ? "text-yellow-600"
+                                      : "text-red-600"
                             }`}
                         >
                             {insights.attendanceRate}%
@@ -1592,8 +1741,8 @@ const ForYourCaseCard = ({
                                 insights.completionRate >= 80
                                     ? "text-green-600"
                                     : insights.completionRate >= 60
-                                    ? "text-yellow-600"
-                                    : "text-red-600"
+                                      ? "text-yellow-600"
+                                      : "text-red-600"
                             }`}
                         >
                             {insights.completionRate}%
@@ -1610,15 +1759,15 @@ const ForYourCaseCard = ({
                                 insights.trendDirection === "improving"
                                     ? "text-green-600"
                                     : insights.trendDirection === "stable"
-                                    ? "text-gray-600"
-                                    : "text-red-600"
+                                      ? "text-gray-600"
+                                      : "text-red-600"
                             }`}
                         >
                             {insights.trendDirection === "improving"
                                 ? "↑ Up"
                                 : insights.trendDirection === "declining"
-                                ? "↓ Down"
-                                : "→ Stable"}
+                                  ? "↓ Down"
+                                  : "→ Stable"}
                         </p>
                     </div>
                     <div className="bg-white rounded-xl p-3 shadow-sm text-center">
@@ -1648,7 +1797,7 @@ const ForYourCaseCard = ({
                                 </p>
                                 <p
                                     className={`text-lg font-bold ${getGradeColorClass(
-                                        insights.writtenWorksAvg
+                                        insights.writtenWorksAvg,
                                     )}`}
                                 >
                                     {insights.writtenWorksAvg || "--"}%
@@ -1660,7 +1809,7 @@ const ForYourCaseCard = ({
                                 </p>
                                 <p
                                     className={`text-lg font-bold ${getGradeColorClass(
-                                        insights.performanceTaskAvg
+                                        insights.performanceTaskAvg,
                                     )}`}
                                 >
                                     {insights.performanceTaskAvg || "--"}%
@@ -1670,7 +1819,7 @@ const ForYourCaseCard = ({
                                 <p className="text-xs text-gray-500">Exam</p>
                                 <p
                                     className={`text-lg font-bold ${getGradeColorClass(
-                                        insights.quarterlyExamAvg
+                                        insights.quarterlyExamAvg,
                                     )}`}
                                 >
                                     {insights.quarterlyExamAvg || "--"}%
@@ -1684,9 +1833,9 @@ const ForYourCaseCard = ({
                                 {insights.weakestCategory === "writtenWorks"
                                     ? "Written Works"
                                     : insights.weakestCategory ===
-                                      "performanceTask"
-                                    ? "Performance Tasks"
-                                    : "Quarterly Exam"}{" "}
+                                        "performanceTask"
+                                      ? "Performance Tasks"
+                                      : "Quarterly Exam"}{" "}
                                 ({insights.weakestScore}%)
                             </span>
                         </div>
@@ -1710,8 +1859,8 @@ const ForYourCaseCard = ({
                                             risk.severity === "high"
                                                 ? "bg-red-500"
                                                 : risk.severity === "medium"
-                                                ? "bg-yellow-500"
-                                                : "bg-gray-400"
+                                                  ? "bg-yellow-500"
+                                                  : "bg-gray-400"
                                         }`}
                                     />
                                     {risk.text}
@@ -1825,7 +1974,7 @@ const ForYourCaseCard = ({
                                                     </p>
                                                     <p
                                                         className={`text-2xl font-bold ${getGradeColorClass(
-                                                            insights.currentGrade
+                                                            insights.currentGrade,
                                                         )}`}
                                                     >
                                                         {insights.currentGrade}%
@@ -1951,7 +2100,7 @@ const ForYourCaseCard = ({
                                                                     {step.details?.map(
                                                                         (
                                                                             detail,
-                                                                            dIdx
+                                                                            dIdx,
                                                                         ) => (
                                                                             <li
                                                                                 key={
@@ -1966,7 +2115,7 @@ const ForYourCaseCard = ({
                                                                                     detail
                                                                                 }
                                                                             </li>
-                                                                        )
+                                                                        ),
                                                                     )}
                                                                 </ul>
                                                             </div>
@@ -1996,7 +2145,7 @@ const ForYourCaseCard = ({
                                                             </div>
                                                         </div>
                                                     );
-                                                }
+                                                },
                                             )}
 
                                         {/* Conclusion Summary */}
@@ -2016,7 +2165,7 @@ const ForYourCaseCard = ({
                                                                 className={`text-xl font-bold ${getGradeColorClass(
                                                                     improvementPlan
                                                                         .conclusion
-                                                                        .currentGrade
+                                                                        .currentGrade,
                                                                 )}`}
                                                             >
                                                                 {
@@ -2035,7 +2184,7 @@ const ForYourCaseCard = ({
                                                                 className={`text-xl font-bold ${getGradeColorClass(
                                                                     improvementPlan
                                                                         .conclusion
-                                                                        .expectedGrade
+                                                                        .expectedGrade,
                                                                 )}`}
                                                             >
                                                                 {
@@ -2291,7 +2440,7 @@ const AnalyticsShow = ({
 
                     {/* Right Column - Sidebar */}
                     <div className="space-y-6">
-                        <GradeChart data={quarterlyGrades} />
+                        <GradeChart data={gradeBreakdown} />
                         <AttendanceSummary attendance={attendance} />
                         {intervention && (
                             <InterventionCard intervention={intervention} />

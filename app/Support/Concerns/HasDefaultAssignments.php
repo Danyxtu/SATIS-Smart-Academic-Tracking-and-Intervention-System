@@ -89,10 +89,21 @@ trait HasDefaultAssignments
         }
 
         // If the value under key 1/"1" is a list of arrays (categories), it's per-quarter.
-        // A single category object would have keys like 'id', 'label', 'weight'.
-        // A list of categories is a sequential array whose first element is also an array.
+        // A single category object would have keys like 'id', 'label', 'weight', 'tasks'.
+        // A list of categories is a sequential array whose first element is also an array with 'tasks'.
         if (is_array($firstQuarter) && !isset($firstQuarter['id']) && !isset($firstQuarter['label'])) {
-            return true;
+            // Extra safety: for per-quarter format, the value must be a sequential list
+            // where each element looks like a category (has 'tasks' key or is an array of arrays).
+            // If the first element of $firstQuarter is itself an array, it's per-quarter.
+            $firstItem = reset($firstQuarter);
+            if (is_array($firstItem)) {
+                return true;
+            }
+            // If $firstQuarter is an empty array, treat as per-quarter (empty quarter)
+            if (empty($firstQuarter)) {
+                return true;
+            }
+            return false;
         }
 
         return false;
@@ -116,15 +127,64 @@ trait HasDefaultAssignments
         return $existing;
     }
 
+    /**
+     * Well-known category IDs mapped to their default label and weight.
+     * Used as a fallback when stored data is missing label/weight fields.
+     */
+    private static array $knownCategories = [
+        'written_works'    => ['label' => 'Written Works',    'weight' => 0.30],
+        'performance_task' => ['label' => 'Performance Task', 'weight' => 0.40],
+        'quarterly_exam'   => ['label' => 'Quarterly Exam',   'weight' => 0.30],
+    ];
+
+    /**
+     * Default categories ordered by index, used to repair generic "Category N" entries.
+     */
+    private static array $defaultCategoryOrder = [
+        0 => ['id' => 'written_works',    'label' => 'Written Works',    'weight' => 0.30],
+        1 => ['id' => 'performance_task', 'label' => 'Performance Task', 'weight' => 0.40],
+        2 => ['id' => 'quarterly_exam',   'label' => 'Quarterly Exam',   'weight' => 0.30],
+    ];
+
     protected function normalizeGradeCategories(?array $categories = null): array
     {
         $fallback = $categories ?? $this->defaultGradeCategories();
 
         return collect($fallback)
             ->map(function ($category, $index) {
-                $label = trim($category['label'] ?? ('Category ' . ($index + 1)));
-                $id = $category['id'] ?? Str::snake($label);
-                $weight = $this->normalizeCategoryWeight($category['weight'] ?? null);
+                $id = $category['id'] ?? null;
+                $known = $id ? (self::$knownCategories[$id] ?? null) : null;
+
+                $label = trim($category['label'] ?? '');
+                $storedWeight = $category['weight'] ?? null;
+
+                // Detect generic "Category N" labels (e.g. "Category 1", "category2", "Category 3")
+                // and repair them using the default category order.
+                $isGenericLabel = empty($label) || preg_match('/^category\s*\d+$/i', $label);
+                $isGenericId    = $id !== null && preg_match('/^category\s*\d+$/i', $id);
+
+                if (($isGenericLabel || $isGenericId) && isset(self::$defaultCategoryOrder[$index])) {
+                    $default = self::$defaultCategoryOrder[$index];
+                    if ($isGenericLabel) {
+                        $label = $default['label'];
+                    }
+                    if ($isGenericId || $id === null) {
+                        $id = $default['id'];
+                    }
+                    if ($storedWeight === null || (float) $storedWeight === 0.0) {
+                        $storedWeight = $default['weight'];
+                    }
+                } elseif (empty($label)) {
+                    $label = $known['label'] ?? ('Category ' . ($index + 1));
+                }
+
+                if ($id === null) {
+                    $id = Str::snake($label);
+                }
+
+                $weight = $this->normalizeCategoryWeight(
+                    $storedWeight ?? ($known['weight'] ?? null)
+                );
 
                 $tasks = collect($category['tasks'] ?? [])
                     ->map(function ($task, $taskIndex) use ($id) {
@@ -135,7 +195,7 @@ trait HasDefaultAssignments
                             'id' => $taskId,
                             'label' => $taskLabel,
                             'total' => (float) ($task['total'] ?? 100),
-                            'category_id' => $task['category_id'] ?? $id,
+                            'category_id' => $id, // Always use the (possibly repaired) parent category id
                         ];
                     })
                     ->values()

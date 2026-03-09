@@ -81,7 +81,7 @@ class InterventionController extends Controller
                 return [
                     'id' => $intervention->id,
                     'enrollmentId' => $enrollment->id,
-                    'subjectName' => $subject?->name ?? 'Unknown Subject',
+                    'subjectName' => $subject?->subject_name ?? 'Unknown Subject',
                     'subjectSection' => $subject?->section,
                     'teacherName' => $teacher?->name ?? 'N/A',
                     'type' => $intervention->type,
@@ -138,7 +138,7 @@ class InterventionController extends Controller
                 'title' => $notification->title,
                 'message' => $notification->message,
                 'senderName' => $notification->sender?->name ?? 'System',
-                'subjectName' => $notification->intervention?->enrollment?->subject?->name ?? null,
+                'subjectName' => $notification->intervention?->enrollment?->subject?->subject_name ?? null,
                 'isRead' => $notification->is_read,
                 'time' => $notification->created_at->diffForHumans(),
                 'timeFull' => $notification->created_at->format('M d, Y h:i A'),

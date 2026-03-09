@@ -133,8 +133,7 @@ class GradeController extends Controller
             $summary['updated']++;
         }
 
-        return redirect()
-            ->route('teacher.classes.index')
+        return back()
             ->with('success', 'Grades updated successfully.')
             ->with('grade_update_summary', $summary);
     }
@@ -186,8 +185,7 @@ class GradeController extends Controller
             ]);
         }
 
-        return redirect()
-            ->route('teacher.classes.index')
+        return back()
             ->with('success', 'Grades uploaded successfully.')
             ->with('grade_import_summary', $summary);
     }

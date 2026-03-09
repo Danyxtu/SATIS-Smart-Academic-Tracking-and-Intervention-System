@@ -588,7 +588,7 @@ const MyClass = (props) => {
                     quarter: selectedQuarter,
                 },
                 {
-                    preserveState: false, // Refresh the data
+                    preserveState: true,
                     preserveScroll: true,
                     onSuccess: () => {
                         setActiveGradeCategoryId(null);
@@ -684,7 +684,7 @@ const MyClass = (props) => {
         setIsImportingGrades(true);
 
         const formData = new FormData();
-        formData.append("grades", file);
+        formData.append("grades_file", file);
 
         try {
             router.post(
@@ -692,6 +692,7 @@ const MyClass = (props) => {
                 formData,
                 {
                     forceFormData: true,
+                    preserveState: true,
                     preserveScroll: true,
                     onSuccess: () => {
                         setUploadSuccess("Grades imported successfully!");
@@ -701,6 +702,7 @@ const MyClass = (props) => {
                     },
                     onError: (errors) => {
                         const errorMsg =
+                            errors.grades_file ||
                             errors.grades ||
                             "Failed to import grades. Please check the file format.";
                         setUploadError(errorMsg);
@@ -1222,8 +1224,10 @@ const MyClass = (props) => {
                                                                                 </span>
                                                                             )}
                                                                     </span>
-                                                                    {/* Add button (not for Quarterly Exam) */}
-                                                                    {!isQE && (
+                                                                    {/* Add button — always for non-QE; for QE only when no task exists yet */}
+                                                                    {(!isQE ||
+                                                                        tasks.length ===
+                                                                            0) && (
                                                                         <button
                                                                             type="button"
                                                                             onClick={() =>
