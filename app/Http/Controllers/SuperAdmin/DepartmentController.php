@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Department;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -25,8 +24,8 @@ class DepartmentController extends Controller
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
-                $q->where('first_name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%");
+                $q->where('department_name', 'like', "%{$search}%")
+                    ->orWhere('department_code', 'like', "%{$search}%");
             });
         }
 
@@ -57,13 +56,11 @@ class DepartmentController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:50', 'unique:departments,code'],
+            'department_name' => ['required', 'string', 'max:255'],
+            'department_code' => ['required', 'string', 'max:50', 'unique:departments,department_code'],
             'description' => ['nullable', 'string', 'max:1000'],
             'is_active' => ['boolean'],
         ]);
-
-        $validated['created_by'] = Auth::id();
 
         Department::create($validated);
 
@@ -96,8 +93,8 @@ class DepartmentController extends Controller
         return Inertia::render('SuperAdmin/Departments/Show', [
             'department' => [
                 'id' => $department->id,
-                'name' => $department->name,
-                'code' => $department->code,
+                'name' => $department->department_name,
+                'code' => $department->department_code,
                 'description' => $department->description,
                 'is_active' => $department->is_active,
                 'created_by' => $department->creator?->name ?? 'System',
@@ -120,8 +117,8 @@ class DepartmentController extends Controller
         return Inertia::render('SuperAdmin/Departments/Edit', [
             'department' => [
                 'id' => $department->id,
-                'name' => $department->name,
-                'code' => $department->code,
+                'name' => $department->department_name,
+                'code' => $department->department_code,
                 'description' => $department->description,
                 'is_active' => $department->is_active,
                 'admins_count' => $department->admins_count,
@@ -137,8 +134,8 @@ class DepartmentController extends Controller
     public function update(Request $request, Department $department): RedirectResponse
     {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:50', Rule::unique('departments')->ignore($department->id)],
+            'department_name' => ['required', 'string', 'max:255'],
+            'department_code' => ['required', 'string', 'max:50', Rule::unique('departments')->ignore($department->id)],
             'description' => ['nullable', 'string', 'max:1000'],
             'is_active' => ['boolean'],
         ]);

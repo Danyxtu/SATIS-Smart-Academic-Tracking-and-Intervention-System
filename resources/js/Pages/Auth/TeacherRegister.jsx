@@ -191,7 +191,8 @@ export default function TeacherRegister({ departments }) {
                                 <option value="">Select your department</option>
                                 {departments.map((dept) => (
                                     <option key={dept.id} value={dept.id}>
-                                        {dept.name} ({dept.code})
+                                        {dept.department_name} (
+                                        {dept.department_code})
                                     </option>
                                 ))}
                             </select>
@@ -259,7 +260,7 @@ export default function TeacherRegister({ departments }) {
                                 onChange={(e) =>
                                     setData(
                                         "password_confirmation",
-                                        e.target.value
+                                        e.target.value,
                                     )
                                 }
                             />

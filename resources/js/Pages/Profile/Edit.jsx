@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Head, useForm, usePage } from "@inertiajs/react";
+import { Head, useForm, usePage, router } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import TeacherLayout from "@/Layouts/TeacherLayout";
 import AdminLayout from "@/Layouts/AdminLayout";
@@ -14,6 +14,9 @@ import {
     X,
     Eye,
     EyeOff,
+    Clock,
+    Send,
+    XCircle,
 } from "lucide-react";
 import UserPicture from "../../../assets/user.png";
 
@@ -259,7 +262,7 @@ const ChangePasswordModal = ({ show, onClose }) => {
 };
 
 // --- Main Profile Component ---
-export default function Edit({ status, student }) {
+export default function Edit({ status, student, pendingPasswordReset }) {
     const { auth } = usePage().props;
     const user = auth.user;
     const isStudent = user.role === "student";
@@ -267,6 +270,32 @@ export default function Edit({ status, student }) {
     const isAdmin = user.role === "admin";
 
     const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [showResetRequestForm, setShowResetRequestForm] = useState(false);
+
+    // Password reset request form
+    const resetRequestForm = useForm({
+        reason: "",
+    });
+
+    const handleResetRequest = (e) => {
+        e.preventDefault();
+        resetRequestForm.post(route("profile.request-password-reset"), {
+            onSuccess: () => {
+                resetRequestForm.reset();
+                setShowResetRequestForm(false);
+            },
+        });
+    };
+
+    const handleCancelResetRequest = () => {
+        if (
+            confirm(
+                "Are you sure you want to cancel your password reset request?",
+            )
+        ) {
+            router.delete(route("profile.cancel-password-reset"));
+        }
+    };
 
     // Get the full name for display
     const fullName =
@@ -462,6 +491,157 @@ export default function Edit({ status, student }) {
                                     Change Password
                                 </button>
                             </div>
+
+                            {/* Admin Password Reset Request - for students and teachers */}
+                            {(isStudent || isTeacher) && (
+                                <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                        <div>
+                                            <h4 className="font-medium text-gray-900">
+                                                Forgot your password?
+                                            </h4>
+                                            <p className="text-sm text-gray-500 mt-1">
+                                                Request a password reset from
+                                                your administrator
+                                            </p>
+                                        </div>
+
+                                        {/* Show status if there's a pending request */}
+                                        {pendingPasswordReset ? (
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-2 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                                    <Clock
+                                                        size={16}
+                                                        className="text-yellow-600"
+                                                    />
+                                                    <span className="text-sm font-medium text-yellow-700">
+                                                        Request Pending
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={
+                                                        handleCancelResetRequest
+                                                    }
+                                                    className="flex items-center gap-1.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                >
+                                                    <XCircle size={16} />
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        ) : !showResetRequestForm ? (
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setShowResetRequestForm(
+                                                        true,
+                                                    )
+                                                }
+                                                className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-medium transition-colors shadow-sm"
+                                            >
+                                                <Send size={18} />
+                                                Request Reset
+                                            </button>
+                                        ) : null}
+                                    </div>
+
+                                    {/* Pending request details */}
+                                    {pendingPasswordReset && (
+                                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                            <p className="text-sm text-yellow-700">
+                                                <strong>Submitted:</strong>{" "}
+                                                {
+                                                    pendingPasswordReset.created_at
+                                                }
+                                            </p>
+                                            {pendingPasswordReset.reason && (
+                                                <p className="text-sm text-yellow-700 mt-1">
+                                                    <strong>Reason:</strong>{" "}
+                                                    {
+                                                        pendingPasswordReset.reason
+                                                    }
+                                                </p>
+                                            )}
+                                            <p className="text-xs text-yellow-600 mt-2">
+                                                An administrator will review
+                                                your request. You may be asked
+                                                to verify your identity in
+                                                person.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Reset request form */}
+                                    {showResetRequestForm &&
+                                        !pendingPasswordReset && (
+                                            <form
+                                                onSubmit={handleResetRequest}
+                                                className="mt-4 space-y-3"
+                                            >
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                        Reason{" "}
+                                                        <span className="text-gray-400 text-xs">
+                                                            (Optional)
+                                                        </span>
+                                                    </label>
+                                                    <textarea
+                                                        value={
+                                                            resetRequestForm
+                                                                .data.reason
+                                                        }
+                                                        onChange={(e) =>
+                                                            resetRequestForm.setData(
+                                                                "reason",
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        placeholder="Briefly describe why you need a password reset..."
+                                                        rows={3}
+                                                        className="w-full rounded-xl border border-gray-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-200 px-4 py-3 text-sm"
+                                                        maxLength={500}
+                                                    />
+                                                    {resetRequestForm.errors
+                                                        .reason && (
+                                                        <p className="text-sm text-red-600 mt-1">
+                                                            {
+                                                                resetRequestForm
+                                                                    .errors
+                                                                    .reason
+                                                            }
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div className="flex gap-3">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setShowResetRequestForm(
+                                                                false,
+                                                            );
+                                                            resetRequestForm.reset();
+                                                        }}
+                                                        className="px-4 py-2.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        type="submit"
+                                                        disabled={
+                                                            resetRequestForm.processing
+                                                        }
+                                                        className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-xl transition-colors disabled:opacity-50"
+                                                    >
+                                                        <Send size={16} />
+                                                        {resetRequestForm.processing
+                                                            ? "Submitting..."
+                                                            : "Submit Request"}
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        )}
+                                </div>
+                            )}
                         </SectionCard>
 
                         {/* Info Note */}

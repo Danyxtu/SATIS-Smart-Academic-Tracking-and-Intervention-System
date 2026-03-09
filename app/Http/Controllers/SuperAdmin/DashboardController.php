@@ -34,9 +34,11 @@ class DashboardController extends Controller
             ->get()
             ->map(fn($user) => [
                 'id' => $user->id,
-                'name' => $user->name,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'middle_name' => $user->middle_name,
                 'email' => $user->email,
-                'department' => $user->department?->name ?? 'Unassigned',
+                'department' => $user->department?->department_name ?? 'Unassigned',
                 'created_at' => $user->created_at->diffForHumans(),
             ]);
 
@@ -46,8 +48,8 @@ class DashboardController extends Controller
             ->get()
             ->map(fn($dept) => [
                 'id' => $dept->id,
-                'name' => $dept->name,
-                'code' => $dept->code,
+                'name' => $dept->department_name,
+                'code' => $dept->department_code,
                 'admins_count' => $dept->admins_count,
                 'teachers_count' => $dept->teachers_count,
                 'students_count' => $dept->students_count,

@@ -242,7 +242,8 @@ export default function Edit({ admin, departments }) {
                                 <option value="">Select a department</option>
                                 {departments?.map((dept) => (
                                     <option key={dept.id} value={dept.id}>
-                                        {dept.name} ({dept.code})
+                                        {dept.department_name} (
+                                        {dept.department_code})
                                     </option>
                                 ))}
                             </select>
