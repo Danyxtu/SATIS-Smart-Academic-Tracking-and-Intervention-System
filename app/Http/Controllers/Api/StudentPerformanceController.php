@@ -397,7 +397,7 @@ class StudentPerformanceController extends Controller
             ],
             'subject' => [
                 'id' => $subject?->id,
-                'name' => $subject?->name ?? 'Unknown Subject',
+                'name' => $subject?->subject_name ?? $subject?->name ?? 'Unknown Subject',
                 'teacher' => $enrollment->subjectTeacher?->teacher
                     ? $enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name
                     : 'N/A',

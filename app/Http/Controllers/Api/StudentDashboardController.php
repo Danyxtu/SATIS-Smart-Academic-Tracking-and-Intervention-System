@@ -157,21 +157,41 @@ class StudentDashboardController extends Controller
             ->take(5)
             ->values();
 
-        $recentGrades = $enrollments
-            ->flatMap(fn($e) => $e->grades)
-            ->sortByDesc('created_at')
-            ->take(20)
-            ->groupBy(fn($g) => $g->created_at->format('W'))
-            ->take(4)
-            ->map(function ($weekGrades) {
-                $total = $weekGrades->sum('score');
-                $possible = $weekGrades->sum('total_score');
-                return $possible > 0 ? round(($total / $possible) * 100) : null;
-            })
-            ->filter()
-            ->reverse()
-            ->values()
-            ->toArray();
+        // Build grade trend: use the last-updated subject's individual grade items
+        // grouped by category, each converted to a percentage for accurate plotting
+        $lastUpdatedEnrollment = $enrollments
+            ->filter(fn($e) => $e->grades->isNotEmpty())
+            ->sortByDesc(fn($e) => $e->grades->max('updated_at'))
+            ->first();
+
+        $gradeTrendData = [
+            'subjectName' => null,
+            'items' => [],
+        ];
+
+        if ($lastUpdatedEnrollment) {
+            $trendSubject = $lastUpdatedEnrollment->subjectTeacher?->subject;
+            $gradeTrendData['subjectName'] = $trendSubject?->subject_name ?? 'Unknown Subject';
+
+            $gradeTrendData['items'] = $lastUpdatedEnrollment->grades
+                ->sortBy('created_at')
+                ->values()
+                ->map(function ($grade) {
+                    $percentage = $grade->total_score > 0
+                        ? round(($grade->score / $grade->total_score) * 100)
+                        : null;
+                    return [
+                        'id' => $grade->id,
+                        'name' => $grade->assignment_name,
+                        'key' => $grade->assignment_key,
+                        'score' => $grade->score,
+                        'totalScore' => $grade->total_score,
+                        'percentage' => $percentage,
+                        'quarter' => $grade->quarter,
+                    ];
+                })
+                ->toArray();
+        }
 
         return response()->json([
             'student' => [
@@ -199,7 +219,7 @@ class StudentDashboardController extends Controller
             'notifications' => $notifications,
             'unreadNotificationCount' => $unreadCount,
             'upcomingTasks' => $upcomingTasks,
-            'gradeTrend' => $recentGrades,
+            'gradeTrend' => $gradeTrendData,
             'semesters' => [
                 'current' => (int) $currentSemester,
                 'selected' => (int) $selectedSemester,
