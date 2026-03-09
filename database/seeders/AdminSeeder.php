@@ -15,9 +15,9 @@ class AdminSeeder extends Seeder
     {
         // First, create a default department if it doesn't exist
         $department = Department::firstOrCreate(
-            ['code' => 'DEFAULT'],
+            ['department_code' => 'DEFAULT'],
             [
-                'name' => 'Default Department',
+                'department_name' => 'Default Department',
                 'description' => 'Default department for testing',
                 'is_active' => true,
             ]
@@ -41,7 +41,7 @@ class AdminSeeder extends Seeder
         $this->command->info('Admin user created successfully!');
         $this->command->table(
             ['Email', 'Password', 'Department'],
-            [['admin@satis.edu', 'admin123', $department->name]]
+            [['admin@satis.edu', 'admin123', $department->department_name]]
         );
     }
 }

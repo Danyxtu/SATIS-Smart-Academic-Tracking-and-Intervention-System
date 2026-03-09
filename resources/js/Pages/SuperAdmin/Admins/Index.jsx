@@ -133,7 +133,7 @@ export default function Index({ admins, departments, filters }) {
                                     <option value="">All Departments</option>
                                     {departments?.map((dept) => (
                                         <option key={dept.id} value={dept.id}>
-                                            {dept.name}
+                                            {dept.department_name}
                                         </option>
                                     ))}
                                 </select>
@@ -207,7 +207,7 @@ export default function Index({ admins, departments, filters }) {
                                                     </div>
                                                     <span className="text-sm font-medium text-slate-700">
                                                         {admin.department
-                                                            ?.name ||
+                                                            ?.department_name ||
                                                             "Unassigned"}
                                                     </span>
                                                 </div>

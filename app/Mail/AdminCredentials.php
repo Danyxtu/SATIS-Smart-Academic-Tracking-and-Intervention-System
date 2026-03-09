@@ -44,7 +44,7 @@ class AdminCredentials extends Mailable implements ShouldQueue
                 'adminName' => $this->admin->name,
                 'email' => $this->admin->email,
                 'password' => $this->plainPassword,
-                'departmentName' => $this->admin->department?->name ?? 'N/A',
+                'departmentName' => $this->admin->department?->department_name ?? 'N/A',
                 'createdByName' => $this->createdBy?->name ?? 'System Administrator',
                 'loginUrl' => config('app.url') . '/login',
             ],

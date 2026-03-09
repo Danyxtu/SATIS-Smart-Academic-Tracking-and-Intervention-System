@@ -105,8 +105,8 @@ class DashboardServices
 
         $department = $teacher->department ? [
             'id' => $teacher->department->id,
-            'name' => $teacher->department->name,
-            'code' => $teacher->department->code,
+            'name' => $teacher->department->department_name,
+            'code' => $teacher->department->department_code,
         ] : null;
 
 

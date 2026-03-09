@@ -22,8 +22,8 @@ class TeacherRegistrationController extends Controller
     public function create(): Response
     {
         $departments = Department::where('is_active', true)
-            ->select('id', 'name', 'code')
-            ->orderBy('name')
+            ->select('id', 'department_name', 'department_code')
+            ->orderBy('department_name')
             ->get();
 
         return Inertia::render('Auth/TeacherRegister', [

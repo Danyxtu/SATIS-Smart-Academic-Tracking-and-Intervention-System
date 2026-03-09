@@ -40,8 +40,8 @@ class HandleInertiaRequests extends Middleware
             $userData = array_merge($user->toArray(), [
                 'department' => $user->department ? [
                     'id' => $user->department->id,
-                    'name' => $user->department->name,
-                    'code' => $user->department->code,
+                    'name' => $user->department->department_name,
+                    'code' => $user->department->department_code,
                 ] : null,
             ]);
         }
@@ -59,6 +59,8 @@ class HandleInertiaRequests extends Middleware
                 'new_student_password' => fn() => $request->session()->get('new_student_password'),
                 'grade_update_summary' => fn() => $request->session()->get('grade_update_summary'),
                 'grade_import_summary' => fn() => $request->session()->get('grade_import_summary'),
+                'generated_password' => fn() => $request->session()->get('generated_password'),
+                'reset_request_id' => fn() => $request->session()->get('reset_request_id'),
             ],
             'notifications' => $this->getNotificationData($user),
         ];
