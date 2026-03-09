@@ -45,8 +45,8 @@ class TeacherRegistrationController extends Controller
                     'email' => $registration->email,
                     'department' => $registration->department ? [
                         'id' => $registration->department->id,
-                        'name' => $registration->department->name,
-                        'code' => $registration->department->code,
+                        'name' => $registration->department->department_name,
+                        'code' => $registration->department->department_code,
                     ] : null,
                     'document_url' => $registration->document_path
                         ? Storage::url($registration->document_path)
@@ -84,14 +84,14 @@ class TeacherRegistrationController extends Controller
 
         // Create the user account
         $user = User::create([
-            'name' => $registration->full_name,
+            'first_name' => $registration->first_name,
+            'last_name' => $registration->last_name,
             'email' => $registration->email,
             'password' => $registration->password, // Already hashed
             'role' => 'teacher',
             'department_id' => $registration->department_id,
             'status' => 'active',
             'created_by' => $admin->id,
-            'email_verified_at' => now(), // Teachers are verified on approval
         ]);
 
         // Update registration status

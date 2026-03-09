@@ -24,7 +24,7 @@ class AdminController extends Controller
      */
     public function index(Request $request): Response
     {
-        $query = User::role('admin')->with('department:id,name,code');
+        $query = User::role('admin')->with('department:id,department_name,department_code');
 
         // Search
         if ($request->filled('search')) {
@@ -45,8 +45,8 @@ class AdminController extends Controller
         $admins = $query->latest()->paginate(10)->withQueryString();
 
         $departments = Department::active()
-            ->select('id', 'name', 'code')
-            ->orderBy('name')
+            ->select('id', 'department_name', 'department_code')
+            ->orderBy('department_name')
             ->get();
 
         return Inertia::render('SuperAdmin/Admins/Index', [
@@ -62,8 +62,8 @@ class AdminController extends Controller
     public function create(): Response
     {
         $departments = Department::active()
-            ->select('id', 'name', 'code')
-            ->orderBy('name')
+            ->select('id', 'department_name', 'department_code')
+            ->orderBy('department_name')
             ->get();
 
         return Inertia::render('SuperAdmin/Admins/Create', [
@@ -132,7 +132,7 @@ class AdminController extends Controller
             abort(404);
         }
 
-        $admin->load('department:id,name,code');
+        $admin->load('department:id,department_name,department_code');
 
         // Get stats for this admin's department
         $departmentStats = [];
@@ -152,8 +152,8 @@ class AdminController extends Controller
                 'email' => $admin->email,
                 'department' => $admin->department ? [
                     'id' => $admin->department->id,
-                    'name' => $admin->department->name,
-                    'code' => $admin->department->code,
+                    'name' => $admin->department->department_name,
+                    'code' => $admin->department->department_code,
                 ] : null,
                 'temp_password' => $admin->temp_password,
                 'must_change_password' => $admin->must_change_password,
@@ -174,8 +174,8 @@ class AdminController extends Controller
         }
 
         $departments = Department::active()
-            ->select('id', 'name', 'code')
-            ->orderBy('name')
+            ->select('id', 'department_name', 'department_code')
+            ->orderBy('department_name')
             ->get();
 
         return Inertia::render('SuperAdmin/Admins/Edit', [

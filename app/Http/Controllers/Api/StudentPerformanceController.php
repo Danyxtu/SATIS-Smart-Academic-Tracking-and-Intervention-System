@@ -97,7 +97,9 @@ class StudentPerformanceController extends Controller
             return [
                 'id' => $enrollment->id,
                 'subjectId' => $enrollment->subjectTeacher?->subject_id,
+                // Provide both `subject_name` (existing) and `name` for front-end compatibility
                 'subject_name' => $enrollment->subjectTeacher?->subject?->subject_name ?? 'Unknown Subject',
+                'name' => $enrollment->subjectTeacher?->subject?->subject_name ?? 'Unknown Subject',
                 'section' => $enrollment->subjectTeacher?->section,
                 'teacher' => $enrollment->subjectTeacher?->teacher
                     ? $enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name

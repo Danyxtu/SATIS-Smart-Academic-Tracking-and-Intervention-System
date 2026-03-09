@@ -1,6 +1,15 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import { useState, useRef, useEffect } from "react";
+import {
+    LineChart,
+    Line,
+    XAxis,
+    YAxis,
+    Tooltip,
+    CartesianGrid,
+    ResponsiveContainer,
+} from "recharts";
 
 // --- Greeting based on time of day ---
 const getGreeting = () => {
@@ -137,7 +146,7 @@ const SubjectCard = ({ subject }) => {
                         <span className="text-sm text-gray-600">Grade</span>
                         <span
                             className={`text-sm font-bold ${getGradeColor(
-                                subject.grade
+                                subject.grade,
                             )}`}
                         >
                             {subject.gradeDisplay}
@@ -146,7 +155,7 @@ const SubjectCard = ({ subject }) => {
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                         <div
                             className={`h-full rounded-full transition-all duration-500 ${getProgressColor(
-                                subject.grade
+                                subject.grade,
                             )}`}
                             style={{ width: `${subject.grade || 0}%` }}
                         />
@@ -340,10 +349,10 @@ const NotificationItem = ({ notification, onMarkRead, isHighlighted }) => {
                     // Navigate to interventions page with highlight
                     router.visit(
                         route("interventions-feed") +
-                            `?highlight=${notification.id}`
+                            `?highlight=${notification.id}`,
                     );
                 },
-            }
+            },
         );
     };
 
@@ -419,42 +428,208 @@ const TaskItem = ({ task }) => (
     </div>
 );
 
-// --- Mini Chart Component (Visual Grade Trend) ---
+// --- Category config for grade trend line chart ---
+const CATEGORY_COLORS = {
+    written_works: { stroke: "#3b82f6", label: "Written Works" },
+    performance_task: { stroke: "#f59e0b", label: "Performance Task" },
+    quarterly_exam: { stroke: "#ec4899", label: "Quarterly Exam" },
+};
+
+const CATEGORY_KEYWORDS = {
+    written_works: [
+        "written",
+        "written works",
+        "written_works",
+        "written-work",
+    ],
+    performance_task: [
+        "performance",
+        "performance task",
+        "performance_task",
+        "performance-t",
+    ],
+    quarterly_exam: ["quarterly exam", "quarterly_exam", "quarterly", "exam"],
+};
+
+const detectCategory = (item) => {
+    const text = ((item.key || "") + " " + (item.name || "")).toLowerCase();
+    for (const [catId, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+        if (keywords.some((k) => text.includes(k))) return catId;
+    }
+    return "other";
+};
+
+// --- Mini Chart Component (Visual Grade Trend - Line Chart per Category) ---
 const MiniChart = ({ data }) => {
-    if (!data || data.length === 0) {
+    // data = { subjectName, items: [{ id, name, key, score, totalScore, percentage, quarter }] }
+    const items = data?.items || [];
+
+    if (!items || items.length === 0) {
         return (
-            <div className="h-16 flex items-center justify-center text-sm text-gray-400">
+            <div className="h-40 flex items-center justify-center text-sm text-gray-400">
                 No data available
             </div>
         );
     }
 
-    const max = Math.max(...data, 100);
-    const min = Math.min(...data, 0);
-    const range = max - min || 1;
+    // Filter items with valid scores
+    const validItems = items.filter(
+        (item) => item.score !== null && item.totalScore > 0,
+    );
+
+    if (validItems.length === 0) {
+        return (
+            <div className="h-40 flex items-center justify-center text-sm text-gray-400">
+                No scores recorded yet
+            </div>
+        );
+    }
+
+    // Tag each item with detected category and percentage
+    const taggedItems = validItems.map((item) => ({
+        ...item,
+        _category: detectCategory(item),
+        _pct: Math.round((item.score / item.totalScore) * 100),
+    }));
+
+    // Group by category
+    const grouped = {};
+    taggedItems.forEach((item) => {
+        if (!grouped[item._category]) grouped[item._category] = [];
+        grouped[item._category].push(item);
+    });
+
+    const activeCategories = Object.keys(grouped).filter(
+        (cat) => cat !== "other",
+    );
+    const categoriesToPlot =
+        activeCategories.length > 0 ? activeCategories : Object.keys(grouped);
+
+    const maxLen = Math.max(
+        ...categoriesToPlot.map((cat) => grouped[cat]?.length || 0),
+        1,
+    );
+
+    // Build chart data
+    const chartData = [];
+    for (let i = 0; i < maxLen; i++) {
+        const point = { index: i + 1 };
+        categoriesToPlot.forEach((cat) => {
+            const entry = grouped[cat]?.[i];
+            if (entry) {
+                point[cat] = entry._pct;
+                point[`_label_${cat}`] = entry.name;
+            }
+        });
+        chartData.push(point);
+    }
+
+    // Custom tooltip
+    const CustomTooltip = ({ active, payload, label }) => {
+        if (!active || !payload || payload.length === 0) return null;
+        return (
+            <div className="bg-white rounded-lg shadow-lg border border-gray-100 p-2.5 text-xs">
+                <p className="font-semibold text-gray-700 mb-1">
+                    Item #{label}
+                </p>
+                {payload.map((entry) => {
+                    const cat = entry.dataKey;
+                    const catInfo = CATEGORY_COLORS[cat] || {
+                        label: cat,
+                        stroke: "#6b7280",
+                    };
+                    const itemLabel = entry.payload?.[`_label_${cat}`] || "";
+                    return (
+                        <div
+                            key={cat}
+                            className="flex items-center gap-1.5 mb-0.5"
+                        >
+                            <span
+                                className="inline-block w-2 h-2 rounded-full"
+                                style={{ backgroundColor: entry.color }}
+                            />
+                            <span className="text-gray-600 truncate max-w-[120px]">
+                                {catInfo.label}
+                                {itemLabel ? ` – ${itemLabel}` : ""}:
+                            </span>
+                            <span className="font-bold text-gray-800">
+                                {entry.value}%
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    };
 
     return (
-        <div className="h-16 flex items-end gap-1">
-            {data.map((value, index) => {
-                const height = ((value - min) / range) * 100;
-                const isLast = index === data.length - 1;
-                return (
-                    <div
-                        key={index}
-                        className="flex-1 flex flex-col items-center"
-                    >
+        <div>
+            {/* Legend */}
+            <div className="flex flex-wrap gap-3 mb-2">
+                {categoriesToPlot.map((cat) => {
+                    const info = CATEGORY_COLORS[cat] || {
+                        label: cat,
+                        stroke: "#6b7280",
+                    };
+                    return (
                         <div
-                            className={`w-full rounded-t transition-all duration-300 ${
-                                isLast ? "bg-indigo-500" : "bg-indigo-200"
-                            }`}
-                            style={{ height: `${height}%`, minHeight: "4px" }}
+                            key={cat}
+                            className="flex items-center gap-1.5 text-xs text-gray-500"
+                        >
+                            <span
+                                className="inline-block w-3 h-0.5 rounded"
+                                style={{ backgroundColor: info.stroke }}
+                            />
+                            {info.label}
+                        </div>
+                    );
+                })}
+            </div>
+
+            <div className="h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                        data={chartData}
+                        margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
+                    >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                        <XAxis
+                            dataKey="index"
+                            stroke="#9ca3af"
+                            fontSize={10}
+                            tickLine={false}
+                            axisLine={false}
                         />
-                        <span className="text-xs text-gray-400 mt-1">
-                            W{index + 1}
-                        </span>
-                    </div>
-                );
-            })}
+                        <YAxis
+                            stroke="#9ca3af"
+                            fontSize={10}
+                            domain={[0, 100]}
+                            tickLine={false}
+                            axisLine={false}
+                            ticks={[0, 25, 50, 75, 100]}
+                            tickFormatter={(v) => `${v}%`}
+                        />
+                        <Tooltip content={<CustomTooltip />} />
+                        {categoriesToPlot.map((cat) => {
+                            const info = CATEGORY_COLORS[cat] || {
+                                stroke: "#6b7280",
+                            };
+                            return (
+                                <Line
+                                    key={cat}
+                                    type="monotone"
+                                    dataKey={cat}
+                                    stroke={info.stroke}
+                                    strokeWidth={2}
+                                    dot={{ r: 2.5, fill: info.stroke }}
+                                    activeDot={{ r: 4 }}
+                                    connectNulls
+                                />
+                            );
+                        })}
+                    </LineChart>
+                </ResponsiveContainer>
+            </div>
         </div>
     );
 };
@@ -485,7 +660,7 @@ export default function Dashboard({
     notifications = [],
     unreadNotificationCount = 0,
     upcomingTasks = [],
-    gradeTrend = [],
+    gradeTrend = {},
     semesters = {},
 }) {
     const [showAllNotifications, setShowAllNotifications] = useState(false);
@@ -500,7 +675,7 @@ export default function Dashboard({
         router.get(
             window.location.pathname,
             { semester },
-            { preserveState: true, preserveScroll: true }
+            { preserveState: true, preserveScroll: true },
         );
     };
 
@@ -510,7 +685,7 @@ export default function Dashboard({
             {},
             {
                 preserveScroll: true,
-            }
+            },
         );
     };
 
@@ -520,7 +695,7 @@ export default function Dashboard({
             {},
             {
                 preserveScroll: true,
-            }
+            },
         );
     };
 
@@ -781,18 +956,27 @@ export default function Dashboard({
                                                 semesters?.selected === sem.id;
                                             const isCurrentSem =
                                                 semesters?.current === sem.id;
+                                            // Consider a semester "future" (not started) when its id is greater than the current semester
+                                            const isFutureSemester =
+                                                semesters?.current &&
+                                                sem.id > semesters?.current;
                                             return (
                                                 <button
                                                     key={sem.id}
-                                                    onClick={() =>
+                                                    onClick={() => {
+                                                        if (isFutureSemester)
+                                                            return;
                                                         handleSemesterChange(
-                                                            sem.id
-                                                        )
-                                                    }
+                                                            sem.id,
+                                                        );
+                                                    }}
+                                                    disabled={isFutureSemester}
                                                     className={`flex-1 relative flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-medium transition-all ${
-                                                        isActive
-                                                            ? "bg-pink-600 text-white shadow-md"
-                                                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                                        isFutureSemester
+                                                            ? "bg-gray-50 text-gray-400 cursor-not-allowed opacity-60"
+                                                            : isActive
+                                                              ? "bg-pink-600 text-white shadow-md"
+                                                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                                                     }`}
                                                 >
                                                     <svg
@@ -912,12 +1096,21 @@ export default function Dashboard({
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Grade Trend Card */}
                                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                                    <h3 className="font-semibold text-gray-900 mb-4">
+                                    <h3 className="font-semibold text-gray-900 mb-1">
                                         Grade Trend
                                     </h3>
-                                    <p className="text-sm text-gray-500 mb-4">
-                                        Your weekly performance
-                                    </p>
+                                    {gradeTrend?.subjectName ? (
+                                        <p className="text-sm text-gray-500 mb-3">
+                                            <span className="font-medium text-indigo-600">
+                                                {gradeTrend.subjectName}
+                                            </span>{" "}
+                                            — last updated
+                                        </p>
+                                    ) : (
+                                        <p className="text-sm text-gray-500 mb-3">
+                                            Score breakdown by category
+                                        </p>
+                                    )}
                                     <MiniChart data={gradeTrend} />
                                 </div>
 
@@ -1014,14 +1207,14 @@ export default function Dashboard({
                                                         notification.id.toString()
                                                     }
                                                 />
-                                            )
+                                            ),
                                         )}
 
                                         {notifications.length > 3 && (
                                             <button
                                                 onClick={() =>
                                                     setShowAllNotifications(
-                                                        !showAllNotifications
+                                                        !showAllNotifications,
                                                     )
                                                 }
                                                 className="w-full py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors"

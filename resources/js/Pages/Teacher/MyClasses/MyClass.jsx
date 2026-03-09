@@ -30,6 +30,7 @@ import {
     TemporaryPasswordModal,
     ClassList,
     GradeSubmissionModal,
+    StartQ2ConfirmModal,
 } from "@/Components/Teacher/MyClasses";
 
 // Fallback Grade Categories (in case the class doesn't have any defined)
@@ -145,6 +146,7 @@ const MyClass = (props) => {
         selectedClass,
         roster = [],
         gradeStructure,
+        gradeSummaries = {},
     } = props;
 
     // Debug: Log the props data
@@ -167,6 +169,16 @@ const MyClass = (props) => {
     const [studentViewMode, setStudentViewMode] = useState("classList");
     const isGradeView = studentViewMode === "gradeOverview";
     const [selectedQuarter, setSelectedQuarter] = useState(1);
+
+    // Tab navigation: "q1", "q2", or "final"
+    const [selectedTab, setSelectedTab] = useState("q1");
+
+    // Start Q2 confirmation modal
+    const [isStartQ2ModalOpen, setIsStartQ2ModalOpen] = useState(false);
+
+    // Derive current quarter from class data
+    const currentQuarter = selectedClass?.current_quarter ?? 1;
+    const isQ2Unlocked = currentQuarter >= 2;
 
     // Search and filter state
     const [searchTerm, setSearchTerm] = useState("");
@@ -201,6 +213,12 @@ const MyClass = (props) => {
 
     // Category collapse state (for grade overview table)
     const [collapsedCategories, setCollapsedCategories] = useState({});
+
+    // Sort state for grade columns
+    const [sortConfig, setSortConfig] = useState({
+        column: null, // 'quarterly', 'expected', 'final'
+        order: "asc",
+    });
 
     // Classlist upload state
     const [isUploadingClasslist, setIsUploadingClasslist] = useState(false);
@@ -248,6 +266,20 @@ const MyClass = (props) => {
         return tasks[tasks.length - 1];
     };
 
+    /**
+     * Toggle sort order for a grade column
+     */
+    const handleSortToggle = (column) => {
+        setSortConfig((prev) => {
+            if (prev.column === column) {
+                // Cycle: asc -> desc -> none
+                if (prev.order === "asc") return { column, order: "desc" };
+                return { column: null, order: "asc" };
+            }
+            return { column, order: "asc" };
+        });
+    };
+
     // ========================================================================
     // Computed Values
     // ========================================================================
@@ -255,11 +287,57 @@ const MyClass = (props) => {
     const dirtyGradeCount = Object.keys(dirtyGrades).length;
     const hasGradeChanges = dirtyGradeCount > 0;
 
-    // Use passed gradeStructure or fallback
+    // Use passed gradeStructure (now per-quarter: { "1": { categories, ... }, "2": { categories, ... } })
+    const quarterStructure =
+        gradeStructure?.[selectedQuarter] ??
+        gradeStructure?.[String(selectedQuarter)];
     const gradeCategories =
-        gradeStructure?.categories || FALLBACK_GRADE_CATEGORIES;
+        quarterStructure?.categories ||
+        gradeStructure?.categories ||
+        FALLBACK_GRADE_CATEGORIES;
     const categories = gradeCategories;
     const students = roster;
+
+    // Resolve categories per quarter for cross-quarter checks
+    const q1Categories = useMemo(
+        () =>
+            gradeStructure?.["1"]?.categories ??
+            gradeStructure?.[1]?.categories ??
+            gradeStructure?.categories ??
+            FALLBACK_GRADE_CATEGORIES,
+        [gradeStructure],
+    );
+    const q2Categories = useMemo(
+        () =>
+            gradeStructure?.["2"]?.categories ??
+            gradeStructure?.[2]?.categories ??
+            gradeStructure?.categories ??
+            FALLBACK_GRADE_CATEGORIES,
+        [gradeStructure],
+    );
+
+    // Check if Q1 has quarterly exam scores (at least one student)
+    const q1HasQuarterlyExam = useMemo(() => {
+        return students.some((student) =>
+            hasQuarterlyExamScores(student.grades, q1Categories, 1),
+        );
+    }, [students, q1Categories]);
+
+    // Check if Q2 has quarterly exam scores (at least one student)
+    const q2HasQuarterlyExam = useMemo(() => {
+        return students.some((student) =>
+            hasQuarterlyExamScores(student.grades, q2Categories, 2),
+        );
+    }, [students, q2Categories]);
+
+    // Final Grade tab is unlocked only when BOTH Q1 and Q2 have quarterly grades
+    const isFinalUnlocked = useMemo(() => {
+        if (currentQuarter < 2) return false;
+        // Check that at least one student has both q1_grade and q2_grade
+        return Object.values(gradeSummaries).some(
+            (s) => s.q1_grade != null && s.q2_grade != null,
+        );
+    }, [currentQuarter, gradeSummaries]);
 
     // Filter students based on search term
     const filteredStudents = useMemo(() => {
@@ -272,6 +350,64 @@ const MyClass = (props) => {
             return name.includes(lowerSearch) || lrn.includes(lowerSearch);
         });
     }, [students, searchTerm]);
+
+    // Sort filtered students based on sortConfig (using server-computed grades)
+    const sortedStudents = useMemo(() => {
+        if (!sortConfig.column) return filteredStudents;
+
+        return [...filteredStudents].sort((a, b) => {
+            const summaryA = gradeSummaries[a.id] ?? {};
+            const summaryB = gradeSummaries[b.id] ?? {};
+
+            let valA = 0;
+            let valB = 0;
+
+            if (sortConfig.column === "quarterly") {
+                // Initial grade (raw weighted %)
+                valA =
+                    parseFloat(
+                        selectedQuarter === 1
+                            ? summaryA.initial_grade_q1
+                            : summaryA.initial_grade_q2,
+                    ) || 0;
+                valB =
+                    parseFloat(
+                        selectedQuarter === 1
+                            ? summaryB.initial_grade_q1
+                            : summaryB.initial_grade_q2,
+                    ) || 0;
+            } else if (sortConfig.column === "expected") {
+                valA =
+                    parseFloat(
+                        selectedQuarter === 1
+                            ? summaryA.expected_grade_q1
+                            : summaryA.expected_grade_q2,
+                    ) || 0;
+                valB =
+                    parseFloat(
+                        selectedQuarter === 1
+                            ? summaryB.expected_grade_q1
+                            : summaryB.expected_grade_q2,
+                    ) || 0;
+            } else if (sortConfig.column === "final") {
+                // Transmuted quarterly grade
+                valA =
+                    parseFloat(
+                        selectedQuarter === 1
+                            ? summaryA.q1_grade
+                            : summaryA.q2_grade,
+                    ) || 0;
+                valB =
+                    parseFloat(
+                        selectedQuarter === 1
+                            ? summaryB.q1_grade
+                            : summaryB.q2_grade,
+                    ) || 0;
+            }
+
+            return sortConfig.order === "asc" ? valA - valB : valB - valA;
+        });
+    }, [filteredStudents, sortConfig, gradeSummaries, selectedQuarter]);
 
     // Get assignment columns from grade categories
     const assignmentColumns = useMemo(() => {
@@ -444,14 +580,15 @@ const MyClass = (props) => {
                 };
             });
 
-            // Submit to server using Inertia
+            // Submit to server using Inertia (include quarter for per-quarter storage)
             router.post(
                 `/teacher/classes/${selectedClass.id}/grade-structure`,
                 {
                     categories: updatedCategories,
+                    quarter: selectedQuarter,
                 },
                 {
-                    preserveState: false, // Refresh the data
+                    preserveState: true,
                     preserveScroll: true,
                     onSuccess: () => {
                         setActiveGradeCategoryId(null);
@@ -547,7 +684,7 @@ const MyClass = (props) => {
         setIsImportingGrades(true);
 
         const formData = new FormData();
-        formData.append("grades", file);
+        formData.append("grades_file", file);
 
         try {
             router.post(
@@ -555,6 +692,7 @@ const MyClass = (props) => {
                 formData,
                 {
                     forceFormData: true,
+                    preserveState: true,
                     preserveScroll: true,
                     onSuccess: () => {
                         setUploadSuccess("Grades imported successfully!");
@@ -564,6 +702,7 @@ const MyClass = (props) => {
                     },
                     onError: (errors) => {
                         const errorMsg =
+                            errors.grades_file ||
                             errors.grades ||
                             "Failed to import grades. Please check the file format.";
                         setUploadError(errorMsg);
@@ -617,10 +756,10 @@ const MyClass = (props) => {
         ];
 
         // Create sample rows from current students
-        const rows = filteredStudents.slice(0, 3).map((student) => {
+        const rows = sortedStudents.slice(0, 3).map((student) => {
             const row = [student.lrn || "", student.name || ""];
             assignmentColumns.forEach((col) => {
-                row.push(student.grades?.[col.id] || "");
+                row.push(student.grades?.[selectedQuarter]?.[col.id] || "");
             });
             return row.join(",");
         });
@@ -822,7 +961,7 @@ const MyClass = (props) => {
                     // Student List (No Grades)
                     <div className="overflow-x-auto">
                         <ClassList
-                            filteredStudents={filteredStudents}
+                            filteredStudents={sortedStudents}
                             setSelectedStudentForStatus={
                                 setSelectedStudentForStatus
                             }
@@ -831,7 +970,7 @@ const MyClass = (props) => {
                             }
                             buildStudentKey={buildStudentKey}
                         />
-                        {filteredStudents.length === 0 && (
+                        {sortedStudents.length === 0 && (
                             <EmptyStudentState
                                 hasSearchTerm={Boolean(searchTerm)}
                                 searchTerm={searchTerm}
@@ -844,789 +983,761 @@ const MyClass = (props) => {
                 ) : (
                     // Grade Overview Table (With Grades)
                     <div>
-                        {/* Quarter Toggle and Collapse Controls */}
+                        {/* Tab Navigation: Q1 / Q2 / Final Grade */}
                         <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
                             <div className="flex items-center gap-4">
                                 <div className="flex items-center gap-2">
                                     <span className="text-sm font-medium text-gray-700">
-                                        Quarter:
+                                        View:
                                     </span>
                                     <div className="flex items-center p-1 bg-gray-100 rounded-lg">
+                                        {/* Q1 Tab */}
                                         <button
-                                            onClick={() =>
-                                                setSelectedQuarter(1)
-                                            }
+                                            onClick={() => {
+                                                setSelectedTab("q1");
+                                                setSelectedQuarter(1);
+                                                setDirtyGrades({});
+                                            }}
                                             className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${
-                                                selectedQuarter === 1
+                                                selectedTab === "q1"
                                                     ? "bg-white text-indigo-700 shadow-sm"
                                                     : "text-gray-600 hover:bg-gray-200"
                                             }`}
                                         >
                                             Q1
                                         </button>
-                                        {/* <button
+                                        {/* Q2 Tab */}
+                                        <button
                                             onClick={() => {
-                                                const q1Finished =
-                                                    students.some((student) =>
-                                                        hasQuarterlyExamScores(
-                                                            student.grades,
-                                                            gradeCategories,
-                                                            1,
-                                                        ),
-                                                    );
-                                                const canOpenQ2 =
-                                                    selectedClass?.current_quarter >=
-                                                        2 || q1Finished;
-                                                if (canOpenQ2) {
+                                                if (isQ2Unlocked) {
+                                                    setSelectedTab("q2");
                                                     setSelectedQuarter(2);
+                                                    setDirtyGrades({});
                                                 }
                                             }}
-                                            disabled={
-                                                !(
-                                                    selectedClass?.current_quarter >=
-                                                        2 ||
-                                                    students.some((student) =>
-                                                        hasQuarterlyExamScores(
-                                                            student.grades,
-                                                            gradeCategories,
-                                                            1,
-                                                        ),
-                                                    )
-                                                )
-                                            }
+                                            disabled={!isQ2Unlocked}
                                             className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${
-                                                selectedQuarter === 2
+                                                selectedTab === "q2"
                                                     ? "bg-white text-indigo-700 shadow-sm"
-                                                    : !(
-                                                            selectedClass?.current_quarter >=
-                                                                2 ||
-                                                            students.some(
-                                                                (student) =>
-                                                                    hasQuarterlyExamScores(
-                                                                        student.grades,
-                                                                        gradeCategories,
-                                                                        1,
-                                                                    ),
-                                                            )
-                                                        )
+                                                    : !isQ2Unlocked
                                                       ? "text-gray-400 cursor-not-allowed"
                                                       : "text-gray-600 hover:bg-gray-200"
                                             }`}
                                             title={
-                                                !(
-                                                    selectedClass?.current_quarter >=
-                                                        2 ||
-                                                    students.some((student) =>
-                                                        hasQuarterlyExamScores(
-                                                            student.grades,
-                                                            gradeCategories,
-                                                            1,
-                                                        ),
-                                                    )
-                                                )
-                                                    ? "Complete Quarter 1 quarterly exam first or start Quarter 2"
+                                                !isQ2Unlocked
+                                                    ? "Start Quarter 2 first"
                                                     : ""
                                             }
                                         >
                                             Q2
-                                        </button> */}
+                                        </button>
+                                        {/* Final Grade Tab */}
+                                        <button
+                                            onClick={() => {
+                                                if (isFinalUnlocked) {
+                                                    setSelectedTab("final");
+                                                }
+                                            }}
+                                            disabled={!isFinalUnlocked}
+                                            className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${
+                                                selectedTab === "final"
+                                                    ? "bg-white text-indigo-700 shadow-sm"
+                                                    : !isFinalUnlocked
+                                                      ? "text-gray-400 cursor-not-allowed"
+                                                      : "text-gray-600 hover:bg-gray-200"
+                                            }`}
+                                            title={
+                                                !isFinalUnlocked
+                                                    ? "Final Grade requires both Q1 and Q2 quarterly exam grades"
+                                                    : ""
+                                            }
+                                        >
+                                            Final Grade
+                                        </button>
                                     </div>
                                     {/* Start Quarter 2 */}
-                                    {/* {selectedClass?.current_quarter < 2 && (
+                                    {currentQuarter < 2 && (
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                if (!selectedClass) return;
-                                                if (
-                                                    !confirm(
-                                                        "Start Quarter 2 for this class?\nThis will allow you to view Q2 grades and begin entering Q2 data.",
-                                                    )
-                                                )
-                                                    return;
-                                                router.post(
-                                                    `/teacher/classes/${selectedClass.id}/quarter`,
-                                                    { quarter: 2 },
-                                                    {
-                                                        preserveScroll: true,
-                                                        onSuccess: () => {
-                                                            setSelectedQuarter(
-                                                                2,
-                                                            );
-                                                            router.reload({
-                                                                only: [
-                                                                    "classes",
-                                                                    "rosters",
-                                                                ],
-                                                            });
-                                                        },
-                                                    },
-                                                );
-                                            }}
+                                            onClick={() =>
+                                                setIsStartQ2ModalOpen(true)
+                                            }
                                             className="ml-2 px-3 py-1.5 rounded-md text-sm bg-emerald-600 text-white hover:bg-emerald-700"
                                         >
                                             Start Q2
                                         </button>
-                                    )} */}
+                                    )}
                                 </div>
 
-                                <div className="flex items-center gap-2">
-                                    {/* Edit Grade Categories Button */}
-                                    <button
-                                        onClick={() =>
-                                            setIsEditCategoriesModalOpen(true)
-                                        }
-                                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
-                                        title="Edit grade category percentages"
-                                    >
-                                        <Settings size={14} />
-                                        Edit Percentages
-                                    </button>
+                                {selectedTab !== "final" && (
+                                    <div className="flex items-center gap-2">
+                                        {/* Edit Grade Categories Button */}
+                                        <button
+                                            onClick={() =>
+                                                setIsEditCategoriesModalOpen(
+                                                    true,
+                                                )
+                                            }
+                                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                                            title="Edit grade category percentages"
+                                        >
+                                            <Settings size={14} />
+                                            Edit Percentages
+                                        </button>
 
-                                    {/* Grades Column Toggle */}
-                                    <button
-                                        onClick={() =>
-                                            setGradesExpanded(!gradesExpanded)
-                                        }
-                                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
-                                    >
-                                        {gradesExpanded ? (
-                                            <ChevronUp size={14} />
-                                        ) : (
-                                            <ChevronDown size={14} />
-                                        )}
-                                        {gradesExpanded
-                                            ? "Collapse Grades"
-                                            : "Expand Grades"}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {selectedQuarter === 2 &&
-                                selectedClass?.current_quarter < 2 &&
-                                !students.some((student) =>
-                                    hasQuarterlyExamScores(
-                                        student.grades,
-                                        gradeCategories,
-                                        1,
-                                    ),
-                                ) && (
-                                    <p className="text-sm text-amber-600">
-                                        Quarter 2 is locked until Quarter 1
-                                        quarterly exam scores are entered.
-                                    </p>
+                                        {/* Grades Column Toggle */}
+                                        <button
+                                            onClick={() =>
+                                                setGradesExpanded(
+                                                    !gradesExpanded,
+                                                )
+                                            }
+                                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                                        >
+                                            {gradesExpanded ? (
+                                                <ChevronUp size={14} />
+                                            ) : (
+                                                <ChevronDown size={14} />
+                                            )}
+                                            {gradesExpanded
+                                                ? "Collapse Grades"
+                                                : "Expand Grades"}
+                                        </button>
+                                    </div>
                                 )}
+                            </div>
                         </div>
 
                         {/* Scrollable Table Container */}
-                        <div className="relative border border-gray-200 rounded-lg">
-                            <div className="overflow-x-auto">
-                                <table className="w-full border-collapse">
-                                    <thead className="bg-gray-50">
-                                        {/* Main Header Row */}
-                                        <tr>
-                                            {/* Fixed Left: Student Name */}
-                                            <th className="sticky left-0 z-20 bg-gray-50 px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 min-w-[200px]">
-                                                Student Name
-                                            </th>
-                                            {/* Fixed Left: LRN */}
-                                            <th className="sticky left-[200px] z-20 bg-gray-50 px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 min-w-[120px]">
-                                                LRN
-                                            </th>
-
-                                            {/* Category Headers */}
-                                            {gradeCategories.map((category) => {
-                                                const percent = Math.round(
-                                                    (category.weight ?? 0) *
-                                                        100,
-                                                );
-                                                const tasks =
-                                                    category.tasks ?? [];
-                                                const isCollapsed =
-                                                    isCategoryCollapsed(
-                                                        category.id,
-                                                    );
-                                                const isQE =
-                                                    isQuarterlyExam(category);
-                                                const latestTask =
-                                                    getLatestTask(category);
-
-                                                // Determine colspan based on collapse state
-                                                const colSpan =
-                                                    isCollapsed && latestTask
-                                                        ? 1
-                                                        : Math.max(
-                                                              tasks.length,
-                                                              1,
-                                                          );
-
-                                                return (
-                                                    <th
-                                                        key={category.id}
-                                                        colSpan={colSpan}
-                                                        className="bg-gray-50 px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200"
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            {/* Collapse Toggle (not for Quarterly Exam) */}
-                                                            {!isQE &&
-                                                                tasks.length >
-                                                                    1 && (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() =>
-                                                                            toggleCategoryCollapse(
-                                                                                category.id,
-                                                                            )
-                                                                        }
-                                                                        className="p-0.5 text-gray-500 hover:text-gray-700 transition"
-                                                                        title={
-                                                                            isCollapsed
-                                                                                ? "Expand"
-                                                                                : "Collapse"
-                                                                        }
-                                                                    >
-                                                                        {isCollapsed ? (
-                                                                            <ChevronRight
-                                                                                size={
-                                                                                    14
-                                                                                }
-                                                                            />
-                                                                        ) : (
-                                                                            <ChevronDown
-                                                                                size={
-                                                                                    14
-                                                                                }
-                                                                            />
-                                                                        )}
-                                                                    </button>
-                                                                )}
-                                                            <span className="flex-1">
-                                                                {category.label}{" "}
-                                                                ({percent}
-                                                                %)
-                                                                {isCollapsed &&
-                                                                    tasks.length >
-                                                                        1 && (
-                                                                        <span className="ml-1 text-[10px] text-gray-400">
-                                                                            (
-                                                                            {
-                                                                                tasks.length
-                                                                            }{" "}
-                                                                            items)
-                                                                        </span>
-                                                                    )}
-                                                            </span>
-                                                            {/* Add button (not for Quarterly Exam) */}
-                                                            {!isQE && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        setActiveGradeCategoryId(
-                                                                            category.id,
-                                                                        )
-                                                                    }
-                                                                    className="text-xs font-semibold text-indigo-600 transition hover:text-indigo-700"
-                                                                >
-                                                                    + Add
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    </th>
-                                                );
-                                            })}
-
-                                            {/* Fixed Right: Grade Columns (Collapsible) */}
-                                            {gradesExpanded ? (
-                                                <>
-                                                    <th
-                                                        className="sticky right-[200px] z-20 bg-indigo-50 px-4 py-3 text-left text-xs font-semibold text-indigo-700 uppercase tracking-wider border-l border-indigo-200 min-w-[100px] cursor-pointer hover:bg-indigo-100 transition-colors select-none"
-                                                        onClick={() =>
-                                                            handleSortToggle(
-                                                                "quarterly",
-                                                            )
-                                                        }
-                                                        title="Click to sort by quarterly grade"
-                                                    >
-                                                        <div className="flex items-center gap-1">
-                                                            Q{selectedQuarter}{" "}
-                                                            Grade
-                                                            {sortConfig.column ===
-                                                                "quarterly" &&
-                                                                sortConfig.order ===
-                                                                    "asc" && (
-                                                                    <svg
-                                                                        className="w-3 h-3"
-                                                                        fill="none"
-                                                                        stroke="currentColor"
-                                                                        viewBox="0 0 24 24"
-                                                                    >
-                                                                        <path
-                                                                            strokeLinecap="round"
-                                                                            strokeLinejoin="round"
-                                                                            strokeWidth={
-                                                                                2
-                                                                            }
-                                                                            d="M5 15l7-7 7 7"
-                                                                        />
-                                                                    </svg>
-                                                                )}
-                                                            {sortConfig.column ===
-                                                                "quarterly" &&
-                                                                sortConfig.order ===
-                                                                    "desc" && (
-                                                                    <svg
-                                                                        className="w-3 h-3"
-                                                                        fill="none"
-                                                                        stroke="currentColor"
-                                                                        viewBox="0 0 24 24"
-                                                                    >
-                                                                        <path
-                                                                            strokeLinecap="round"
-                                                                            strokeLinejoin="round"
-                                                                            strokeWidth={
-                                                                                2
-                                                                            }
-                                                                            d="M19 9l-7 7-7-7"
-                                                                        />
-                                                                    </svg>
-                                                                )}
-                                                            {sortConfig.column !==
-                                                                "quarterly" && (
-                                                                <svg
-                                                                    className="w-3 h-3 opacity-50"
-                                                                    fill="none"
-                                                                    stroke="currentColor"
-                                                                    viewBox="0 0 24 24"
-                                                                >
-                                                                    <path
-                                                                        strokeLinecap="round"
-                                                                        strokeLinejoin="round"
-                                                                        strokeWidth={
-                                                                            2
-                                                                        }
-                                                                        d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                                                                    />
-                                                                </svg>
-                                                            )}
-                                                        </div>
-                                                    </th>
-                                                    <th
-                                                        className="sticky right-[100px] z-20 bg-indigo-50 px-4 py-3 text-left text-xs font-semibold text-indigo-700 uppercase tracking-wider border-l border-indigo-100 min-w-[100px] cursor-pointer hover:bg-indigo-100 transition-colors select-none"
-                                                        onClick={() =>
-                                                            handleSortToggle(
-                                                                "expected",
-                                                            )
-                                                        }
-                                                        title="Click to sort by expected grade"
-                                                    >
-                                                        <div className="flex items-center gap-1">
-                                                            Expected
-                                                            {sortConfig.column ===
-                                                                "expected" &&
-                                                                sortConfig.order ===
-                                                                    "asc" && (
-                                                                    <svg
-                                                                        className="w-3 h-3"
-                                                                        fill="none"
-                                                                        stroke="currentColor"
-                                                                        viewBox="0 0 24 24"
-                                                                    >
-                                                                        <path
-                                                                            strokeLinecap="round"
-                                                                            strokeLinejoin="round"
-                                                                            strokeWidth={
-                                                                                2
-                                                                            }
-                                                                            d="M5 15l7-7 7 7"
-                                                                        />
-                                                                    </svg>
-                                                                )}
-                                                            {sortConfig.column ===
-                                                                "expected" &&
-                                                                sortConfig.order ===
-                                                                    "desc" && (
-                                                                    <svg
-                                                                        className="w-3 h-3"
-                                                                        fill="none"
-                                                                        stroke="currentColor"
-                                                                        viewBox="0 0 24 24"
-                                                                    >
-                                                                        <path
-                                                                            strokeLinecap="round"
-                                                                            strokeLinejoin="round"
-                                                                            strokeWidth={
-                                                                                2
-                                                                            }
-                                                                            d="M19 9l-7 7-7-7"
-                                                                        />
-                                                                    </svg>
-                                                                )}
-                                                            {sortConfig.column !==
-                                                                "expected" && (
-                                                                <svg
-                                                                    className="w-3 h-3 opacity-50"
-                                                                    fill="none"
-                                                                    stroke="currentColor"
-                                                                    viewBox="0 0 24 24"
-                                                                >
-                                                                    <path
-                                                                        strokeLinecap="round"
-                                                                        strokeLinejoin="round"
-                                                                        strokeWidth={
-                                                                            2
-                                                                        }
-                                                                        d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                                                                    />
-                                                                </svg>
-                                                            )}
-                                                        </div>
-                                                    </th>
-                                                    <th
-                                                        className="sticky right-0 z-20 bg-indigo-50 px-4 py-3 text-left text-xs font-semibold text-indigo-700 uppercase tracking-wider border-l border-indigo-100 min-w-[100px] cursor-pointer hover:bg-indigo-100 transition-colors select-none"
-                                                        onClick={() =>
-                                                            handleSortToggle(
-                                                                "final",
-                                                            )
-                                                        }
-                                                        title="Click to sort by final grade"
-                                                    >
-                                                        <div className="flex items-center gap-1">
-                                                            Final
-                                                            {sortConfig.column ===
-                                                                "final" &&
-                                                                sortConfig.order ===
-                                                                    "asc" && (
-                                                                    <svg
-                                                                        className="w-3 h-3"
-                                                                        fill="none"
-                                                                        stroke="currentColor"
-                                                                        viewBox="0 0 24 24"
-                                                                    >
-                                                                        <path
-                                                                            strokeLinecap="round"
-                                                                            strokeLinejoin="round"
-                                                                            strokeWidth={
-                                                                                2
-                                                                            }
-                                                                            d="M5 15l7-7 7 7"
-                                                                        />
-                                                                    </svg>
-                                                                )}
-                                                            {sortConfig.column ===
-                                                                "final" &&
-                                                                sortConfig.order ===
-                                                                    "desc" && (
-                                                                    <svg
-                                                                        className="w-3 h-3"
-                                                                        fill="none"
-                                                                        stroke="currentColor"
-                                                                        viewBox="0 0 24 24"
-                                                                    >
-                                                                        <path
-                                                                            strokeLinecap="round"
-                                                                            strokeLinejoin="round"
-                                                                            strokeWidth={
-                                                                                2
-                                                                            }
-                                                                            d="M19 9l-7 7-7-7"
-                                                                        />
-                                                                    </svg>
-                                                                )}
-                                                            {sortConfig.column !==
-                                                                "final" && (
-                                                                <svg
-                                                                    className="w-3 h-3 opacity-50"
-                                                                    fill="none"
-                                                                    stroke="currentColor"
-                                                                    viewBox="0 0 24 24"
-                                                                >
-                                                                    <path
-                                                                        strokeLinecap="round"
-                                                                        strokeLinejoin="round"
-                                                                        strokeWidth={
-                                                                            2
-                                                                        }
-                                                                        d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                                                                    />
-                                                                </svg>
-                                                            )}
-                                                        </div>
-                                                    </th>
-                                                </>
-                                            ) : (
-                                                <th className="sticky right-0 z-20 bg-indigo-50 px-4 py-3 text-left text-xs font-semibold text-indigo-700 uppercase tracking-wider border-l border-indigo-200 min-w-[100px]">
-                                                    <div className="flex items-center gap-1">
-                                                        <ChevronRight
-                                                            size={14}
-                                                        />
-                                                        Grades
-                                                    </div>
+                        {selectedTab !== "final" ? (
+                            <div className="relative border border-gray-200 rounded-lg">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full border-collapse">
+                                        <thead className="bg-gray-50">
+                                            {/* Main Header Row */}
+                                            <tr>
+                                                {/* Fixed Left: Student Name */}
+                                                <th className="sticky left-0 z-20 bg-gray-50 px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 min-w-[200px]">
+                                                    Student Name
                                                 </th>
-                                            )}
-                                        </tr>
+                                                {/* Fixed Left: LRN */}
+                                                <th className="sticky left-[200px] z-20 bg-gray-50 px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 min-w-[120px]">
+                                                    LRN
+                                                </th>
 
-                                        {/* Sub-header Row for Task Labels */}
-                                        <tr className="bg-gray-50/50">
-                                            <th className="sticky left-0 z-20 bg-gray-50/50 border-r border-gray-200"></th>
-                                            <th className="sticky left-[200px] z-20 bg-gray-50/50 border-r border-gray-200"></th>
+                                                {/* Category Headers */}
+                                                {gradeCategories.map(
+                                                    (category) => {
+                                                        const percent =
+                                                            Math.round(
+                                                                (category.weight ??
+                                                                    0) * 100,
+                                                            );
+                                                        const tasks =
+                                                            category.tasks ??
+                                                            [];
+                                                        const isCollapsed =
+                                                            isCategoryCollapsed(
+                                                                category.id,
+                                                            );
+                                                        const isQE =
+                                                            isQuarterlyExam(
+                                                                category,
+                                                            );
+                                                        const latestTask =
+                                                            getLatestTask(
+                                                                category,
+                                                            );
 
-                                            {gradeCategories.map((category) => {
-                                                const tasks =
-                                                    category.tasks ?? [];
-                                                const isCollapsed =
-                                                    isCategoryCollapsed(
-                                                        category.id,
-                                                    );
-                                                const latestTask =
-                                                    getLatestTask(category);
+                                                        // Determine colspan based on collapse state
+                                                        const colSpan =
+                                                            isCollapsed &&
+                                                            latestTask
+                                                                ? 1
+                                                                : Math.max(
+                                                                      tasks.length,
+                                                                      1,
+                                                                  );
 
-                                                if (!tasks.length) {
-                                                    return (
-                                                        <th
-                                                            key={`${category.id}-empty`}
-                                                            className="px-4 py-2 text-left text-xs font-medium text-gray-400 border-r border-gray-200"
-                                                        >
-                                                            No activities yet
-                                                        </th>
-                                                    );
-                                                }
-
-                                                // If collapsed, show only latest task
-                                                if (isCollapsed && latestTask) {
-                                                    return (
-                                                        <th
-                                                            key={`${category.id}-collapsed`}
-                                                            className="px-4 py-2 text-left text-xs font-medium text-gray-500 border-r border-gray-200"
-                                                        >
-                                                            <span className="block">
-                                                                {
-                                                                    latestTask.label
+                                                        return (
+                                                            <th
+                                                                key={
+                                                                    category.id
                                                                 }
-                                                            </span>
-                                                            <span className="text-[10px] font-normal text-gray-400">
-                                                                /{" "}
-                                                                {
-                                                                    latestTask.total
-                                                                }{" "}
-                                                                pts (latest)
-                                                            </span>
-                                                        </th>
-                                                    );
-                                                }
-
-                                                return tasks.map(
-                                                    (task, taskIndex) => (
-                                                        <th
-                                                            key={task.id}
-                                                            className={`px-4 py-2 text-left text-xs font-medium text-gray-500 ${
-                                                                taskIndex ===
-                                                                tasks.length - 1
-                                                                    ? "border-r border-gray-200"
-                                                                    : ""
-                                                            }`}
-                                                        >
-                                                            <span className="block">
-                                                                {task.label}
-                                                            </span>
-                                                            <span className="text-[10px] font-normal text-gray-400">
-                                                                / {task.total}{" "}
-                                                                pts
-                                                            </span>
-                                                        </th>
-                                                    ),
-                                                );
-                                            })}
-
-                                            {/* Empty cells for grade columns */}
-                                            {gradesExpanded ? (
-                                                <>
-                                                    <th className="sticky right-[200px] z-20 bg-indigo-50/50 border-l border-indigo-200"></th>
-                                                    <th className="sticky right-[100px] z-20 bg-indigo-50/50 border-l border-indigo-100"></th>
-                                                    <th className="sticky right-0 z-20 bg-indigo-50/50 border-l border-indigo-100"></th>
-                                                </>
-                                            ) : (
-                                                <th className="sticky right-0 z-20 bg-indigo-50/50 border-l border-indigo-200"></th>
-                                            )}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                        {filteredStudents.map(
-                                            (student, index) => {
-                                                const draftValues = {
-                                                    ...(student.grades ?? {}),
-                                                    ...(dirtyGrades[
-                                                        student.id
-                                                    ] ?? {}),
-                                                };
-                                                const studentKey =
-                                                    buildStudentKey(
-                                                        student,
-                                                        index,
-                                                    );
-                                                const studentDraft =
-                                                    dirtyGrades[student.id] ??
-                                                    {};
-
-                                                // Calculate grade for row coloring
-                                                const currentGrade =
-                                                    calculateExpectedQuarterlyGrade(
-                                                        draftValues,
-                                                        gradeCategories,
-                                                        selectedQuarter,
-                                                    );
-                                                const gradeColors =
-                                                    getGradeRowColors(
-                                                        currentGrade,
-                                                    );
-
-                                                return (
-                                                    <tr
-                                                        key={studentKey}
-                                                        className={`${
-                                                            gradeColors.row
-                                                        } ${
-                                                            gradeColors.hoverRow ||
-                                                            "hover:bg-gray-50/50"
-                                                        } transition-colors`}
-                                                    >
-                                                        {/* Fixed Left: Student Name */}
-                                                        <td
-                                                            className={`sticky left-0 z-10 ${gradeColors.leftCell} px-4 py-3 border-r border-gray-200 min-w-[200px]`}
-                                                        >
-                                                            <div className="text-sm font-medium text-gray-900">
-                                                                {student.name}
-                                                            </div>
-                                                            {formatAcademicMeta(
-                                                                student,
-                                                            ) && (
-                                                                <div className="text-xs text-gray-500">
-                                                                    {formatAcademicMeta(
-                                                                        student,
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                        {/* Fixed Left: LRN */}
-                                                        <td
-                                                            className={`sticky left-[200px] z-10 ${gradeColors.leftCell} px-4 py-3 whitespace-nowrap text-sm text-gray-500 border-r border-gray-200 min-w-[120px]`}
-                                                        >
-                                                            {student.lrn}
-                                                        </td>
-
-                                                        {/* Grade Input Cells */}
-                                                        {gradeCategories.map(
-                                                            (category) => {
-                                                                const tasks =
-                                                                    category.tasks ??
-                                                                    [];
-                                                                const isCollapsed =
-                                                                    isCategoryCollapsed(
-                                                                        category.id,
-                                                                    );
-                                                                const latestTask =
-                                                                    getLatestTask(
-                                                                        category,
-                                                                    );
-
-                                                                if (
-                                                                    !tasks.length
-                                                                ) {
-                                                                    return (
-                                                                        <td
-                                                                            key={`${studentKey}-${category.id}-placeholder`}
-                                                                            className="px-4 py-3 text-center text-xs text-gray-400 border-r border-gray-200"
-                                                                        >
-                                                                            —
-                                                                        </td>
-                                                                    );
+                                                                colSpan={
+                                                                    colSpan
                                                                 }
-
-                                                                // If collapsed, show only latest task input
-                                                                if (
-                                                                    isCollapsed &&
-                                                                    latestTask
-                                                                ) {
-                                                                    const rawValue =
-                                                                        studentDraft[
-                                                                            latestTask
-                                                                                .id
-                                                                        ] !==
-                                                                        undefined
-                                                                            ? studentDraft[
-                                                                                  latestTask
-                                                                                      .id
-                                                                              ]
-                                                                            : student
-                                                                                  .grades?.[
-                                                                                  latestTask
-                                                                                      .id
-                                                                              ];
-                                                                    const inputValue =
-                                                                        rawValue ===
-                                                                            "" ||
-                                                                        rawValue ===
-                                                                            null ||
-                                                                        rawValue ===
-                                                                            undefined
-                                                                            ? ""
-                                                                            : `${rawValue}`;
-
-                                                                    return (
-                                                                        <td
-                                                                            key={`${studentKey}-${category.id}-collapsed`}
-                                                                            className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200"
-                                                                        >
-                                                                            <input
-                                                                                type="number"
-                                                                                min="0"
-                                                                                max={
-                                                                                    latestTask.total
-                                                                                }
-                                                                                step="0.01"
-                                                                                value={
-                                                                                    inputValue
-                                                                                }
-                                                                                onChange={(
-                                                                                    event,
-                                                                                ) =>
-                                                                                    handleGradeChange(
-                                                                                        student.id,
-                                                                                        latestTask.id,
-                                                                                        latestTask.total,
-                                                                                        event
-                                                                                            .target
-                                                                                            .value,
+                                                                className="bg-gray-50 px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200"
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    {/* Collapse Toggle (not for Quarterly Exam) */}
+                                                                    {!isQE &&
+                                                                        tasks.length >
+                                                                            1 && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    toggleCategoryCollapse(
+                                                                                        category.id,
                                                                                     )
                                                                                 }
-                                                                                className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                                                                            />
-                                                                            <span className="mt-0.5 block text-[10px] text-gray-400">
-                                                                                /{" "}
-                                                                                {
-                                                                                    latestTask.total
+                                                                                className="p-0.5 text-gray-500 hover:text-gray-700 transition"
+                                                                                title={
+                                                                                    isCollapsed
+                                                                                        ? "Expand"
+                                                                                        : "Collapse"
                                                                                 }
-                                                                            </span>
-                                                                        </td>
-                                                                    );
-                                                                }
+                                                                            >
+                                                                                {isCollapsed ? (
+                                                                                    <ChevronRight
+                                                                                        size={
+                                                                                            14
+                                                                                        }
+                                                                                    />
+                                                                                ) : (
+                                                                                    <ChevronDown
+                                                                                        size={
+                                                                                            14
+                                                                                        }
+                                                                                    />
+                                                                                )}
+                                                                            </button>
+                                                                        )}
+                                                                    <span className="flex-1">
+                                                                        {
+                                                                            category.label
+                                                                        }{" "}
+                                                                        (
+                                                                        {
+                                                                            percent
+                                                                        }
+                                                                        %)
+                                                                        {isCollapsed &&
+                                                                            tasks.length >
+                                                                                1 && (
+                                                                                <span className="ml-1 text-[10px] text-gray-400">
+                                                                                    (
+                                                                                    {
+                                                                                        tasks.length
+                                                                                    }{" "}
+                                                                                    items)
+                                                                                </span>
+                                                                            )}
+                                                                    </span>
+                                                                    {/* Add button — always for non-QE; for QE only when no task exists yet */}
+                                                                    {(!isQE ||
+                                                                        tasks.length ===
+                                                                            0) && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() =>
+                                                                                setActiveGradeCategoryId(
+                                                                                    category.id,
+                                                                                )
+                                                                            }
+                                                                            className="text-xs font-semibold text-indigo-600 transition hover:text-indigo-700"
+                                                                        >
+                                                                            +
+                                                                            Add
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </th>
+                                                        );
+                                                    },
+                                                )}
 
-                                                                return tasks.map(
-                                                                    (
-                                                                        task,
-                                                                        taskIndex,
-                                                                    ) => {
+                                                {/* Fixed Right: Grade Columns (Collapsible) */}
+                                                {gradesExpanded ? (
+                                                    <>
+                                                        <th
+                                                            className="sticky right-[200px] z-20 bg-indigo-50 px-4 py-3 text-left text-xs font-semibold text-indigo-700 uppercase tracking-wider border-l border-indigo-200 min-w-[100px] cursor-pointer hover:bg-indigo-100 transition-colors select-none"
+                                                            onClick={() =>
+                                                                handleSortToggle(
+                                                                    "quarterly",
+                                                                )
+                                                            }
+                                                            title="Click to sort by quarterly grade"
+                                                        >
+                                                            <div className="flex items-center gap-1">
+                                                                Initial Grade
+                                                                {sortConfig.column ===
+                                                                    "quarterly" &&
+                                                                    sortConfig.order ===
+                                                                        "asc" && (
+                                                                        <svg
+                                                                            className="w-3 h-3"
+                                                                            fill="none"
+                                                                            stroke="currentColor"
+                                                                            viewBox="0 0 24 24"
+                                                                        >
+                                                                            <path
+                                                                                strokeLinecap="round"
+                                                                                strokeLinejoin="round"
+                                                                                strokeWidth={
+                                                                                    2
+                                                                                }
+                                                                                d="M5 15l7-7 7 7"
+                                                                            />
+                                                                        </svg>
+                                                                    )}
+                                                                {sortConfig.column ===
+                                                                    "quarterly" &&
+                                                                    sortConfig.order ===
+                                                                        "desc" && (
+                                                                        <svg
+                                                                            className="w-3 h-3"
+                                                                            fill="none"
+                                                                            stroke="currentColor"
+                                                                            viewBox="0 0 24 24"
+                                                                        >
+                                                                            <path
+                                                                                strokeLinecap="round"
+                                                                                strokeLinejoin="round"
+                                                                                strokeWidth={
+                                                                                    2
+                                                                                }
+                                                                                d="M19 9l-7 7-7-7"
+                                                                            />
+                                                                        </svg>
+                                                                    )}
+                                                                {sortConfig.column !==
+                                                                    "quarterly" && (
+                                                                    <svg
+                                                                        className="w-3 h-3 opacity-50"
+                                                                        fill="none"
+                                                                        stroke="currentColor"
+                                                                        viewBox="0 0 24 24"
+                                                                    >
+                                                                        <path
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                            strokeWidth={
+                                                                                2
+                                                                            }
+                                                                            d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
+                                                                        />
+                                                                    </svg>
+                                                                )}
+                                                            </div>
+                                                        </th>
+                                                        <th
+                                                            className="sticky right-[100px] z-20 bg-indigo-50 px-4 py-3 text-left text-xs font-semibold text-indigo-700 uppercase tracking-wider border-l border-indigo-100 min-w-[100px] cursor-pointer hover:bg-indigo-100 transition-colors select-none"
+                                                            onClick={() =>
+                                                                handleSortToggle(
+                                                                    "expected",
+                                                                )
+                                                            }
+                                                            title="Click to sort by expected grade"
+                                                        >
+                                                            <div className="flex items-center gap-1">
+                                                                Expected Grade
+                                                                {sortConfig.column ===
+                                                                    "expected" &&
+                                                                    sortConfig.order ===
+                                                                        "asc" && (
+                                                                        <svg
+                                                                            className="w-3 h-3"
+                                                                            fill="none"
+                                                                            stroke="currentColor"
+                                                                            viewBox="0 0 24 24"
+                                                                        >
+                                                                            <path
+                                                                                strokeLinecap="round"
+                                                                                strokeLinejoin="round"
+                                                                                strokeWidth={
+                                                                                    2
+                                                                                }
+                                                                                d="M5 15l7-7 7 7"
+                                                                            />
+                                                                        </svg>
+                                                                    )}
+                                                                {sortConfig.column ===
+                                                                    "expected" &&
+                                                                    sortConfig.order ===
+                                                                        "desc" && (
+                                                                        <svg
+                                                                            className="w-3 h-3"
+                                                                            fill="none"
+                                                                            stroke="currentColor"
+                                                                            viewBox="0 0 24 24"
+                                                                        >
+                                                                            <path
+                                                                                strokeLinecap="round"
+                                                                                strokeLinejoin="round"
+                                                                                strokeWidth={
+                                                                                    2
+                                                                                }
+                                                                                d="M19 9l-7 7-7-7"
+                                                                            />
+                                                                        </svg>
+                                                                    )}
+                                                                {sortConfig.column !==
+                                                                    "expected" && (
+                                                                    <svg
+                                                                        className="w-3 h-3 opacity-50"
+                                                                        fill="none"
+                                                                        stroke="currentColor"
+                                                                        viewBox="0 0 24 24"
+                                                                    >
+                                                                        <path
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                            strokeWidth={
+                                                                                2
+                                                                            }
+                                                                            d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
+                                                                        />
+                                                                    </svg>
+                                                                )}
+                                                            </div>
+                                                        </th>
+                                                        <th
+                                                            className="sticky right-0 z-20 bg-indigo-50 px-4 py-3 text-left text-xs font-semibold text-indigo-700 uppercase tracking-wider border-l border-indigo-100 min-w-[100px] cursor-pointer hover:bg-indigo-100 transition-colors select-none"
+                                                            onClick={() =>
+                                                                handleSortToggle(
+                                                                    "final",
+                                                                )
+                                                            }
+                                                            title="Click to sort by transmuted grade"
+                                                        >
+                                                            <div className="flex items-center gap-1">
+                                                                Q
+                                                                {
+                                                                    selectedQuarter
+                                                                }{" "}
+                                                                Grade
+                                                                {sortConfig.column ===
+                                                                    "final" &&
+                                                                    sortConfig.order ===
+                                                                        "asc" && (
+                                                                        <svg
+                                                                            className="w-3 h-3"
+                                                                            fill="none"
+                                                                            stroke="currentColor"
+                                                                            viewBox="0 0 24 24"
+                                                                        >
+                                                                            <path
+                                                                                strokeLinecap="round"
+                                                                                strokeLinejoin="round"
+                                                                                strokeWidth={
+                                                                                    2
+                                                                                }
+                                                                                d="M5 15l7-7 7 7"
+                                                                            />
+                                                                        </svg>
+                                                                    )}
+                                                                {sortConfig.column ===
+                                                                    "final" &&
+                                                                    sortConfig.order ===
+                                                                        "desc" && (
+                                                                        <svg
+                                                                            className="w-3 h-3"
+                                                                            fill="none"
+                                                                            stroke="currentColor"
+                                                                            viewBox="0 0 24 24"
+                                                                        >
+                                                                            <path
+                                                                                strokeLinecap="round"
+                                                                                strokeLinejoin="round"
+                                                                                strokeWidth={
+                                                                                    2
+                                                                                }
+                                                                                d="M19 9l-7 7-7-7"
+                                                                            />
+                                                                        </svg>
+                                                                    )}
+                                                                {sortConfig.column !==
+                                                                    "final" && (
+                                                                    <svg
+                                                                        className="w-3 h-3 opacity-50"
+                                                                        fill="none"
+                                                                        stroke="currentColor"
+                                                                        viewBox="0 0 24 24"
+                                                                    >
+                                                                        <path
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                            strokeWidth={
+                                                                                2
+                                                                            }
+                                                                            d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
+                                                                        />
+                                                                    </svg>
+                                                                )}
+                                                            </div>
+                                                        </th>
+                                                    </>
+                                                ) : (
+                                                    <th className="sticky right-0 z-20 bg-indigo-50 px-4 py-3 text-left text-xs font-semibold text-indigo-700 uppercase tracking-wider border-l border-indigo-200 min-w-[100px]">
+                                                        <div className="flex items-center gap-1">
+                                                            <ChevronRight
+                                                                size={14}
+                                                            />
+                                                            Grades
+                                                        </div>
+                                                    </th>
+                                                )}
+                                            </tr>
+
+                                            {/* Sub-header Row for Task Labels */}
+                                            <tr className="bg-gray-50/50">
+                                                <th className="sticky left-0 z-20 bg-gray-50/50 border-r border-gray-200"></th>
+                                                <th className="sticky left-[200px] z-20 bg-gray-50/50 border-r border-gray-200"></th>
+
+                                                {gradeCategories.map(
+                                                    (category) => {
+                                                        const tasks =
+                                                            category.tasks ??
+                                                            [];
+                                                        const isCollapsed =
+                                                            isCategoryCollapsed(
+                                                                category.id,
+                                                            );
+                                                        const latestTask =
+                                                            getLatestTask(
+                                                                category,
+                                                            );
+
+                                                        if (!tasks.length) {
+                                                            return (
+                                                                <th
+                                                                    key={`${category.id}-empty`}
+                                                                    className="px-4 py-2 text-left text-xs font-medium text-gray-400 border-r border-gray-200"
+                                                                >
+                                                                    No
+                                                                    activities
+                                                                    yet
+                                                                </th>
+                                                            );
+                                                        }
+
+                                                        // If collapsed, show only latest task
+                                                        if (
+                                                            isCollapsed &&
+                                                            latestTask
+                                                        ) {
+                                                            return (
+                                                                <th
+                                                                    key={`${category.id}-collapsed`}
+                                                                    className="px-4 py-2 text-left text-xs font-medium text-gray-500 border-r border-gray-200"
+                                                                >
+                                                                    <span className="block">
+                                                                        {
+                                                                            latestTask.label
+                                                                        }
+                                                                    </span>
+                                                                    <span className="text-[10px] font-normal text-gray-400">
+                                                                        /{" "}
+                                                                        {
+                                                                            latestTask.total
+                                                                        }{" "}
+                                                                        pts
+                                                                        (latest)
+                                                                    </span>
+                                                                </th>
+                                                            );
+                                                        }
+
+                                                        return tasks.map(
+                                                            (
+                                                                task,
+                                                                taskIndex,
+                                                            ) => (
+                                                                <th
+                                                                    key={
+                                                                        task.id
+                                                                    }
+                                                                    className={`px-4 py-2 text-left text-xs font-medium text-gray-500 ${
+                                                                        taskIndex ===
+                                                                        tasks.length -
+                                                                            1
+                                                                            ? "border-r border-gray-200"
+                                                                            : ""
+                                                                    }`}
+                                                                >
+                                                                    <span className="block">
+                                                                        {
+                                                                            task.label
+                                                                        }
+                                                                    </span>
+                                                                    <span className="text-[10px] font-normal text-gray-400">
+                                                                        /{" "}
+                                                                        {
+                                                                            task.total
+                                                                        }{" "}
+                                                                        pts
+                                                                    </span>
+                                                                </th>
+                                                            ),
+                                                        );
+                                                    },
+                                                )}
+
+                                                {/* Empty cells for grade columns */}
+                                                {gradesExpanded ? (
+                                                    <>
+                                                        <th className="sticky right-[200px] z-20 bg-indigo-50/50 border-l border-indigo-200"></th>
+                                                        <th className="sticky right-[100px] z-20 bg-indigo-50/50 border-l border-indigo-100"></th>
+                                                        <th className="sticky right-0 z-20 bg-indigo-50/50 border-l border-indigo-100"></th>
+                                                    </>
+                                                ) : (
+                                                    <th className="sticky right-0 z-20 bg-indigo-50/50 border-l border-indigo-200"></th>
+                                                )}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white divide-y divide-gray-200">
+                                            {sortedStudents.map(
+                                                (student, index) => {
+                                                    const draftValues = {
+                                                        ...(student.grades?.[
+                                                            selectedQuarter
+                                                        ] ?? {}),
+                                                        ...(dirtyGrades[
+                                                            student.id
+                                                        ] ?? {}),
+                                                    };
+                                                    const studentKey =
+                                                        buildStudentKey(
+                                                            student,
+                                                            index,
+                                                        );
+                                                    const studentDraft =
+                                                        dirtyGrades[
+                                                            student.id
+                                                        ] ?? {};
+
+                                                    // Server-computed grade summary for this enrollment
+                                                    const summary =
+                                                        gradeSummaries[
+                                                            student.id
+                                                        ] ?? {};
+
+                                                    // Pick the right quarter's server values
+                                                    const initialGrade =
+                                                        selectedQuarter === 1
+                                                            ? summary.initial_grade_q1
+                                                            : summary.initial_grade_q2;
+                                                    const expectedGrade =
+                                                        selectedQuarter === 1
+                                                            ? summary.expected_grade_q1
+                                                            : summary.expected_grade_q2;
+
+                                                    // Quarterly (transmuted) grade only shows if student has quarterly exam score
+                                                    // Wrap draftValues (flat map) back into quarter-grouped structure for the utility
+                                                    const draftGradesGrouped = {
+                                                        ...student.grades,
+                                                        [selectedQuarter]:
+                                                            draftValues,
+                                                    };
+                                                    const studentHasQE =
+                                                        hasQuarterlyExamScores(
+                                                            draftGradesGrouped,
+                                                            gradeCategories,
+                                                            selectedQuarter,
+                                                        );
+                                                    const quarterGrade =
+                                                        studentHasQE
+                                                            ? selectedQuarter ===
+                                                              1
+                                                                ? summary.q1_grade
+                                                                : summary.q2_grade
+                                                            : null;
+
+                                                    // Use server-computed transmuted grade for row coloring
+                                                    const gradeColors =
+                                                        getGradeRowColors(
+                                                            quarterGrade != null
+                                                                ? String(
+                                                                      quarterGrade,
+                                                                  )
+                                                                : "N/A",
+                                                        );
+
+                                                    return (
+                                                        <tr
+                                                            key={studentKey}
+                                                            className={`${
+                                                                gradeColors.row
+                                                            } ${
+                                                                gradeColors.hoverRow ||
+                                                                "hover:bg-gray-50/50"
+                                                            } transition-colors`}
+                                                        >
+                                                            {/* Fixed Left: Student Name */}
+                                                            <td
+                                                                className={`sticky left-0 z-10 ${gradeColors.leftCell} px-4 py-3 border-r border-gray-200 min-w-[200px]`}
+                                                            >
+                                                                <div className="text-sm font-medium text-gray-900">
+                                                                    {
+                                                                        student.name
+                                                                    }
+                                                                </div>
+                                                                {formatAcademicMeta(
+                                                                    student,
+                                                                ) && (
+                                                                    <div className="text-xs text-gray-500">
+                                                                        {formatAcademicMeta(
+                                                                            student,
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            {/* Fixed Left: LRN */}
+                                                            <td
+                                                                className={`sticky left-[200px] z-10 ${gradeColors.leftCell} px-4 py-3 whitespace-nowrap text-sm text-gray-500 border-r border-gray-200 min-w-[120px]`}
+                                                            >
+                                                                {student.lrn}
+                                                            </td>
+
+                                                            {/* Grade Input Cells */}
+                                                            {gradeCategories.map(
+                                                                (category) => {
+                                                                    const tasks =
+                                                                        category.tasks ??
+                                                                        [];
+                                                                    const isCollapsed =
+                                                                        isCategoryCollapsed(
+                                                                            category.id,
+                                                                        );
+                                                                    const latestTask =
+                                                                        getLatestTask(
+                                                                            category,
+                                                                        );
+
+                                                                    if (
+                                                                        !tasks.length
+                                                                    ) {
+                                                                        return (
+                                                                            <td
+                                                                                key={`${studentKey}-${category.id}-placeholder`}
+                                                                                className="px-4 py-3 text-center text-xs text-gray-400 border-r border-gray-200"
+                                                                            >
+                                                                                —
+                                                                            </td>
+                                                                        );
+                                                                    }
+
+                                                                    // If collapsed, show only latest task input
+                                                                    if (
+                                                                        isCollapsed &&
+                                                                        latestTask
+                                                                    ) {
                                                                         const rawValue =
                                                                             studentDraft[
-                                                                                task
+                                                                                latestTask
                                                                                     .id
                                                                             ] !==
                                                                             undefined
                                                                                 ? studentDraft[
-                                                                                      task
+                                                                                      latestTask
                                                                                           .id
                                                                                   ]
                                                                                 : student
                                                                                       .grades?.[
-                                                                                      task
+                                                                                      selectedQuarter
+                                                                                  ]?.[
+                                                                                      latestTask
                                                                                           .id
                                                                                   ];
                                                                         const inputValue =
@@ -1641,20 +1752,14 @@ const MyClass = (props) => {
 
                                                                         return (
                                                                             <td
-                                                                                key={`${studentKey}-${task.id}`}
-                                                                                className={`px-4 py-3 text-sm text-gray-700 ${
-                                                                                    taskIndex ===
-                                                                                    tasks.length -
-                                                                                        1
-                                                                                        ? "border-r border-gray-200"
-                                                                                        : ""
-                                                                                }`}
+                                                                                key={`${studentKey}-${category.id}-collapsed`}
+                                                                                className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200"
                                                                             >
                                                                                 <input
                                                                                     type="number"
                                                                                     min="0"
                                                                                     max={
-                                                                                        task.total
+                                                                                        latestTask.total
                                                                                     }
                                                                                     step="0.01"
                                                                                     value={
@@ -1665,8 +1770,8 @@ const MyClass = (props) => {
                                                                                     ) =>
                                                                                         handleGradeChange(
                                                                                             student.id,
-                                                                                            task.id,
-                                                                                            task.total,
+                                                                                            latestTask.id,
+                                                                                            latestTask.total,
                                                                                             event
                                                                                                 .target
                                                                                                 .value,
@@ -1677,78 +1782,270 @@ const MyClass = (props) => {
                                                                                 <span className="mt-0.5 block text-[10px] text-gray-400">
                                                                                     /{" "}
                                                                                     {
-                                                                                        task.total
+                                                                                        latestTask.total
                                                                                     }
                                                                                 </span>
                                                                             </td>
                                                                         );
-                                                                    },
-                                                                );
-                                                            },
-                                                        )}
+                                                                    }
 
-                                                        {/* Fixed Right: Grade Columns */}
-                                                        {gradesExpanded ? (
-                                                            <>
+                                                                    return tasks.map(
+                                                                        (
+                                                                            task,
+                                                                            taskIndex,
+                                                                        ) => {
+                                                                            const rawValue =
+                                                                                studentDraft[
+                                                                                    task
+                                                                                        .id
+                                                                                ] !==
+                                                                                undefined
+                                                                                    ? studentDraft[
+                                                                                          task
+                                                                                              .id
+                                                                                      ]
+                                                                                    : student
+                                                                                          .grades?.[
+                                                                                          selectedQuarter
+                                                                                      ]?.[
+                                                                                          task
+                                                                                              .id
+                                                                                      ];
+                                                                            const inputValue =
+                                                                                rawValue ===
+                                                                                    "" ||
+                                                                                rawValue ===
+                                                                                    null ||
+                                                                                rawValue ===
+                                                                                    undefined
+                                                                                    ? ""
+                                                                                    : `${rawValue}`;
+
+                                                                            return (
+                                                                                <td
+                                                                                    key={`${studentKey}-${task.id}`}
+                                                                                    className={`px-4 py-3 text-sm text-gray-700 ${
+                                                                                        taskIndex ===
+                                                                                        tasks.length -
+                                                                                            1
+                                                                                            ? "border-r border-gray-200"
+                                                                                            : ""
+                                                                                    }`}
+                                                                                >
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        min="0"
+                                                                                        max={
+                                                                                            task.total
+                                                                                        }
+                                                                                        step="0.01"
+                                                                                        value={
+                                                                                            inputValue
+                                                                                        }
+                                                                                        onChange={(
+                                                                                            event,
+                                                                                        ) =>
+                                                                                            handleGradeChange(
+                                                                                                student.id,
+                                                                                                task.id,
+                                                                                                task.total,
+                                                                                                event
+                                                                                                    .target
+                                                                                                    .value,
+                                                                                            )
+                                                                                        }
+                                                                                        className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                                                                                    />
+                                                                                    <span className="mt-0.5 block text-[10px] text-gray-400">
+                                                                                        /{" "}
+                                                                                        {
+                                                                                            task.total
+                                                                                        }
+                                                                                    </span>
+                                                                                </td>
+                                                                            );
+                                                                        },
+                                                                    );
+                                                                },
+                                                            )}
+
+                                                            {/* Fixed Right: Grade Columns */}
+                                                            {gradesExpanded ? (
+                                                                <>
+                                                                    <td
+                                                                        className={`sticky right-[200px] z-10 ${gradeColors.rightCell} px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900 border-l border-gray-300 min-w-[100px]`}
+                                                                    >
+                                                                        {initialGrade !=
+                                                                        null
+                                                                            ? `${parseFloat(initialGrade).toFixed(1)}%`
+                                                                            : "—"}
+                                                                    </td>
+                                                                    <td
+                                                                        className={`sticky right-[100px] z-10 ${gradeColors.rightCell} px-4 py-3 whitespace-nowrap text-sm font-semibold text-indigo-600 border-l border-gray-200 min-w-[100px]`}
+                                                                    >
+                                                                        {expectedGrade !=
+                                                                        null
+                                                                            ? `${parseFloat(expectedGrade).toFixed(1)}%`
+                                                                            : "—"}
+                                                                    </td>
+                                                                    <td
+                                                                        className={`sticky right-0 z-10 ${gradeColors.rightCell} px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 border-l border-gray-200 min-w-[100px]`}
+                                                                    >
+                                                                        {quarterGrade !=
+                                                                        null
+                                                                            ? quarterGrade
+                                                                            : "—"}
+                                                                    </td>
+                                                                </>
+                                                            ) : (
                                                                 <td
-                                                                    className={`sticky right-[200px] z-10 ${gradeColors.rightCell} px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900 border-l border-gray-300 min-w-[100px]`}
+                                                                    className={`sticky right-0 z-10 ${gradeColors.rightCell} px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 border-l border-gray-300 min-w-[100px]`}
                                                                 >
-                                                                    {hasQuarterlyExamScores(
-                                                                        draftValues,
-                                                                        gradeCategories,
-                                                                        selectedQuarter,
-                                                                    )
-                                                                        ? calculateFinalGrade(
-                                                                              draftValues,
-                                                                              gradeCategories,
-                                                                              selectedQuarter,
-                                                                          )
+                                                                    {quarterGrade !=
+                                                                    null
+                                                                        ? quarterGrade
                                                                         : "—"}
                                                                 </td>
-                                                                <td
-                                                                    className={`sticky right-[100px] z-10 ${gradeColors.rightCell} px-4 py-3 whitespace-nowrap text-sm font-semibold text-indigo-600 border-l border-gray-200 min-w-[100px]`}
-                                                                >
-                                                                    {
-                                                                        currentGrade
-                                                                    }
-                                                                </td>
-                                                                <td
-                                                                    className={`sticky right-0 z-10 ${gradeColors.rightCell} px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 border-l border-gray-200 min-w-[100px]`}
-                                                                >
-                                                                    {calculateOverallFinalGrade(
-                                                                        draftValues,
-                                                                        gradeCategories,
-                                                                    )}
-                                                                </td>
-                                                            </>
-                                                        ) : (
+                                                            )}
+                                                        </tr>
+                                                    );
+                                                },
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {sortedStudents.length === 0 && (
+                                    <EmptyStudentState
+                                        hasSearchTerm={Boolean(searchTerm)}
+                                        searchTerm={searchTerm}
+                                        onAddStudent={() =>
+                                            setIsAddStudentModalOpen(true)
+                                        }
+                                    />
+                                )}
+                            </div>
+                        ) : (
+                            /* ============================================================
+                           FINAL GRADE TABLE
+                           ============================================================ */
+                            <div className="relative border border-gray-200 rounded-lg">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full border-collapse">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="sticky left-0 z-20 bg-gray-50 px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 min-w-[200px]">
+                                                    Student Name
+                                                </th>
+                                                <th className="bg-gray-50 px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 min-w-[120px]">
+                                                    LRN
+                                                </th>
+                                                <th className="bg-indigo-50 px-4 py-3 text-center text-xs font-semibold text-indigo-700 uppercase tracking-wider border-r border-gray-200 min-w-[100px]">
+                                                    Q1 Grade
+                                                </th>
+                                                <th className="bg-indigo-50 px-4 py-3 text-center text-xs font-semibold text-indigo-700 uppercase tracking-wider border-r border-gray-200 min-w-[100px]">
+                                                    Q2 Grade
+                                                </th>
+                                                <th className="bg-emerald-50 px-4 py-3 text-center text-xs font-semibold text-emerald-700 uppercase tracking-wider min-w-[120px]">
+                                                    Final Grade
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white divide-y divide-gray-200">
+                                            {sortedStudents.map(
+                                                (student, index) => {
+                                                    const summary =
+                                                        gradeSummaries[
+                                                            student.id
+                                                        ] ?? {};
+                                                    const q1 = summary.q1_grade;
+                                                    const q2 = summary.q2_grade;
+                                                    const final_grade =
+                                                        summary.final_grade;
+                                                    const gradeColors =
+                                                        getGradeRowColors(
+                                                            final_grade != null
+                                                                ? String(
+                                                                      final_grade,
+                                                                  )
+                                                                : "N/A",
+                                                        );
+
+                                                    return (
+                                                        <tr
+                                                            key={buildStudentKey(
+                                                                student,
+                                                                index,
+                                                            )}
+                                                            className={`${gradeColors.row} ${gradeColors.hoverRow} transition-colors`}
+                                                        >
                                                             <td
-                                                                className={`sticky right-0 z-10 ${gradeColors.rightCell} px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 border-l border-gray-300 min-w-[100px]`}
+                                                                className={`sticky left-0 z-10 ${gradeColors.leftCell} px-4 py-3 border-r border-gray-200 min-w-[200px]`}
                                                             >
-                                                                {calculateOverallFinalGrade(
-                                                                    draftValues,
-                                                                    gradeCategories,
+                                                                <div className="text-sm font-medium text-gray-900">
+                                                                    {
+                                                                        student.name
+                                                                    }
+                                                                </div>
+                                                                {formatAcademicMeta(
+                                                                    student,
+                                                                ) && (
+                                                                    <div className="text-xs text-gray-500">
+                                                                        {formatAcademicMeta(
+                                                                            student,
+                                                                        )}
+                                                                    </div>
                                                                 )}
                                                             </td>
-                                                        )}
-                                                    </tr>
-                                                );
-                                            },
-                                        )}
-                                    </tbody>
-                                </table>
+                                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 border-r border-gray-200 min-w-[120px]">
+                                                                {student.lrn}
+                                                            </td>
+                                                            <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-center text-gray-900 border-r border-gray-200 min-w-[100px]">
+                                                                {q1 != null
+                                                                    ? q1
+                                                                    : "—"}
+                                                            </td>
+                                                            <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-center text-gray-900 border-r border-gray-200 min-w-[100px]">
+                                                                {q2 != null
+                                                                    ? q2
+                                                                    : "—"}
+                                                            </td>
+                                                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-center text-gray-900 min-w-[120px]">
+                                                                <span
+                                                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                                                        final_grade ==
+                                                                        null
+                                                                            ? "bg-gray-100 text-gray-500"
+                                                                            : final_grade >=
+                                                                                75
+                                                                              ? "bg-green-100 text-green-800"
+                                                                              : "bg-red-100 text-red-800"
+                                                                    }`}
+                                                                >
+                                                                    {final_grade !=
+                                                                    null
+                                                                        ? final_grade
+                                                                        : "—"}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                },
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {sortedStudents.length === 0 && (
+                                    <EmptyStudentState
+                                        hasSearchTerm={Boolean(searchTerm)}
+                                        searchTerm={searchTerm}
+                                        onAddStudent={() =>
+                                            setIsAddStudentModalOpen(true)
+                                        }
+                                    />
+                                )}
                             </div>
-                            {filteredStudents.length === 0 && (
-                                <EmptyStudentState
-                                    hasSearchTerm={Boolean(searchTerm)}
-                                    searchTerm={searchTerm}
-                                    onAddStudent={() =>
-                                        setIsAddStudentModalOpen(true)
-                                    }
-                                />
-                            )}
-                        </div>
-                        {!hasAssignments && (
+                        )}
+                        {selectedTab !== "final" && !hasAssignments && (
                             <p className="text-center text-gray-500 py-6">
                                 Add your first activity under Written Works,
                                 Performance Task, or Quarterly Exam to begin
@@ -1775,6 +2072,7 @@ const MyClass = (props) => {
                 onClose={() => setIsEditCategoriesModalOpen(false)}
                 subjectId={selectedClass?.id}
                 categories={gradeCategories}
+                quarter={selectedQuarter}
             />
             {/* --- Add Student Modal --- */}
             {isAddStudentModalOpen && selectedClass && (
@@ -1815,6 +2113,7 @@ const MyClass = (props) => {
                     student={selectedStudentForStatus}
                     assignments={assignmentColumns}
                     gradeCategories={gradeCategories}
+                    gradeStructure={gradeStructure}
                 />
             )}
             {/* --- Grade Submission Modal --- */}
@@ -1823,6 +2122,20 @@ const MyClass = (props) => {
                 onClose={handleCloseGradeModal}
                 status={gradeSubmissionModal.status}
                 message={gradeSubmissionModal.message}
+            />
+            {/* --- Start Q2 Confirmation Modal --- */}
+            <StartQ2ConfirmModal
+                isOpen={isStartQ2ModalOpen}
+                onClose={() => setIsStartQ2ModalOpen(false)}
+                classId={selectedClass?.id}
+                hasQuarterlyExam={q1HasQuarterlyExam}
+                onSuccess={() => {
+                    setSelectedTab("q2");
+                    setSelectedQuarter(2);
+                    router.reload({
+                        only: ["classes", "rosters"],
+                    });
+                }}
             />
         </>
     );

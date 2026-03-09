@@ -27,10 +27,19 @@ class GradeController extends Controller
     {
         $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
-        $structure = $this->buildGradeStructure($subjectTeacher->grade_categories);
-        $assignments = collect($structure['assignments'])->keyBy('id');
+        $stored = $subjectTeacher->grade_categories ?? [];
+        $q1Structure = $this->buildGradeStructure($this->resolveQuarterCategories($stored, 1));
+        $q2Structure = $this->buildGradeStructure($this->resolveQuarterCategories($stored, 2));
 
-        if ($assignments->isEmpty()) {
+        $assignmentsByQuarter = [
+            1 => collect($q1Structure['assignments'])->keyBy('id'),
+            2 => collect($q2Structure['assignments'])->keyBy('id'),
+        ];
+
+        // Merge all assignments for a combined empty check
+        $allAssignments = $assignmentsByQuarter[1]->merge($assignmentsByQuarter[2]);
+
+        if ($allAssignments->isEmpty()) {
             return back()->withErrors([
                 'grades' => 'Add at least one grading activity before saving scores.',
             ]);
@@ -74,6 +83,8 @@ class GradeController extends Controller
         foreach ($data['grades'] as $index => $gradePayload) {
             $enrollmentId = (int) $gradePayload['enrollment_id'];
             $assignmentId = (string) $gradePayload['assignment_id'];
+            $quarter = $gradePayload['quarter'] ?? 1;
+            $assignments = $assignmentsByQuarter[$quarter] ?? $assignmentsByQuarter[1];
             $assignment = $assignments->get($assignmentId);
 
             if (! $assignment) {
@@ -90,7 +101,6 @@ class GradeController extends Controller
                 continue;
             }
 
-            $quarter = $gradePayload['quarter'] ?? 1;
             $score = $gradePayload['score'];
 
             if ($score !== null && $score > $assignment['total']) {
@@ -123,8 +133,7 @@ class GradeController extends Controller
             $summary['updated']++;
         }
 
-        return redirect()
-            ->route('teacher.classes.index')
+        return back()
             ->with('success', 'Grades updated successfully.')
             ->with('grade_update_summary', $summary);
     }
@@ -135,9 +144,12 @@ class GradeController extends Controller
 
         $request->validate([
             'grades_file' => 'required|file|mimes:csv,txt|max:4096',
+            'quarter' => 'sometimes|integer|in:1,2',
         ]);
 
-        $structure = $this->buildGradeStructure($subjectTeacher->grade_categories);
+        $quarter = (int) ($request->input('quarter', $subjectTeacher->current_quarter ?? 1));
+        $stored = $subjectTeacher->grade_categories ?? [];
+        $structure = $this->buildGradeStructure($this->resolveQuarterCategories($stored, $quarter));
         $assignments = collect($structure['assignments']);
 
         if ($assignments->isEmpty()) {
@@ -154,7 +166,7 @@ class GradeController extends Controller
         }
 
         try {
-            $summary = $this->importGradesFromCsv($subjectTeacher, $request->file('grades_file'), $structure);
+            $summary = $this->importGradesFromCsv($subjectTeacher, $request->file('grades_file'), $structure, $quarter);
         } catch (RuntimeException $exception) {
             if ($request->expectsJson()) {
                 return response()->json([
@@ -173,13 +185,12 @@ class GradeController extends Controller
             ]);
         }
 
-        return redirect()
-            ->route('teacher.classes.index')
+        return back()
             ->with('success', 'Grades uploaded successfully.')
             ->with('grade_import_summary', $summary);
     }
 
-    private function importGradesFromCsv(SubjectTeacher $subjectTeacher, UploadedFile $file, array $structure): array
+    private function importGradesFromCsv(SubjectTeacher $subjectTeacher, UploadedFile $file, array $structure, int $quarter = 1): array
     {
         $rows = $this->readSpreadsheetRows($file);
 
@@ -256,7 +267,7 @@ class GradeController extends Controller
                     [
                         'enrollment_id' => $enrollment->id,
                         'assignment_key' => $assignmentId,
-                        'quarter' => 1,
+                        'quarter' => $quarter,
                     ],
                     [
                         'assignment_name' => $assignment['label'],

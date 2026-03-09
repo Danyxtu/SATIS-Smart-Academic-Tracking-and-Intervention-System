@@ -19,9 +19,9 @@ return new class extends Migration
             $table->string('section')->nullable();
             $table->string('strand')->nullable();
             $table->string('track')->nullable();
-            $table->string('subject');
-            $table->integer('grade');
-            $table->string('trend');
+            $table->string('subject')->nullable();
+            $table->integer('grade')->nullable();
+            $table->string('trend')->nullable();
             $table->string('avatar')->nullable();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->timestamps();

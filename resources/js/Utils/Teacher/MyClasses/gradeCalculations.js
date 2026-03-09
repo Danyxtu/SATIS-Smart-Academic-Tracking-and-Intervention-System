@@ -1,22 +1,14 @@
+/**
+ * Grades are now grouped by quarter:
+ *   { 1: { taskId: score, ... }, 2: { taskId: score, ... } }
+ *
+ * Each helper receives the full grades object and picks the right quarter slice.
+ */
+
 const calculateFinalGrade = (grades = {}, categories = [], quarter = 1) => {
     if (!categories.length) return "N/A";
 
-    // Filter grades for the specific quarter
-    const quarterGrades = {};
-    Object.entries(grades).forEach(([key, value]) => {
-        // Grades are stored with quarter prefix like "q1_taskId" or just "taskId" for Q1
-        const isQ1Grade = !key.startsWith("q2_");
-        const isQ2Grade = key.startsWith("q2_");
-
-        if (quarter === 1 && isQ1Grade) {
-            quarterGrades[key] = value;
-        } else if (quarter === 2 && isQ2Grade) {
-            quarterGrades[key.replace("q2_", "")] = value;
-        } else if (quarter === 1) {
-            // For backward compatibility, use raw grades for Q1
-            quarterGrades[key] = value;
-        }
-    });
+    const quarterGrades = grades?.[quarter] ?? {};
 
     let totalWeight = 0;
     let weightedScore = 0;
@@ -103,20 +95,7 @@ const calculateExpectedQuarterlyGrade = (
 ) => {
     if (!categories.length) return "N/A";
 
-    // Filter grades for the specific quarter
-    const quarterGrades = {};
-    Object.entries(grades).forEach(([key, value]) => {
-        const isQ1Grade = !key.startsWith("q2_");
-        const isQ2Grade = key.startsWith("q2_");
-
-        if (quarter === 1 && isQ1Grade) {
-            quarterGrades[key] = value;
-        } else if (quarter === 2 && isQ2Grade) {
-            quarterGrades[key.replace("q2_", "")] = value;
-        } else if (quarter === 1) {
-            quarterGrades[key] = value;
-        }
-    });
+    const quarterGrades = grades?.[quarter] ?? {};
 
     let totalEarned = 0;
     let totalPossible = 0;
@@ -210,6 +189,8 @@ const calculateExpectedQuarterlyGrade = (
 
 // Check if a quarter has quarterly exam scores (indicates quarter is started/finished)
 const hasQuarterlyExamScores = (grades = {}, categories = [], quarter = 1) => {
+    const quarterGrades = grades?.[quarter] ?? {};
+
     const quarterlyExamCategory = categories.find(
         (cat) =>
             cat.id === "quarterly_exam" ||
@@ -221,8 +202,7 @@ const hasQuarterlyExamScores = (grades = {}, categories = [], quarter = 1) => {
     }
 
     return quarterlyExamCategory.tasks.some((task) => {
-        const gradeKey = quarter === 2 ? `q2_${task.id}` : task.id;
-        const value = grades?.[gradeKey];
+        const value = quarterGrades?.[task.id];
         return value !== "" && value !== null && value !== undefined;
     });
 };
@@ -231,13 +211,14 @@ const hasQuarterlyExamScores = (grades = {}, categories = [], quarter = 1) => {
 const isQuarterComplete = (grades = {}, categories = [], quarter = 1) => {
     if (!categories.length) return false;
 
+    const quarterGrades = grades?.[quarter] ?? {};
+
     return categories.every((category) => {
         const tasks = category?.tasks ?? [];
         if (!tasks.length) return false;
 
         return tasks.some((task) => {
-            const gradeKey = quarter === 2 ? `q2_${task.id}` : task.id;
-            const value = grades?.[gradeKey];
+            const value = quarterGrades?.[task.id];
             return value !== "" && value !== null && value !== undefined;
         });
     });

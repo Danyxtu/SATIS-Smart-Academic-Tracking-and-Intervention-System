@@ -47,18 +47,18 @@ export default function Index({ departments, filters }) {
         router.get(
             route("superadmin.departments.index"),
             { search, status },
-            { preserveState: true }
+            { preserveState: true },
         );
     };
 
     const handleDelete = (department) => {
         if (
             confirm(
-                `Are you sure you want to delete "${department.name}"? This action cannot be undone.`
+                `Are you sure you want to delete "${department.department_name}"? This action cannot be undone.`,
             )
         ) {
             router.delete(
-                route("superadmin.departments.destroy", department.id)
+                route("superadmin.departments.destroy", department.id),
             );
         }
     };
@@ -67,7 +67,7 @@ export default function Index({ departments, filters }) {
         router.post(
             route("superadmin.departments.toggle-status", department.id),
             {},
-            { preserveState: true }
+            { preserveState: true },
         );
     };
 
@@ -205,7 +205,9 @@ export default function Index({ departments, filters }) {
                                                     </div>
                                                     <div>
                                                         <p className="font-semibold text-slate-900">
-                                                            {dept.name}
+                                                            {
+                                                                dept.department_name
+                                                            }
                                                         </p>
                                                         {dept.description && (
                                                             <p className="text-xs text-slate-500 truncate max-w-xs">
@@ -219,7 +221,7 @@ export default function Index({ departments, filters }) {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className="inline-flex items-center rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                                                    {dept.code}
+                                                    {dept.department_code}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-center">
@@ -266,7 +268,7 @@ export default function Index({ departments, filters }) {
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         handleToggleStatus(
-                                                            dept
+                                                            dept,
                                                         );
                                                     }}
                                                     className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
@@ -302,7 +304,7 @@ export default function Index({ departments, filters }) {
                                                     <Link
                                                         href={route(
                                                             "superadmin.departments.edit",
-                                                            dept.id
+                                                            dept.id,
                                                         )}
                                                         className="rounded-lg p-2 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                                                     >
@@ -352,8 +354,8 @@ export default function Index({ departments, filters }) {
                                             link.active
                                                 ? "bg-blue-600 text-white"
                                                 : link.url
-                                                ? "text-slate-600 hover:bg-slate-100"
-                                                : "text-slate-300 cursor-not-allowed"
+                                                  ? "text-slate-600 hover:bg-slate-100"
+                                                  : "text-slate-300 cursor-not-allowed"
                                         }`}
                                         dangerouslySetInnerHTML={{
                                             __html: link.label,
@@ -394,7 +396,7 @@ export default function Index({ departments, filters }) {
                                     </div>
                                     <div>
                                         <h2 className="text-2xl font-bold text-white">
-                                            {selectedDepartment.name}
+                                            {selectedDepartment.department_name}
                                         </h2>
                                         <div className="mt-1 flex items-center gap-2">
                                             <span className="inline-flex items-center rounded-lg bg-white/20 px-2.5 py-1 text-xs font-semibold text-white">
@@ -402,7 +404,9 @@ export default function Index({ departments, filters }) {
                                                     size={12}
                                                     className="mr-1"
                                                 />
-                                                {selectedDepartment.code}
+                                                {
+                                                    selectedDepartment.department_code
+                                                }
                                             </span>
                                             <span
                                                 className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold ${
@@ -504,7 +508,7 @@ export default function Index({ departments, filters }) {
                                             </span>
                                             <span className="font-medium text-slate-700">
                                                 {new Date(
-                                                    selectedDepartment.created_at
+                                                    selectedDepartment.created_at,
                                                 ).toLocaleDateString("en-US", {
                                                     year: "numeric",
                                                     month: "long",
@@ -539,7 +543,7 @@ export default function Index({ departments, filters }) {
                                     <Link
                                         href={route(
                                             "superadmin.departments.edit",
-                                            selectedDepartment.id
+                                            selectedDepartment.id,
                                         )}
                                         className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 transition-colors"
                                     >

@@ -69,8 +69,8 @@ class UserController extends Controller
             'userTrends' => $userTrends,
             'department' => $department ? [
                 'id' => $department->id,
-                'name' => $department->name,
-                'code' => $department->code,
+                'name' => $department->department_name,
+                'code' => $department->department_code,
             ] : null,
         ]);
     }
@@ -190,8 +190,8 @@ class UserController extends Controller
             'sections' => $sections,
             'department' => $department ? [
                 'id' => $department->id,
-                'name' => $department->name,
-                'code' => $department->code,
+                'name' => $department->department_name,
+                'code' => $department->department_code,
             ] : null,
         ]);
     }
@@ -207,8 +207,8 @@ class UserController extends Controller
         return Inertia::render('Admin/Users/Create', [
             'department' => $department ? [
                 'id' => $department->id,
-                'name' => $department->name,
-                'code' => $department->code,
+                'name' => $department->department_name,
+                'code' => $department->department_code,
             ] : null,
         ]);
     }
@@ -230,6 +230,11 @@ class UserController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'role' => 'required|in:student,teacher', // Admin cannot create other admins
         ];
+
+        // Require LRN for student role
+        if ($request->role === 'student') {
+            $rules['lrn'] = 'required|string|max:20|unique:students,lrn';
+        }
 
         // Only require password for non-student roles
         if ($request->role !== 'student') {
@@ -268,9 +273,13 @@ class UserController extends Controller
 
         // If creating a student, also create the student profile
         if ($validated['role'] === 'student') {
+            $middleName = $validated['middle_name'] ?? null;
+            $studentName = trim($validated['first_name'] . ' ' . ($middleName ? $middleName . ' ' : '') . $validated['last_name']);
+
             Student::create([
                 'user_id' => $user->id,
-                'student_id' => 'STU-' . str_pad($user->id, 6, '0', STR_PAD_LEFT),
+                'student_name' => $studentName,
+                'lrn' => $validated['lrn'],
             ]);
 
             // Return with temporary password for student
@@ -312,8 +321,8 @@ class UserController extends Controller
             ],
             'department' => $department ? [
                 'id' => $department->id,
-                'name' => $department->name,
-                'code' => $department->code,
+                'name' => $department->department_name,
+                'code' => $department->department_code,
             ] : null,
         ]);
     }
@@ -451,10 +460,13 @@ class UserController extends Controller
         // Build query
         $query = PasswordResetRequest::with(['user', 'processedBy']);
 
-        // Scope to admin's department if applicable
+        // Scope to admin's department (teachers) + all students
         if ($admin->department_id) {
             $query->whereHas('user', function ($q) use ($admin) {
-                $q->where('department_id', $admin->department_id);
+                $q->where(function ($q2) use ($admin) {
+                    $q2->where('department_id', $admin->department_id)
+                        ->orWhere('role', 'student');
+                });
             });
         }
 
@@ -469,7 +481,10 @@ class UserController extends Controller
         $countsQuery = PasswordResetRequest::query();
         if ($admin->department_id) {
             $countsQuery->whereHas('user', function ($q) use ($admin) {
-                $q->where('department_id', $admin->department_id);
+                $q->where(function ($q2) use ($admin) {
+                    $q2->where('department_id', $admin->department_id)
+                        ->orWhere('role', 'student');
+                });
             });
         }
 
@@ -489,17 +504,27 @@ class UserController extends Controller
 
     /**
      * Approve a password reset request.
+     * Generates an 8-character temporary password for F2F reset.
+     * The user must change this password on next login.
      */
     public function approvePasswordResetRequest(Request $request, PasswordResetRequest $passwordResetRequest)
     {
         $validated = $request->validate([
-            'new_password' => ['required', Rules\Password::defaults()],
             'admin_notes' => ['nullable', 'string', 'max:500'],
         ]);
 
-        // Update user's password
+        // Generate a random 8-character password
+        $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+        $tempPassword = '';
+        for ($i = 0; $i < 8; $i++) {
+            $tempPassword .= $chars[random_int(0, strlen($chars) - 1)];
+        }
+
+        // Update user's password and flag for forced change
         $passwordResetRequest->user->update([
-            'password' => Hash::make($validated['new_password']),
+            'password' => Hash::make($tempPassword),
+            'temp_password' => $tempPassword,
+            'must_change_password' => true,
         ]);
 
         // Update request status
@@ -510,7 +535,11 @@ class UserController extends Controller
             'processed_at' => now(),
         ]);
 
-        return back()->with('success', 'Password reset request approved. User password has been changed.');
+        return back()->with([
+            'success' => 'Password reset approved. Share the temporary password with the user face-to-face.',
+            'generated_password' => $tempPassword,
+            'reset_request_id' => $passwordResetRequest->id,
+        ]);
     }
 
     /**

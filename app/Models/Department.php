@@ -12,11 +12,10 @@ class Department extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name',
-        'code',
+        'department_name',
+        'department_code',
         'description',
         'is_active',
-        'created_by',
     ];
 
     protected $casts = [

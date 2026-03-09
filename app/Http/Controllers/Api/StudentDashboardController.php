@@ -126,7 +126,9 @@ class StudentDashboardController extends Controller
             return [
                 'id' => $enrollment->id,
                 'subjectId' => $enrollment->subjectTeacher?->subject_id,
+                // Keep existing `subject_name` but also provide `name` to match mobile/front-end expectations
                 'subject_name' => $enrollment->subjectTeacher?->subject?->subject_name ?? 'Unknown Subject',
+                'name' => $enrollment->subjectTeacher?->subject?->subject_name ?? 'Unknown Subject',
                 'section' => $enrollment->subjectTeacher?->subject?->section,
                 'teacher_name' => $enrollment->subjectTeacher?->teacher
                     ? $enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name
