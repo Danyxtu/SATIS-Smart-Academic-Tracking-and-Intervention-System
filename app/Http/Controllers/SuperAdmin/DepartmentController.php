@@ -77,40 +77,40 @@ class DepartmentController extends Controller
     /**
      * Display the specified department.
      */
-    public function show(Department $department): Response
-    {
-        $this->authorize('manage-departments');
+    // public function show(Department $department): Response
+    // {
+    //     $this->authorize('manage-departments');
 
-        $department->loadCount(['admins', 'teachers', 'students']);
+    //     $department->loadCount(['admins', 'teachers', 'students']);
 
-        $admins = $department->admins()
-            ->latest()
-            ->get()
-            ->map(fn($user) => [
-                'id' => $user->id,
-                'name' => $user->first_name . ' ' . $user->last_name,
-                'email' => $user->email,
-                'created_at' => $user->created_at->format('M d, Y'),
-            ]);
+    //     $admins = $department->admins()
+    //         ->latest()
+    //         ->get()
+    //         ->map(fn($user) => [
+    //             'id' => $user->id,
+    //             'name' => $user->first_name . ' ' . $user->last_name,
+    //             'email' => $user->email,
+    //             'created_at' => $user->created_at->format('M d, Y'),
+    //         ]);
 
-        $teacherCount = $department->teachers()->count();
-        $studentCount = $department->students()->count();
+    //     $teacherCount = $department->teachers()->count();
+    //     $studentCount = $department->students()->count();
 
-        return Inertia::render('SuperAdmin/Departments/Show', [
-            'department' => [
-                'id' => $department->id,
-                'name' => $department->department_name,
-                'code' => $department->department_code,
-                'description' => $department->description,
-                'is_active' => $department->is_active,
-                'created_at' => $department->created_at->format('M d, Y'),
-                'admins_count' => $department->admins_count,
-                'teachers_count' => $teacherCount,
-                'students_count' => $studentCount,
-            ],
-            'admins' => $admins,
-        ]);
-    }
+    //     return Inertia::render('SuperAdmin/Departments/Show', [
+    //         'department' => [
+    //             'id' => $department->id,
+    //             'name' => $department->department_name,
+    //             'code' => $department->department_code,
+    //             'description' => $department->description,
+    //             'is_active' => $department->is_active,
+    //             'created_at' => $department->created_at->format('M d, Y'),
+    //             'admins_count' => $department->admins_count,
+    //             'teachers_count' => $teacherCount,
+    //             'students_count' => $studentCount,
+    //         ],
+    //         'admins' => $admins,
+    //     ]);
+    // }
 
     /**
      * Show the form for editing the specified department.

@@ -33,6 +33,9 @@ class DatabaseSeeder extends Seeder
             'role' => 'teacher',
         ]);
 
+        // Seed departments
+        $this->call(DepartmentSeeder::class);
+
         // Seed subjects (classlists)
         $this->call(SubjectSeeder::class);
     }
