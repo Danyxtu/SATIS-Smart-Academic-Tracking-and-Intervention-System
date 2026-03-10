@@ -62,6 +62,8 @@ class DepartmentController extends Controller
             'is_active' => ['boolean'],
         ]);
 
+        $validated['created_by'] = $request->user()->id;
+
         Department::create($validated);
 
         return redirect()
