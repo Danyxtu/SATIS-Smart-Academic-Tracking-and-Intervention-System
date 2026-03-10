@@ -17,6 +17,8 @@ class DepartmentController extends Controller
      */
     public function index(Request $request): Response
     {
+        $this->authorize('manage-departments');
+
         $query = Department::withCount(['admins', 'teachers', 'students']);
 
         // Search
@@ -46,6 +48,8 @@ class DepartmentController extends Controller
      */
     public function create(): Response
     {
+        $this->authorize('create-department');
+
         return Inertia::render('SuperAdmin/Departments/Create');
     }
 
@@ -54,6 +58,8 @@ class DepartmentController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create-department');
+
         $validated = $request->validate([
             'department_name' => ['required', 'string', 'max:255'],
             'department_code' => ['required', 'string', 'max:50', 'unique:departments,department_code'],
@@ -73,6 +79,8 @@ class DepartmentController extends Controller
      */
     public function show(Department $department): Response
     {
+        $this->authorize('manage-departments');
+
         $department->loadCount(['admins', 'teachers', 'students']);
 
         $admins = $department->admins()
@@ -109,6 +117,8 @@ class DepartmentController extends Controller
      */
     public function edit(Department $department): Response
     {
+        $this->authorize('update-department');
+
         $department->loadCount(['admins', 'teachers', 'students']);
 
         return Inertia::render('SuperAdmin/Departments/Edit', [
@@ -130,6 +140,8 @@ class DepartmentController extends Controller
      */
     public function update(Request $request, Department $department): RedirectResponse
     {
+        $this->authorize('update-department');
+
         $validated = $request->validate([
             'department_name' => ['required', 'string', 'max:255'],
             'department_code' => ['required', 'string', 'max:50', Rule::unique('departments')->ignore($department->id)],
@@ -149,6 +161,8 @@ class DepartmentController extends Controller
      */
     public function destroy(Department $department): RedirectResponse
     {
+        $this->authorize('delete-department');
+
         // Check if department has users
         if ($department->users()->count() > 0) {
             return back()->with('error', 'Cannot delete department with assigned users.');
@@ -166,6 +180,8 @@ class DepartmentController extends Controller
      */
     public function toggleStatus(Department $department): RedirectResponse
     {
+        $this->authorize('update-department');
+
         $department->update(['is_active' => !$department->is_active]);
 
         $status = $department->is_active ? 'activated' : 'deactivated';

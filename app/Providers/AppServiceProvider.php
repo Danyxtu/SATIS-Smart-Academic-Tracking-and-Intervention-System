@@ -27,6 +27,21 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('access-super-admin-portal', function (User $user) {
             return $user->role === 'super_admin';
         });
+
+        // Department management gates (super_admin only)
+        Gate::define('manage-departments', function (User $user) {
+            return $user->role === 'super_admin';
+        });
+        Gate::define('create-department', function (User $user) {
+            return $user->role === 'super_admin';
+        });
+        Gate::define('update-department', function (User $user) {
+            return $user->role === 'super_admin';
+        });
+        Gate::define('delete-department', function (User $user) {
+            return $user->role === 'super_admin';
+        });
+
         Gate::define('access-teacher-portal', function (User $user) {
             return $user->role === 'teacher';
         });
