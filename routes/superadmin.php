@@ -27,7 +27,20 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal'])
             ->name('dashboard');
 
         // Department Management
-        Route::resource('departments', DepartmentController::class);
+        Route::get('/departments', [DepartmentController::class, 'index'])
+            ->name('departments.index');
+        Route::get('/departments/create', [DepartmentController::class, 'create'])
+            ->name('departments.create');
+        Route::post('/departments', [DepartmentController::class, 'store'])
+            ->name('departments.store');
+        Route::get('/departments/{department}', [DepartmentController::class, 'show'])
+            ->name('departments.show');
+        Route::get('/departments/{department}/edit', [DepartmentController::class, 'edit'])
+            ->name('departments.edit');
+        Route::put('/departments/{department}', [DepartmentController::class, 'update'])
+            ->name('departments.update');
+        Route::delete('/departments/{department}', [DepartmentController::class, 'destroy'])
+            ->name('departments.destroy');
         Route::post('/departments/{department}/toggle-status', [DepartmentController::class, 'toggleStatus'])
             ->name('departments.toggle-status');
 
