@@ -16,7 +16,6 @@ class Department extends Model
         'department_code',
         'description',
         'is_active',
-        'created_by',
     ];
 
     protected $casts = [

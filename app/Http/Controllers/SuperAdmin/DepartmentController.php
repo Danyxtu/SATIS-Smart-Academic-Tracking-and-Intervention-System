@@ -17,8 +17,7 @@ class DepartmentController extends Controller
      */
     public function index(Request $request): Response
     {
-        $query = Department::withCount(['admins', 'teachers', 'students'])
-            ->with('creator:id,first_name,last_name');
+        $query = Department::withCount(['admins', 'teachers', 'students']);
 
         // Search
         if ($request->filled('search')) {
@@ -62,8 +61,6 @@ class DepartmentController extends Controller
             'is_active' => ['boolean'],
         ]);
 
-        $validated['created_by'] = $request->user()->id;
-
         Department::create($validated);
 
         return redirect()
@@ -76,7 +73,6 @@ class DepartmentController extends Controller
      */
     public function show(Department $department): Response
     {
-        $department->load(['creator:id,first_name,last_name']);
         $department->loadCount(['admins', 'teachers', 'students']);
 
         $admins = $department->admins()
@@ -99,7 +95,6 @@ class DepartmentController extends Controller
                 'code' => $department->department_code,
                 'description' => $department->description,
                 'is_active' => $department->is_active,
-                'created_by' => $department->creator?->name ?? 'System',
                 'created_at' => $department->created_at->format('M d, Y'),
                 'admins_count' => $department->admins_count,
                 'teachers_count' => $teacherCount,
