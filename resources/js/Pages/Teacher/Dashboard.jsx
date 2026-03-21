@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from "react";
-import TeacherLayout from "@/Layouts/TeacherLayout";
+import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
 import { Head, Link } from "@inertiajs/react";
 import {
     AlertTriangle,
     ClipboardList,
     TrendingDown,
-    CheckCircle2,
+    ChecxkCircle2,
     Calendar,
     BookOpen,
     Building2,
@@ -145,7 +145,7 @@ const Dashboard = ({
     // Full Name of the teacher
     const fullname = auth.user.first_name + " " + auth.user.last_name;
     return (
-        <TeacherLayout>
+        <SuperAdminLayout>
             <Head title="Teacher Dashboard" />
 
             {/* 1. Header */}
@@ -459,7 +459,7 @@ const Dashboard = ({
                 onClose={() => setShowInterventionModal(false)}
                 priorityStudents={priorityStudents}
             />
-        </TeacherLayout>
+        </SuperAdminLayout>
     );
 };
 export default Dashboard;

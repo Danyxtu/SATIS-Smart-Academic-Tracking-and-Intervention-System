@@ -5,6 +5,7 @@ use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardCo
 use App\Http\Controllers\SuperAdmin\DepartmentController;
 use App\Http\Controllers\SuperAdmin\AdminController as SuperAdminAdminController;
 use App\Http\Controllers\SuperAdmin\SettingsController;
+use App\Http\Controllers\SuperAdmin\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -17,7 +18,7 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::middleware(['auth', 'verified', 'can:access-super-admin-portal'])
+Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superadmin'])
     ->prefix('superadmin')
     ->name('superadmin.')
     ->group(function () {
@@ -27,10 +28,27 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal'])
             ->name('dashboard');
 
         // Department Management
-        Route::resource('departments', DepartmentController::class);
+        Route::get('/departments', [DepartmentController::class, 'index'])
+            ->name('departments.index');
+        Route::get('/departments/create', [DepartmentController::class, 'create'])
+            ->name('departments.create');
+        Route::post('/departments', [DepartmentController::class, 'store'])
+            ->name('departments.store');
+        Route::get('/departments/{department}', [DepartmentController::class, 'show'])
+            ->name('departments.show');
+        Route::get('/departments/{department}/edit', [DepartmentController::class, 'edit'])
+            ->name('departments.edit');
+        Route::put('/departments/{department}', [DepartmentController::class, 'update'])
+            ->name('departments.update');
+        Route::delete('/departments/{department}', [DepartmentController::class, 'destroy'])
+            ->name('departments.destroy');
         Route::post('/departments/{department}/toggle-status', [DepartmentController::class, 'toggleStatus'])
             ->name('departments.toggle-status');
 
+        // User Management
+        Route::resource('users', UserManagementController::class);
+        Route::get('users/', [UserManagementController::class, 'index'])
+            ->name('users.index');
         // Admin Management
         Route::resource('admins', SuperAdminAdminController::class);
         Route::post('/admins/{admin}/reset-password', [SuperAdminAdminController::class, 'resetPassword'])

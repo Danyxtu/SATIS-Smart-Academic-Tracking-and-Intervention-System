@@ -1,340 +1,375 @@
 import { useState } from "react";
-import ApplicationLogo from "@/Components/ApplicationLogo";
-import Dropdown from "@/Components/Dropdown";
-import NavLink from "@/Components/NavLink";
-import ResponsiveNavLink from "@/Components/ResponsiveNavLink";
-import DarkModeToggle from "@/Components/DarkModeToggle";
+import SATISHeader from "@/Components/SATISHeader";
 import ConfirmationDialog from "@/Components/ConfirmationDialog";
 import { Link, usePage, router } from "@inertiajs/react";
-import UserPicture from "../../assets/user.png";
+import getInitials from "@/utils/initialsHelper";
 import {
-    House,
-    LogOut,
-    Menu,
     X,
-    Users,
-    Shield,
-    Settings,
-    Building2,
-    BookOpen,
+    ChevronRight,
+    ChevronDown,
+    LogOut,
+    CheckCircle,
+    XCircle,
+    Menu,
 } from "lucide-react";
+import { superAdminRoutes } from "@/routes/superadmin";
+import { adminRoutes } from "@/routes/admin";
+import { teachersRoutes } from "@/routes/teachers";
 
-export default function SuperAdminLayout({ children }) {
-    const { auth, flash } = usePage().props;
-    const [showingNavigationDropdown, setShowingNavigationDropdown] =
-        useState(false);
-    const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
+// ── Role section config ──────────────────────────────────────────
+const ROLE_SECTIONS = [
+    {
+        key: "teacher",
+        label: "Teacher",
+        routes: teachersRoutes,
+        labelColor: "text-blue-400",
+        activeLabelColor: "text-blue-300",
+        activeGradient: "from-blue-600/30 to-blue-500/10",
+        activeRing: "ring-blue-500/30",
+        activeIcon: "bg-blue-500/20 text-blue-400",
+        activeChevron: "text-blue-400/60",
+        activeBar: "bg-blue-400",
+        indicator: "bg-blue-500",
+        headerHover: "hover:bg-blue-500/10",
+        headerActive: "bg-blue-500/10",
+    },
+    {
+        key: "admin",
+        label: "Admin",
+        routes: adminRoutes,
+        labelColor: "text-emerald-400",
+        activeLabelColor: "text-emerald-300",
+        activeGradient: "from-emerald-600/30 to-emerald-500/10",
+        activeRing: "ring-emerald-500/30",
+        activeIcon: "bg-emerald-500/20 text-emerald-400",
+        activeChevron: "text-emerald-400/60",
+        activeBar: "bg-emerald-400",
+        indicator: "bg-emerald-500",
+        headerHover: "hover:bg-emerald-500/10",
+        headerActive: "bg-emerald-500/10",
+    },
+    {
+        key: "superadmin",
+        label: "Superadmin",
+        routes: superAdminRoutes,
+        labelColor: "text-amber-400",
+        activeLabelColor: "text-amber-300",
+        activeGradient: "from-amber-600/30 to-amber-500/10",
+        activeRing: "ring-amber-500/30",
+        activeIcon: "bg-amber-500/20 text-amber-400",
+        activeChevron: "text-amber-400/60",
+        activeBar: "bg-amber-400",
+        indicator: "bg-amber-500",
+        headerHover: "hover:bg-amber-500/10",
+        headerActive: "bg-amber-500/10",
+    },
+];
 
-    // Handle logout confirmation
-    const handleLogoutClick = () => {
-        setShowLogoutConfirmation(true);
-    };
+// ── Nav item ─────────────────────────────────────────────────────
+function NavItem({ item, section, onLinkClick }) {
+    const label = item.label ?? item.name;
+    const dest = item.destination ?? item.path;
+    const activeCheck = item.activeCheck ?? dest;
+    const Icon = item.icon;
 
-    const handleConfirmLogout = () => {
-        // Use Inertia router to post the logout request
-        router.post(route("logout"));
-    };
-
-    // Super Admin Navigation Items
-    const menuItems = [
-        {
-            icon: <House size={18} />,
-            label: "Dashboard",
-            destination: "superadmin.dashboard",
-            activeCheck: "superadmin.dashboard",
-        },
-        {
-            icon: <Building2 size={18} />,
-            label: "Departments",
-            destination: "superadmin.departments.index",
-            activeCheck: "superadmin.departments.*",
-        },
-        {
-            icon: <Users size={18} />,
-            label: "Admins",
-            destination: "superadmin.admins.index",
-            activeCheck: "superadmin.admins.*",
-        },
-        // {
-        //     icon: <BookOpen size={18} />,
-        //     label: "Curriculum",
-        //     destination: "superadmin.curriculum.index",
-        //     activeCheck: "superadmin.curriculum.*",
-        // },
-        {
-            icon: <Settings size={18} />,
-            label: "Settings",
-            destination: "superadmin.settings.index",
-            activeCheck: "superadmin.settings.*",
-        },
-    ];
+    const routeExists = route().has(dest);
+    const isActive = routeExists ? route().current(activeCheck) : false;
 
     return (
-        <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
-            {/* Flash Messages */}
-            {flash?.success && (
-                <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg animate-fade-in-down">
-                    <div className="flex items-center gap-2">
-                        <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M5 13l4 4L19 7"
-                            />
-                        </svg>
-                        {flash.success}
-                    </div>
-                </div>
+        <Link
+            href={routeExists ? route(dest) : "#"}
+            onClick={onLinkClick}
+            className={`
+                group relative flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium
+                transition-all duration-150
+                ${
+                    isActive
+                        ? `bg-gradient-to-r ${section.activeGradient} text-white ring-1 ${section.activeRing}`
+                        : "text-slate-400 hover:bg-slate-700/50 hover:text-white"
+                }
+                ${!routeExists ? "cursor-not-allowed opacity-40" : ""}
+            `}
+        >
+            {/* Active left bar */}
+            <div
+                className={`absolute left-0 h-5 w-0.5 rounded-r-full transition-all ${section.activeBar} ${
+                    isActive ? "opacity-100" : "opacity-0"
+                }`}
+            />
+
+            {/* Icon */}
+            <div
+                className={`flex h-5 w-5 items-center justify-center rounded-lg transition-colors flex-shrink-0 ${
+                    isActive
+                        ? section.activeIcon
+                        : "bg-slate-700/50 text-slate-400 group-hover:bg-slate-600/50 group-hover:text-slate-200"
+                }`}
+            >
+                <Icon size={12} />
+            </div>
+
+            <span className="truncate">{label}</span>
+
+            {isActive && (
+                <ChevronRight
+                    size={14}
+                    className={`ml-auto flex-shrink-0 ${section.activeChevron}`}
+                />
             )}
-            {flash?.error && (
-                <div className="fixed top-4 right-4 z-50 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg animate-fade-in-down">
-                    <div className="flex items-center gap-2">
-                        <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M6 18L18 6M6 6l12 12"
-                            />
-                        </svg>
-                        {flash.error}
-                    </div>
-                </div>
-            )}
+        </Link>
+    );
+}
 
-            {/* Top Navigation Bar */}
-            <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 z-40">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between h-16">
-                        {/* Logo & Main Nav Links */}
-                        <div className="flex">
-                            {/* Logo */}
-                            <div className="flex-shrink-0 flex items-center">
-                                <Link href={route("superadmin.dashboard")}>
-                                    <ApplicationLogo className="block h-10 w-auto fill-current text-gray-800" />
-                                </Link>
-                                <div className="ml-3 hidden sm:flex items-center">
-                                    <span className="font-semibold text-xl text-gray-700 dark:text-gray-200">
-                                        SATIS
-                                    </span>
-                                    <span className="ml-2 px-2 py-0.5 text-xs font-bold bg-indigo-100 text-indigo-700 rounded-full flex items-center gap-1">
-                                        <Shield size={12} />
-                                        Super Admin
-                                    </span>
-                                </div>
-                            </div>
+// ── Collapsible section ───────────────────────────────────────────
+function NavSection({ section, onLinkClick }) {
+    // Auto-open if a child route is currently active
+    const hasActiveRoute = section.routes.some((item) => {
+        const dest = item.destination ?? item.path;
+        const activeCheck = item.activeCheck ?? dest;
+        return route().has(dest) && route().current(activeCheck);
+    });
 
-                            {/* Desktop Nav Links */}
-                            <div className="hidden space-x-4 sm:-my-px sm:ml-10 sm:flex">
-                                {menuItems.map((item) => {
-                                    const routeExists = route().has(
-                                        item.destination,
-                                    );
-                                    const isActive = routeExists
-                                        ? route().current(item.activeCheck)
-                                        : false;
+    const [isOpen, setIsOpen] = useState(hasActiveRoute);
 
-                                    return (
-                                        <NavLink
-                                            key={item.label}
-                                            href={
-                                                routeExists
-                                                    ? route(item.destination)
-                                                    : "#"
-                                            }
-                                            active={isActive}
-                                            className={`relative inline-flex items-center gap-2 px-1 pt-1 border-b-2 text-sm font-medium transition-colors
-                                                ${
-                                                    isActive
-                                                        ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
-                                                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200"
-                                                }
-                                                ${
-                                                    !routeExists
-                                                        ? "cursor-not-allowed opacity-50"
-                                                        : ""
-                                                }
-                                            `}
-                                        >
-                                            {item.icon}
-                                            {item.label}
-                                        </NavLink>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Right Side: User Dropdown */}
-                        <div className="hidden sm:flex sm:items-center sm:ml-6">
-                            <DarkModeToggle className="mr-3" />
-
-                            <div className="ml-3 relative">
-                                <Dropdown>
-                                    <Dropdown.Trigger>
-                                        <button
-                                            type="button"
-                                            className="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                                        >
-                                            <div className="relative">
-                                                <img
-                                                    className="w-10 h-10 rounded-full border-2 border-indigo-300"
-                                                    src={UserPicture}
-                                                    alt="User"
-                                                />
-                                                <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-indigo-500 rounded-full border-2 border-white flex items-center justify-center">
-                                                    <Shield
-                                                        size={8}
-                                                        className="text-white"
-                                                    />
-                                                </span>
-                                            </div>
-                                        </button>
-                                    </Dropdown.Trigger>
-
-                                    <Dropdown.Content>
-                                        <div className="px-4 py-3 border-b border-gray-100">
-                                            <div className="font-medium text-base text-gray-800 dark:text-gray-200">
-                                                {auth.user.name}
-                                            </div>
-                                            <div className="font-medium text-sm text-gray-500 dark:text-gray-400">
-                                                {auth.user.email}
-                                            </div>
-                                            <div className="mt-2 flex flex-col gap-1">
-                                                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-full w-fit">
-                                                    <Shield
-                                                        size={10}
-                                                        className="mr-1"
-                                                    />
-                                                    Super Administrator
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <Dropdown.Link
-                                            href={route("profile.edit")}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                <Settings size={16} />
-                                                Profile Settings
-                                            </div>
-                                        </Dropdown.Link>
-                                        <button
-                                            onClick={handleLogoutClick}
-                                            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 dark:text-red-400"
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                <LogOut size={16} />
-                                                Log Out
-                                            </div>
-                                        </button>
-                                    </Dropdown.Content>
-                                </Dropdown>
-                            </div>
-                        </div>
-
-                        {/* Hamburger Menu (Mobile) */}
-                        <div className="-mr-2 flex items-center sm:hidden">
-                            <button
-                                onClick={() =>
-                                    setShowingNavigationDropdown(
-                                        (previousState) => !previousState,
-                                    )
-                                }
-                                className="inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none transition-colors"
-                            >
-                                {showingNavigationDropdown ? (
-                                    <X size={24} />
-                                ) : (
-                                    <Menu size={24} />
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Responsive Navigation Menu (Mobile) */}
+    return (
+        <div>
+            {/* Toggle header */}
+            <button
+                onClick={() => setIsOpen((v) => !v)}
+                className={`
+                    w-full flex items-center gap-2 px-2 py-1.5 rounded-lg
+                    transition-all duration-150
+                    ${isOpen ? section.headerActive : section.headerHover}
+                `}
+            >
+                {/* Dot */}
                 <div
-                    className={
-                        (showingNavigationDropdown ? "block" : "hidden") +
-                        " sm:hidden border-t"
-                    }
-                >
-                    <div className="pt-2 pb-3 space-y-1">
-                        {menuItems.map((item) => {
-                            const routeExists = route().has(item.destination);
-                            const isActive = routeExists
-                                ? route().current(item.activeCheck)
-                                : false;
-                            return (
-                                <ResponsiveNavLink
-                                    key={item.label}
-                                    href={
-                                        routeExists
-                                            ? route(item.destination)
-                                            : "#"
-                                    }
-                                    active={isActive}
-                                    className={
-                                        !routeExists
-                                            ? "cursor-not-allowed opacity-50"
-                                            : ""
-                                    }
-                                >
-                                    <div className="flex items-center gap-2">
-                                        {item.icon} {item.label}
-                                    </div>
-                                </ResponsiveNavLink>
-                            );
-                        })}
-                    </div>
+                    className={`w-1.5 h-1.5 rounded-full flex-shrink-0 transition-opacity ${
+                        section.indicator
+                    } ${isOpen ? "opacity-100" : "opacity-50"}`}
+                />
 
-                    {/* Responsive User Settings */}
-                    <div className="pt-4 pb-1 border-t border-gray-200">
-                        <div className="px-4">
-                            <div className="font-medium text-base text-gray-800 dark:text-gray-200">
-                                {auth.user.name}
-                            </div>
-                            <div className="font-medium text-sm text-gray-500">
-                                {auth.user.email}
-                            </div>
-                            <div className="mt-2 flex flex-col gap-1">
-                                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-full w-fit">
-                                    <Shield size={10} className="mr-1" />
-                                    Super Administrator
-                                </span>
-                            </div>
-                        </div>
-                        <div className="mt-3 space-y-1">
-                            <ResponsiveNavLink href={route("profile.edit")}>
-                                Profile Settings
-                            </ResponsiveNavLink>
-                            <button
-                                onClick={handleLogoutClick}
-                                className="block w-full text-left px-4 py-2 text-base font-medium text-red-600 hover:bg-red-50 hover:text-red-700 rounded-md"
-                            >
-                                Log Out
-                            </button>
-                        </div>
-                    </div>
+                {/* Label */}
+                <span
+                    className={`text-[9px] font-bold uppercase tracking-widest flex-1 text-left transition-colors ${
+                        isOpen
+                            ? section.activeLabelColor
+                            : `${section.labelColor} opacity-70`
+                    }`}
+                >
+                    {section.label}
+                </span>
+
+                {/* Chevron rotates on open */}
+                <ChevronDown
+                    size={11}
+                    className={`flex-shrink-0 transition-transform duration-200 ${
+                        isOpen
+                            ? `rotate-0 ${section.activeLabelColor}`
+                            : `-rotate-90 ${section.labelColor} opacity-50`
+                    }`}
+                />
+            </button>
+
+            {/* Items — CSS max-height transition */}
+            <div
+                className={`overflow-hidden transition-all duration-200 ease-in-out ${
+                    isOpen ? "max-h-96 opacity-100 mt-0.5" : "max-h-0 opacity-0"
+                }`}
+            >
+                <div className="space-y-0.5 pl-1">
+                    {section.routes.map((item) => (
+                        <NavItem
+                            key={item.label ?? item.name}
+                            item={item}
+                            section={section}
+                            onLinkClick={onLinkClick}
+                        />
+                    ))}
                 </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Sidebar content ───────────────────────────────────────────────
+function SidebarContent({ initials, fullName, onLinkClick, onLogout }) {
+    return (
+        <div className="flex flex-col h-full text-xs">
+            {/* Brand / User */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-700/60">
+                <Link
+                    href={route("superadmin.dashboard")}
+                    className="flex items-center gap-3 min-w-0"
+                    onClick={onLinkClick}
+                >
+                    <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/30">
+                        <span className="text-white font-bold text-xs uppercase">
+                            {initials}
+                        </span>
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-xs font-bold text-white tracking-tight leading-none truncate">
+                            {fullName}
+                        </p>
+                        <p className="text-[9px] font-semibold text-amber-400 uppercase tracking-widest mt-0.5">
+                            Super Admin
+                        </p>
+                    </div>
+                </Link>
+            </div>
+
+            {/* Collapsible nav sections */}
+            <nav className="flex-1 px-2 py-2 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                {ROLE_SECTIONS.map((section) => (
+                    <NavSection
+                        key={section.key}
+                        section={section}
+                        onLinkClick={onLinkClick}
+                    />
+                ))}
             </nav>
 
-            {/* Page Content */}
-            <main className="flex-1 p-6">
-                <div className="max-w-7xl mx-auto">{children}</div>
-            </main>
+            {/* Logout */}
+            <div className="p-2 border-t border-slate-700/60">
+                <button
+                    onClick={onLogout}
+                    className="w-full flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-medium text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-colors group"
+                >
+                    <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-slate-700/50 group-hover:bg-rose-500/20 transition-colors">
+                        <LogOut size={12} />
+                    </div>
+                    Log Out
+                </button>
+            </div>
+        </div>
+    );
+}
 
-            {/* Logout Confirmation Dialog */}
+// ── Layout ────────────────────────────────────────────────────────
+export default function SuperAdminLayout({ children }) {
+    const { auth, flash } = usePage().props;
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
+    const [flashVisible, setFlashVisible] = useState(true);
+
+    const handleLogoutClick = () => setShowLogoutConfirmation(true);
+    const handleConfirmLogout = () => router.post(route("logout"));
+
+    const fullName =
+        `${auth.user.first_name} ${auth.user.last_name}`.trim() || "Superadmin";
+    const initials = getInitials(auth.user.first_name, auth.user.last_name);
+
+    return (
+        <div className="flex h-screen overflow-hidden bg-slate-100 dark:bg-slate-900 text-[13px]">
+            {/* ── Desktop Sidebar ── */}
+            <aside className="hidden lg:flex lg:flex-col w-56 shrink-0 bg-slate-900 relative">
+                <SidebarContent
+                    initials={initials}
+                    fullName={fullName}
+                    onLinkClick={undefined}
+                    onLogout={handleLogoutClick}
+                />
+            </aside>
+
+            {/* ── Mobile Sidebar Overlay ── */}
+            {sidebarOpen && (
+                <div className="fixed inset-0 z-50 lg:hidden">
+                    <div
+                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        onClick={() => setSidebarOpen(false)}
+                    />
+                    <aside className="absolute left-0 top-0 bottom-0 w-64 bg-slate-900 shadow-2xl">
+                        <button
+                            onClick={() => setSidebarOpen(false)}
+                            className="absolute top-4 right-4 rounded-lg p-1.5 text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
+                        >
+                            <X size={18} />
+                        </button>
+                        <SidebarContent
+                            initials={initials}
+                            fullName={fullName}
+                            onLinkClick={() => setSidebarOpen(false)}
+                            onLogout={handleLogoutClick}
+                        />
+                    </aside>
+                </div>
+            )}
+
+            {/* ── Main Area ── */}
+            <div className="flex flex-col flex-1 min-w-0 overflow-hidden text-[13px]">
+                {/* Mobile top bar */}
+                <div className="lg:hidden flex items-center gap-2 px-4 py-2 bg-slate-900 border-b border-slate-700/60">
+                    <button
+                        onClick={() => setSidebarOpen(true)}
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
+                    >
+                        <Menu size={18} />
+                    </button>
+                    <span className="text-xs font-bold text-white tracking-tight">
+                        {fullName}
+                    </span>
+                    <span className="text-[9px] font-semibold text-amber-400 uppercase tracking-widest">
+                        · Super Admin
+                    </span>
+                </div>
+
+                <SATISHeader
+                    user={{
+                        name: fullName,
+                        role: "Superadmin",
+                        initials: initials,
+                    }}
+                />
+
+                {/* Flash Messages */}
+                {flashVisible && flash?.success && (
+                    <div className="mx-5 mt-4 flex items-center justify-between gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 shadow-sm">
+                        <div className="flex items-center gap-2">
+                            <CheckCircle
+                                size={16}
+                                className="text-emerald-500 shrink-0"
+                            />
+                            <p className="text-sm font-medium text-emerald-800">
+                                {flash.success}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setFlashVisible(false)}
+                            className="rounded-md p-1 text-emerald-500 hover:bg-emerald-100 transition-colors"
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>
+                )}
+
+                {flashVisible && flash?.error && (
+                    <div className="mx-5 mt-4 flex items-center justify-between gap-3 rounded-xl bg-red-50 border border-red-200 px-4 py-3 shadow-sm">
+                        <div className="flex items-center gap-2">
+                            <XCircle
+                                size={16}
+                                className="text-red-500 shrink-0"
+                            />
+                            <p className="text-sm font-medium text-red-800">
+                                {flash.error}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setFlashVisible(false)}
+                            className="rounded-md p-1 text-red-400 hover:bg-red-100 transition-colors"
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>
+                )}
+
+                {/* Page Content */}
+                <main className="flex-1 overflow-y-auto p-3 md:p-4">
+                    <div className="max-w-6xl mx-auto">{children}</div>
+                </main>
+            </div>
+
+            {/* Logout Confirmation */}
             <ConfirmationDialog
                 show={showLogoutConfirmation}
                 title="Log Out"

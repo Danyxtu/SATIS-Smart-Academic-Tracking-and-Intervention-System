@@ -75,8 +75,8 @@ $admin = App\Models\User::create([
 
 # Create a super admin
 $superAdmin = App\Models\User::create([
-    'first_name' => 'Alice',
-    'last_name' => 'SuperAdmin',
+    'first_name' => 'Danny',
+    'last_name' => 'Dinglasa',
     'email' => 'superadmin@example.com',
     'password' => bcrypt('password'),
     'role' => 'super_admin',
@@ -85,6 +85,9 @@ $superAdmin = App\Models\User::create([
 
 exit
 ```
+
+Main Superadmin: superadmin@satis.edu / superadmin123
+Teacher+Superadmin: teachsa@satis.edu / teachsa123
 
 ### 3. Open Browser DevTools
 

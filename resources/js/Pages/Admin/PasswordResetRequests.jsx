@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import AdminLayout from "@/Layouts/AdminLayout";
+import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
 import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
 import { Fragment } from "react";
 import { Dialog, Transition } from "@headlessui/react";
@@ -501,7 +501,7 @@ export default function PasswordResetRequests({
     };
 
     return (
-        <AdminLayout>
+        <SuperAdminLayout>
             <Head title="Password Reset Requests" />
 
             {/* Header */}
@@ -742,6 +742,6 @@ export default function PasswordResetRequests({
                 password={passwordModal.password}
                 userName={passwordModal.userName}
             />
-        </AdminLayout>
+        </SuperAdminLayout>
     );
 }

@@ -21,17 +21,17 @@ use Inertia\Inertia;
 Route::get('/', function () {
     if (Auth::check()) {
         $user = Auth::user();
-        if ($user->role === 'teacher') {
-            return redirect()->route('teacher.dashboard');
+        if ($user->hasRole('super_admin')) {
+            return redirect()->route('superadmin.dashboard');
         }
-        if ($user->role === 'student') {
-            return redirect()->route('dashboard');
-        }
-        if ($user->role === 'admin') {
+        if ($user->hasRole('admin')) {
             return redirect()->route('admin.dashboard');
         }
-        if ($user->role === 'super_admin') {
-            return redirect()->route('superadmin.dashboard');
+        if ($user->hasRole('teacher')) {
+            return redirect()->route('teacher.dashboard');
+        }
+        if ($user->hasRole('student')) {
+            return redirect()->route('dashboard');
         }
     }
 

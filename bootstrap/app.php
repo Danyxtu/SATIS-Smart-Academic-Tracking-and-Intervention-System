@@ -7,6 +7,10 @@ use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use App\Http\Middleware\EnsurePasswordChanged;
 use App\Http\Middleware\EnsureTeacherApproved;
+use App\Http\Middleware\EnsureAdmin;
+use App\Http\Middleware\EnsureSuperAdmin;
+use App\Http\Middleware\EnsureStaff;
+use App\Http\Middleware\EnsureStudent;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -22,6 +26,14 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsurePasswordChanged::class,
             EnsureTeacherApproved::class,
         ]);
+        $middleware->alias(
+            [
+                'staff'      => EnsureStaff::class,
+                'admin'      => EnsureAdmin::class,
+                'superadmin' => EnsureSuperAdmin::class,
+                'student'    => EnsureStudent::class,
+            ]
+        );
 
         // Login redirection is handled in RedirectIfAuthenticated middleware
     })
