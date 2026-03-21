@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useForm, usePage, router } from "@inertiajs/react";
 import { useLoading } from "@/Context/LoadingContext";
 import { ArrowLeft } from "lucide-react";
+import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
 
 // --- Helper Function ---
 const getPriorityClasses = (priority) => {
@@ -40,14 +41,14 @@ function InterventionDashboard({ students, onSelectStudent }) {
     const totalStudents = students.length;
     const highPriority = students.filter((s) => s.priority === "High").length;
     const mediumPriority = students.filter(
-        (s) => s.priority === "Medium"
+        (s) => s.priority === "Medium",
     ).length;
     const lowPriority = students.filter((s) => s.priority === "Low").length;
 
     const toggleSelect = (id, e) => {
         e.stopPropagation();
         setSelectedIds((prev) =>
-            prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+            prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
         );
     };
 
@@ -64,7 +65,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
     };
 
     const selectedStudents = sortedStudents.filter((s) =>
-        selectedIds.includes(s.id)
+        selectedIds.includes(s.id),
     );
 
     return (
@@ -338,7 +339,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                             <input
                                                 type="checkbox"
                                                 checked={selectedIds.includes(
-                                                    s.id
+                                                    s.id,
                                                 )}
                                                 onChange={(e) =>
                                                     toggleSelect(s.id, e)
@@ -385,7 +386,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span
                                                 className={getPriorityClasses(
-                                                    s.priority
+                                                    s.priority,
                                                 )}
                                             >
                                                 {s.priority}
@@ -601,7 +602,7 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
                                     onClick={() => setFeedbackType(type.id)}
                                     className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${getTypeButtonClasses(
                                         type.id,
-                                        type.color
+                                        type.color,
                                     )}`}
                                 >
                                     <span
@@ -676,7 +677,7 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
                                 type="button"
                                 onClick={() =>
                                     setMessage(
-                                        "Great improvement on your recent work! Keep it up!"
+                                        "Great improvement on your recent work! Keep it up!",
                                     )
                                 }
                                 className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
@@ -687,7 +688,7 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
                                 type="button"
                                 onClick={() =>
                                     setMessage(
-                                        "Please see me during office hours to discuss your progress."
+                                        "Please see me during office hours to discuss your progress.",
                                     )
                                 }
                                 className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
@@ -698,7 +699,7 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
                                 type="button"
                                 onClick={() =>
                                     setMessage(
-                                        "Don't forget to submit your missing assignments by the deadline."
+                                        "Don't forget to submit your missing assignments by the deadline.",
                                     )
                                 }
                                 className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
@@ -836,7 +837,7 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
                     setIsSubmitting(false);
                 },
                 preserveScroll: true,
-            }
+            },
         );
     };
 
@@ -1271,7 +1272,7 @@ function StartInterventionModal({
     const removeTask = (index) => {
         setData(
             "tasks",
-            data.tasks.filter((_, i) => i !== index)
+            data.tasks.filter((_, i) => i !== index),
         );
     };
 
@@ -1397,18 +1398,18 @@ function StartInterventionModal({
                     isSelected
                         ? "bg-indigo-100"
                         : tierColor === "emerald"
-                        ? "bg-emerald-100"
-                        : tierColor === "amber"
-                        ? "bg-amber-100"
-                        : tierColor === "gray"
-                        ? "bg-gray-100"
-                        : "bg-red-100"
+                          ? "bg-emerald-100"
+                          : tierColor === "amber"
+                            ? "bg-amber-100"
+                            : tierColor === "gray"
+                              ? "bg-gray-100"
+                              : "bg-red-100"
                 }`}
             >
                 <IconComponent
                     className={`w-5 h-5 ${getIconColorClasses(
                         tierColor,
-                        isSelected
+                        isSelected,
                     )}`}
                 />
             </div>
@@ -1542,8 +1543,8 @@ function StartInterventionModal({
                                                         isHighRisk
                                                             ? "border-transparent bg-gray-50 cursor-not-allowed grayscale"
                                                             : data.type === key
-                                                            ? "border-indigo-500 bg-white ring-2 ring-indigo-200 shadow-md"
-                                                            : "border-transparent bg-white/80 hover:bg-white hover:border-emerald-200 hover:shadow-md"
+                                                              ? "border-indigo-500 bg-white ring-2 ring-indigo-200 shadow-md"
+                                                              : "border-transparent bg-white/80 hover:bg-white hover:border-emerald-200 hover:shadow-md"
                                                     }`}
                                                 >
                                                     <div className="flex items-center gap-3">
@@ -1554,16 +1555,16 @@ function StartInterventionModal({
                                                                 : strategy.tierColor,
                                                             !isHighRisk &&
                                                                 data.type ===
-                                                                    key
+                                                                    key,
                                                         )}
                                                         <p
                                                             className={`font-medium text-sm flex-1 ${
                                                                 isHighRisk
                                                                     ? "text-gray-400"
                                                                     : data.type ===
-                                                                      key
-                                                                    ? "text-indigo-900"
-                                                                    : "text-gray-700"
+                                                                        key
+                                                                      ? "text-indigo-900"
+                                                                      : "text-gray-700"
                                                             }`}
                                                         >
                                                             {strategy.label}
@@ -1652,8 +1653,8 @@ function StartInterventionModal({
                                                         isHighRisk
                                                             ? "border-transparent bg-gray-50 cursor-not-allowed grayscale"
                                                             : data.type === key
-                                                            ? "border-indigo-500 bg-white ring-2 ring-indigo-200 shadow-md"
-                                                            : "border-transparent bg-white/80 hover:bg-white hover:border-amber-200 hover:shadow-md"
+                                                              ? "border-indigo-500 bg-white ring-2 ring-indigo-200 shadow-md"
+                                                              : "border-transparent bg-white/80 hover:bg-white hover:border-amber-200 hover:shadow-md"
                                                     }`}
                                                 >
                                                     <div className="flex items-center gap-3">
@@ -1664,16 +1665,16 @@ function StartInterventionModal({
                                                                 : strategy.tierColor,
                                                             !isHighRisk &&
                                                                 data.type ===
-                                                                    key
+                                                                    key,
                                                         )}
                                                         <p
                                                             className={`font-medium text-sm flex-1 ${
                                                                 isHighRisk
                                                                     ? "text-gray-400"
                                                                     : data.type ===
-                                                                      key
-                                                                    ? "text-indigo-900"
-                                                                    : "text-gray-700"
+                                                                        key
+                                                                      ? "text-indigo-900"
+                                                                      : "text-gray-700"
                                                             }`}
                                                         >
                                                             {strategy.label}
@@ -1753,7 +1754,7 @@ function StartInterventionModal({
                                                         {renderIcon(
                                                             strategy.iconKey,
                                                             strategy.tierColor,
-                                                            data.type === key
+                                                            data.type === key,
                                                         )}
                                                         <div className="flex-1">
                                                             <p
@@ -1795,7 +1796,7 @@ function StartInterventionModal({
                         {/* Selected Strategy Info Box */}
                         <div
                             className={`mb-5 p-4 rounded-xl border ${getTierBgClasses(
-                                selectedStrategy.tierColor
+                                selectedStrategy.tierColor,
                             )}`}
                         >
                             <div className="flex items-start gap-3">
@@ -1809,7 +1810,7 @@ function StartInterventionModal({
                                             <IconComponent
                                                 className={`w-6 h-6 ${getIconColorClasses(
                                                     selectedStrategy.tierColor,
-                                                    false
+                                                    false,
                                                 )}`}
                                             />
                                         ) : null;
@@ -1822,7 +1823,7 @@ function StartInterventionModal({
                                         </h4>
                                         <span
                                             className={`text-xs px-2 py-0.5 rounded-full font-medium border ${getTierBadgeClasses(
-                                                selectedStrategy.tierColor
+                                                selectedStrategy.tierColor,
                                             )}`}
                                         >
                                             Tier {selectedStrategy.tier} •{" "}
@@ -2108,7 +2109,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                     setApprovalNotes("");
                 },
                 onFinish: () => setIsProcessing(false),
-            }
+            },
         );
     };
 
@@ -2127,7 +2128,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                     setRejectionReason("");
                 },
                 onFinish: () => setIsProcessing(false),
-            }
+            },
         );
     };
 
@@ -2464,7 +2465,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                                     {assignment.title}
                                                 </span>
                                             </div>
-                                        )
+                                        ),
                                     )}
                                 </div>
                             </div>
@@ -3000,6 +3001,6 @@ const Interventions = ({ watchlist = [], studentDetails = {} }) => {
     );
 };
 
-Interventions.layout = (page) => <TeacherLayout children={page} />;
+Interventions.layout = (page) => <SuperAdminLayout children={page} />;
 
 export default Interventions;

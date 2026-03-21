@@ -28,7 +28,6 @@ class User extends Authenticatable
         'email',
         'personal_email',
         'password',
-        'role',
         'status',
         'department_id',
         'created_by',
@@ -108,36 +107,40 @@ class User extends Authenticatable
         return $this->hasMany(User::class, 'created_by');
     }
 
-    /**
-     * Check if user is a super admin.
-     */
+
+    public function roles()
+    {
+        return $this->belongsToMany(Role::class);
+    }
+
+    public function hasRole(string $role): bool
+    {
+        return $this->roles->contains('name', $role);
+    }
+
     public function isSuperAdmin(): bool
     {
-        return $this->role === 'super_admin';
+        return $this->hasRole('super_admin');
     }
 
-    /**
-     * Check if user is an admin.
-     */
     public function isAdmin(): bool
     {
-        return $this->role === 'admin';
+        return $this->hasRole('admin');
     }
 
-    /**
-     * Check if user is a teacher.
-     */
     public function isTeacher(): bool
     {
-        return $this->role === 'teacher';
+        return $this->hasRole('teacher');
     }
 
-    /**
-     * Check if user is a student.
-     */
     public function isStudent(): bool
     {
-        return $this->role === 'student';
+        return $this->hasRole('student');
+    }
+
+    public function isStaff(): bool
+    {
+        return !$this->isStudent();
     }
 
     /**

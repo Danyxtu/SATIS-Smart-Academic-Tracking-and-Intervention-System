@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import TeacherLayout from "../../Layouts/TeacherLayout";
+import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import { useLoading } from "@/Context/LoadingContext";
 import {
@@ -923,6 +923,6 @@ const MyClasses = ({
     );
 };
 
-MyClasses.layout = (page) => <TeacherLayout children={page} />;
+MyClasses.layout = (page) => <SuperAdminLayout children={page} />;
 
 export default MyClasses;

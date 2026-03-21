@@ -19,7 +19,6 @@ return new class extends Migration
             $table->string('middle_name')->nullable();
             $table->string('email')->unique();
             $table->string('personal_email')->nullable()->unique();
-            $table->string('role'); // e.g., "admin", "teacher", "student", "superadmin"
             $table->timestamp('email_verified_at')->nullable();
             // Password management fields
             $table->string('password');

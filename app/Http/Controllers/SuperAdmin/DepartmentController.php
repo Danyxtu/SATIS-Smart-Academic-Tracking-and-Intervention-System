@@ -19,7 +19,8 @@ class DepartmentController extends Controller
     {
         $this->authorize('manage-departments');
 
-        $query = Department::withCount(['admins', 'teachers', 'students']);
+        // $query = Department::withCount(['admins', 'teachers', 'students']);
+        $query = Department::query();
 
         // Search
         if ($request->filled('search')) {
@@ -59,7 +60,7 @@ class DepartmentController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create-department');
-
+        dd($request->all());
         $validated = $request->validate([
             'department_name' => ['required', 'string', 'max:255'],
             'department_code' => ['required', 'string', 'max:50', 'unique:departments,department_code'],

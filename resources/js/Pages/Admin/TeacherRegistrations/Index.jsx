@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import AdminLayout from "@/Layouts/AdminLayout";
+import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import { Fragment } from "react";
 import { Dialog, Transition } from "@headlessui/react";
@@ -434,7 +434,7 @@ export default function Index({ registrations = [], pendingCount = 0, error }) {
     };
 
     return (
-        <AdminLayout>
+        <>
             <Head title="Teacher Registrations" />
 
             <div className="max-w-7xl mx-auto">
@@ -556,6 +556,7 @@ export default function Index({ registrations = [], pendingCount = 0, error }) {
                 registration={rejectModal.registration}
                 processing={processing}
             />
-        </AdminLayout>
+        </>
     );
 }
+Index.layout = (page) => <SuperAdminLayout children={page} />;

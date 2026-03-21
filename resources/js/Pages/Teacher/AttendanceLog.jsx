@@ -2,6 +2,7 @@ import React from "react";
 import TeacherLayout from "../../Layouts/TeacherLayout";
 import { Head, Link } from "@inertiajs/react";
 import { Users, Calendar, ChevronRight, Check, X, Clock } from "lucide-react";
+import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
 
 // Color classes for sections
 const colorClasses = {
@@ -16,7 +17,7 @@ const colorClasses = {
 
 const AttendanceLog = ({ sections = [] }) => {
     return (
-        <TeacherLayout>
+        <>
             <Head title="Attendance Log" />
 
             {/* --- Breadcrumbs --- */}
@@ -128,8 +129,10 @@ const AttendanceLog = ({ sections = [] }) => {
                     ))}
                 </div>
             )}
-        </TeacherLayout>
+        </>
     );
 };
+
+AttendanceLog.layout = (page) => <SuperAdminLayout children={page} />;
 
 export default AttendanceLog;

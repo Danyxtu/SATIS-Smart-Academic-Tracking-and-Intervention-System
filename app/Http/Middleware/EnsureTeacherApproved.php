@@ -34,7 +34,7 @@ class EnsureTeacherApproved
         }
 
         // Only apply to teachers
-        if (!$user->isTeacher()) {
+        if (!$user->hasRole('teacher')) {
             return $next($request);
         }
 
