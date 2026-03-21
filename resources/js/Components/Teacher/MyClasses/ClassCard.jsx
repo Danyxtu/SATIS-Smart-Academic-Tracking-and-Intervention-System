@@ -30,51 +30,74 @@ const ClassCard = ({
 
     return (
         <div
-            className={`bg-white rounded-xl shadow-lg overflow-hidden transition-all hover:shadow-xl hover:scale-105 group ${isLoading ? "opacity-75" : ""}`}
+            className={`bg-white rounded-lg border border-gray-200 overflow-hidden transition-all hover:shadow-md hover:border-indigo-300 group ${isLoading ? "opacity-75" : ""}`}
         >
             <button
                 onClick={() => handleClassSelect(cls)}
-                className="w-full p-6 text-left"
+                className="w-full p-4 text-left"
                 disabled={isLoading}
             >
-                <div className="flex items-center justify-between mb-4">
-                    <span
-                        className={`${colors.bg} ${colors.text} px-3 py-1 rounded-full text-sm font-medium`}
-                    >
-                        {badgeLabel}
-                    </span>
+                {/* Header with badge and icon */}
+                <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1 min-w-0">
+                        <span
+                            className={`${colors.bg} ${colors.text} px-2.5 py-1 rounded-md text-xs font-semibold inline-block`}
+                        >
+                            {badgeLabel}
+                        </span>
+                    </div>
                     {isLoading ? (
-                        <Loader2 className={`${colors.icon} animate-spin`} />
+                        <Loader2
+                            className={`${colors.icon} animate-spin flex-shrink-0 ml-2`}
+                            size={20}
+                        />
                     ) : (
-                        <Book className={colors.icon} />
+                        <Book
+                            className={`${colors.icon} flex-shrink-0 ml-2`}
+                            size={20}
+                        />
                     )}
                 </div>
+
+                {/* Class section/name */}
                 {showSectionLine && (
-                    <h2 className="text-2xl font-bold text-gray-900">
+                    <h3 className="text-lg font-bold text-gray-900 mb-1 truncate">
                         {classSection}
-                    </h2>
+                    </h3>
                 )}
-                <p className="text-gray-600 text-lg">{cls.subject}</p>
+
+                {/* Subject */}
+                <p
+                    className="text-sm text-gray-700 font-medium mb-2 truncate"
+                    title={cls.subject}
+                >
+                    {cls.subject}
+                </p>
+
+                {/* Strand/Track */}
                 {(cls.strand || cls.track) && (
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500 mb-3 truncate">
                         {[cls.strand, cls.track].filter(Boolean).join(" • ")}
                     </p>
                 )}
-                <div className="flex items-center text-gray-500 mt-6">
-                    <Users size={16} className="mr-2" />
-                    <span className="text-sm font-medium">
-                        {cls.student_count ?? 0} Students
+
+                {/* Student count */}
+                <div className="flex items-center text-gray-600 mt-3 pt-3 border-t border-gray-100">
+                    <Users size={14} className="mr-1.5 flex-shrink-0" />
+                    <span className="text-xs font-medium">
+                        {cls.student_count ?? 0} Student
+                        {cls.student_count !== 1 ? "s" : ""}
                     </span>
                 </div>
             </button>
 
             {/* Send Nudge Button */}
-            <div className="px-6 pb-4">
+            <div className="px-4 pb-3 border-t border-gray-100">
                 <button
                     onClick={handleNudgeClick}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 text-indigo-700 rounded-lg transition-all text-sm font-medium border border-indigo-100 hover:border-indigo-200"
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-md transition-colors text-xs font-medium"
                 >
-                    <Megaphone size={16} />
+                    <Megaphone size={14} />
                     Send Nudge
                 </button>
             </div>

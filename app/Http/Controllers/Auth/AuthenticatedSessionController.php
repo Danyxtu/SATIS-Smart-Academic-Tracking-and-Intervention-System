@@ -40,19 +40,16 @@ class AuthenticatedSessionController extends Controller
             return redirect()->route('password.force-change');
         }
 
-        // Redirect based on roles (pivot table)
-        if ($user->isSuperAdmin() && $user->isTeacher()) {
-            // If user is both superadmin and teacher, prioritize superadmin dashboard
-            return redirect()->intended(route('superadmin.dashboard'));
+        // Always prioritize teacher dashboard if user has teacher role
+        if ($user->isTeacher()) {
+            return redirect()->intended(route('teacher.dashboard'));
         }
+        // Otherwise, check for superadmin, then admin, then student
         if ($user->isSuperAdmin()) {
             return redirect()->intended(route('superadmin.dashboard'));
         }
         if ($user->isAdmin()) {
             return redirect()->intended(route('admin.dashboard'));
-        }
-        if ($user->isTeacher()) {
-            return redirect()->intended(route('teacher.dashboard'));
         }
         if ($user->isStudent()) {
             return redirect()->intended(route('dashboard'));

@@ -11,6 +11,7 @@ use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureStaff;
 use App\Http\Middleware\EnsureStudent;
+use App\Http\Middleware\EnsureTeacher;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -32,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 'admin'      => EnsureAdmin::class,
                 'superadmin' => EnsureSuperAdmin::class,
                 'student'    => EnsureStudent::class,
+                'teacher'    => EnsureTeacher::class,
             ]
         );
 

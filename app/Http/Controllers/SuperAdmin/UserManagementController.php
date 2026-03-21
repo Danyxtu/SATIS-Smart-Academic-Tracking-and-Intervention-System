@@ -25,7 +25,9 @@ class UserManagementController extends Controller
         }
 
         if ($role = $request->input('role')) {
-            $query->where('role', $role);
+            $query->whereHas('roles', function ($q) use ($role) {
+                $q->where('name', $role);
+            });
         }
 
         $users = $query->orderBy('created_at', 'desc')
