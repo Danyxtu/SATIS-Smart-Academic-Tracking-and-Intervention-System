@@ -21,14 +21,15 @@ use Inertia\Inertia;
 Route::get('/', function () {
     if (Auth::check()) {
         $user = Auth::user();
+        // Always prioritize teacher dashboard if user has teacher role
+        if ($user->hasRole('teacher')) {
+            return redirect()->route('teacher.dashboard');
+        }
         if ($user->hasRole('super_admin')) {
             return redirect()->route('superadmin.dashboard');
         }
         if ($user->hasRole('admin')) {
             return redirect()->route('admin.dashboard');
-        }
-        if ($user->hasRole('teacher')) {
-            return redirect()->route('teacher.dashboard');
         }
         if ($user->hasRole('student')) {
             return redirect()->route('dashboard');
@@ -87,15 +88,20 @@ Route::middleware('auth')->group(function () {
 */
 Route::get('/redirect-after-login', function () {
     $user = Auth::user();
-
-    $redirect = match ($user->role) {
-        'super_admin' => 'superadmin.dashboard',
-        'admin' => 'admin.dashboard',
-        'teacher' => 'teacher.dashboard',
-        'student' => 'dashboard',
-        default => '/',
-    };
-    return redirect()->route($redirect);
+    // Always prioritize teacher dashboard if user has teacher role
+    if ($user->hasRole('teacher')) {
+        return redirect()->route('teacher.dashboard');
+    }
+    if ($user->hasRole('super_admin')) {
+        return redirect()->route('superadmin.dashboard');
+    }
+    if ($user->hasRole('admin')) {
+        return redirect()->route('admin.dashboard');
+    }
+    if ($user->hasRole('student')) {
+        return redirect()->route('dashboard');
+    }
+    return redirect('/');
 })->middleware(['auth']);
 
 

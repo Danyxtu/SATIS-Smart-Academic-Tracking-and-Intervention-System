@@ -121,6 +121,7 @@ function NavItem({ item, section, onLinkClick }) {
 }
 
 // ── Collapsible section ───────────────────────────────────────────
+// ── Collapsible section ───────────────────────────────────────────
 function NavSection({ section, onLinkClick }) {
     // Auto-open if a child route is currently active
     const hasActiveRoute = section.routes.some((item) => {
@@ -131,16 +132,40 @@ function NavSection({ section, onLinkClick }) {
 
     const [isOpen, setIsOpen] = useState(hasActiveRoute);
 
+    // Check if user has the role for this section
+    const { auth } = usePage().props;
+    const userRoles = auth.user.roles?.map((r) => r.name) || [];
+    console.log("User roles:", userRoles);
+
+    // Map section keys to role names
+    const roleMapping = {
+        teacher: "teacher",
+        admin: "admin",
+        superadmin: "super_admin",
+    };
+
+    // Check if user has this section's role
+    const requiredRole = roleMapping[section.key];
+    const isDisabled = !userRoles.includes(requiredRole);
+
     return (
         <div>
             {/* Toggle header */}
             <button
-                onClick={() => setIsOpen((v) => !v)}
+                onClick={isDisabled ? undefined : () => setIsOpen((v) => !v)}
                 className={`
                     w-full flex items-center gap-2 px-2 py-1.5 rounded-lg
                     transition-all duration-150
                     ${isOpen ? section.headerActive : section.headerHover}
+                    ${isDisabled ? "opacity-50 cursor-not-allowed hover:bg-slate-800/40" : ""}
                 `}
+                disabled={isDisabled}
+                style={isDisabled ? { pointerEvents: "auto" } : {}}
+                title={
+                    isDisabled
+                        ? "You cannot access this role's portal"
+                        : undefined
+                }
             >
                 {/* Dot */}
                 <div
@@ -149,15 +174,25 @@ function NavSection({ section, onLinkClick }) {
                     } ${isOpen ? "opacity-100" : "opacity-50"}`}
                 />
 
-                {/* Label */}
+                {/* Label + Stop sign if disabled */}
                 <span
-                    className={`text-[9px] font-bold uppercase tracking-widest flex-1 text-left transition-colors ${
+                    className={`text-[9px] font-bold uppercase tracking-widest flex-1 text-left transition-colors flex items-center gap-1 ${
                         isOpen
                             ? section.activeLabelColor
                             : `${section.labelColor} opacity-70`
                     }`}
                 >
                     {section.label}
+                    {isDisabled && (
+                        <span
+                            className="ml-1 text-slate-400 group-hover:text-red-400"
+                            style={{ fontSize: "1.1em" }}
+                            role="img"
+                            aria-label="No entry"
+                        >
+                            &#128683;
+                        </span>
+                    )}
                 </span>
 
                 {/* Chevron rotates on open */}
@@ -174,18 +209,21 @@ function NavSection({ section, onLinkClick }) {
             {/* Items — CSS max-height transition */}
             <div
                 className={`overflow-hidden transition-all duration-200 ease-in-out ${
-                    isOpen ? "max-h-96 opacity-100 mt-0.5" : "max-h-0 opacity-0"
+                    isOpen && !isDisabled
+                        ? "max-h-96 opacity-100 mt-0.5"
+                        : "max-h-0 opacity-0"
                 }`}
             >
                 <div className="space-y-0.5 pl-1">
-                    {section.routes.map((item) => (
-                        <NavItem
-                            key={item.label ?? item.name}
-                            item={item}
-                            section={section}
-                            onLinkClick={onLinkClick}
-                        />
-                    ))}
+                    {!isDisabled &&
+                        section.routes.map((item) => (
+                            <NavItem
+                                key={item.label ?? item.name}
+                                item={item}
+                                section={section}
+                                onLinkClick={onLinkClick}
+                            />
+                        ))}
                 </div>
             </div>
         </div>
@@ -193,11 +231,31 @@ function NavSection({ section, onLinkClick }) {
 }
 
 // ── Sidebar content ───────────────────────────────────────────────
+
 function SidebarContent({ initials, fullName, onLinkClick, onLogout }) {
+    const { auth } = usePage().props;
+    const userRoles = auth.user.roles?.map((r) => r.name) || [];
+
+    // Map role names to display labels and colors
+    const roleConfig = {
+        teacher: {
+            label: "Teacher",
+            color: "bg-blue-500/20 text-blue-300 ring-blue-500/30",
+        },
+        admin: {
+            label: "Admin",
+            color: "bg-emerald-500/20 text-emerald-300 ring-emerald-500/30",
+        },
+        super_admin: {
+            label: "Super Admin",
+            color: "bg-amber-500/20 text-amber-300 ring-amber-500/30",
+        },
+    };
+
     return (
         <div className="flex flex-col h-full text-xs">
             {/* Brand / User */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-700/60">
+            <div className="flex flex-col gap-2 px-4 py-3 border-b border-slate-700/60">
                 <Link
                     href={route("superadmin.dashboard")}
                     className="flex items-center gap-3 min-w-0"
@@ -212,11 +270,25 @@ function SidebarContent({ initials, fullName, onLinkClick, onLogout }) {
                         <p className="text-xs font-bold text-white tracking-tight leading-none truncate">
                             {fullName}
                         </p>
-                        <p className="text-[9px] font-semibold text-amber-400 uppercase tracking-widest mt-0.5">
-                            Super Admin
-                        </p>
                     </div>
                 </Link>
+
+                {/* Role Badges */}
+                <div className="flex flex-wrap gap-1 pl-0.5">
+                    {userRoles.map((role) => {
+                        const config = roleConfig[role];
+                        if (!config) return null;
+
+                        return (
+                            <span
+                                key={role}
+                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-semibold uppercase tracking-wide ring-1 ${config.color}`}
+                            >
+                                {config.label}
+                            </span>
+                        );
+                    })}
+                </div>
             </div>
 
             {/* Collapsible nav sections */}
