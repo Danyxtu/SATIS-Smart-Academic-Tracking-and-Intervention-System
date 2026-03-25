@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import TeacherLayout from "../../Layouts/TeacherLayout";
+import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import { useLoading } from "@/Context/LoadingContext";
 import {
@@ -8,6 +8,10 @@ import {
     UploadCloud,
     BookOpen,
     Calendar,
+    CheckCircle,
+    AlertCircle,
+    XCircle,
+    Copy,
 } from "lucide-react";
 
 // Utils
@@ -23,7 +27,10 @@ import {
  */
 import {
     AddNewClassModal,
+    BulkStudentImportSummaryModal,
     ClassCard,
+    ClassCreateSummaryModal,
+    DeleteClassModal,
     SendNudgeModal,
 } from "@/Components/Teacher/MyClasses";
 import MyClass from "./MyClasses/MyClass";
@@ -62,6 +69,7 @@ const buildClassKey = (cls, index) => {
 
 const MyClasses = ({
     classes = [],
+    departments = [],
     rosters = {},
     gradeStructures = {},
     defaultSchoolYear,
@@ -99,7 +107,10 @@ const MyClasses = ({
         typeof flash.grade_import_summary === "object"
             ? flash.grade_import_summary
             : null;
-    const importSummaryErrors = importSummary?.errors ?? [];
+    const classCreateSummary =
+        typeof flash.class_create_summary === "object"
+            ? flash.class_create_summary
+            : null;
 
     const { startLoading, stopLoading } = useLoading();
 
@@ -110,6 +121,20 @@ const MyClasses = ({
         return classIdFromUrl ? parseInt(classIdFromUrl) : null;
     });
     const [isAddClassModalOpen, setIsAddClassModalOpen] = useState(false);
+    const [editClassModal, setEditClassModal] = useState({
+        open: false,
+        classData: null,
+    });
+    const [deleteClassModal, setDeleteClassModal] = useState({
+        open: false,
+        classData: null,
+    });
+    const [isImportSummaryModalOpen, setIsImportSummaryModalOpen] = useState(
+        Boolean(importSummary),
+    );
+    const [isClassCreateSummaryOpen, setIsClassCreateSummaryOpen] = useState(
+        Boolean(classCreateSummary),
+    );
     const [isDragging, setIsDragging] = useState(false);
     const [droppedFile, setDroppedFile] = useState(null);
     const [highlightAddClass, setHighlightAddClass] = useState(false);
@@ -265,6 +290,14 @@ const MyClasses = ({
         setActiveGradeCategoryId(null);
     }, [selectedClassId]);
 
+    useEffect(() => {
+        setIsImportSummaryModalOpen(Boolean(importSummary));
+    }, [importSummary]);
+
+    useEffect(() => {
+        setIsClassCreateSummaryOpen(Boolean(classCreateSummary));
+    }, [classCreateSummary]);
+
     const dirtyGradeCount = Object.keys(dirtyGrades).length;
     const hasGradeChanges = dirtyGradeCount > 0;
     const selectedClassMeta = selectedClass
@@ -382,8 +415,59 @@ const MyClasses = ({
         );
     };
 
+    const handleEditClass = (cls) => {
+        setEditClassModal({ open: true, classData: cls });
+    };
+
+    const handleDeleteClass = (cls) => {
+        setDeleteClassModal({ open: true, classData: cls });
+    };
+
+    const handleDeletedClass = (cls) => {
+        if (selectedClassId === cls.id) {
+            handleGoBack();
+        }
+    };
+
+    const handleSummarySaveChanges = () => {
+        if (!classCreateSummary) {
+            setIsClassCreateSummaryOpen(false);
+            return;
+        }
+
+        const existingClass = classes.find(
+            (cls) => cls.id === classCreateSummary.class_id,
+        );
+
+        const classForEdit =
+            existingClass ||
+            (classCreateSummary.class_id
+                ? {
+                      id: classCreateSummary.class_id,
+                      name: classCreateSummary.grade_level,
+                      section: classCreateSummary.section,
+                      strand: classCreateSummary.strand,
+                      subject_name: classCreateSummary.subject_name,
+                      color: classCreateSummary.color || "indigo",
+                      track: classCreateSummary.track || "",
+                      school_year: classCreateSummary.school_year,
+                  }
+                : null);
+
+        setIsClassCreateSummaryOpen(false);
+
+        if (classForEdit) {
+            setEditClassModal({ open: true, classData: classForEdit });
+        }
+    };
+
+    const handleSummarySkip = () => {
+        setIsClassCreateSummaryOpen(false);
+    };
+
     return (
         <>
+            <Head title="My Classes" />
             <input
                 ref={gradeUploadInputRef}
                 type="file"
@@ -391,513 +475,393 @@ const MyClasses = ({
                 accept=".csv,text/csv"
                 onChange={handleGradesFileSelected}
             />
-            <header className="mb-6 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="space-y-2">
-                        {hasSelectedClass && (
-                            <div>
-                                <div className="flex items-center gap-2 text-sm text-gray-500">
-                                    <button
-                                        type="button"
-                                        onClick={handleGoBack}
-                                        className="font-medium text-indigo-600 hover:text-indigo-700"
-                                    >
-                                        My Classes
-                                    </button>
-                                    <ChevronRight
+
+            <div className="space-y-4">
+                {/* Compact Header */}
+                <header className="flex items-center justify-between">
+                    {hasSelectedClass ? (
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={handleGoBack}
+                                className="text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+                            >
+                                My Classes
+                            </button>
+                            <ChevronRight size={14} className="text-gray-400" />
+                            <span className="text-sm text-gray-600">
+                                Class Details
+                            </span>
+                        </div>
+                    ) : (
+                        <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                            My Classes
+                        </h1>
+                    )}
+
+                    {!hasSelectedClass && (
+                        <button
+                            type="button"
+                            onClick={() => setIsAddClassModalOpen(true)}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-all ${
+                                highlightAddClass ? "animate-pulse" : ""
+                            }`}
+                            style={
+                                highlightAddClass
+                                    ? {
+                                          boxShadow:
+                                              "0 0 20px rgba(99, 102, 241, 0.5)",
+                                      }
+                                    : {}
+                            }
+                        >
+                            <Plus size={16} /> Add Class
+                        </button>
+                    )}
+                </header>
+
+                {/* Compact Flash Messages */}
+                {(gradeUpdateSummary ||
+                    gradeImportSummary ||
+                    newStudentPassword) && (
+                    <div className="grid gap-3">
+                        {/* New Student Password */}
+                        {newStudentPassword && (
+                            <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3">
+                                <div className="flex items-start gap-2">
+                                    <CheckCircle
                                         size={16}
-                                        className="text-gray-400"
+                                        className="text-emerald-600 mt-0.5 flex-shrink-0"
                                     />
-                                    <div className="text-gray-500 text-sm">
-                                        My Class
-                                    </div>
-                                </div>
-                                <div className="flex items-center mt-3">
-                                    <h1 className="text-2xl font-bold text-gray-800">
-                                        My Class
-                                    </h1>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3 w-full">
-                        {!hasSelectedClass && (
-                            <div className="flex justify-between w-full">
-                                <div className="flex items-center">
-                                    <h1 className="text-2xl font-bold text-gray-800">
-                                        My Classes
-                                    </h1>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsAddClassModalOpen(true)}
-                                    className={`flex items-center gap-2 rounded-lg border border-indigo-600 px-4 py-2 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-50 ${
-                                        highlightAddClass
-                                            ? "animate-pulse-twice"
-                                            : ""
-                                    }`}
-                                    style={
-                                        highlightAddClass
-                                            ? {
-                                                  animation:
-                                                      "pulse-highlight 0.5s ease-in-out 4",
-                                                  boxShadow:
-                                                      "0 0 20px rgba(99, 102, 241, 0.5)",
-                                              }
-                                            : {}
-                                    }
-                                >
-                                    <Plus size={16} /> Add New Class
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </header>
-            {/* This will show when there are import or grade update summaries */}
-            {(importSummary || gradeUpdateSummary || gradeImportSummary) && (
-                <section className="mb-8 grid gap-4 lg:grid-cols-2">
-                    {importSummary && (
-                        <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-sm text-indigo-900 shadow-sm">
-                            <div className="flex flex-wrap items-center gap-4">
-                                <div>
-                                    <p className="font-semibold">
-                                        Recent classlist upload summary
-                                    </p>
-                                    {selectedClassMeta && (
-                                        <p className="text-sm text-gray-500">
-                                            {selectedClassMeta}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+                                            New Student Created
                                         </p>
-                                    )}
-                                </div>
-                                <div className="flex flex-wrap gap-4">
-                                    <span>
-                                        Added: {importSummary.imported ?? 0}
-                                    </span>
-                                    <span>
-                                        Updated: {importSummary.updated ?? 0}
-                                    </span>
-                                    <span>
-                                        Skipped: {importSummary.skipped ?? 0}
-                                    </span>
-                                </div>
-                            </div>
-                            {importSummaryErrors.length > 0 && (
-                                <details className="mt-3">
-                                    <summary className="cursor-pointer font-medium text-red-700">
-                                        View {importSummaryErrors.length} error
-                                        {importSummaryErrors.length > 1
-                                            ? "s"
-                                            : ""}
-                                    </summary>
-                                    <ul className="mt-2 list-disc space-y-1 pl-5 text-red-700">
-                                        {importSummaryErrors.map(
-                                            (error, index) => (
-                                                <li key={index}>{error}</li>
-                                            ),
-                                        )}
-                                    </ul>
-                                </details>
-                            )}
-                            {/* Created students with generated passwords (shown once) */}
-                            {(importSummary.created_students?.length ?? 0) >
-                                0 && (
-                                <details className="mt-3">
-                                    <summary className="cursor-pointer font-medium text-indigo-800">
-                                        View generated passwords for{" "}
-                                        {importSummary.created_students.length}{" "}
-                                        newly created student(s)
-                                    </summary>
-                                    <ul className="mt-2 space-y-2 text-indigo-900">
-                                        {importSummary.created_students.map(
-                                            (s, idx) => (
-                                                <li
-                                                    key={idx}
-                                                    className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-center p-2 bg-white rounded-md border border-indigo-100"
-                                                >
-                                                    <div className="col-span-1 font-medium">
-                                                        {s.name ??
-                                                            s.email ??
-                                                            "Student"}
-                                                    </div>
-                                                    <div className="text-sm text-gray-600">
-                                                        LRN: {s.lrn ?? "N/A"}
-                                                    </div>
-                                                    <div className="text-sm text-gray-600">
-                                                        Email:{" "}
-                                                        {s.email ?? "N/A"}
-                                                    </div>
-                                                    <div className="flex items-center gap-2 text-sm">
-                                                        <span className="font-mono bg-indigo-50 px-2 py-1 rounded">
-                                                            {s.password}
-                                                        </span>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                navigator.clipboard.writeText(
-                                                                    s.password,
-                                                                )
-                                                            }
-                                                            className="text-sm text-indigo-700 hover:underline"
-                                                        >
-                                                            Copy
-                                                        </button>
-                                                    </div>
-                                                </li>
-                                            ),
-                                        )}
-                                    </ul>
-                                </details>
-                            )}
-                        </div>
-                    )}
-
-                    {newStudentPassword && (
-                        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-900 shadow-sm">
-                            <p className="font-semibold">New student created</p>
-                            <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                <div>
-                                    <p className="text-sm text-gray-700">
-                                        Name
-                                    </p>
-                                    <p className="font-medium">
-                                        {newStudentPassword.name}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-gray-700">
-                                        Email
-                                    </p>
-                                    <p className="font-medium">
-                                        {newStudentPassword.email ?? "N/A"}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-gray-700">
-                                        Password
-                                    </p>
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-mono bg-green-50 px-2 py-1 rounded">
-                                            {newStudentPassword.password}
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                navigator.clipboard.writeText(
-                                                    newStudentPassword.password,
-                                                )
-                                            }
-                                            className="text-sm text-emerald-700 hover:underline"
-                                        >
-                                            Copy
-                                        </button>
+                                        <div className="flex items-center gap-2 mt-1.5">
+                                            <span className="text-xs text-emerald-700 dark:text-emerald-300">
+                                                {newStudentPassword.name}
+                                            </span>
+                                            <code className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-200 rounded text-[10px] font-mono">
+                                                {newStudentPassword.password}
+                                            </code>
+                                            <button
+                                                onClick={() =>
+                                                    navigator.clipboard.writeText(
+                                                        newStudentPassword.password,
+                                                    )
+                                                }
+                                                className="p-1 hover:bg-emerald-100 dark:hover:bg-emerald-800 rounded transition-colors"
+                                                title="Copy password"
+                                            >
+                                                <Copy
+                                                    size={12}
+                                                    className="text-emerald-600 dark:text-emerald-400"
+                                                />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {gradeUpdateSummary && (
-                        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-900 shadow-sm">
-                            <div className="flex flex-wrap items-center gap-4">
-                                <p className="font-semibold">
-                                    Recent manual grade updates
-                                </p>
-                                <div className="flex flex-wrap gap-4">
-                                    <span>
-                                        Saved: {gradeUpdateSummary.updated ?? 0}
-                                    </span>
-                                    <span>
-                                        Cleared:{" "}
-                                        {gradeUpdateSummary.cleared ?? 0}
-                                    </span>
-                                    <span>
-                                        Skipped:{" "}
-                                        {gradeUpdateSummary.skipped ?? 0}
-                                    </span>
+                        {/* Grade Update Summary */}
+                        {gradeUpdateSummary && (
+                            <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3">
+                                <div className="flex items-start gap-2">
+                                    <CheckCircle
+                                        size={16}
+                                        className="text-emerald-600 mt-0.5 flex-shrink-0"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+                                            Grade Updates
+                                        </p>
+                                        <div className="flex flex-wrap gap-3 mt-1 text-xs text-emerald-700 dark:text-emerald-300">
+                                            <span>
+                                                Saved:{" "}
+                                                {gradeUpdateSummary.updated ??
+                                                    0}
+                                            </span>
+                                            <span>
+                                                Cleared:{" "}
+                                                {gradeUpdateSummary.cleared ??
+                                                    0}
+                                            </span>
+                                            <span>
+                                                Skipped:{" "}
+                                                {gradeUpdateSummary.skipped ??
+                                                    0}
+                                            </span>
+                                        </div>
+                                        {(gradeUpdateSummary.errors?.length ??
+                                            0) > 0 && (
+                                            <details className="mt-2">
+                                                <summary className="cursor-pointer text-xs font-medium text-red-700 dark:text-red-400 hover:underline">
+                                                    View{" "}
+                                                    {
+                                                        gradeUpdateSummary
+                                                            .errors.length
+                                                    }{" "}
+                                                    issue
+                                                    {gradeUpdateSummary.errors
+                                                        .length > 1
+                                                        ? "s"
+                                                        : ""}
+                                                </summary>
+                                                <ul className="mt-1 space-y-0.5 pl-4 text-xs text-red-700 dark:text-red-400 list-disc">
+                                                    {gradeUpdateSummary.errors.map(
+                                                        (error, index) => (
+                                                            <li key={index}>
+                                                                {error}
+                                                            </li>
+                                                        ),
+                                                    )}
+                                                </ul>
+                                            </details>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                            {(gradeUpdateSummary.errors?.length ?? 0) > 0 && (
-                                <details className="mt-3">
-                                    <summary className="cursor-pointer font-medium text-red-700">
-                                        View {gradeUpdateSummary.errors.length}{" "}
-                                        issue
-                                        {gradeUpdateSummary.errors.length > 1
-                                            ? "s"
-                                            : ""}
-                                    </summary>
-                                    <ul className="mt-2 list-disc space-y-1 pl-5 text-red-700">
-                                        {gradeUpdateSummary.errors.map(
-                                            (error, index) => (
-                                                <li key={index}>{error}</li>
-                                            ),
-                                        )}
-                                    </ul>
-                                </details>
-                            )}
-                        </div>
-                    )}
+                        )}
 
-                    {gradeImportSummary && (
-                        <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900 shadow-sm">
-                            <div className="flex flex-wrap items-center gap-4">
-                                <p className="font-semibold">
-                                    Recent grade CSV upload
-                                </p>
-                                <div className="flex flex-wrap gap-4">
-                                    <span>
-                                        Updated:{" "}
-                                        {gradeImportSummary.updated ?? 0}
-                                    </span>
-                                    <span>
-                                        Skipped:{" "}
-                                        {gradeImportSummary.skipped ?? 0}
-                                    </span>
+                        {/* Grade Import Summary */}
+                        {gradeImportSummary && (
+                            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                                <div className="flex items-start gap-2">
+                                    <CheckCircle
+                                        size={16}
+                                        className="text-blue-600 mt-0.5 flex-shrink-0"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">
+                                            Grade CSV Upload
+                                        </p>
+                                        <div className="flex flex-wrap gap-3 mt-1 text-xs text-blue-700 dark:text-blue-300">
+                                            <span>
+                                                Updated:{" "}
+                                                {gradeImportSummary.updated ??
+                                                    0}
+                                            </span>
+                                            <span>
+                                                Skipped:{" "}
+                                                {gradeImportSummary.skipped ??
+                                                    0}
+                                            </span>
+                                        </div>
+                                        {(gradeImportSummary.errors?.length ??
+                                            0) > 0 && (
+                                            <details className="mt-2">
+                                                <summary className="cursor-pointer text-xs font-medium text-red-700 dark:text-red-400 hover:underline">
+                                                    View{" "}
+                                                    {
+                                                        gradeImportSummary
+                                                            .errors.length
+                                                    }{" "}
+                                                    issue
+                                                    {gradeImportSummary.errors
+                                                        .length > 1
+                                                        ? "s"
+                                                        : ""}
+                                                </summary>
+                                                <ul className="mt-1 space-y-0.5 pl-4 text-xs text-red-700 dark:text-red-400 list-disc">
+                                                    {gradeImportSummary.errors.map(
+                                                        (error, index) => (
+                                                            <li key={index}>
+                                                                {error}
+                                                            </li>
+                                                        ),
+                                                    )}
+                                                </ul>
+                                            </details>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                            {(gradeImportSummary.errors?.length ?? 0) > 0 && (
-                                <details className="mt-3">
-                                    <summary className="cursor-pointer font-medium text-red-700">
-                                        View {gradeImportSummary.errors.length}{" "}
-                                        issue
-                                        {gradeImportSummary.errors.length > 1
-                                            ? "s"
-                                            : ""}
-                                    </summary>
-                                    <ul className="mt-2 list-disc space-y-1 pl-5 text-red-700">
-                                        {gradeImportSummary.errors.map(
-                                            (error, index) => (
-                                                <li key={index}>{error}</li>
-                                            ),
-                                        )}
-                                    </ul>
-                                </details>
-                            )}
-                        </div>
-                    )}
-                </section>
-            )}
+                        )}
+                    </div>
+                )}
 
-            {/* --- Conditional View: Grid or Classlist --- */}
-
-            {!selectedClass ? (
-                // Class Grid View (Main Page)
-                <div
-                    className="relative"
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                >
-                    {/* Semester Navigation Toggle */}
-                    <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
-                        {/* Header with School Year */}
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                                <Calendar
-                                    size={20}
-                                    className="text-indigo-600"
-                                />
-                                <span className="font-semibold text-gray-700">
-                                    Academic Year {defaultSchoolYear}
-                                </span>
+                {/* Main Content */}
+                {!selectedClass ? (
+                    <div
+                        className="relative"
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                    >
+                        {/* Compact Semester Navigation */}
+                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-3 mb-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-1.5">
+                                    <Calendar
+                                        size={16}
+                                        className="text-indigo-600"
+                                    />
+                                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                        SY {defaultSchoolYear}
+                                    </span>
+                                </div>
+                                {selectedSemester !== currentSemester && (
+                                    <span className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full font-medium">
+                                        Viewing past
+                                    </span>
+                                )}
                             </div>
-                            {selectedSemester !== currentSemester && (
-                                <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
-                                    Viewing past semester
-                                </span>
-                            )}
-                        </div>
 
-                        {/* Semester Tabs */}
-                        <div className="flex gap-2">
-                            {[
-                                {
-                                    id: 1,
-                                    label: "1st Semester",
-                                    shortLabel: "Sem 1",
-                                    count: semester1Count,
-                                },
-                                {
-                                    id: 2,
-                                    label: "2nd Semester",
-                                    shortLabel: "Sem 2",
-                                    count: semester2Count,
-                                },
-                            ].map((semester) => {
-                                const isActive =
-                                    selectedSemester === semester.id;
-                                const isCurrentSemester =
-                                    currentSemester === semester.id;
-                                // Future semester tabs are disabled (e.g., 2nd Sem when current is 1st)
-                                const isFutureSemester =
-                                    semester.id > currentSemester;
-                                // Past semester viewing indicator
-                                const isPastSemester =
-                                    semester.id < currentSemester;
-                                // Semester tab button with count badge and current semester indicator
-                                return (
-                                    <button
-                                        key={semester.id}
-                                        onClick={() => {
-                                            if (isFutureSemester) return;
-                                            router.get(
-                                                window.location.pathname,
-                                                { semester: semester.id },
-                                                {
-                                                    preserveState: true,
-                                                    preserveScroll: true,
-                                                },
-                                            );
-                                        }}
-                                        disabled={isFutureSemester}
-                                        className={`
-                                            flex-1 relative flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all
-                                            ${
-                                                isFutureSemester
-                                                    ? "bg-gray-50 text-gray-400 cursor-not-allowed opacity-60"
-                                                    : isActive
-                                                      ? "bg-indigo-600 text-white shadow-md"
-                                                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                            }
-                                        `}
-                                    >
-                                        <BookOpen size={18} />
-                                        <span className="hidden sm:inline">
-                                            {semester.label}
-                                        </span>
-                                        <span className="sm:hidden">
-                                            {semester.shortLabel}
-                                        </span>
+                            {/* Compact Semester Tabs */}
+                            <div className="flex gap-2">
+                                {[
+                                    {
+                                        id: 1,
+                                        label: "1st Sem",
+                                        count: semester1Count,
+                                    },
+                                    {
+                                        id: 2,
+                                        label: "2nd Sem",
+                                        count: semester2Count,
+                                    },
+                                ].map((semester) => {
+                                    const isActive =
+                                        selectedSemester === semester.id;
+                                    const isCurrentSemester =
+                                        currentSemester === semester.id;
+                                    const isFutureSemester =
+                                        semester.id > currentSemester;
 
-                                        {/* Class Count Badge */}
-                                        <span
+                                    return (
+                                        <button
+                                            key={semester.id}
+                                            onClick={() => {
+                                                if (isFutureSemester) return;
+                                                router.get(
+                                                    window.location.pathname,
+                                                    { semester: semester.id },
+                                                    {
+                                                        preserveState: true,
+                                                        preserveScroll: true,
+                                                    },
+                                                );
+                                            }}
+                                            disabled={isFutureSemester}
                                             className={`
-                                                ml-1 px-2 py-0.5 rounded-full text-xs font-bold
+                                                flex-1 relative flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition-all
                                                 ${
+                                                    isFutureSemester
+                                                        ? "bg-gray-50 text-gray-400 cursor-not-allowed"
+                                                        : isActive
+                                                          ? "bg-indigo-600 text-white shadow-sm"
+                                                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                                }
+                                            `}
+                                        >
+                                            <BookOpen size={14} />
+                                            {semester.label}
+                                            <span
+                                                className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
                                                     isFutureSemester
                                                         ? "bg-gray-200 text-gray-400"
                                                         : isActive
                                                           ? "bg-white/20 text-white"
                                                           : "bg-gray-200 text-gray-600"
-                                                }
-                                            `}
-                                        >
-                                            {isFutureSemester
-                                                ? "—"
-                                                : semester.count}
-                                        </span>
-
-                                        {/* Current Semester Indicator */}
-                                        {isCurrentSemester && (
-                                            <span
-                                                className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${
-                                                    isActive
-                                                        ? "bg-green-400"
-                                                        : "bg-green-500"
-                                                } border-2 border-white`}
-                                                title="Current Semester"
-                                            />
-                                        )}
-
-                                        {/* Past Semester Indicator */}
-                                        {isPastSemester && !isActive && (
-                                            <span className="absolute -top-1 -right-1 text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold border border-amber-200">
-                                                Past
+                                                }`}
+                                            >
+                                                {isFutureSemester
+                                                    ? "—"
+                                                    : semester.count}
                                             </span>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        {/* Info Text */}
-                        <p className="text-center text-xs text-gray-500 mt-3">
-                            Viewing{" "}
-                            {selectedSemester === 1 ? "First" : "Second"}{" "}
-                            Semester classes
-                            {semester1Count + semester2Count > 0 && (
-                                <span className="ml-1">
-                                    ({classes.length} of{" "}
-                                    {semester1Count + semester2Count} total)
-                                </span>
-                            )}
-                        </p>
-                    </div>
-
-                    {/* Dropzone Overlay */}
-                    {isDragging && (
-                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-indigo-500 bg-opacity-75 rounded-xl border-4 border-dashed border-white">
-                            <UploadCloud
-                                size={64}
-                                className="text-white mb-4"
-                            />
-                            <p className="text-2xl font-bold text-white">
-                                Drop CSV classlist here
-                            </p>
-                        </div>
-                    )}
-
-                    {/* Class Grid */}
-                    {classes.length === 0 ? (
-                        // State if no classes for the semester
-                        <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <BookOpen size={32} className="text-gray-400" />
+                                            {isCurrentSemester && (
+                                                <span
+                                                    className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-500 border border-white"
+                                                    title="Current"
+                                                />
+                                            )}
+                                        </button>
+                                    );
+                                })}
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                                No classes for{" "}
-                                {selectedSemester === 1 ? "1st" : "2nd"}{" "}
-                                Semester
-                            </h3>
-                            <p className="text-gray-500 mb-4">
-                                {selectedSemester === currentSemester
-                                    ? "Add your first class to get started with this semester."
-                                    : "No classes were created during this semester."}
-                            </p>
-                            {selectedSemester === currentSemester && (
-                                <button
-                                    onClick={() => setIsAddClassModalOpen(true)}
-                                    className="inline-flex items-center gap-2 bg-indigo-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors"
-                                >
-                                    <Plus size={18} />
-                                    Add Class
-                                </button>
-                            )}
                         </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {classes.map((cls, index) => {
-                                const colors = getColorClasses(cls.color);
-                                const classKey = buildClassKey(cls, index);
-                                const isLoading = loadingClassId === cls.id;
-                                return (
-                                    <ClassCard
-                                        key={classKey}
-                                        colors={colors}
-                                        cls={cls}
-                                        handleClassSelect={() =>
-                                            handleClassSelect(cls.id)
-                                        }
-                                        onSendNudge={handleSendNudge}
-                                        isLoading={isLoading}
-                                    />
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            ) : (
-                // This will be a separate component for the classlist and grade management view
-                <MyClass
-                    selectedClassHeading={selectedClassHeading}
-                    selectedClass={selectedClass}
-                    roster={roster}
-                    gradeStructure={gradeStructure}
-                    gradeSummaries={gradeSummaries}
-                />
-            )}
 
-            {/* --- (NEW) Add Class Modal --- */}
+                        {/* Dropzone Overlay */}
+                        {isDragging && (
+                            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-indigo-500/90 rounded-xl border-4 border-dashed border-white">
+                                <UploadCloud
+                                    size={48}
+                                    className="text-white mb-3"
+                                />
+                                <p className="text-xl font-bold text-white">
+                                    Drop CSV classlist here
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Class Grid */}
+                        {classes.length === 0 ? (
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-8 text-center">
+                                <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <BookOpen
+                                        size={24}
+                                        className="text-gray-400"
+                                    />
+                                </div>
+                                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
+                                    No classes for{" "}
+                                    {selectedSemester === 1 ? "1st" : "2nd"}{" "}
+                                    Semester
+                                </h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                                    {selectedSemester === currentSemester
+                                        ? "Add your first class to get started."
+                                        : "No classes were created this semester."}
+                                </p>
+                                {selectedSemester === currentSemester && (
+                                    <button
+                                        onClick={() =>
+                                            setIsAddClassModalOpen(true)
+                                        }
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                                    >
+                                        <Plus size={16} />
+                                        Add Class
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                {classes.map((cls, index) => {
+                                    const colors = getColorClasses(cls.color);
+                                    const classKey = buildClassKey(cls, index);
+                                    const isLoading = loadingClassId === cls.id;
+                                    return (
+                                        <ClassCard
+                                            key={classKey}
+                                            colors={colors}
+                                            cls={cls}
+                                            handleClassSelect={() =>
+                                                handleClassSelect(cls.id)
+                                            }
+                                            onSendNudge={handleSendNudge}
+                                            onEditClass={handleEditClass}
+                                            onDeleteClass={handleDeleteClass}
+                                            isLoading={isLoading}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <MyClass
+                        selectedClassHeading={selectedClassHeading}
+                        selectedClass={selectedClass}
+                        roster={roster}
+                        gradeStructure={gradeStructure}
+                        gradeSummaries={gradeSummaries}
+                    />
+                )}
+            </div>
+
+            {/* Modals */}
             {isAddClassModalOpen && (
                 <AddNewClassModal
                     onClose={() => {
@@ -907,10 +871,40 @@ const MyClasses = ({
                     defaultSchoolYear={defaultSchoolYear}
                     currentSemester={currentSemester}
                     initialFile={droppedFile}
+                    departments={departments}
                 />
             )}
 
-            {/* --- Send Nudge Modal --- */}
+            {editClassModal.open && editClassModal.classData && (
+                <AddNewClassModal
+                    mode="edit"
+                    classData={editClassModal.classData}
+                    onClose={() => {
+                        setEditClassModal({ open: false, classData: null });
+                    }}
+                    defaultSchoolYear={defaultSchoolYear}
+                    currentSemester={currentSemester}
+                    departments={departments}
+                />
+            )}
+
+            <ClassCreateSummaryModal
+                isOpen={isClassCreateSummaryOpen}
+                summary={classCreateSummary}
+                onClose={() => setIsClassCreateSummaryOpen(false)}
+                onSaveChanges={handleSummarySaveChanges}
+                onSkip={handleSummarySkip}
+            />
+
+            <DeleteClassModal
+                isOpen={deleteClassModal.open}
+                classData={deleteClassModal.classData}
+                onClose={() =>
+                    setDeleteClassModal({ open: false, classData: null })
+                }
+                onDeleted={handleDeletedClass}
+            />
+
             <SendNudgeModal
                 isOpen={isNudgeModalOpen}
                 onClose={() => {
@@ -919,10 +913,20 @@ const MyClasses = ({
                 }}
                 subject={nudgeTargetClass}
             />
+
+            {isImportSummaryModalOpen &&
+                importSummary &&
+                !isClassCreateSummaryOpen &&
+                !editClassModal.open && (
+                    <BulkStudentImportSummaryModal
+                        summary={importSummary}
+                        onClose={() => setIsImportSummaryModalOpen(false)}
+                    />
+                )}
         </>
     );
 };
 
-MyClasses.layout = (page) => <TeacherLayout children={page} />;
+MyClasses.layout = (page) => <SuperAdminLayout children={page} />;
 
 export default MyClasses;

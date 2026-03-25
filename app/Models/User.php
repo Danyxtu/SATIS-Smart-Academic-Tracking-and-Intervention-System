@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -28,7 +29,6 @@ class User extends Authenticatable
         'email',
         'personal_email',
         'password',
-        'role',
         'status',
         'department_id',
         'created_by',
@@ -108,36 +108,91 @@ class User extends Authenticatable
         return $this->hasMany(User::class, 'created_by');
     }
 
-    /**
-     * Check if user is a super admin.
-     */
+
+    public function roles()
+    {
+        return $this->belongsToMany(Role::class);
+    }
+
+    public function hasRole(string $role): bool
+    {
+        return $this->roles->contains('name', $role);
+    }
+
     public function isSuperAdmin(): bool
     {
-        return $this->role === 'super_admin';
+        return $this->hasRole('super_admin');
     }
 
-    /**
-     * Check if user is an admin.
-     */
     public function isAdmin(): bool
     {
-        return $this->role === 'admin';
+        return $this->hasRole('admin');
     }
 
-    /**
-     * Check if user is a teacher.
-     */
     public function isTeacher(): bool
     {
-        return $this->role === 'teacher';
+        return $this->hasRole('teacher');
+    }
+
+    public function isStudent(): bool
+    {
+        return $this->hasRole('student');
+    }
+
+    public function isStaff(): bool
+    {
+        return !$this->isStudent();
     }
 
     /**
-     * Check if user is a student.
+     * Normalize role names with business rules.
+     * Rule: a super_admin cannot also be an admin.
+     *
+     * @param  array<int, string>  $roleNames
+     * @return array<int, string>
      */
-    public function isStudent(): bool
+    public static function normalizeRoleNames(array $roleNames): array
     {
-        return $this->role === 'student';
+        $unique = collect($roleNames)
+            ->filter(fn($name) => is_string($name) && trim($name) !== '')
+            ->map(fn($name) => trim($name))
+            ->unique()
+            ->values();
+
+        if ($unique->contains('super_admin')) {
+            $unique = $unique->reject(fn($name) => $name === 'admin')->values();
+        }
+
+        return $unique->all();
+    }
+
+    /**
+     * Sync roles by role names while enforcing role business rules.
+     *
+     * @param  array<int, string>  $roleNames
+     */
+    public function syncRolesByName(array $roleNames, bool $detaching = true): void
+    {
+        $normalized = self::normalizeRoleNames($roleNames);
+
+        if ($normalized === []) {
+            if ($detaching) {
+                $this->roles()->detach();
+            }
+            return;
+        }
+
+        $roleIds = Role::query()
+            ->whereIn('name', $normalized)
+            ->pluck('id')
+            ->all();
+
+        if ($detaching) {
+            $this->roles()->sync($roleIds);
+            return;
+        }
+
+        $this->roles()->syncWithoutDetaching($roleIds);
     }
 
     /**

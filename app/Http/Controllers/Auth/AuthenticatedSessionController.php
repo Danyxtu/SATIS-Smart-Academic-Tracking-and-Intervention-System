@@ -20,7 +20,7 @@ class AuthenticatedSessionController extends Controller
     {
         return Inertia::render('Auth/Login', [
             'canResetPassword' => Route::has('password.request'),
-            'status' => session('status'),
+            'status'           => session('status'),
         ]);
     }
 
@@ -31,37 +31,30 @@ class AuthenticatedSessionController extends Controller
     {
         $request->authenticate();
 
-        session()->regenerate();
+        $request->session()->regenerate();
 
-        // --- THIS IS THE MODIFIED PART ---
-
-        // Get the authenticated user
         $user = Auth::user();
 
-        // Check if user must change password (first-time login)
+        // Force password change on first login — runs before any role redirect
         if ($user->must_change_password) {
             return redirect()->route('password.force-change');
         }
 
-        // Check their role and redirect them
-        if ($user->role === 'super_admin') {
-            return redirect()->intended(route('superadmin.dashboard'));
-        }
-
-        if ($user->role === 'admin') {
-            return redirect()->intended(route('admin.dashboard'));
-        }
-
-        if ($user->role === 'teacher') {
+        // Always prioritize teacher dashboard if user has teacher role
+        if ($user->isTeacher()) {
             return redirect()->intended(route('teacher.dashboard'));
         }
-
-        if ($user->role === 'student') {
+        // Otherwise, check for superadmin, then admin, then student
+        if ($user->isSuperAdmin()) {
+            return redirect()->intended(route('superadmin.dashboard'));
+        }
+        if ($user->isAdmin()) {
+            return redirect()->intended(route('admin.dashboard'));
+        }
+        if ($user->isStudent()) {
             return redirect()->intended(route('dashboard'));
         }
-
-        // Fallback in case a user has no role
-        return redirect()->intended('/');
+        return redirect('/');
     }
 
     /**

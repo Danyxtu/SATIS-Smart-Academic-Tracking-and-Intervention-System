@@ -56,6 +56,7 @@ class HandleInertiaRequests extends Middleware
                 'error' => fn() => $request->session()->get('error'),
                 'message' => fn() => $request->session()->get('message'),
                 'import_summary' => fn() => $request->session()->get('import_summary'),
+                'class_create_summary' => fn() => $request->session()->get('class_create_summary'),
                 'new_student_password' => fn() => $request->session()->get('new_student_password'),
                 'grade_update_summary' => fn() => $request->session()->get('grade_update_summary'),
                 'grade_import_summary' => fn() => $request->session()->get('grade_import_summary'),
