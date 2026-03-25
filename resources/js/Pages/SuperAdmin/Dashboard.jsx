@@ -49,7 +49,7 @@ export default function Dashboard({
             bgLight: "bg-violet-50",
             textColor: "text-violet-600",
             shadowColor: "shadow-violet-500/20",
-            href: route("superadmin.admins.index"),
+            href: route("superadmin.users.index", { role: "admin" }),
         },
         {
             name: "Teachers",
@@ -60,7 +60,7 @@ export default function Dashboard({
             bgLight: "bg-emerald-50",
             textColor: "text-emerald-600",
             shadowColor: "shadow-emerald-500/20",
-            href: "#",
+            href: route("superadmin.users.index", { role: "teacher" }),
         },
         {
             name: "Students",
@@ -71,7 +71,7 @@ export default function Dashboard({
             bgLight: "bg-amber-50",
             textColor: "text-amber-600",
             shadowColor: "shadow-amber-500/20",
-            href: "#",
+            href: route("superadmin.users.index", { role: "student" }),
         },
     ];
 
@@ -80,7 +80,7 @@ export default function Dashboard({
             name: "Add Department",
             description: "Create a new academic department",
             icon: Building2,
-            href: route("superadmin.departments.create"),
+            href: route("superadmin.departments.index"),
             color: "from-blue-500 to-indigo-600",
             shadow: "shadow-blue-500/30",
         },
@@ -252,9 +252,7 @@ export default function Dashboard({
                                     No departments yet
                                 </p>
                                 <Link
-                                    href={route(
-                                        "superadmin.departments.create",
-                                    )}
+                                    href={route("superadmin.departments.index")}
                                     className="text-sm font-semibold text-blue-600 hover:text-blue-700"
                                 >
                                     Create your first department

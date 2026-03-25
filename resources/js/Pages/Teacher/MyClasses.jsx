@@ -27,7 +27,10 @@ import {
  */
 import {
     AddNewClassModal,
+    BulkStudentImportSummaryModal,
     ClassCard,
+    ClassCreateSummaryModal,
+    DeleteClassModal,
     SendNudgeModal,
 } from "@/Components/Teacher/MyClasses";
 import MyClass from "./MyClasses/MyClass";
@@ -66,6 +69,7 @@ const buildClassKey = (cls, index) => {
 
 const MyClasses = ({
     classes = [],
+    departments = [],
     rosters = {},
     gradeStructures = {},
     defaultSchoolYear,
@@ -103,7 +107,10 @@ const MyClasses = ({
         typeof flash.grade_import_summary === "object"
             ? flash.grade_import_summary
             : null;
-    const importSummaryErrors = importSummary?.errors ?? [];
+    const classCreateSummary =
+        typeof flash.class_create_summary === "object"
+            ? flash.class_create_summary
+            : null;
 
     const { startLoading, stopLoading } = useLoading();
 
@@ -114,6 +121,20 @@ const MyClasses = ({
         return classIdFromUrl ? parseInt(classIdFromUrl) : null;
     });
     const [isAddClassModalOpen, setIsAddClassModalOpen] = useState(false);
+    const [editClassModal, setEditClassModal] = useState({
+        open: false,
+        classData: null,
+    });
+    const [deleteClassModal, setDeleteClassModal] = useState({
+        open: false,
+        classData: null,
+    });
+    const [isImportSummaryModalOpen, setIsImportSummaryModalOpen] = useState(
+        Boolean(importSummary),
+    );
+    const [isClassCreateSummaryOpen, setIsClassCreateSummaryOpen] = useState(
+        Boolean(classCreateSummary),
+    );
     const [isDragging, setIsDragging] = useState(false);
     const [droppedFile, setDroppedFile] = useState(null);
     const [highlightAddClass, setHighlightAddClass] = useState(false);
@@ -269,6 +290,14 @@ const MyClasses = ({
         setActiveGradeCategoryId(null);
     }, [selectedClassId]);
 
+    useEffect(() => {
+        setIsImportSummaryModalOpen(Boolean(importSummary));
+    }, [importSummary]);
+
+    useEffect(() => {
+        setIsClassCreateSummaryOpen(Boolean(classCreateSummary));
+    }, [classCreateSummary]);
+
     const dirtyGradeCount = Object.keys(dirtyGrades).length;
     const hasGradeChanges = dirtyGradeCount > 0;
     const selectedClassMeta = selectedClass
@@ -386,6 +415,56 @@ const MyClasses = ({
         );
     };
 
+    const handleEditClass = (cls) => {
+        setEditClassModal({ open: true, classData: cls });
+    };
+
+    const handleDeleteClass = (cls) => {
+        setDeleteClassModal({ open: true, classData: cls });
+    };
+
+    const handleDeletedClass = (cls) => {
+        if (selectedClassId === cls.id) {
+            handleGoBack();
+        }
+    };
+
+    const handleSummarySaveChanges = () => {
+        if (!classCreateSummary) {
+            setIsClassCreateSummaryOpen(false);
+            return;
+        }
+
+        const existingClass = classes.find(
+            (cls) => cls.id === classCreateSummary.class_id,
+        );
+
+        const classForEdit =
+            existingClass ||
+            (classCreateSummary.class_id
+                ? {
+                      id: classCreateSummary.class_id,
+                      name: classCreateSummary.grade_level,
+                      section: classCreateSummary.section,
+                      strand: classCreateSummary.strand,
+                      subject_name: classCreateSummary.subject_name,
+                      color: classCreateSummary.color || "indigo",
+                      track: classCreateSummary.track || "",
+                      school_year: classCreateSummary.school_year,
+                  }
+                : null);
+
+        setIsClassCreateSummaryOpen(false);
+
+        if (classForEdit) {
+            setEditClassModal({ open: true, classData: classForEdit });
+        }
+    };
+
+    const handleSummarySkip = () => {
+        setIsClassCreateSummaryOpen(false);
+    };
+
     return (
         <>
             <Head title="My Classes" />
@@ -442,133 +521,10 @@ const MyClasses = ({
                 </header>
 
                 {/* Compact Flash Messages */}
-                {(importSummary ||
-                    gradeUpdateSummary ||
+                {(gradeUpdateSummary ||
                     gradeImportSummary ||
                     newStudentPassword) && (
                     <div className="grid gap-3">
-                        {/* Import Summary */}
-                        {importSummary && (
-                            <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3">
-                                <div className="flex items-start gap-2">
-                                    <CheckCircle
-                                        size={16}
-                                        className="text-indigo-600 mt-0.5 flex-shrink-0"
-                                    />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">
-                                            Classlist Upload Summary
-                                        </p>
-                                        <div className="flex flex-wrap gap-3 mt-1 text-xs text-indigo-700 dark:text-indigo-300">
-                                            <span>
-                                                Added:{" "}
-                                                {importSummary.imported ?? 0}
-                                            </span>
-                                            <span>
-                                                Updated:{" "}
-                                                {importSummary.updated ?? 0}
-                                            </span>
-                                            <span>
-                                                Skipped:{" "}
-                                                {importSummary.skipped ?? 0}
-                                            </span>
-                                        </div>
-
-                                        {/* Errors */}
-                                        {importSummaryErrors.length > 0 && (
-                                            <details className="mt-2">
-                                                <summary className="cursor-pointer text-xs font-medium text-red-700 dark:text-red-400 hover:underline">
-                                                    View{" "}
-                                                    {importSummaryErrors.length}{" "}
-                                                    error
-                                                    {importSummaryErrors.length >
-                                                    1
-                                                        ? "s"
-                                                        : ""}
-                                                </summary>
-                                                <ul className="mt-1 space-y-0.5 pl-4 text-xs text-red-700 dark:text-red-400 list-disc">
-                                                    {importSummaryErrors.map(
-                                                        (error, index) => (
-                                                            <li key={index}>
-                                                                {error}
-                                                            </li>
-                                                        ),
-                                                    )}
-                                                </ul>
-                                            </details>
-                                        )}
-
-                                        {/* Created Students */}
-                                        {(importSummary.created_students
-                                            ?.length ?? 0) > 0 && (
-                                            <details className="mt-2">
-                                                <summary className="cursor-pointer text-xs font-medium text-indigo-800 dark:text-indigo-300 hover:underline">
-                                                    View passwords for{" "}
-                                                    {
-                                                        importSummary
-                                                            .created_students
-                                                            .length
-                                                    }{" "}
-                                                    new student
-                                                    {importSummary
-                                                        .created_students
-                                                        .length > 1
-                                                        ? "s"
-                                                        : ""}
-                                                </summary>
-                                                <div className="mt-2 space-y-1.5">
-                                                    {importSummary.created_students.map(
-                                                        (s, idx) => (
-                                                            <div
-                                                                key={idx}
-                                                                className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-gray-800 rounded border border-indigo-100 dark:border-indigo-800 text-xs"
-                                                            >
-                                                                <div className="flex-1 min-w-0">
-                                                                    <p className="font-medium text-gray-900 dark:text-white truncate">
-                                                                        {s.name ??
-                                                                            s.email ??
-                                                                            "Student"}
-                                                                    </p>
-                                                                    <p className="text-gray-500 dark:text-gray-400 text-[10px]">
-                                                                        LRN:{" "}
-                                                                        {s.lrn ??
-                                                                            "N/A"}
-                                                                    </p>
-                                                                </div>
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <code className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-900 dark:text-indigo-200 rounded text-[10px] font-mono">
-                                                                        {
-                                                                            s.password
-                                                                        }
-                                                                    </code>
-                                                                    <button
-                                                                        onClick={() =>
-                                                                            navigator.clipboard.writeText(
-                                                                                s.password,
-                                                                            )
-                                                                        }
-                                                                        className="p-1 hover:bg-indigo-100 dark:hover:bg-indigo-800 rounded transition-colors"
-                                                                        title="Copy password"
-                                                                    >
-                                                                        <Copy
-                                                                            size={
-                                                                                12
-                                                                            }
-                                                                            className="text-indigo-600 dark:text-indigo-400"
-                                                                        />
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        ),
-                                                    )}
-                                                </div>
-                                            </details>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
                         {/* New Student Password */}
                         {newStudentPassword && (
                             <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3">
@@ -885,6 +841,8 @@ const MyClasses = ({
                                                 handleClassSelect(cls.id)
                                             }
                                             onSendNudge={handleSendNudge}
+                                            onEditClass={handleEditClass}
+                                            onDeleteClass={handleDeleteClass}
                                             isLoading={isLoading}
                                         />
                                     );
@@ -913,8 +871,39 @@ const MyClasses = ({
                     defaultSchoolYear={defaultSchoolYear}
                     currentSemester={currentSemester}
                     initialFile={droppedFile}
+                    departments={departments}
                 />
             )}
+
+            {editClassModal.open && editClassModal.classData && (
+                <AddNewClassModal
+                    mode="edit"
+                    classData={editClassModal.classData}
+                    onClose={() => {
+                        setEditClassModal({ open: false, classData: null });
+                    }}
+                    defaultSchoolYear={defaultSchoolYear}
+                    currentSemester={currentSemester}
+                    departments={departments}
+                />
+            )}
+
+            <ClassCreateSummaryModal
+                isOpen={isClassCreateSummaryOpen}
+                summary={classCreateSummary}
+                onClose={() => setIsClassCreateSummaryOpen(false)}
+                onSaveChanges={handleSummarySaveChanges}
+                onSkip={handleSummarySkip}
+            />
+
+            <DeleteClassModal
+                isOpen={deleteClassModal.open}
+                classData={deleteClassModal.classData}
+                onClose={() =>
+                    setDeleteClassModal({ open: false, classData: null })
+                }
+                onDeleted={handleDeletedClass}
+            />
 
             <SendNudgeModal
                 isOpen={isNudgeModalOpen}
@@ -924,6 +913,16 @@ const MyClasses = ({
                 }}
                 subject={nudgeTargetClass}
             />
+
+            {isImportSummaryModalOpen &&
+                importSummary &&
+                !isClassCreateSummaryOpen &&
+                !editClassModal.open && (
+                    <BulkStudentImportSummaryModal
+                        summary={importSummary}
+                        onClose={() => setIsImportSummaryModalOpen(false)}
+                    />
+                )}
         </>
     );
 };

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
+use App\Models\Department;
+use App\Models\Role;
 use App\Models\Student;
 use App\Models\StudentNotification;
 use App\Models\Subject;
@@ -20,6 +22,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -97,6 +100,10 @@ class ClassController extends Controller
     public function goToMyClasses(Request $request): Response
     {
         $classesData = $this->ClassesServices->getClassesData($request);
+        $departments = Department::query()
+            ->where('is_active', true)
+            ->orderBy('department_code')
+            ->get(['department_name', 'department_code']);
 
         $classes = $classesData['classes'];
         $defaultSchoolYear = $classesData['defaultSchoolYear'];
@@ -114,6 +121,7 @@ class ClassController extends Controller
             'semester1Count',
             'semester2Count',
             'roster',
+            'departments',
         ));
     }
 
@@ -128,14 +136,23 @@ class ClassController extends Controller
 
         $data = $request->validate([
             'grade_level' => 'required|string|max:255',
-            'section' => 'required|string|max:255',
+            'section' => ['required', 'string', 'max:20', 'regex:/^[A-Za-z]+$/'],
             'subject_name' => 'required|string|max:255',
             'color' => 'required|string|in:' . implode(',', self::COLOR_OPTIONS),
             'school_year' => 'required|string|max:255',
-            'strand' => 'nullable|string|max:255',
+            'strand' => ['required', 'string', Rule::exists('departments', 'department_code')],
             'track' => 'nullable|string|max:255',
             'classlist' => 'nullable|file|mimes:csv,txt,xls,xlsx|max:4096',
         ]);
+
+        $sectionSuffix = strtoupper(trim($data['section']));
+        $sectionCombined = strtoupper(trim($data['strand'])) . '-' . $sectionSuffix;
+
+        $duplicateSectionCount = SubjectTeacher::query()
+            ->where('teacher_id', $teacher->id)
+            ->where('grade_level', $data['grade_level'])
+            ->where('section', $sectionCombined)
+            ->count();
 
         // First, find or create the subject
         $subjectCode = Str::slug($data['subject_name'], '_') . '_' . Str::random(6);
@@ -149,8 +166,8 @@ class ClassController extends Controller
             'subject_id' => $subject->id,
             'teacher_id' => $teacher->id,
             'grade_level' => $data['grade_level'],
-            'section' => $data['section'],
-            'strand' => $data['strand'] ?? null,
+            'section' => $sectionCombined,
+            'strand' => strtoupper(trim($data['strand'])),
             'track' => $data['track'] ?? null,
             'color' => $data['color'],
             'school_year' => $data['school_year'],
@@ -175,7 +192,81 @@ class ClassController extends Controller
         return redirect()
             ->route('teacher.classes.index')
             ->with('success', 'Class created successfully.')
+            ->with('class_create_summary', [
+                'class_id' => $subjectTeacher->id,
+                'grade_level' => $data['grade_level'],
+                'strand' => strtoupper(trim($data['strand'])),
+                'section_suffix' => $sectionSuffix,
+                'section' => $sectionCombined,
+                'subject_name' => $data['subject_name'],
+                'color' => $data['color'],
+                'track' => $data['track'] ?? null,
+                'school_year' => $data['school_year'],
+                'semester' => (string) $currentSemester,
+                'duplicate_basis' => 'grade_section',
+                'duplicate_section' => $duplicateSectionCount > 0,
+                'duplicate_count' => $duplicateSectionCount,
+            ])
             ->with('import_summary', $summary);
+    }
+
+    public function updateClass(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
+    {
+        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
+
+        $data = $request->validate([
+            'grade_level' => 'required|string|max:255',
+            'section' => ['required', 'string', 'max:20', 'regex:/^[A-Za-z]+$/'],
+            'subject_name' => 'required|string|max:255',
+            'color' => 'required|string|in:' . implode(',', self::COLOR_OPTIONS),
+            'school_year' => 'required|string|max:255',
+            'strand' => ['required', 'string', Rule::exists('departments', 'department_code')],
+            'track' => 'nullable|string|max:255',
+        ]);
+
+        $sectionSuffix = strtoupper(trim($data['section']));
+        $sectionCombined = strtoupper(trim($data['strand'])) . '-' . $sectionSuffix;
+
+        $subjectCode = Str::slug($data['subject_name'], '_') . '_' . Str::random(6);
+        $subject = Subject::firstOrCreate(
+            ['subject_name' => $data['subject_name']],
+            ['subject_code' => $subjectCode]
+        );
+
+        $subjectTeacher->update([
+            'subject_id' => $subject->id,
+            'grade_level' => $data['grade_level'],
+            'section' => $sectionCombined,
+            'strand' => strtoupper(trim($data['strand'])),
+            'track' => $data['track'] ?? null,
+            'color' => $data['color'],
+            'school_year' => $data['school_year'],
+        ]);
+
+        return redirect()
+            ->route('teacher.classes.index')
+            ->with('success', 'Class updated successfully.');
+    }
+
+    public function destroyClass(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
+    {
+        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
+
+        $request->validate([
+            'password' => 'required|string',
+        ]);
+
+        if (!Hash::check($request->password, $request->user()->password)) {
+            return back()->withErrors([
+                'password' => 'The provided password is incorrect.',
+            ]);
+        }
+
+        $subjectTeacher->delete();
+
+        return redirect()
+            ->route('teacher.classes.index')
+            ->with('success', 'Class deleted successfully.');
     }
 
     public function enrollStudent(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
@@ -201,12 +292,19 @@ class ClassController extends Controller
             'email' => $data['email'] ?? null,
         ]);
 
-        // Prepare flash with generated password if created
-        $redirect = redirect()->route('teacher.classes.index')->with('success', 'Student added to class.');
+        $statusMessage = match ($result['status']) {
+            'created' => 'Student account created and assigned to class.',
+            'assigned_existing' => 'Existing student assigned to class.',
+            'already_assigned' => 'Student already exists and is already assigned to this class.',
+            default => 'Student added to class.',
+        };
+
+        // Prepare flash with generated password if a new account was created
+        $redirect = redirect()->route('teacher.classes.index')->with('success', $statusMessage);
 
         if (is_array($result) && ! empty($result['password'])) {
             $redirect = $redirect->with('new_student_password', [
-                'student_name' => $studentName,
+                'name' => $studentName,
                 'lrn' => $data['lrn'],
                 'email' => $data['email'] ?? null,
                 'password' => $result['password'],
@@ -286,11 +384,14 @@ class ClassController extends Controller
         }
 
         $summary = [
-            'imported' => 0,
-            'updated' => 0,
+            'newly_created' => 0,
+            'assigned_existing' => 0,
+            'already_enrolled' => 0,
             'skipped' => 0,
             'errors' => [],
-            'created_students' => [],
+            'newly_created_students' => [],
+            'assigned_existing_students' => [],
+            'already_enrolled_students' => [],
         ];
 
         $seenLrns = [];
@@ -318,18 +419,28 @@ class ClassController extends Controller
 
             try {
                 $result = $this->persistStudentRecord($subjectTeacher, $payload);
-                if ($result['status'] === 'created') {
-                    $summary['imported']++;
-                } else {
-                    $summary['updated']++;
-                }
 
-                if (!empty($result['password'])) {
-                    $summary['created_students'][] = [
+                if ($result['status'] === 'created') {
+                    $summary['newly_created']++;
+                    $summary['newly_created_students'][] = [
                         'name' => $payload['student_name'] ?? null,
                         'lrn' => $payload['lrn'] ?? null,
                         'email' => $payload['email'] ?? null,
                         'password' => $result['password'],
+                    ];
+                } elseif ($result['status'] === 'assigned_existing') {
+                    $summary['assigned_existing']++;
+                    $summary['assigned_existing_students'][] = [
+                        'name' => $payload['student_name'] ?? null,
+                        'lrn' => $payload['lrn'] ?? null,
+                        'email' => $payload['email'] ?? null,
+                    ];
+                } elseif ($result['status'] === 'already_assigned') {
+                    $summary['already_enrolled']++;
+                    $summary['already_enrolled_students'][] = [
+                        'name' => $payload['student_name'] ?? null,
+                        'lrn' => $payload['lrn'] ?? null,
+                        'email' => $payload['email'] ?? null,
                     ];
                 }
             } catch (ValidationException $exception) {
@@ -341,8 +452,10 @@ class ClassController extends Controller
             }
         }
 
-        // Ensure created_students array exists
-        $summary['created_students'] = $summary['created_students'] ?? [];
+        // Legacy keys kept for compatibility with existing flash consumers.
+        $summary['imported'] = $summary['newly_created'];
+        $summary['updated'] = $summary['assigned_existing'] + $summary['already_enrolled'];
+        $summary['created_students'] = $summary['newly_created_students'];
 
         return $summary;
     }
@@ -408,7 +521,7 @@ class ClassController extends Controller
             $student->user_id = $user->id;
         }
 
-        $wasExisting = $student->exists;
+        $studentExistedBeforeSave = $student->exists;
 
         // Update student record - use student_name (single field)
         $student->student_name = $studentName;
@@ -424,7 +537,7 @@ class ClassController extends Controller
 
         $student->save();
 
-        Enrollment::firstOrCreate(
+        $enrollment = Enrollment::firstOrCreate(
             [
                 'user_id' => $student->user_id,
                 'subject_teachers_id' => $subjectTeacher->id,
@@ -436,8 +549,15 @@ class ClassController extends Controller
             ]
         );
 
+        $status = 'assigned_existing';
+        if (! $studentExistedBeforeSave) {
+            $status = 'created';
+        } elseif (! $enrollment->wasRecentlyCreated) {
+            $status = 'already_assigned';
+        }
+
         return [
-            'status' => $wasExisting ? 'updated' : 'created',
+            'status' => $status,
             'password' => $generatedPlainPassword,
             'user' => $user,
         ];
@@ -574,9 +694,13 @@ class ClassController extends Controller
                 'password' => $plainPassword, // Store plain text initially - will be hashed on first login change
                 'temp_password' => $plainPassword, // Store for teacher to view
                 'must_change_password' => true,
-                'role' => 'student',
             ]
         );
+
+        $studentRoleId = Role::where('name', 'student')->value('id');
+        if ($studentRoleId) {
+            $user->roles()->syncWithoutDetaching([$studentRoleId]);
+        }
 
         // Only return the generated plaintext password when a user was newly created
         return [

@@ -30,8 +30,6 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
         // Department Management
         Route::get('/departments', [DepartmentController::class, 'index'])
             ->name('departments.index');
-        Route::get('/departments/create', [DepartmentController::class, 'create'])
-            ->name('departments.create');
         Route::post('/departments', [DepartmentController::class, 'store'])
             ->name('departments.store');
         Route::get('/departments/{department}', [DepartmentController::class, 'show'])
@@ -46,9 +44,8 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
             ->name('departments.toggle-status');
 
         // User Management
-        Route::resource('users', UserManagementController::class);
-        Route::get('users/', [UserManagementController::class, 'index'])
-            ->name('users.index');
+        Route::resource('users', UserManagementController::class)
+            ->only(['index', 'store', 'update', 'destroy']);
         // Admin Management
         Route::resource('admins', SuperAdminAdminController::class);
         Route::post('/admins/{admin}/reset-password', [SuperAdminAdminController::class, 'resetPassword'])

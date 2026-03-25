@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -141,6 +142,57 @@ class User extends Authenticatable
     public function isStaff(): bool
     {
         return !$this->isStudent();
+    }
+
+    /**
+     * Normalize role names with business rules.
+     * Rule: a super_admin cannot also be an admin.
+     *
+     * @param  array<int, string>  $roleNames
+     * @return array<int, string>
+     */
+    public static function normalizeRoleNames(array $roleNames): array
+    {
+        $unique = collect($roleNames)
+            ->filter(fn($name) => is_string($name) && trim($name) !== '')
+            ->map(fn($name) => trim($name))
+            ->unique()
+            ->values();
+
+        if ($unique->contains('super_admin')) {
+            $unique = $unique->reject(fn($name) => $name === 'admin')->values();
+        }
+
+        return $unique->all();
+    }
+
+    /**
+     * Sync roles by role names while enforcing role business rules.
+     *
+     * @param  array<int, string>  $roleNames
+     */
+    public function syncRolesByName(array $roleNames, bool $detaching = true): void
+    {
+        $normalized = self::normalizeRoleNames($roleNames);
+
+        if ($normalized === []) {
+            if ($detaching) {
+                $this->roles()->detach();
+            }
+            return;
+        }
+
+        $roleIds = Role::query()
+            ->whereIn('name', $normalized)
+            ->pluck('id')
+            ->all();
+
+        if ($detaching) {
+            $this->roles()->sync($roleIds);
+            return;
+        }
+
+        $this->roles()->syncWithoutDetaching($roleIds);
     }
 
     /**
