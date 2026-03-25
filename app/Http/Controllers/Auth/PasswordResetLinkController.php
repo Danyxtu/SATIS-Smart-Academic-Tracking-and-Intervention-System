@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\PasswordResetRequest;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
@@ -47,5 +49,50 @@ class PasswordResetLinkController extends Controller
         throw ValidationException::withMessages([
             'email' => [trans($status)],
         ]);
+    }
+
+    /**
+     * Handle an incoming admin password reset request from a teacher.
+     */
+    public function requestAdminReset(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'reason' => 'required|string|max:500',
+        ]);
+
+        // Find the user by email
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            throw ValidationException::withMessages([
+                'email' => ['We could not find an account with that email address.'],
+            ]);
+        }
+
+        // Only teachers and students can request admin password reset
+        if (!in_array($user->role, ['teacher', 'student'])) {
+            throw ValidationException::withMessages([
+                'email' => ['Admin password reset is only available for teacher and student accounts.'],
+            ]);
+        }
+
+        // Check if user already has a pending request
+        $existingRequest = PasswordResetRequest::where('user_id', $user->id)
+            ->where('status', PasswordResetRequest::STATUS_PENDING)
+            ->first();
+
+        if ($existingRequest) {
+            return back()->with('status', 'You already have a pending password reset request. Please wait for your department admin to process it.');
+        }
+
+        // Create the password reset request
+        PasswordResetRequest::create([
+            'user_id' => $user->id,
+            'reason' => $request->reason,
+            'status' => PasswordResetRequest::STATUS_PENDING,
+        ]);
+
+        return back()->with('status', 'Your password reset request has been sent to your department admin. Please visit your admin in person to receive your new password.');
     }
 }

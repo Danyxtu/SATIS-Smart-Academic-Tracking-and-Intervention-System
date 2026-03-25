@@ -15,8 +15,8 @@ import {
 
 export default function Edit({ department }) {
     const { data, setData, put, processing, errors } = useForm({
-        name: department.name || "",
-        code: department.code || "",
+        department_name: department.name || "",
+        department_code: department.code || "",
         description: department.description || "",
         is_active: department.is_active ?? true,
     });
@@ -81,21 +81,21 @@ export default function Edit({ department }) {
                             </label>
                             <input
                                 type="text"
-                                value={data.name}
+                                value={data.department_name}
                                 onChange={(e) =>
-                                    setData("name", e.target.value)
+                                    setData("department_name", e.target.value)
                                 }
                                 placeholder="e.g., Information and Communications Technology"
                                 className={`w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors ${
-                                    errors.name
+                                    errors.department_name
                                         ? "border-rose-300 bg-rose-50/50"
                                         : ""
                                 }`}
                             />
-                            {errors.name && (
+                            {errors.department_name && (
                                 <p className="mt-2 text-sm text-rose-600 flex items-center gap-1">
                                     <Info size={14} />
-                                    {errors.name}
+                                    {errors.department_name}
                                 </p>
                             )}
                         </div>
@@ -109,24 +109,24 @@ export default function Edit({ department }) {
                             </label>
                             <input
                                 type="text"
-                                value={data.code}
+                                value={data.department_code}
                                 onChange={(e) =>
                                     setData(
-                                        "code",
-                                        e.target.value.toUpperCase()
+                                        "department_code",
+                                        e.target.value.toUpperCase(),
                                     )
                                 }
                                 placeholder="e.g., ICT"
                                 className={`w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors ${
-                                    errors.code
+                                    errors.department_code
                                         ? "border-rose-300 bg-rose-50/50"
                                         : ""
                                 }`}
                             />
-                            {errors.code && (
+                            {errors.department_code && (
                                 <p className="mt-2 text-sm text-rose-600 flex items-center gap-1">
                                     <Info size={14} />
-                                    {errors.code}
+                                    {errors.department_code}
                                 </p>
                             )}
                             <p className="mt-2 text-xs text-slate-400">
@@ -200,7 +200,7 @@ export default function Edit({ department }) {
                                         onChange={(e) =>
                                             setData(
                                                 "is_active",
-                                                e.target.checked
+                                                e.target.checked,
                                             )
                                         }
                                         className="peer sr-only"

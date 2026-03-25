@@ -17,6 +17,7 @@ import {
     Copy,
     Key,
     Building2,
+    Hash,
 } from "lucide-react";
 
 // Role Selection Card
@@ -84,6 +85,7 @@ export default function Create({ department }) {
         first_name: "",
         last_name: "",
         middle_name: "",
+        lrn: "",
         email: "",
         password: "",
         password_confirmation: "",
@@ -314,6 +316,40 @@ export default function Create({ department }) {
                             </p>
                         )}
                     </div>
+
+                    {/* LRN - only show for student role */}
+                    {data.role === "student" && (
+                        <div>
+                            <label
+                                htmlFor="lrn"
+                                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                            >
+                                Learner Reference Number (LRN) *
+                            </label>
+                            <div className="relative">
+                                <Hash
+                                    size={18}
+                                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                                />
+                                <input
+                                    id="lrn"
+                                    type="text"
+                                    value={data.lrn}
+                                    onChange={(e) =>
+                                        setData("lrn", e.target.value)
+                                    }
+                                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    placeholder="Enter 12-digit LRN"
+                                    maxLength={20}
+                                />
+                            </div>
+                            {errors.lrn && (
+                                <p className="mt-1 text-sm text-red-600">
+                                    {errors.lrn}
+                                </p>
+                            )}
+                        </div>
+                    )}
 
                     {/* Info box for student role - auto-generated password */}
                     {data.role === "student" && (

@@ -15,6 +15,8 @@ class GradeCalculationService
 {
     /**
      * Calculate final grade for a specific quarter
+     *
+     * $grades is a quarter-grouped array: [ 1 => [ taskId => score ], 2 => [ taskId => score ] ]
      */
     public function calculateFinalGrade(array $grades, array $categories, int $quarter = 1): string
     {
@@ -22,7 +24,7 @@ class GradeCalculationService
             return 'N/A';
         }
 
-        $quarterGrades = $this->filterGradesByQuarter($grades, $quarter);
+        $quarterGrades = $grades[$quarter] ?? [];
 
         $totalWeight = 0;
         $weightedScore = 0;
@@ -76,6 +78,8 @@ class GradeCalculationService
      */
     public function hasQuarterlyExamScores(array $grades, array $categories, int $quarter = 1): bool
     {
+        $quarterGrades = $grades[$quarter] ?? [];
+
         $quarterlyExamCategory = collect($categories)->first(function ($category) {
             return ($category['id'] ?? '') === 'quarterly_exam' ||
                 str_contains(strtolower($category['label'] ?? ''), 'quarterly exam');
@@ -86,8 +90,7 @@ class GradeCalculationService
         }
 
         foreach ($quarterlyExamCategory['tasks'] as $task) {
-            $gradeKey = $quarter === 2 ? "q2_{$task['id']}" : $task['id'];
-            $value = $grades[$gradeKey] ?? null;
+            $value = $quarterGrades[$task['id']] ?? null;
 
             if ($value !== '' && $value !== null) {
                 return true;
@@ -106,6 +109,8 @@ class GradeCalculationService
             return false;
         }
 
+        $quarterGrades = $grades[$quarter] ?? [];
+
         foreach ($categories as $category) {
             $tasks = $category['tasks'] ?? [];
             if (empty($tasks)) {
@@ -114,8 +119,7 @@ class GradeCalculationService
 
             $hasScores = false;
             foreach ($tasks as $task) {
-                $gradeKey = $quarter === 2 ? "q2_{$task['id']}" : $task['id'];
-                $value = $grades[$gradeKey] ?? null;
+                $value = $quarterGrades[$task['id']] ?? null;
 
                 if ($value !== '' && $value !== null) {
                     $hasScores = true;
@@ -134,17 +138,22 @@ class GradeCalculationService
     /**
      * Calculate the overall final grade (average of Q1 and Q2)
      */
-    public function calculateOverallFinalGrade(array $grades, array $categories): string
+    public function calculateOverallFinalGrade(array $grades, array $q1Categories, array $q2Categories = []): string
     {
-        $q1Complete = $this->isQuarterComplete($grades, $categories, 1);
-        $q2Complete = $this->isQuarterComplete($grades, $categories, 2);
+        // If q2Categories not provided, use q1Categories for both (legacy compat)
+        if (empty($q2Categories)) {
+            $q2Categories = $q1Categories;
+        }
+
+        $q1Complete = $this->isQuarterComplete($grades, $q1Categories, 1);
+        $q2Complete = $this->isQuarterComplete($grades, $q2Categories, 2);
 
         if (!$q1Complete || !$q2Complete) {
             return '—';
         }
 
-        $q1Grade = $this->calculateFinalGrade($grades, $categories, 1);
-        $q2Grade = $this->calculateFinalGrade($grades, $categories, 2);
+        $q1Grade = $this->calculateFinalGrade($grades, $q1Categories, 1);
+        $q2Grade = $this->calculateFinalGrade($grades, $q2Categories, 2);
 
         if ($q1Grade === '—' || $q2Grade === '—') {
             return '—';
@@ -171,7 +180,7 @@ class GradeCalculationService
             return 'N/A';
         }
 
-        $quarterGrades = $this->filterGradesByQuarter($grades, $quarter);
+        $quarterGrades = $grades[$quarter] ?? [];
 
         $totalEarned = 0;
         $totalPossible = 0;
@@ -231,23 +240,30 @@ class GradeCalculationService
     }
 
     /**
-     * Calculate all grade data for a student
+     * Calculate all grade data for a student.
+     *
+     * @param  array  $gradeStructure  Per-quarter: { '1': { categories: [...] }, '2': { categories: [...] } }
      */
     public function calculateStudentGrades(Enrollment $enrollment, array $gradeStructure): array
     {
-        $grades = $enrollment->grades->keyBy('assignment_key')->map->score->toArray();
-        $categories = $gradeStructure['categories'] ?? [];
+        // Build quarter-grouped grades: [ 1 => [ taskId => score ], 2 => [ taskId => score ] ]
+        $grades = $enrollment->grades->groupBy('quarter')->map(function ($quarterGrades) {
+            return $quarterGrades->mapWithKeys(fn($g) => [$g->assignment_key => $g->score])->toArray();
+        })->toArray();
+
+        $q1Categories = $gradeStructure['1']['categories'] ?? $gradeStructure['categories'] ?? [];
+        $q2Categories = $gradeStructure['2']['categories'] ?? $gradeStructure['categories'] ?? [];
 
         return [
-            'q1_grade' => $this->calculateFinalGrade($grades, $categories, 1),
-            'q2_grade' => $this->calculateFinalGrade($grades, $categories, 2),
-            'overall_grade' => $this->calculateOverallFinalGrade($grades, $categories),
-            'q1_complete' => $this->isQuarterComplete($grades, $categories, 1),
-            'q2_complete' => $this->isQuarterComplete($grades, $categories, 2),
-            'q1_has_exam' => $this->hasQuarterlyExamScores($grades, $categories, 1),
-            'q2_has_exam' => $this->hasQuarterlyExamScores($grades, $categories, 2),
-            'q1_expected' => $this->calculateExpectedQuarterlyGrade($grades, $categories, 1),
-            'q2_expected' => $this->calculateExpectedQuarterlyGrade($grades, $categories, 2),
+            'q1_grade' => $this->calculateFinalGrade($grades, $q1Categories, 1),
+            'q2_grade' => $this->calculateFinalGrade($grades, $q2Categories, 2),
+            'overall_grade' => $this->calculateOverallFinalGrade($grades, $q1Categories, $q2Categories),
+            'q1_complete' => $this->isQuarterComplete($grades, $q1Categories, 1),
+            'q2_complete' => $this->isQuarterComplete($grades, $q2Categories, 2),
+            'q1_has_exam' => $this->hasQuarterlyExamScores($grades, $q1Categories, 1),
+            'q2_has_exam' => $this->hasQuarterlyExamScores($grades, $q2Categories, 2),
+            'q1_expected' => $this->calculateExpectedQuarterlyGrade($grades, $q1Categories, 1),
+            'q2_expected' => $this->calculateExpectedQuarterlyGrade($grades, $q2Categories, 2),
         ];
     }
 
@@ -263,29 +279,5 @@ class GradeCalculationService
                 'calculated_grades' => $this->calculateStudentGrades($enrollment, $gradeStructure),
             ];
         })->toArray();
-    }
-
-    /**
-     * Filter grades by quarter
-     */
-    private function filterGradesByQuarter(array $grades, int $quarter): array
-    {
-        $quarterGrades = [];
-
-        foreach ($grades as $key => $value) {
-            $isQ1Grade = !str_starts_with($key, 'q2_');
-            $isQ2Grade = str_starts_with($key, 'q2_');
-
-            if ($quarter === 1 && $isQ1Grade) {
-                $quarterGrades[$key] = $value;
-            } elseif ($quarter === 2 && $isQ2Grade) {
-                $quarterGrades[str_replace('q2_', '', $key)] = $value;
-            } elseif ($quarter === 1) {
-                // For backward compatibility, use raw grades for Q1
-                $quarterGrades[$key] = $value;
-            }
-        }
-
-        return $quarterGrades;
     }
 }

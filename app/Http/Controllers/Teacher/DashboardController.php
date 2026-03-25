@@ -58,6 +58,8 @@ class DashboardController extends Controller
         // Department Data under Logged in teacher
         $department = $dashboardData['department'];
 
+        $allSubjects = $dashboardData['allSubjects'];
+
         return Inertia::render('Teacher/Dashboard', compact(
             'stats',
             'priorityStudents',
@@ -65,6 +67,7 @@ class DashboardController extends Controller
             'recentActivity',
             'academicPeriod',
             'department',
+            'allSubjects'
         ));
     }
 
@@ -144,8 +147,8 @@ class DashboardController extends Controller
             ],
             'department' => $teacher->department ? [
                 'id' => $teacher->department->id,
-                'name' => $teacher->department->name,
-                'code' => $teacher->department->code,
+                'name' => $teacher->department->department_name,
+                'code' => $teacher->department->department_code,
             ] : null,
             'academicPeriod' => [
                 'schoolYear' => $currentSchoolYear,

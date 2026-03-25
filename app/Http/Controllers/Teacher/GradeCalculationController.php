@@ -21,6 +21,18 @@ class GradeCalculationController extends Controller
     }
 
     /**
+     * Build per-quarter grade structure from the stored categories.
+     */
+    private function perQuarterGradeStructure(SubjectTeacher $subjectTeacher): array
+    {
+        $stored = $subjectTeacher->grade_categories ?? [];
+        return [
+            '1' => $this->buildGradeStructure($this->resolveQuarterCategories($stored, 1)),
+            '2' => $this->buildGradeStructure($this->resolveQuarterCategories($stored, 2)),
+        ];
+    }
+
+    /**
      * Calculate grades for a specific class
      */
     public function calculateClassGrades(Request $request, SubjectTeacher $subjectTeacher): JsonResponse
@@ -33,8 +45,8 @@ class GradeCalculationController extends Controller
             'enrollments.grades',
         ]);
 
-        // Build grade structure
-        $gradeStructure = $this->buildGradeStructure($subjectTeacher->grade_categories);
+        // Build per-quarter grade structure
+        $gradeStructure = $this->perQuarterGradeStructure($subjectTeacher);
 
         // Calculate grades for all students
         $calculatedGrades = $this->gradeCalculationService->calculateClassGrades(
@@ -67,8 +79,8 @@ class GradeCalculationController extends Controller
             ->with(['user.student', 'grades'])
             ->findOrFail($enrollmentId);
 
-        // Build grade structure
-        $gradeStructure = $this->buildGradeStructure($subjectTeacher->grade_categories);
+        // Build per-quarter grade structure
+        $gradeStructure = $this->perQuarterGradeStructure($subjectTeacher);
 
         // Calculate grades for this student
         $calculatedGrades = $this->gradeCalculationService->calculateStudentGrades($enrollment, $gradeStructure);
@@ -106,8 +118,8 @@ class GradeCalculationController extends Controller
 
         $enrollments = $query->get();
 
-        // Build grade structure
-        $gradeStructure = $this->buildGradeStructure($subjectTeacher->grade_categories);
+        // Build per-quarter grade structure
+        $gradeStructure = $this->perQuarterGradeStructure($subjectTeacher);
 
         // Calculate grades
         $calculatedGrades = $this->gradeCalculationService->calculateClassGrades($enrollments, $gradeStructure);

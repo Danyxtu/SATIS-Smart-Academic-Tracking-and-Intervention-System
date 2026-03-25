@@ -4,20 +4,25 @@ namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
+use App\Models\Department;
+use App\Models\Role;
 use App\Models\Student;
 use App\Models\StudentNotification;
 use App\Models\Subject;
 use App\Models\SubjectTeacher;
 use App\Models\SystemSetting;
 use App\Models\User;
+use App\Services\EnrollmentGradeService;
 use App\Services\GradeCalculationService;
 use App\Support\Concerns\HasDefaultAssignments;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -31,11 +36,16 @@ class ClassController extends Controller
 
     protected $ClassesServices;
     protected GradeCalculationService $gradeCalculationService;
+    protected EnrollmentGradeService $enrollmentGradeService;
 
-    public function __construct(ClassesServices $myClassesServices, GradeCalculationService $gradeCalculationService)
-    {
+    public function __construct(
+        ClassesServices $myClassesServices,
+        GradeCalculationService $gradeCalculationService,
+        EnrollmentGradeService $enrollmentGradeService,
+    ) {
         $this->ClassesServices = $myClassesServices;
         $this->gradeCalculationService = $gradeCalculationService;
+        $this->enrollmentGradeService = $enrollmentGradeService;
     }
 
     private const COLOR_OPTIONS = ['indigo', 'blue', 'red', 'green', 'amber', 'purple', 'teal'];
@@ -90,6 +100,10 @@ class ClassController extends Controller
     public function goToMyClasses(Request $request): Response
     {
         $classesData = $this->ClassesServices->getClassesData($request);
+        $departments = Department::query()
+            ->where('is_active', true)
+            ->orderBy('department_code')
+            ->get(['department_name', 'department_code']);
 
         $classes = $classesData['classes'];
         $defaultSchoolYear = $classesData['defaultSchoolYear'];
@@ -107,6 +121,7 @@ class ClassController extends Controller
             'semester1Count',
             'semester2Count',
             'roster',
+            'departments',
         ));
     }
 
@@ -121,14 +136,23 @@ class ClassController extends Controller
 
         $data = $request->validate([
             'grade_level' => 'required|string|max:255',
-            'section' => 'required|string|max:255',
+            'section' => ['required', 'string', 'max:20', 'regex:/^[A-Za-z]+$/'],
             'subject_name' => 'required|string|max:255',
             'color' => 'required|string|in:' . implode(',', self::COLOR_OPTIONS),
             'school_year' => 'required|string|max:255',
-            'strand' => 'nullable|string|max:255',
+            'strand' => ['required', 'string', Rule::exists('departments', 'department_code')],
             'track' => 'nullable|string|max:255',
             'classlist' => 'nullable|file|mimes:csv,txt,xls,xlsx|max:4096',
         ]);
+
+        $sectionSuffix = strtoupper(trim($data['section']));
+        $sectionCombined = strtoupper(trim($data['strand'])) . '-' . $sectionSuffix;
+
+        $duplicateSectionCount = SubjectTeacher::query()
+            ->where('teacher_id', $teacher->id)
+            ->where('grade_level', $data['grade_level'])
+            ->where('section', $sectionCombined)
+            ->count();
 
         // First, find or create the subject
         $subjectCode = Str::slug($data['subject_name'], '_') . '_' . Str::random(6);
@@ -142,8 +166,8 @@ class ClassController extends Controller
             'subject_id' => $subject->id,
             'teacher_id' => $teacher->id,
             'grade_level' => $data['grade_level'],
-            'section' => $data['section'],
-            'strand' => $data['strand'] ?? null,
+            'section' => $sectionCombined,
+            'strand' => strtoupper(trim($data['strand'])),
             'track' => $data['track'] ?? null,
             'color' => $data['color'],
             'school_year' => $data['school_year'],
@@ -168,7 +192,81 @@ class ClassController extends Controller
         return redirect()
             ->route('teacher.classes.index')
             ->with('success', 'Class created successfully.')
+            ->with('class_create_summary', [
+                'class_id' => $subjectTeacher->id,
+                'grade_level' => $data['grade_level'],
+                'strand' => strtoupper(trim($data['strand'])),
+                'section_suffix' => $sectionSuffix,
+                'section' => $sectionCombined,
+                'subject_name' => $data['subject_name'],
+                'color' => $data['color'],
+                'track' => $data['track'] ?? null,
+                'school_year' => $data['school_year'],
+                'semester' => (string) $currentSemester,
+                'duplicate_basis' => 'grade_section',
+                'duplicate_section' => $duplicateSectionCount > 0,
+                'duplicate_count' => $duplicateSectionCount,
+            ])
             ->with('import_summary', $summary);
+    }
+
+    public function updateClass(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
+    {
+        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
+
+        $data = $request->validate([
+            'grade_level' => 'required|string|max:255',
+            'section' => ['required', 'string', 'max:20', 'regex:/^[A-Za-z]+$/'],
+            'subject_name' => 'required|string|max:255',
+            'color' => 'required|string|in:' . implode(',', self::COLOR_OPTIONS),
+            'school_year' => 'required|string|max:255',
+            'strand' => ['required', 'string', Rule::exists('departments', 'department_code')],
+            'track' => 'nullable|string|max:255',
+        ]);
+
+        $sectionSuffix = strtoupper(trim($data['section']));
+        $sectionCombined = strtoupper(trim($data['strand'])) . '-' . $sectionSuffix;
+
+        $subjectCode = Str::slug($data['subject_name'], '_') . '_' . Str::random(6);
+        $subject = Subject::firstOrCreate(
+            ['subject_name' => $data['subject_name']],
+            ['subject_code' => $subjectCode]
+        );
+
+        $subjectTeacher->update([
+            'subject_id' => $subject->id,
+            'grade_level' => $data['grade_level'],
+            'section' => $sectionCombined,
+            'strand' => strtoupper(trim($data['strand'])),
+            'track' => $data['track'] ?? null,
+            'color' => $data['color'],
+            'school_year' => $data['school_year'],
+        ]);
+
+        return redirect()
+            ->route('teacher.classes.index')
+            ->with('success', 'Class updated successfully.');
+    }
+
+    public function destroyClass(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
+    {
+        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
+
+        $request->validate([
+            'password' => 'required|string',
+        ]);
+
+        if (!Hash::check($request->password, $request->user()->password)) {
+            return back()->withErrors([
+                'password' => 'The provided password is incorrect.',
+            ]);
+        }
+
+        $subjectTeacher->delete();
+
+        return redirect()
+            ->route('teacher.classes.index')
+            ->with('success', 'Class deleted successfully.');
     }
 
     public function enrollStudent(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
@@ -194,12 +292,19 @@ class ClassController extends Controller
             'email' => $data['email'] ?? null,
         ]);
 
-        // Prepare flash with generated password if created
-        $redirect = redirect()->route('teacher.classes.index')->with('success', 'Student added to class.');
+        $statusMessage = match ($result['status']) {
+            'created' => 'Student account created and assigned to class.',
+            'assigned_existing' => 'Existing student assigned to class.',
+            'already_assigned' => 'Student already exists and is already assigned to this class.',
+            default => 'Student added to class.',
+        };
+
+        // Prepare flash with generated password if a new account was created
+        $redirect = redirect()->route('teacher.classes.index')->with('success', $statusMessage);
 
         if (is_array($result) && ! empty($result['password'])) {
             $redirect = $redirect->with('new_student_password', [
-                'student_name' => $studentName,
+                'name' => $studentName,
                 'lrn' => $data['lrn'],
                 'email' => $data['email'] ?? null,
                 'password' => $result['password'],
@@ -234,6 +339,7 @@ class ClassController extends Controller
         $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
         $data = $request->validate([
+            'quarter' => 'nullable|integer|min:1|max:2',
             'categories' => 'required|array|min:1',
             'categories.*.id' => 'nullable|string|max:255',
             'categories.*.label' => 'required|string|max:255',
@@ -244,15 +350,21 @@ class ClassController extends Controller
             'categories.*.tasks.*.total' => 'required|numeric|min:1',
         ]);
 
+        $quarter = $data['quarter'] ?? ($subjectTeacher->current_quarter ?? 1);
         $structure = $this->buildGradeStructure($data['categories']);
 
+        // Merge into the per-quarter map
+        $perQuarter = $this->buildPerQuarterCategories(
+            $subjectTeacher->grade_categories,
+            $quarter,
+            $structure['categories'],
+        );
+
         $subjectTeacher->update([
-            'grade_categories' => $structure['categories'],
+            'grade_categories' => $perQuarter,
         ]);
 
-        return redirect()
-            ->route('teacher.classes.index')
-            ->with('success', 'Grade structure updated.');
+        return back()->with('success', 'Grade structure updated.');
     }
 
     private function importClasslist(SubjectTeacher $subjectTeacher, UploadedFile $file): array
@@ -272,11 +384,14 @@ class ClassController extends Controller
         }
 
         $summary = [
-            'imported' => 0,
-            'updated' => 0,
+            'newly_created' => 0,
+            'assigned_existing' => 0,
+            'already_enrolled' => 0,
             'skipped' => 0,
             'errors' => [],
-            'created_students' => [],
+            'newly_created_students' => [],
+            'assigned_existing_students' => [],
+            'already_enrolled_students' => [],
         ];
 
         $seenLrns = [];
@@ -304,18 +419,28 @@ class ClassController extends Controller
 
             try {
                 $result = $this->persistStudentRecord($subjectTeacher, $payload);
-                if ($result['status'] === 'created') {
-                    $summary['imported']++;
-                } else {
-                    $summary['updated']++;
-                }
 
-                if (!empty($result['password'])) {
-                    $summary['created_students'][] = [
+                if ($result['status'] === 'created') {
+                    $summary['newly_created']++;
+                    $summary['newly_created_students'][] = [
                         'name' => $payload['student_name'] ?? null,
                         'lrn' => $payload['lrn'] ?? null,
                         'email' => $payload['email'] ?? null,
                         'password' => $result['password'],
+                    ];
+                } elseif ($result['status'] === 'assigned_existing') {
+                    $summary['assigned_existing']++;
+                    $summary['assigned_existing_students'][] = [
+                        'name' => $payload['student_name'] ?? null,
+                        'lrn' => $payload['lrn'] ?? null,
+                        'email' => $payload['email'] ?? null,
+                    ];
+                } elseif ($result['status'] === 'already_assigned') {
+                    $summary['already_enrolled']++;
+                    $summary['already_enrolled_students'][] = [
+                        'name' => $payload['student_name'] ?? null,
+                        'lrn' => $payload['lrn'] ?? null,
+                        'email' => $payload['email'] ?? null,
                     ];
                 }
             } catch (ValidationException $exception) {
@@ -327,8 +452,10 @@ class ClassController extends Controller
             }
         }
 
-        // Ensure created_students array exists
-        $summary['created_students'] = $summary['created_students'] ?? [];
+        // Legacy keys kept for compatibility with existing flash consumers.
+        $summary['imported'] = $summary['newly_created'];
+        $summary['updated'] = $summary['assigned_existing'] + $summary['already_enrolled'];
+        $summary['created_students'] = $summary['newly_created_students'];
 
         return $summary;
     }
@@ -394,7 +521,7 @@ class ClassController extends Controller
             $student->user_id = $user->id;
         }
 
-        $wasExisting = $student->exists;
+        $studentExistedBeforeSave = $student->exists;
 
         // Update student record - use student_name (single field)
         $student->student_name = $studentName;
@@ -410,7 +537,7 @@ class ClassController extends Controller
 
         $student->save();
 
-        Enrollment::firstOrCreate(
+        $enrollment = Enrollment::firstOrCreate(
             [
                 'user_id' => $student->user_id,
                 'subject_teachers_id' => $subjectTeacher->id,
@@ -422,8 +549,15 @@ class ClassController extends Controller
             ]
         );
 
+        $status = 'assigned_existing';
+        if (! $studentExistedBeforeSave) {
+            $status = 'created';
+        } elseif (! $enrollment->wasRecentlyCreated) {
+            $status = 'already_assigned';
+        }
+
         return [
-            'status' => $wasExisting ? 'updated' : 'created',
+            'status' => $status,
             'password' => $generatedPlainPassword,
             'user' => $user,
         ];
@@ -560,9 +694,13 @@ class ClassController extends Controller
                 'password' => $plainPassword, // Store plain text initially - will be hashed on first login change
                 'temp_password' => $plainPassword, // Store for teacher to view
                 'must_change_password' => true,
-                'role' => 'student',
             ]
         );
+
+        $studentRoleId = Role::where('name', 'student')->value('id');
+        if ($studentRoleId) {
+            $user->roles()->syncWithoutDetaching([$studentRoleId]);
+        }
 
         // Only return the generated plaintext password when a user was newly created
         return [
@@ -669,13 +807,17 @@ class ClassController extends Controller
 
     /**
      * Start or advance the active quarter for the class.
+     *
+     * If the current quarter has no quarterly-exam scores the teacher must
+     * confirm by providing their password.
      */
     public function startQuarter(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
     {
         $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
         $data = $request->validate([
-            'quarter' => 'required|integer|min:1|max:4',
+            'quarter'  => 'required|integer|min:1|max:4',
+            'password' => 'nullable|string',
         ]);
 
         $quarter = (int) $data['quarter'];
@@ -685,11 +827,96 @@ class ClassController extends Controller
             return back()->with('error', 'Cannot set to a previous or same quarter.');
         }
 
-        $subjectTeacher->update(['current_quarter' => $quarter]);
+        // Check whether the previous quarter has quarterly-exam scores
+        $previousQuarter = $quarter - 1;
+        $subjectTeacher->loadMissing('enrollments.grades');
+
+        $hasQuarterlyExam = $this->classHasQuarterlyExamScores(
+            $subjectTeacher,
+            $previousQuarter
+        );
+
+        // If no quarterly exam scores exist, require password confirmation
+        if (!$hasQuarterlyExam) {
+            if (empty($data['password'])) {
+                return back()->withErrors([
+                    'password' => 'Password is required when advancing without quarterly exam scores.',
+                ]);
+            }
+
+            if (!Hash::check($data['password'], $request->user()->password)) {
+                return back()->withErrors([
+                    'password' => 'The provided password is incorrect.',
+                ]);
+            }
+        }
+
+        // Initialize the new quarter's categories if they don't exist yet
+        $storedCategories = $subjectTeacher->grade_categories;
+        $newQuarterCategories = $this->resolveQuarterCategories($storedCategories, $quarter);
+
+        // If the new quarter has no categories (or empty default), seed with category structure (no tasks)
+        if (empty($newQuarterCategories) || !isset($storedCategories[$quarter]) && !isset($storedCategories[(string) $quarter])) {
+            $previousCategories = $this->resolveQuarterCategories($storedCategories, $previousQuarter);
+            // Copy category structure (id, label, weight) but with empty tasks
+            $emptyCategories = array_map(function ($cat) {
+                return [
+                    'id' => $cat['id'],
+                    'label' => $cat['label'],
+                    'weight' => $cat['weight'],
+                    'tasks' => [],
+                ];
+            }, $previousCategories);
+
+            $perQuarter = $this->buildPerQuarterCategories($storedCategories, $quarter, $emptyCategories);
+            $subjectTeacher->update([
+                'current_quarter' => $quarter,
+                'grade_categories' => $perQuarter,
+            ]);
+        } else {
+            $subjectTeacher->update(['current_quarter' => $quarter]);
+        }
 
         $subjectName = $subjectTeacher->subject?->subject_name ?? $subjectTeacher->name;
 
         return back()->with('success', "Quarter {$quarter} started for {$subjectName}.");
+    }
+
+    /**
+     * Check if at least one enrollment in the class has a quarterly-exam score
+     * for the given quarter.
+     */
+    private function classHasQuarterlyExamScores(SubjectTeacher $subjectTeacher, int $quarter): bool
+    {
+        $categories = $this->resolveQuarterCategories($subjectTeacher->grade_categories, $quarter);
+
+        // Find the quarterly exam category
+        $qeCategory = collect($categories)->first(function ($cat) {
+            $id = $cat['id'] ?? '';
+            $label = strtolower($cat['label'] ?? '');
+            return $id === 'quarterly_exam' || str_contains($label, 'quarterly exam');
+        });
+
+        if (!$qeCategory || empty($qeCategory['tasks'])) {
+            return false;
+        }
+
+        $taskIds = collect($qeCategory['tasks'])->pluck('id')->toArray();
+
+        foreach ($subjectTeacher->enrollments as $enrollment) {
+            foreach ($enrollment->grades as $grade) {
+                // Filter by the quarter column
+                if ((int) $grade->quarter !== $quarter) {
+                    continue;
+                }
+
+                if (in_array($grade->assignment_key, $taskIds) && $grade->score !== null) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     public function myClass(Request $request, SubjectTeacher $subjectTeacher)
@@ -708,12 +935,44 @@ class ClassController extends Controller
 
             // Use a try-catch to handle potential errors
             try {
-                $gradeStructure = $this->buildGradeStructure($subjectTeacher->grade_categories);
-                $gradeStructure = $this->ClassesServices->ensureStructureCoversExistingGrades($subjectTeacher, $gradeStructure);
+                // Build per-quarter grade structures
+                $currentQuarter = $subjectTeacher->current_quarter ?? 1;
+                $storedCategories = $subjectTeacher->grade_categories;
+
+                $q1Categories = $this->resolveQuarterCategories($storedCategories, 1);
+                $q2Categories = $this->resolveQuarterCategories($storedCategories, 2);
+
+                $q1Structure = $this->buildGradeStructure($q1Categories);
+                $q2Structure = $this->buildGradeStructure($q2Categories);
+
+                $q1Structure = $this->ClassesServices->ensureStructureCoversExistingGrades($subjectTeacher, $q1Structure, 1);
+                $q2Structure = $this->ClassesServices->ensureStructureCoversExistingGrades($subjectTeacher, $q2Structure, 2);
+
+                // Persist the normalised categories so repaired labels/weights are saved
+                $repairedPerQuarter = $this->buildPerQuarterCategories(
+                    $subjectTeacher->grade_categories,
+                    1,
+                    $q1Structure['categories'],
+                );
+                $repairedPerQuarter = $this->buildPerQuarterCategories(
+                    $repairedPerQuarter,
+                    2,
+                    $q2Structure['categories'],
+                );
+                $subjectTeacher->updateQuietly(['grade_categories' => $repairedPerQuarter]);
+
+                // Combined structure keyed by quarter for the frontend
+                $gradeStructure = [
+                    '1' => $q1Structure,
+                    '2' => $q2Structure,
+                ];
             } catch (\Exception $e) {
                 Log::error('Grade structure error:', ['error' => $e->getMessage()]);
-                // Fallback to default grade structure if there's an error
-                $gradeStructure = $this->buildGradeStructure($this->defaultGradeCategories());
+                $fallback = $this->buildGradeStructure($this->defaultGradeCategories());
+                $gradeStructure = [
+                    '1' => $fallback,
+                    '2' => $fallback,
+                ];
             }
 
             $classData = [
@@ -751,9 +1010,11 @@ class ClassController extends Controller
                     'track' => $studentProfile?->track ?? $subjectTeacher->track,
                     'temp_password' => $user?->temp_password,
                     'must_change_password' => $user?->must_change_password ?? true,
-                    'grades' => $enrollment->grades->mapWithKeys(fn($grade) => [
-                        $grade->assignment_key ?: Str::slug($grade->assignment_name, '_') => $grade->score,
-                    ])->all(),
+                    'grades' => $enrollment->grades->groupBy('quarter')->map(function ($quarterGrades) {
+                        return $quarterGrades->mapWithKeys(fn($grade) => [
+                            $grade->assignment_key ?: Str::slug($grade->assignment_name, '_') => $grade->score,
+                        ])->all();
+                    })->toArray(),
                 ];
             })->values();
 
@@ -763,11 +1024,23 @@ class ClassController extends Controller
                 $gradeStructure
             );
 
+            // Recalculate and persist enrollment-level grades (initial, expected, transmuted, final)
+            $this->enrollmentGradeService->recalculateClassGrades($subjectTeacher);
+            $subjectTeacher->load('enrollments'); // reload to get fresh values
+
+            // Build per-enrollment grade summaries keyed by enrollment ID
+            $gradeSummaries = $subjectTeacher->enrollments
+                ->mapWithKeys(fn($e) => [
+                    $e->id => $this->enrollmentGradeService->buildGradeSummary($e),
+                ])
+                ->toArray();
+
             return response()->json([
                 'class' => $classData,
                 'roster' => $roster,
                 'gradeStructure' => $gradeStructure,
                 'calculatedGrades' => $calculatedGrades,
+                'gradeSummaries' => $gradeSummaries,
                 'updated_at' => now()->toISOString(),
             ]);
         } catch (\Exception $e) {

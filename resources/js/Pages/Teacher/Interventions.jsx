@@ -3,11 +3,12 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useForm, usePage, router } from "@inertiajs/react";
 import { useLoading } from "@/Context/LoadingContext";
 import { ArrowLeft } from "lucide-react";
+import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
 
 // --- Helper Function ---
 const getPriorityClasses = (priority) => {
     const baseClasses =
-        "px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full";
+        "px-2 py-0.5 inline-flex text-[10px] leading-4 font-semibold rounded-full";
     switch (priority) {
         case "High":
             return `${baseClasses} bg-red-100 text-red-800`;
@@ -40,14 +41,14 @@ function InterventionDashboard({ students, onSelectStudent }) {
     const totalStudents = students.length;
     const highPriority = students.filter((s) => s.priority === "High").length;
     const mediumPriority = students.filter(
-        (s) => s.priority === "Medium"
+        (s) => s.priority === "Medium",
     ).length;
     const lowPriority = students.filter((s) => s.priority === "Low").length;
 
     const toggleSelect = (id, e) => {
         e.stopPropagation();
         setSelectedIds((prev) =>
-            prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+            prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
         );
     };
 
@@ -64,11 +65,11 @@ function InterventionDashboard({ students, onSelectStudent }) {
     };
 
     const selectedStudents = sortedStudents.filter((s) =>
-        selectedIds.includes(s.id)
+        selectedIds.includes(s.id),
     );
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {/* Bulk Action Modal */}
             <BulkInterventionModal
                 open={isBulkModalOpen}
@@ -79,14 +80,14 @@ function InterventionDashboard({ students, onSelectStudent }) {
                 selectedStudents={selectedStudents}
             />
 
-            {/* Bulk Selection Bar */}
+            {/* Compact Bulk Selection Bar */}
             {selectedIds.length > 0 && (
-                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-4 rounded-xl shadow-lg flex items-center justify-between animate-in slide-in-from-top-2">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-3 rounded-xl shadow-md flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
-                                className="h-5 w-5"
+                                className="h-4 w-4"
                                 viewBox="0 0 20 20"
                                 fill="currentColor"
                             >
@@ -99,29 +100,29 @@ function InterventionDashboard({ students, onSelectStudent }) {
                             </svg>
                         </div>
                         <div>
-                            <p className="font-semibold">
+                            <p className="font-semibold text-sm">
                                 {selectedIds.length} student
                                 {selectedIds.length !== 1 ? "s" : ""} selected
                             </p>
-                            <p className="text-sm text-indigo-200">
+                            <p className="text-xs text-indigo-200">
                                 Ready for bulk intervention
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <button
                             onClick={clearSelection}
-                            className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors"
+                            className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium transition-colors"
                         >
-                            Clear Selection
+                            Clear
                         </button>
                         <button
                             onClick={() => setIsBulkModalOpen(true)}
-                            className="px-5 py-2 bg-white text-indigo-700 hover:bg-indigo-50 rounded-lg text-sm font-semibold shadow-md transition-all flex items-center gap-2"
+                            className="px-4 py-1.5 bg-white text-indigo-700 hover:bg-indigo-50 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5"
                         >
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
-                                className="h-4 w-4"
+                                className="h-3.5 w-3.5"
                                 viewBox="0 0 20 20"
                                 fill="currentColor"
                             >
@@ -137,22 +138,22 @@ function InterventionDashboard({ students, onSelectStudent }) {
                 </div>
             )}
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+            {/* Compact Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-500">
-                                Total Students on Watchlist
+                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                                Total Watchlist
                             </p>
-                            <p className="text-3xl font-bold text-gray-900 mt-1">
+                            <p className="text-2xl font-bold text-gray-900 mt-1">
                                 {totalStudents}
                             </p>
                         </div>
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl flex items-center justify-center">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center">
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
-                                className="h-6 w-6 text-indigo-600"
+                                className="h-5 w-5 text-indigo-600"
                                 viewBox="0 0 20 20"
                                 fill="currentColor"
                             >
@@ -161,20 +162,21 @@ function InterventionDashboard({ students, onSelectStudent }) {
                         </div>
                     </div>
                 </div>
-                <div className="bg-gradient-to-br from-red-50 to-rose-50 p-5 rounded-xl shadow-sm border border-red-100 hover:shadow-md transition-shadow">
+
+                <div className="bg-gradient-to-br from-red-50 to-rose-50 p-4 rounded-xl shadow-sm border border-red-100 hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-red-600">
+                            <p className="text-xs font-medium text-red-600 uppercase tracking-wide">
                                 High Priority
                             </p>
-                            <p className="text-3xl font-bold text-red-700 mt-1">
+                            <p className="text-2xl font-bold text-red-700 mt-1">
                                 {highPriority}
                             </p>
                         </div>
-                        <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+                        <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
-                                className="h-6 w-6 text-red-600"
+                                className="h-5 w-5 text-red-600"
                                 viewBox="0 0 20 20"
                                 fill="currentColor"
                             >
@@ -187,20 +189,21 @@ function InterventionDashboard({ students, onSelectStudent }) {
                         </div>
                     </div>
                 </div>
-                <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-5 rounded-xl shadow-sm border border-amber-100 hover:shadow-md transition-shadow">
+
+                <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-4 rounded-xl shadow-sm border border-amber-100 hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-amber-600">
+                            <p className="text-xs font-medium text-amber-600 uppercase tracking-wide">
                                 Medium Priority
                             </p>
-                            <p className="text-3xl font-bold text-amber-700 mt-1">
+                            <p className="text-2xl font-bold text-amber-700 mt-1">
                                 {mediumPriority}
                             </p>
                         </div>
-                        <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                        <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
-                                className="h-6 w-6 text-amber-600"
+                                className="h-5 w-5 text-amber-600"
                                 viewBox="0 0 20 20"
                                 fill="currentColor"
                             >
@@ -215,15 +218,15 @@ function InterventionDashboard({ students, onSelectStudent }) {
                 </div>
             </div>
 
-            {/* Priority Watchlist */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+            {/* Compact Priority Watchlist */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-md">
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-sm">
                                 <svg
                                     xmlns="http://www.w3.org/2000/svg"
-                                    className="h-5 w-5 text-white"
+                                    className="h-4 w-4 text-white"
                                     viewBox="0 0 20 20"
                                     fill="currentColor"
                                 >
@@ -236,16 +239,15 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold text-gray-900">
+                                <h3 className="text-sm font-bold text-gray-900">
                                     Priority Watchlist
                                 </h3>
-                                <p className="text-sm text-gray-500">
-                                    Students requiring attention based on
-                                    academic performance
+                                <p className="text-xs text-gray-500">
+                                    Students requiring attention
                                 </p>
                             </div>
                         </div>
-                        <span className="px-3 py-1 bg-indigo-100 text-indigo-700 text-sm font-medium rounded-full">
+                        <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-medium rounded-full">
                             {students.length} student
                             {students.length !== 1 ? "s" : ""}
                         </span>
@@ -256,7 +258,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="w-12 px-4 py-3">
+                                <th className="w-10 px-3 py-2">
                                     {sortedStudents.length > 0 && (
                                         <input
                                             type="checkbox"
@@ -266,7 +268,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                                 sortedStudents.length > 0
                                             }
                                             onChange={toggleSelectAll}
-                                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                            className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
                                         />
                                     )}
                                 </th>
@@ -279,7 +281,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                 ].map((head) => (
                                     <th
                                         key={head}
-                                        className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
+                                        className="px-4 py-2 text-left text-[10px] font-semibold text-gray-600 uppercase tracking-wider"
                                     >
                                         {head}
                                     </th>
@@ -291,12 +293,12 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                 <tr>
                                     <td
                                         colSpan="6"
-                                        className="px-6 py-16 text-center"
+                                        className="px-6 py-12 text-center"
                                     >
                                         <div className="flex flex-col items-center">
-                                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                                            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-3">
                                                 <svg
-                                                    className="w-8 h-8 text-green-500"
+                                                    className="w-6 h-6 text-green-500"
                                                     fill="none"
                                                     stroke="currentColor"
                                                     viewBox="0 0 24 24"
@@ -309,13 +311,12 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                                     />
                                                 </svg>
                                             </div>
-                                            <p className="text-lg font-semibold text-gray-900">
-                                                All students are doing well!
+                                            <p className="text-base font-semibold text-gray-900">
+                                                All students doing well!
                                             </p>
-                                            <p className="text-sm text-gray-500 mt-1 max-w-sm">
+                                            <p className="text-xs text-gray-500 mt-1 max-w-sm">
                                                 No students currently need
-                                                intervention based on grades or
-                                                attendance.
+                                                intervention.
                                             </p>
                                         </div>
                                     </td>
@@ -332,23 +333,23 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                         }`}
                                     >
                                         <td
-                                            className="px-4 py-4 whitespace-nowrap"
+                                            className="px-3 py-3 whitespace-nowrap"
                                             onClick={(e) => e.stopPropagation()}
                                         >
                                             <input
                                                 type="checkbox"
                                                 checked={selectedIds.includes(
-                                                    s.id
+                                                    s.id,
                                                 )}
                                                 onChange={(e) =>
                                                     toggleSelect(s.id, e)
                                                 }
-                                                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                                className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
                                             />
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
+                                        <td className="px-4 py-3 whitespace-nowrap">
                                             <div className="flex items-center">
-                                                <div className="flex-shrink-0 h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold mr-3 shadow-sm group-hover:shadow-md transition-shadow">
+                                                <div className="flex-shrink-0 h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold mr-2 shadow-sm group-hover:shadow-md transition-shadow">
                                                     {s.name
                                                         .split(" ")
                                                         .map((n) => n[0])
@@ -356,48 +357,46 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                                         .substring(0, 2)}
                                                 </div>
                                                 <div>
-                                                    <div className="text-sm font-medium text-gray-900">
+                                                    <div className="text-xs font-medium text-gray-900">
                                                         {s.name}
                                                     </div>
                                                     {s.hasPendingCompletionRequest && (
-                                                        <span className="text-xs text-amber-600 flex items-center gap-1">
-                                                            <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
-                                                            Pending Completion
-                                                            Request
+                                                        <span className="text-[10px] text-amber-600 flex items-center gap-1">
+                                                            <span className="w-1 h-1 bg-amber-500 rounded-full animate-pulse"></span>
+                                                            Pending Request
                                                         </span>
                                                     )}
                                                     {!s.hasPendingCompletionRequest &&
                                                         s.hasActiveIntervention && (
-                                                            <span className="text-xs text-green-600 flex items-center gap-1">
-                                                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                                                            <span className="text-[10px] text-green-600 flex items-center gap-1">
+                                                                <span className="w-1 h-1 bg-green-500 rounded-full animate-pulse"></span>
                                                                 Active
-                                                                Intervention
                                                             </span>
                                                         )}
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="text-sm text-gray-600">
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                            <span className="text-xs text-gray-600">
                                                 {s.alertReason}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
+                                        <td className="px-4 py-3 whitespace-nowrap">
                                             <span
                                                 className={getPriorityClasses(
-                                                    s.priority
+                                                    s.priority,
                                                 )}
                                             >
                                                 {s.priority}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="text-sm text-gray-600">
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                            <span className="text-xs text-gray-600">
                                                 {s.subject}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="text-sm text-gray-500">
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                            <span className="text-xs text-gray-500">
                                                 {s.lastInterventionDate}
                                             </span>
                                         </td>
@@ -601,7 +600,7 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
                                     onClick={() => setFeedbackType(type.id)}
                                     className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${getTypeButtonClasses(
                                         type.id,
-                                        type.color
+                                        type.color,
                                     )}`}
                                 >
                                     <span
@@ -676,7 +675,7 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
                                 type="button"
                                 onClick={() =>
                                     setMessage(
-                                        "Great improvement on your recent work! Keep it up!"
+                                        "Great improvement on your recent work! Keep it up!",
                                     )
                                 }
                                 className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
@@ -687,7 +686,7 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
                                 type="button"
                                 onClick={() =>
                                     setMessage(
-                                        "Please see me during office hours to discuss your progress."
+                                        "Please see me during office hours to discuss your progress.",
                                     )
                                 }
                                 className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
@@ -698,7 +697,7 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
                                 type="button"
                                 onClick={() =>
                                     setMessage(
-                                        "Don't forget to submit your missing assignments by the deadline."
+                                        "Don't forget to submit your missing assignments by the deadline.",
                                     )
                                 }
                                 className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
@@ -836,7 +835,7 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
                     setIsSubmitting(false);
                 },
                 preserveScroll: true,
-            }
+            },
         );
     };
 
@@ -1271,7 +1270,7 @@ function StartInterventionModal({
     const removeTask = (index) => {
         setData(
             "tasks",
-            data.tasks.filter((_, i) => i !== index)
+            data.tasks.filter((_, i) => i !== index),
         );
     };
 
@@ -1397,18 +1396,18 @@ function StartInterventionModal({
                     isSelected
                         ? "bg-indigo-100"
                         : tierColor === "emerald"
-                        ? "bg-emerald-100"
-                        : tierColor === "amber"
-                        ? "bg-amber-100"
-                        : tierColor === "gray"
-                        ? "bg-gray-100"
-                        : "bg-red-100"
+                          ? "bg-emerald-100"
+                          : tierColor === "amber"
+                            ? "bg-amber-100"
+                            : tierColor === "gray"
+                              ? "bg-gray-100"
+                              : "bg-red-100"
                 }`}
             >
                 <IconComponent
                     className={`w-5 h-5 ${getIconColorClasses(
                         tierColor,
-                        isSelected
+                        isSelected,
                     )}`}
                 />
             </div>
@@ -1542,8 +1541,8 @@ function StartInterventionModal({
                                                         isHighRisk
                                                             ? "border-transparent bg-gray-50 cursor-not-allowed grayscale"
                                                             : data.type === key
-                                                            ? "border-indigo-500 bg-white ring-2 ring-indigo-200 shadow-md"
-                                                            : "border-transparent bg-white/80 hover:bg-white hover:border-emerald-200 hover:shadow-md"
+                                                              ? "border-indigo-500 bg-white ring-2 ring-indigo-200 shadow-md"
+                                                              : "border-transparent bg-white/80 hover:bg-white hover:border-emerald-200 hover:shadow-md"
                                                     }`}
                                                 >
                                                     <div className="flex items-center gap-3">
@@ -1554,16 +1553,16 @@ function StartInterventionModal({
                                                                 : strategy.tierColor,
                                                             !isHighRisk &&
                                                                 data.type ===
-                                                                    key
+                                                                    key,
                                                         )}
                                                         <p
                                                             className={`font-medium text-sm flex-1 ${
                                                                 isHighRisk
                                                                     ? "text-gray-400"
                                                                     : data.type ===
-                                                                      key
-                                                                    ? "text-indigo-900"
-                                                                    : "text-gray-700"
+                                                                        key
+                                                                      ? "text-indigo-900"
+                                                                      : "text-gray-700"
                                                             }`}
                                                         >
                                                             {strategy.label}
@@ -1652,8 +1651,8 @@ function StartInterventionModal({
                                                         isHighRisk
                                                             ? "border-transparent bg-gray-50 cursor-not-allowed grayscale"
                                                             : data.type === key
-                                                            ? "border-indigo-500 bg-white ring-2 ring-indigo-200 shadow-md"
-                                                            : "border-transparent bg-white/80 hover:bg-white hover:border-amber-200 hover:shadow-md"
+                                                              ? "border-indigo-500 bg-white ring-2 ring-indigo-200 shadow-md"
+                                                              : "border-transparent bg-white/80 hover:bg-white hover:border-amber-200 hover:shadow-md"
                                                     }`}
                                                 >
                                                     <div className="flex items-center gap-3">
@@ -1664,16 +1663,16 @@ function StartInterventionModal({
                                                                 : strategy.tierColor,
                                                             !isHighRisk &&
                                                                 data.type ===
-                                                                    key
+                                                                    key,
                                                         )}
                                                         <p
                                                             className={`font-medium text-sm flex-1 ${
                                                                 isHighRisk
                                                                     ? "text-gray-400"
                                                                     : data.type ===
-                                                                      key
-                                                                    ? "text-indigo-900"
-                                                                    : "text-gray-700"
+                                                                        key
+                                                                      ? "text-indigo-900"
+                                                                      : "text-gray-700"
                                                             }`}
                                                         >
                                                             {strategy.label}
@@ -1753,7 +1752,7 @@ function StartInterventionModal({
                                                         {renderIcon(
                                                             strategy.iconKey,
                                                             strategy.tierColor,
-                                                            data.type === key
+                                                            data.type === key,
                                                         )}
                                                         <div className="flex-1">
                                                             <p
@@ -1795,7 +1794,7 @@ function StartInterventionModal({
                         {/* Selected Strategy Info Box */}
                         <div
                             className={`mb-5 p-4 rounded-xl border ${getTierBgClasses(
-                                selectedStrategy.tierColor
+                                selectedStrategy.tierColor,
                             )}`}
                         >
                             <div className="flex items-start gap-3">
@@ -1809,7 +1808,7 @@ function StartInterventionModal({
                                             <IconComponent
                                                 className={`w-6 h-6 ${getIconColorClasses(
                                                     selectedStrategy.tierColor,
-                                                    false
+                                                    false,
                                                 )}`}
                                             />
                                         ) : null;
@@ -1822,7 +1821,7 @@ function StartInterventionModal({
                                         </h4>
                                         <span
                                             className={`text-xs px-2 py-0.5 rounded-full font-medium border ${getTierBadgeClasses(
-                                                selectedStrategy.tierColor
+                                                selectedStrategy.tierColor,
                                             )}`}
                                         >
                                             Tier {selectedStrategy.tier} •{" "}
@@ -2108,7 +2107,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                     setApprovalNotes("");
                 },
                 onFinish: () => setIsProcessing(false),
-            }
+            },
         );
     };
 
@@ -2127,7 +2126,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                     setRejectionReason("");
                 },
                 onFinish: () => setIsProcessing(false),
-            }
+            },
         );
     };
 
@@ -2464,7 +2463,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                                     {assignment.title}
                                                 </span>
                                             </div>
-                                        )
+                                        ),
                                     )}
                                 </div>
                             </div>
@@ -3000,6 +2999,6 @@ const Interventions = ({ watchlist = [], studentDetails = {} }) => {
     );
 };
 
-Interventions.layout = (page) => <TeacherLayout children={page} />;
+Interventions.layout = (page) => <SuperAdminLayout children={page} />;
 
 export default Interventions;

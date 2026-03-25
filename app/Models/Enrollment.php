@@ -15,6 +15,23 @@ class Enrollment extends Model
         'risk_status',
         'current_grade',
         'current_attendance_rate',
+        'initial_grade_q1',
+        'expected_grade_q1',
+        'q1_grade',
+        'initial_grade_q2',
+        'expected_grade_q2',
+        'q2_grade',
+        'final_grade',
+    ];
+
+    protected $casts = [
+        'initial_grade_q1' => 'float',
+        'expected_grade_q1' => 'float',
+        'q1_grade' => 'integer',
+        'initial_grade_q2' => 'float',
+        'expected_grade_q2' => 'float',
+        'q2_grade' => 'integer',
+        'final_grade' => 'integer',
     ];
 
     public function user()

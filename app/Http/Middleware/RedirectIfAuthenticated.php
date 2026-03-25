@@ -20,22 +20,21 @@ class RedirectIfAuthenticated
 
         foreach ($guards as $guard) {
             if (Auth::guard($guard)->check()) {
-
-                // --- THIS IS THE MODIFIED PART ---
-
-                // Get the authenticated user
+                // Get the authenticated user and redirect to their dashboard
                 $user = Auth::user();
-
-                // Check their role and redirect them
-                if ($user->role === 'teacher') {
+                // Always prioritize teacher dashboard if user has teacher role
+                if ($user->isTeacher()) {
                     return redirect(route('teacher.dashboard'));
                 }
-
-                if ($user->role === 'student') {
+                if ($user->isSuperAdmin()) {
+                    return redirect(route('superadmin.dashboard'));
+                }
+                if ($user->isAdmin()) {
+                    return redirect(route('admin.dashboard'));
+                }
+                if ($user->isStudent()) {
                     return redirect(route('dashboard'));
                 }
-
-                // Fallback (this should match the one in your controller)
                 return redirect('/');
             }
         }

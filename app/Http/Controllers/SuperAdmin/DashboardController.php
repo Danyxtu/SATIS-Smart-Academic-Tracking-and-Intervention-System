@@ -20,15 +20,24 @@ class DashboardController extends Controller
         $stats = [
             'total_departments' => Department::count(),
             'active_departments' => Department::active()->count(),
-            'total_admins' => User::role('admin')->count(),
-            'total_teachers' => User::role('teacher')->count(),
-            'total_students' => User::role('student')->count(),
+            'total_admins' => User::whereHas('roles', function ($q) {
+                $q->where('name', 'admin');
+            })->count(),
+            'total_teachers' => User::whereHas('roles', function ($q) {
+                $q->where('name', 'teacher');
+            })->count(),
+            'total_students' => User::whereHas('roles', function ($q) {
+                $q->where('name', 'student');
+            })->count(),
             'total_subjects' => Subject::count(),
             'active_subjects' => Subject::count(), // All subjects are considered active
         ];
 
-        $recentAdmins = User::role('admin')
+        $recentAdmins = User::query()
             ->with('department')
+            ->whereHas('roles', function ($q) {
+                $q->where('name', 'admin');
+            })
             ->latest()
             ->take(5)
             ->get()
@@ -36,22 +45,39 @@ class DashboardController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'department' => $user->department?->name ?? 'Unassigned',
-                'created_at' => $user->created_at->diffForHumans(),
+                'department' => $user->department?->department_name ?? 'Unassigned',
+                'created_at' => $user->created_at?->diffForHumans(),
             ]);
 
-        $departments = Department::withCount(['admins', 'teachers', 'students'])
+        $departments = Department::query()
+            ->withCount([
+                'users as admins_count' => function ($q) {
+                    $q->whereHas('roles', function ($roleQ) {
+                        $roleQ->where('name', 'admin');
+                    });
+                },
+                'users as teachers_count' => function ($q) {
+                    $q->whereHas('roles', function ($roleQ) {
+                        $roleQ->where('name', 'teacher');
+                    });
+                },
+                'users as students_count' => function ($q) {
+                    $q->whereHas('roles', function ($roleQ) {
+                        $roleQ->where('name', 'student');
+                    });
+                },
+            ])
             ->latest()
             ->take(5)
             ->get()
             ->map(fn($dept) => [
                 'id' => $dept->id,
-                'name' => $dept->name,
-                'code' => $dept->code,
-                'admins_count' => $dept->admins_count,
-                'teachers_count' => $dept->teachers_count,
-                'students_count' => $dept->students_count,
-                'is_active' => $dept->is_active,
+                'name' => $dept->department_name,
+                'code' => $dept->department_code,
+                'admins_count' => (int) $dept->admins_count,
+                'teachers_count' => (int) $dept->teachers_count,
+                'students_count' => (int) $dept->students_count,
+                'is_active' => (bool) $dept->is_active,
             ]);
 
         $currentSettings = [

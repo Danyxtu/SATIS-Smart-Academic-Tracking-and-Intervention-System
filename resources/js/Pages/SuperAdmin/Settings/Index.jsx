@@ -12,6 +12,11 @@ import {
     CheckCircle,
     Sparkles,
     Shield,
+    BookOpen,
+    ToggleLeft,
+    AlertCircle,
+    ChevronRight,
+    Zap,
 } from "lucide-react";
 
 export default function Index({ settings, schoolYears }) {
@@ -39,330 +44,553 @@ export default function Index({ settings, schoolYears }) {
         post(route("superadmin.settings.update"));
     };
 
+    const activeControls = [
+        data.enrollment_open,
+        data.grade_submission_open,
+    ].filter(Boolean).length;
+
     return (
         <>
             <Head title="System Settings" />
 
-            <div className="max-w-3xl mx-auto space-y-6">
-                {/* Header */}
-                <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center shadow-lg shadow-slate-500/25">
-                        <Settings className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-900">
-                            System Settings
-                        </h1>
-                        <p className="text-slate-500">
-                            Configure school year, semester, and system-wide
-                            settings
-                        </p>
+            <div className="space-y-6">
+                {/* ── Page Header ──────────────────────────────────────── */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-800 to-slate-900 px-8 py-7 shadow-xl">
+                    {/* Decorative circles */}
+                    <div className="absolute -top-10 -right-10 h-48 w-48 rounded-full bg-white/5 blur-2xl" />
+                    <div className="absolute -bottom-8 left-1/3 h-32 w-32 rounded-full bg-blue-500/10 blur-xl" />
+
+                    <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                        <div className="flex items-center gap-5">
+                            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm ring-1 ring-white/20">
+                                <Settings className="h-7 w-7 text-white" />
+                            </div>
+                            <div>
+                                <h1 className="text-2xl font-bold text-white tracking-tight">
+                                    System Settings
+                                </h1>
+                                <p className="text-slate-400 text-sm mt-0.5">
+                                    Configure global school system parameters
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Status Pills */}
+                        <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2 backdrop-blur-sm ring-1 ring-white/10">
+                                <div
+                                    className={`h-2 w-2 rounded-full ${data.enrollment_open ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`}
+                                />
+                                <span className="text-xs font-semibold text-white">
+                                    Enrollment{" "}
+                                    {data.enrollment_open ? "Open" : "Closed"}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2 backdrop-blur-sm ring-1 ring-white/10">
+                                <div
+                                    className={`h-2 w-2 rounded-full ${data.grade_submission_open ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`}
+                                />
+                                <span className="text-xs font-semibold text-white">
+                                    Grades{" "}
+                                    {data.grade_submission_open
+                                        ? "Open"
+                                        : "Closed"}
+                                </span>
+                            </div>
+                            {data.current_school_year && (
+                                <div className="flex items-center gap-2 rounded-xl bg-blue-500/20 px-4 py-2 backdrop-blur-sm ring-1 ring-blue-400/30">
+                                    <BookOpen
+                                        size={12}
+                                        className="text-blue-300"
+                                    />
+                                    <span className="text-xs font-semibold text-blue-200">
+                                        {data.current_school_year} · Sem{" "}
+                                        {data.current_semester}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Academic Period */}
-                    <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
-                        <div className="flex items-center gap-4 p-6 border-b border-slate-100 bg-slate-50/50">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/25">
-                                <Calendar className="h-6 w-6 text-white" />
-                            </div>
-                            <div>
-                                <h2 className="font-semibold text-slate-900">
-                                    Academic Period
-                                </h2>
-                                <p className="text-sm text-slate-500">
-                                    Set the current school year and semester
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="p-6 space-y-5">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                {/* School Year */}
-                                <div>
-                                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
-                                        <Calendar
-                                            size={14}
-                                            className="text-slate-400"
-                                        />
-                                        Current School Year
-                                        <span className="text-rose-500">*</span>
-                                    </label>
-                                    <select
-                                        value={data.current_school_year}
-                                        onChange={(e) =>
-                                            setData(
-                                                "current_school_year",
-                                                e.target.value
-                                            )
-                                        }
-                                        className={`w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors ${
-                                            errors.current_school_year
-                                                ? "border-rose-300 bg-rose-50/50"
-                                                : ""
-                                        }`}
-                                    >
-                                        <option value="">
-                                            Select school year
-                                        </option>
-                                        {availableSchoolYears.map((year) => (
-                                            <option key={year} value={year}>
-                                                {year}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {errors.current_school_year && (
-                                        <p className="mt-2 text-sm text-rose-600 flex items-center gap-1">
-                                            <Info size={14} />
-                                            {errors.current_school_year}
+                <form onSubmit={handleSubmit}>
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                        {/* ── LEFT COLUMN (2/3 width) ───────────────────── */}
+                        <div className="xl:col-span-2 space-y-6">
+                            {/* Academic Period Card */}
+                            <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
+                                <div className="flex items-center gap-4 px-6 py-5 border-b border-slate-100">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md shadow-blue-500/20">
+                                        <Calendar className="h-5 w-5 text-white" />
+                                    </div>
+                                    <div>
+                                        <h2 className="font-semibold text-slate-900">
+                                            Academic Period
+                                        </h2>
+                                        <p className="text-xs text-slate-500">
+                                            Current school year and semester
                                         </p>
-                                    )}
+                                    </div>
                                 </div>
 
-                                {/* Semester */}
-                                <div>
-                                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
-                                        <Sparkles
-                                            size={14}
-                                            className="text-slate-400"
-                                        />
-                                        Current Semester
-                                        <span className="text-rose-500">*</span>
-                                    </label>
-                                    <select
-                                        value={data.current_semester}
-                                        onChange={(e) =>
-                                            setData(
-                                                "current_semester",
-                                                e.target.value
-                                            )
-                                        }
-                                        className={`w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors ${
-                                            errors.current_semester
-                                                ? "border-rose-300 bg-rose-50/50"
-                                                : ""
-                                        }`}
-                                    >
-                                        <option value="1">1st Semester</option>
-                                        <option value="2">2nd Semester</option>
-                                    </select>
-                                    {errors.current_semester && (
-                                        <p className="mt-2 text-sm text-rose-600 flex items-center gap-1">
-                                            <Info size={14} />
-                                            {errors.current_semester}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
+                                <div className="p-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                        {/* School Year */}
+                                        <div>
+                                            <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                                                <Calendar size={12} />
+                                                School Year
+                                                <span className="text-rose-400">
+                                                    *
+                                                </span>
+                                            </label>
+                                            <select
+                                                value={data.current_school_year}
+                                                onChange={(e) =>
+                                                    setData(
+                                                        "current_school_year",
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className={`w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm font-medium focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors ${
+                                                    errors.current_school_year
+                                                        ? "border-rose-300 bg-rose-50/50"
+                                                        : ""
+                                                }`}
+                                            >
+                                                <option value="">
+                                                    Select school year
+                                                </option>
+                                                {availableSchoolYears.map(
+                                                    (year) => (
+                                                        <option
+                                                            key={year}
+                                                            value={year}
+                                                        >
+                                                            {year}
+                                                        </option>
+                                                    ),
+                                                )}
+                                            </select>
+                                            {errors.current_school_year && (
+                                                <p className="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                                    <Info size={12} />
+                                                    {errors.current_school_year}
+                                                </p>
+                                            )}
+                                        </div>
 
-                            <div className="rounded-xl bg-blue-50 p-4 border border-blue-100">
-                                <div className="flex gap-3">
-                                    <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                                        <Info
+                                        {/* Semester */}
+                                        <div>
+                                            <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                                                <Sparkles size={12} />
+                                                Semester
+                                                <span className="text-rose-400">
+                                                    *
+                                                </span>
+                                            </label>
+                                            {/* Custom toggle-style selector */}
+                                            <div className="flex rounded-xl border border-slate-200 bg-slate-50/50 p-1 gap-1">
+                                                {["1", "2"].map((sem) => (
+                                                    <button
+                                                        key={sem}
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setData(
+                                                                "current_semester",
+                                                                sem,
+                                                            )
+                                                        }
+                                                        className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all ${
+                                                            data.current_semester ===
+                                                            sem
+                                                                ? "bg-white text-blue-600 shadow-sm ring-1 ring-slate-200"
+                                                                : "text-slate-500 hover:text-slate-700"
+                                                        }`}
+                                                    >
+                                                        {sem === "1"
+                                                            ? "1st Semester"
+                                                            : "2nd Semester"}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            {errors.current_semester && (
+                                                <p className="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                                    <Info size={12} />
+                                                    {errors.current_semester}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Info banner */}
+                                    <div className="mt-5 flex gap-3 rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">
+                                        <AlertCircle
                                             size={16}
-                                            className="text-blue-600"
+                                            className="text-amber-500 shrink-0 mt-0.5"
                                         />
-                                    </div>
-                                    <div className="text-sm text-blue-800">
-                                        <p className="font-semibold">
-                                            Academic Period Impact
-                                        </p>
-                                        <p className="mt-1 text-blue-700">
-                                            Changing the school year or semester
-                                            affects enrollment, grades, and
-                                            attendance records. Make sure all
-                                            grades are submitted before changing
-                                            to a new period.
+                                        <p className="text-xs text-amber-700 leading-relaxed">
+                                            <span className="font-semibold">
+                                                Heads up:
+                                            </span>{" "}
+                                            Changing the academic period affects
+                                            enrollment records, grade
+                                            submissions, and attendance. Ensure
+                                            all grades are finalized before
+                                            switching periods.
                                         </p>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
 
-                    {/* System Controls */}
-                    <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
-                        <div className="flex items-center gap-4 p-6 border-b border-slate-100 bg-slate-50/50">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/25">
-                                <Clock className="h-6 w-6 text-white" />
-                            </div>
-                            <div>
-                                <h2 className="font-semibold text-slate-900">
-                                    System Controls
-                                </h2>
-                                <p className="text-sm text-slate-500">
-                                    Toggle system features and deadlines
-                                </p>
+                            {/* School Information Card */}
+                            <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
+                                <div className="flex items-center gap-4 px-6 py-5 border-b border-slate-100">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-md shadow-emerald-500/20">
+                                        <School className="h-5 w-5 text-white" />
+                                    </div>
+                                    <div>
+                                        <h2 className="font-semibold text-slate-900">
+                                            School Information
+                                        </h2>
+                                        <p className="text-xs text-slate-500">
+                                            Used in reports, documents, and
+                                            printed materials
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="p-6 space-y-5">
+                                    <div>
+                                        <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                                            <School size={12} />
+                                            School Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={data.school_name}
+                                            onChange={(e) =>
+                                                setData(
+                                                    "school_name",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="e.g., Sample Senior High School"
+                                            className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                                            <MapPin size={12} />
+                                            School Address
+                                        </label>
+                                        <textarea
+                                            value={data.school_address}
+                                            onChange={(e) =>
+                                                setData(
+                                                    "school_address",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            rows={3}
+                                            placeholder="Full school address including barangay, city, and province..."
+                                            className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors resize-none"
+                                        />
+                                    </div>
+
+                                    {/* Preview */}
+                                    {(data.school_name ||
+                                        data.school_address) && (
+                                        <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
+                                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                                                Preview
+                                            </p>
+                                            <p className="font-semibold text-slate-800 text-sm">
+                                                {data.school_name || "—"}
+                                            </p>
+                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                {data.school_address || "—"}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
-                        <div className="p-6 space-y-4">
-                            {/* Enrollment Open */}
-                            <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-100">
-                                <div className="flex items-center gap-3">
+                        {/* ── RIGHT COLUMN (1/3 width) ──────────────────── */}
+                        <div className="space-y-6">
+                            {/* System Controls Card */}
+                            <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
+                                <div className="flex items-center gap-4 px-6 py-5 border-b border-slate-100">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-md shadow-amber-500/20">
+                                        <Zap className="h-5 w-5 text-white" />
+                                    </div>
+                                    <div>
+                                        <h2 className="font-semibold text-slate-900">
+                                            System Controls
+                                        </h2>
+                                        <p className="text-xs text-slate-500">
+                                            Toggle system features
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="p-5 space-y-3">
+                                    {/* Enrollment Toggle */}
                                     <div
-                                        className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+                                        className={`rounded-xl p-4 border transition-colors ${
                                             data.enrollment_open
-                                                ? "bg-emerald-100"
-                                                : "bg-slate-200"
+                                                ? "bg-emerald-50 border-emerald-100"
+                                                : "bg-slate-50 border-slate-100"
                                         }`}
                                     >
-                                        <GraduationCap
-                                            size={20}
-                                            className={
-                                                data.enrollment_open
-                                                    ? "text-emerald-600"
-                                                    : "text-slate-400"
-                                            }
-                                        />
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex items-center gap-3">
+                                                <div
+                                                    className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
+                                                        data.enrollment_open
+                                                            ? "bg-emerald-100"
+                                                            : "bg-slate-200"
+                                                    }`}
+                                                >
+                                                    <GraduationCap
+                                                        size={18}
+                                                        className={
+                                                            data.enrollment_open
+                                                                ? "text-emerald-600"
+                                                                : "text-slate-400"
+                                                        }
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-slate-900 text-sm">
+                                                        Enrollment
+                                                    </p>
+                                                    <p className="text-xs text-slate-500 mt-0.5">
+                                                        {data.enrollment_open
+                                                            ? "Students can enroll"
+                                                            : "Enrollment disabled"}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <label className="relative inline-flex cursor-pointer items-center shrink-0 mt-0.5">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={
+                                                        data.enrollment_open
+                                                    }
+                                                    onChange={(e) =>
+                                                        setData(
+                                                            "enrollment_open",
+                                                            e.target.checked,
+                                                        )
+                                                    }
+                                                    className="peer sr-only"
+                                                />
+                                                <div className="peer h-5 w-9 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white" />
+                                            </label>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="font-semibold text-slate-900">
-                                            Enrollment Period
-                                        </p>
-                                        <p className="text-sm text-slate-500">
-                                            Allow students to be enrolled in
-                                            classes
-                                        </p>
-                                    </div>
-                                </div>
-                                <label className="relative inline-flex cursor-pointer items-center">
-                                    <input
-                                        type="checkbox"
-                                        checked={data.enrollment_open}
-                                        onChange={(e) =>
-                                            setData(
-                                                "enrollment_open",
-                                                e.target.checked
-                                            )
-                                        }
-                                        className="peer sr-only"
-                                    />
-                                    <div className="peer h-6 w-11 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
-                                </label>
-                            </div>
 
-                            {/* Grade Submission */}
-                            <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-100">
-                                <div className="flex items-center gap-3">
+                                    {/* Grade Submission Toggle */}
                                     <div
-                                        className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+                                        className={`rounded-xl p-4 border transition-colors ${
                                             data.grade_submission_open
-                                                ? "bg-emerald-100"
-                                                : "bg-slate-200"
+                                                ? "bg-emerald-50 border-emerald-100"
+                                                : "bg-slate-50 border-slate-100"
                                         }`}
                                     >
-                                        <CheckCircle
-                                            size={20}
-                                            className={
-                                                data.grade_submission_open
-                                                    ? "text-emerald-600"
-                                                    : "text-slate-400"
-                                            }
-                                        />
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold text-slate-900">
-                                            Grade Submission
-                                        </p>
-                                        <p className="text-sm text-slate-500">
-                                            Allow teachers to submit and edit
-                                            grades
-                                        </p>
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex items-center gap-3">
+                                                <div
+                                                    className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
+                                                        data.grade_submission_open
+                                                            ? "bg-emerald-100"
+                                                            : "bg-slate-200"
+                                                    }`}
+                                                >
+                                                    <CheckCircle
+                                                        size={18}
+                                                        className={
+                                                            data.grade_submission_open
+                                                                ? "text-emerald-600"
+                                                                : "text-slate-400"
+                                                        }
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-slate-900 text-sm">
+                                                        Grade Submission
+                                                    </p>
+                                                    <p className="text-xs text-slate-500 mt-0.5">
+                                                        {data.grade_submission_open
+                                                            ? "Teachers can submit"
+                                                            : "Submission disabled"}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <label className="relative inline-flex cursor-pointer items-center shrink-0 mt-0.5">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={
+                                                        data.grade_submission_open
+                                                    }
+                                                    onChange={(e) =>
+                                                        setData(
+                                                            "grade_submission_open",
+                                                            e.target.checked,
+                                                        )
+                                                    }
+                                                    className="peer sr-only"
+                                                />
+                                                <div className="peer h-5 w-9 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white" />
+                                            </label>
+                                        </div>
                                     </div>
                                 </div>
-                                <label className="relative inline-flex cursor-pointer items-center">
-                                    <input
-                                        type="checkbox"
-                                        checked={data.grade_submission_open}
-                                        onChange={(e) =>
-                                            setData(
-                                                "grade_submission_open",
-                                                e.target.checked
-                                            )
-                                        }
-                                        className="peer sr-only"
-                                    />
-                                    <div className="peer h-6 w-11 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
-                                </label>
                             </div>
+
+                            {/* Summary Card */}
+                            <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
+                                <div className="px-6 py-5 border-b border-slate-100">
+                                    <h3 className="font-semibold text-slate-900 text-sm">
+                                        Configuration Summary
+                                    </h3>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        Current active settings
+                                    </p>
+                                </div>
+                                <div className="p-5 space-y-3">
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-slate-500 flex items-center gap-2">
+                                            <Calendar
+                                                size={13}
+                                                className="text-slate-400"
+                                            />
+                                            School Year
+                                        </span>
+                                        <span className="font-semibold text-slate-800">
+                                            {data.current_school_year || (
+                                                <span className="text-slate-300 font-normal">
+                                                    Not set
+                                                </span>
+                                            )}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-slate-500 flex items-center gap-2">
+                                            <BookOpen
+                                                size={13}
+                                                className="text-slate-400"
+                                            />
+                                            Semester
+                                        </span>
+                                        <span className="font-semibold text-slate-800">
+                                            {data.current_semester === "1"
+                                                ? "1st Semester"
+                                                : "2nd Semester"}
+                                        </span>
+                                    </div>
+                                    <div className="h-px bg-slate-100" />
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-slate-500 flex items-center gap-2">
+                                            <GraduationCap
+                                                size={13}
+                                                className="text-slate-400"
+                                            />
+                                            Enrollment
+                                        </span>
+                                        <span
+                                            className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                                                data.enrollment_open
+                                                    ? "bg-emerald-100 text-emerald-700"
+                                                    : "bg-slate-100 text-slate-500"
+                                            }`}
+                                        >
+                                            {data.enrollment_open
+                                                ? "OPEN"
+                                                : "CLOSED"}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-slate-500 flex items-center gap-2">
+                                            <CheckCircle
+                                                size={13}
+                                                className="text-slate-400"
+                                            />
+                                            Grades
+                                        </span>
+                                        <span
+                                            className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                                                data.grade_submission_open
+                                                    ? "bg-emerald-100 text-emerald-700"
+                                                    : "bg-slate-100 text-slate-500"
+                                            }`}
+                                        >
+                                            {data.grade_submission_open
+                                                ? "OPEN"
+                                                : "CLOSED"}
+                                        </span>
+                                    </div>
+                                    {data.school_name && (
+                                        <>
+                                            <div className="h-px bg-slate-100" />
+                                            <div className="flex items-start justify-between text-sm gap-3">
+                                                <span className="text-slate-500 flex items-center gap-2 shrink-0">
+                                                    <School
+                                                        size={13}
+                                                        className="text-slate-400"
+                                                    />
+                                                    School
+                                                </span>
+                                                <span className="font-semibold text-slate-800 text-right text-xs leading-snug">
+                                                    {data.school_name}
+                                                </span>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Save Button */}
+                            <button
+                                type="submit"
+                                disabled={processing}
+                                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                            >
+                                {processing ? (
+                                    <>
+                                        <svg
+                                            className="animate-spin h-4 w-4 text-white"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <circle
+                                                className="opacity-25"
+                                                cx="12"
+                                                cy="12"
+                                                r="10"
+                                                stroke="currentColor"
+                                                strokeWidth="4"
+                                            />
+                                            <path
+                                                className="opacity-75"
+                                                fill="currentColor"
+                                                d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z"
+                                            />
+                                        </svg>
+                                        Saving Changes...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save size={16} />
+                                        Save Settings
+                                    </>
+                                )}
+                            </button>
                         </div>
-                    </div>
-
-                    {/* School Information */}
-                    <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
-                        <div className="flex items-center gap-4 p-6 border-b border-slate-100 bg-slate-50/50">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/25">
-                                <School className="h-6 w-6 text-white" />
-                            </div>
-                            <div>
-                                <h2 className="font-semibold text-slate-900">
-                                    School Information
-                                </h2>
-                                <p className="text-sm text-slate-500">
-                                    Basic school details for reports and
-                                    documents
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="p-6 space-y-5">
-                            {/* School Name */}
-                            <div>
-                                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
-                                    <School
-                                        size={14}
-                                        className="text-slate-400"
-                                    />
-                                    School Name
-                                </label>
-                                <input
-                                    type="text"
-                                    value={data.school_name}
-                                    onChange={(e) =>
-                                        setData("school_name", e.target.value)
-                                    }
-                                    placeholder="e.g., Sample Senior High School"
-                                    className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors"
-                                />
-                            </div>
-
-                            {/* School Address */}
-                            <div>
-                                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
-                                    <MapPin
-                                        size={14}
-                                        className="text-slate-400"
-                                    />
-                                    School Address
-                                </label>
-                                <textarea
-                                    value={data.school_address}
-                                    onChange={(e) =>
-                                        setData(
-                                            "school_address",
-                                            e.target.value
-                                        )
-                                    }
-                                    rows={2}
-                                    placeholder="Full school address..."
-                                    className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors resize-none"
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center justify-end">
-                        <button
-                            type="submit"
-                            disabled={processing}
-                            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all disabled:opacity-50"
-                        >
-                            <Save size={18} />
-                            {processing ? "Saving..." : "Save Settings"}
-                        </button>
                     </div>
                 </form>
             </div>

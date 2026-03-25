@@ -8,11 +8,15 @@
 export { default as AddGradeTaskModal } from "./AddGradeTaskModal";
 export { default as AddStudentModal } from "./AddStudentModal";
 export { default as ClassCard } from "./ClassCard";
+export { default as ClassCreateSummaryModal } from "./ClassCreateSummaryModal";
 export { default as EditGradeCategoriesModal } from "./EditGradeCategoriesModal";
 export { default as SendNudgeModal } from "./SendNudgeModal";
 export { default as StudentStatusModal } from "./StudentStatusModal";
 export { default as TemporaryPasswordModal } from "./TemporaryPasswordModal";
 export { default as EmptyStudentState } from "./EmptyStudentState";
 export { default as AddNewClassModal } from "./AddNewClassModal";
+export { default as DeleteClassModal } from "./DeleteClassModal";
 export { default as ClassList } from "./ClassList";
 export { default as GradeSubmissionModal } from "./GradeSubmissionModal";
+export { default as StartQ2ConfirmModal } from "./StartQ2ConfirmModal";
+export { default as BulkStudentImportSummaryModal } from "./BulkStudentImportSummaryModal";

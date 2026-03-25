@@ -3,6 +3,15 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use App\Http\Middleware\HandleInertiaRequests;
+use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
+use App\Http\Middleware\EnsurePasswordChanged;
+use App\Http\Middleware\EnsureTeacherApproved;
+use App\Http\Middleware\EnsureAdmin;
+use App\Http\Middleware\EnsureSuperAdmin;
+use App\Http\Middleware\EnsureStaff;
+use App\Http\Middleware\EnsureStudent;
+use App\Http\Middleware\EnsureTeacher;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -13,11 +22,20 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
-            \App\Http\Middleware\HandleInertiaRequests::class,
-            \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
-            \App\Http\Middleware\EnsurePasswordChanged::class,
-            \App\Http\Middleware\EnsureTeacherApproved::class,
+            HandleInertiaRequests::class,
+            AddLinkHeadersForPreloadedAssets::class,
+            EnsurePasswordChanged::class,
+            EnsureTeacherApproved::class,
         ]);
+        $middleware->alias(
+            [
+                'staff'      => EnsureStaff::class,
+                'admin'      => EnsureAdmin::class,
+                'superadmin' => EnsureSuperAdmin::class,
+                'student'    => EnsureStudent::class,
+                'teacher'    => EnsureTeacher::class,
+            ]
+        );
 
         // Login redirection is handled in RedirectIfAuthenticated middleware
     })

@@ -12,11 +12,10 @@ class Department extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name',
-        'code',
+        'department_name',
+        'department_code',
         'description',
         'is_active',
-        'created_by',
     ];
 
     protected $casts = [
@@ -39,29 +38,29 @@ class Department extends Model
         return $this->hasMany(User::class);
     }
 
-    /**
-     * Get all admins in this department.
-     */
-    public function admins(): HasMany
-    {
-        return $this->hasMany(User::class)->where('role', 'admin');
-    }
+    // /**
+    //  * Get all admins in this department.
+    //  */
+    // public function admins(): HasMany
+    // {
+    //     return $this->hasMany(User::class)->where('role', 'admin');
+    // }
 
-    /**
-     * Get all teachers in this department.
-     */
-    public function teachers(): HasMany
-    {
-        return $this->hasMany(User::class)->where('role', 'teacher');
-    }
+    // /**
+    //  * Get all teachers in this department.
+    //  */
+    // public function teachers(): HasMany
+    // {
+    //     return $this->hasMany(User::class)->where('role', 'teacher');
+    // }
 
-    /**
-     * Get all students in this department.
-     */
-    public function students(): HasMany
-    {
-        return $this->hasMany(User::class)->where('role', 'student');
-    }
+    // /**
+    //  * Get all students in this department.
+    //  */
+    // public function students(): HasMany
+    // {
+    //     return $this->hasMany(User::class)->where('role', 'student');
+    // }
 
     /**
      * Scope to get only active departments.

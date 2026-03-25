@@ -31,6 +31,7 @@ import {
     Building2,
     Lock,
 } from "lucide-react";
+import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
 
 // Role Badge Component
 const RoleBadge = ({ role }) => {
@@ -962,7 +963,7 @@ export default function Index({
     };
 
     return (
-        <AdminLayout>
+        <>
             <Head title="User Management" />
 
             {/* Department Info Banner */}
@@ -1379,6 +1380,8 @@ export default function Index({
                 user={tempPasswordModal.user}
                 tempPassword={tempPasswordModal.tempPassword}
             />
-        </AdminLayout>
+        </>
     );
 }
+
+Index.layout = (page) => <SuperAdminLayout children={page} />;

@@ -1,5 +1,5 @@
 import React from "react";
-import AdminLayout from "@/Layouts/AdminLayout";
+import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
 import { Head, Link } from "@inertiajs/react";
 import {
     Users,
@@ -101,7 +101,7 @@ const MiniTrendChart = ({ data }) => {
                         style={{
                             height: `${Math.max(
                                 (item.count / maxCount) * 100,
-                                8
+                                8,
                             )}%`,
                             minHeight: "4px",
                         }}
@@ -164,7 +164,7 @@ export default function Dashboard({ auth, stats, userTrends, department }) {
     ];
 
     return (
-        <AdminLayout>
+        <SuperAdminLayout>
             <Head title="Admin Dashboard" />
 
             {/* Department Header Banner */}
@@ -278,7 +278,7 @@ export default function Dashboard({ auth, stats, userTrends, department }) {
                             <span className="font-semibold text-gray-900 dark:text-white">
                                 {userTrends?.reduce(
                                     (sum, d) => sum + d.count,
-                                    0
+                                    0,
                                 ) || 0}{" "}
                                 users
                             </span>
@@ -317,6 +317,6 @@ export default function Dashboard({ auth, stats, userTrends, department }) {
                     </Link>
                 </div>
             </div>
-        </AdminLayout>
+        </SuperAdminLayout>
     );
 }

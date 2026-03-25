@@ -5,6 +5,7 @@ const StudentStatusModal = ({
     student,
     assignments = [],
     gradeCategories = [],
+    gradeStructure = null,
     calculateFinalGrade,
     calculateExpectedQuarterlyGrade,
     calculateOverallFinalGrade,
@@ -17,6 +18,21 @@ const StudentStatusModal = ({
 
     if (!student) return null;
 
+    // Resolve categories for the selected quarter from per-quarter structure
+    const FALLBACK_CATEGORIES = gradeCategories;
+    const resolveCategories = (quarter) => {
+        if (gradeStructure) {
+            return (
+                gradeStructure?.[quarter]?.categories ??
+                gradeStructure?.[String(quarter)]?.categories ??
+                FALLBACK_CATEGORIES
+            );
+        }
+        return FALLBACK_CATEGORIES;
+    };
+    const currentCategories = resolveCategories(selectedQuarter);
+    const q1Categories = resolveCategories(1);
+
     // Get the temporary password from the student's user record
     const temporaryPassword =
         student.user?.temp_password || student.temp_password || null;
@@ -26,24 +42,28 @@ const StudentStatusModal = ({
 
     // Check if Q1 is finished (has quarterly exam scores)
     const q1Finished = hasQuarterlyExamScores
-        ? hasQuarterlyExamScores(student.grades, gradeCategories, 1)
+        ? hasQuarterlyExamScores(student.grades, q1Categories, 1)
         : false;
 
     // Calculate grades for the selected quarter
     const quarterlyGrade =
         hasQuarterlyExamScores &&
-        hasQuarterlyExamScores(student.grades, gradeCategories, selectedQuarter)
+        hasQuarterlyExamScores(
+            student.grades,
+            currentCategories,
+            selectedQuarter,
+        )
             ? calculateFinalGrade(
                   student.grades,
-                  gradeCategories,
-                  selectedQuarter
+                  currentCategories,
+                  selectedQuarter,
               )
             : "—";
     const expectedGrade = calculateExpectedQuarterlyGrade
         ? calculateExpectedQuarterlyGrade(
               student.grades,
-              gradeCategories,
-              selectedQuarter
+              currentCategories,
+              selectedQuarter,
           )
         : "—";
     const finalGrade = calculateOverallFinalGrade
@@ -273,7 +293,7 @@ const StudentStatusModal = ({
                     </div>
 
                     {/* Grades Overview */}
-                    {gradeCategories.length > 0 && (
+                    {currentCategories.length > 0 && (
                         <div className="rounded-xl border border-gray-100 p-4">
                             <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 pb-3">
                                 <div>
@@ -314,8 +334,8 @@ const StudentStatusModal = ({
                                                 selectedQuarter === 2
                                                     ? "bg-white text-indigo-700 shadow-sm"
                                                     : !q1Finished
-                                                    ? "text-gray-400 cursor-not-allowed"
-                                                    : "text-gray-600 hover:bg-gray-200"
+                                                      ? "text-gray-400 cursor-not-allowed"
+                                                      : "text-gray-600 hover:bg-gray-200"
                                             }`}
                                             title={
                                                 !q1Finished
@@ -330,7 +350,7 @@ const StudentStatusModal = ({
                             </div>
 
                             <div className="flex flex-wrap gap-2 mt-3 mb-3">
-                                {gradeCategories.map((category) => (
+                                {currentCategories.map((category) => (
                                     <span
                                         key={category.id}
                                         className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-600"
@@ -338,107 +358,197 @@ const StudentStatusModal = ({
                                         <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
                                         {category.label} (
                                         {Math.round(
-                                            (category.weight ?? 0) * 100
+                                            (category.weight ?? 0) * 100,
                                         )}
                                         %)
                                     </span>
                                 ))}
                             </div>
 
-                            <div className="mt-3 max-h-56 overflow-y-auto rounded-xl border border-gray-100">
+                            <div className="mt-3 max-h-72 overflow-y-auto rounded-xl border border-gray-100">
                                 <table className="min-w-full divide-y divide-gray-200 text-left">
                                     <thead className="bg-gray-50/80 text-xs font-semibold uppercase tracking-wider text-gray-500 sticky top-0">
                                         <tr>
                                             <th className="px-3 py-2">
-                                                Category
-                                            </th>
-                                            <th className="px-3 py-2">
                                                 Activity
                                             </th>
-                                            <th className="px-3 py-2">Score</th>
-                                            <th className="px-3 py-2">Total</th>
+                                            <th className="px-3 py-2 text-right">
+                                                Score
+                                            </th>
+                                            <th className="px-3 py-2 text-right">
+                                                Total
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 bg-white text-sm text-gray-700">
-                                        {assignments.length === 0 && (
+                                        {currentCategories.every(
+                                            (cat) =>
+                                                !cat.tasks ||
+                                                cat.tasks.length === 0,
+                                        ) && (
                                             <tr>
                                                 <td
                                                     className="px-3 py-4 text-center text-gray-400"
-                                                    colSpan={4}
+                                                    colSpan={3}
                                                 >
                                                     No assignments defined for
                                                     this class yet.
                                                 </td>
                                             </tr>
                                         )}
-                                        {assignments.map((assign) => (
-                                            <tr key={assign.id}>
-                                                <td className="px-3 py-2 font-semibold text-gray-900">
-                                                    {assign.category_label}
-                                                    {assign.category_weight !==
-                                                        undefined && (
-                                                        <span className="ml-1 text-xs text-gray-500">
-                                                            (
-                                                            {Math.round(
-                                                                (assign.category_weight ??
-                                                                    0) * 100
-                                                            )}
-                                                            %)
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-3 py-2 text-gray-600">
-                                                    {assign.label}
-                                                </td>
-                                                <td className="px-3 py-2 font-semibold text-indigo-600">
-                                                    {student.grades?.[
-                                                        assign.id
-                                                    ] ?? "—"}
-                                                </td>
-                                                <td className="px-3 py-2 text-gray-500">
-                                                    {assign.total}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {assignments.length > 0 && (
+                                        {currentCategories.map((category) => {
+                                            const tasks = category.tasks ?? [];
+                                            if (tasks.length === 0) return null;
+
+                                            // Abbreviate category labels
+                                            const abbrev = {
+                                                written_works: "WW",
+                                                performance_task: "PT",
+                                                quarterly_exam: "QE",
+                                            };
+                                            const shortLabel =
+                                                abbrev[category.id] ||
+                                                category.label;
+                                            const percent = Math.round(
+                                                (category.weight ?? 0) * 100,
+                                            );
+
+                                            // Calculate category subtotal
+                                            const quarterGrades =
+                                                student.grades?.[
+                                                    selectedQuarter
+                                                ] ?? {};
+                                            let catScore = 0;
+                                            let catTotal = 0;
+                                            tasks.forEach((task) => {
+                                                const val =
+                                                    quarterGrades[task.id];
+                                                if (
+                                                    val !== undefined &&
+                                                    val !== null &&
+                                                    val !== ""
+                                                ) {
+                                                    catScore += Number(val);
+                                                    catTotal += Number(
+                                                        task.total,
+                                                    );
+                                                }
+                                            });
+
+                                            return (
+                                                <React.Fragment
+                                                    key={category.id}
+                                                >
+                                                    {/* Category Header Row */}
+                                                    <tr className="bg-gray-50/90">
+                                                        <td
+                                                            colSpan={3}
+                                                            className="px-3 py-2"
+                                                        >
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="font-semibold text-gray-900">
+                                                                    {shortLabel}{" "}
+                                                                    <span className="font-normal text-gray-500">
+                                                                        —{" "}
+                                                                        {
+                                                                            category.label
+                                                                        }
+                                                                    </span>
+                                                                    <span className="ml-1 text-xs text-gray-500">
+                                                                        (
+                                                                        {
+                                                                            percent
+                                                                        }
+                                                                        %)
+                                                                    </span>
+                                                                </span>
+                                                                {catTotal >
+                                                                    0 && (
+                                                                    <span className="text-xs font-medium text-indigo-600">
+                                                                        {
+                                                                            catScore
+                                                                        }
+                                                                        /
+                                                                        {
+                                                                            catTotal
+                                                                        }
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    {/* Task Rows */}
+                                                    {tasks.map((task) => {
+                                                        const score =
+                                                            quarterGrades[
+                                                                task.id
+                                                            ];
+                                                        return (
+                                                            <tr key={task.id}>
+                                                                <td className="px-3 py-1.5 pl-6 text-gray-600">
+                                                                    {task.label}
+                                                                </td>
+                                                                <td className="px-3 py-1.5 text-right font-semibold text-indigo-600">
+                                                                    {score !==
+                                                                        undefined &&
+                                                                    score !==
+                                                                        null &&
+                                                                    score !== ""
+                                                                        ? score
+                                                                        : "—"}
+                                                                </td>
+                                                                <td className="px-3 py-1.5 text-right text-gray-500">
+                                                                    {task.total}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </React.Fragment>
+                                            );
+                                        })}
+                                        {currentCategories.some(
+                                            (cat) =>
+                                                cat.tasks &&
+                                                cat.tasks.length > 0,
+                                        ) && (
                                             <>
                                                 <tr className="bg-gray-50/80 text-gray-900">
-                                                    <td
-                                                        className="px-3 py-2 font-semibold"
-                                                        colSpan={3}
-                                                    >
+                                                    <td className="px-3 py-2 font-semibold">
                                                         Q{selectedQuarter} Grade
                                                     </td>
-                                                    <td className="px-3 py-2 font-semibold text-indigo-700">
+                                                    <td
+                                                        className="px-3 py-2 text-right font-semibold text-indigo-700"
+                                                        colSpan={2}
+                                                    >
                                                         {quarterlyGrade}
                                                     </td>
                                                 </tr>
                                                 <tr className="bg-indigo-50/50 text-gray-900">
-                                                    <td
-                                                        className="px-3 py-2 font-semibold"
-                                                        colSpan={3}
-                                                    >
+                                                    <td className="px-3 py-2 font-semibold">
                                                         Expected Q
                                                         {selectedQuarter} Grade
                                                         <span className="ml-2 text-xs font-normal text-gray-500">
                                                             (Projected)
                                                         </span>
                                                     </td>
-                                                    <td className="px-3 py-2 font-semibold text-amber-600">
+                                                    <td
+                                                        className="px-3 py-2 text-right font-semibold text-amber-600"
+                                                        colSpan={2}
+                                                    >
                                                         {expectedGrade}
                                                     </td>
                                                 </tr>
                                                 <tr className="bg-indigo-100/70 text-gray-900">
-                                                    <td
-                                                        className="px-3 py-2 font-bold"
-                                                        colSpan={3}
-                                                    >
+                                                    <td className="px-3 py-2 font-bold">
                                                         Final Grade
                                                         <span className="ml-2 text-xs font-normal text-gray-500">
                                                             (Q1 + Q2 Average)
                                                         </span>
                                                     </td>
-                                                    <td className="px-3 py-2 font-bold text-indigo-800">
+                                                    <td
+                                                        className="px-3 py-2 text-right font-bold text-indigo-800"
+                                                        colSpan={2}
+                                                    >
                                                         {finalGrade}
                                                     </td>
                                                 </tr>

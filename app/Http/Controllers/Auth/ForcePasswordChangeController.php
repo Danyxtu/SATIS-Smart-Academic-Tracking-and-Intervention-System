@@ -45,18 +45,21 @@ class ForcePasswordChangeController extends Controller
         // Refresh the user model to ensure the session has updated data
         $user->refresh();
 
-        // Redirect based on user role
-        if ($user->role === 'student') {
+        // Redirect based on role priority for multi-role users.
+        // Teacher should always land on teacher dashboard when present.
+        if ($user->isTeacher()) {
+            return redirect()->route('teacher.dashboard')->with('success', 'Password changed successfully!');
+        }
+        if ($user->isSuperAdmin()) {
+            return redirect()->route('superadmin.dashboard')->with('success', 'Password changed successfully!');
+        }
+        if ($user->isAdmin()) {
+            return redirect()->route('admin.dashboard')->with('success', 'Password changed successfully!');
+        }
+        if ($user->isStudent()) {
             return redirect()->route('dashboard')->with('success', 'Password changed successfully! Welcome to SATIS.');
         }
 
-        if ($user->role === 'teacher') {
-            return redirect()->route('teacher.dashboard')->with('success', 'Password changed successfully!');
-        }
-        if ($user->role === 'super_admin') {
-            return redirect()->route('superadmin.dashboard')->with('success', 'Password changed successfully!');
-        }
-
-        return redirect()->route('admin.dashboard')->with('success', 'Password changed successfully!');
+        return redirect('/')->with('success', 'Password changed successfully!');
     }
 }
