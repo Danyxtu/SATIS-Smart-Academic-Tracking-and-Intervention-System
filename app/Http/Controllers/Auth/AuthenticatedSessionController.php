@@ -42,17 +42,17 @@ class AuthenticatedSessionController extends Controller
 
         // Always prioritize teacher dashboard if user has teacher role
         if ($user->isTeacher()) {
-            return redirect()->intended(route('teacher.dashboard'));
+            return redirect()->route('teacher.dashboard');
         }
         // Otherwise, check for superadmin, then admin, then student
         if ($user->isSuperAdmin()) {
-            return redirect()->intended(route('superadmin.dashboard'));
+            return redirect()->route('superadmin.dashboard');
         }
         if ($user->isAdmin()) {
-            return redirect()->intended(route('admin.dashboard'));
+            return redirect()->route('admin.dashboard');
         }
         if ($user->isStudent()) {
-            return redirect()->intended(route('dashboard'));
+            return redirect()->route('dashboard');
         }
         return redirect('/');
     }

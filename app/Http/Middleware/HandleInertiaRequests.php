@@ -32,19 +32,20 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        $user = $request->user();
+        $user = $request->user()?->loadMissing('roles:id,name', 'department:id,department_name,department_code');
 
-        // Build user data with department for admin users
-        $userData = $user;
-        if ($user && $user->role === 'admin') {
-            $userData = array_merge($user->toArray(), [
-                'department' => $user->department ? [
-                    'id' => $user->department->id,
-                    'name' => $user->department->department_name,
-                    'code' => $user->department->department_code,
-                ] : null,
-            ]);
-        }
+        // Build user data with explicit roles array and department for admin-capable users
+        $userData = $user ? array_merge($user->toArray(), [
+            'roles' => $user->roles->map(fn($role) => [
+                'id' => $role->id,
+                'name' => $role->name,
+            ])->values()->all(),
+            'department' => ($user->isAdmin() || $user->isSuperAdmin()) && $user->department ? [
+                'id' => $user->department->id,
+                'name' => $user->department->department_name,
+                'code' => $user->department->department_code,
+            ] : null,
+        ]) : null;
 
         return [
             ...parent::share($request),
@@ -81,7 +82,7 @@ class HandleInertiaRequests extends Middleware
         }
 
         // For students: get unread notifications with details
-        if ($user->role === 'student') {
+        if ($user->hasRole('student')) {
             $notifications = StudentNotification::where('user_id', $user->id)
                 ->with(['sender:id,first_name,last_name', 'intervention:id,type,status'])
                 ->orderBy('created_at', 'desc')
@@ -111,7 +112,7 @@ class HandleInertiaRequests extends Middleware
         }
 
         // For teachers: count pending/active interventions they created
-        if ($user->role === 'teacher') {
+        if ($user->hasRole('teacher')) {
             $enrollmentIds = Enrollment::whereHas('subject', function ($query) use ($user) {
                 $query->where('user_id', $user->id);
             })->pluck('id');

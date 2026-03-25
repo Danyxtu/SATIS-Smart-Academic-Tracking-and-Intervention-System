@@ -34,15 +34,25 @@ class UserController extends Controller
 
         $stats = [
             'totalUsers' => (clone $departmentUsersQuery)->count(),
-            'totalStudents' => (clone $departmentUsersQuery)->where('role', 'student')->count(),
-            'totalTeachers' => (clone $departmentUsersQuery)->where('role', 'teacher')->count(),
-            'totalAdmins' => (clone $departmentUsersQuery)->where('role', 'admin')->count(),
-            'recentUsers' => (clone $departmentUsersQuery)->latest()->take(5)->get(['id', 'first_name', 'last_name', 'email', 'role', 'created_at'])
+            'totalStudents' => (clone $departmentUsersQuery)
+                ->whereHas('roles', fn($q) => $q->where('name', 'student'))
+                ->count(),
+            'totalTeachers' => (clone $departmentUsersQuery)
+                ->whereHas('roles', fn($q) => $q->where('name', 'teacher'))
+                ->count(),
+            'totalAdmins' => (clone $departmentUsersQuery)
+                ->whereHas('roles', fn($q) => $q->where('name', 'admin'))
+                ->count(),
+            'recentUsers' => (clone $departmentUsersQuery)
+                ->with('roles:id,name')
+                ->latest()
+                ->take(5)
+                ->get(['id', 'first_name', 'last_name', 'email', 'created_at'])
                 ->map(fn($user) => [
                     'id' => $user->id,
-                    'name' => $user->first_name . ' ' . $user->last_name,
+                    'name' => trim($user->first_name . ' ' . $user->last_name),
                     'email' => $user->email,
-                    'role' => $user->role,
+                    'role' => $user->roles->pluck('name')->first(),
                     'created_at' => $user->created_at,
                 ]),
         ];
@@ -83,13 +93,15 @@ class UserController extends Controller
         $admin = Auth::user();
         $departmentId = $admin->department_id;
 
-        $query = User::query();
+        $query = User::query()->with('roles:id,name');
 
         // Scope to admin's department (teachers and students only)
         if ($departmentId) {
             $query->where(function ($q) use ($departmentId) {
                 $q->where('department_id', $departmentId)
-                    ->orWhere('role', 'student'); // Students may not have department
+                    ->orWhereHas('roles', function ($roleQuery) {
+                        $roleQuery->where('name', 'student');
+                    }); // Students may not have department
             });
         }
 
@@ -97,19 +109,24 @@ class UserController extends Controller
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
+                $q->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
         // Filter by role
         if ($request->filled('role') && $request->role !== 'all') {
-            $query->where('role', $request->role);
+            $query->whereHas('roles', function ($q) use ($request) {
+                $q->where('name', $request->role);
+            });
         }
 
         // Filter by section (for students)
         if ($request->filled('section') && $request->section !== 'all') {
-            $query->where('role', 'student')
+            $query->whereHas('roles', function ($q) {
+                $q->where('name', 'student');
+            })
                 ->whereHas('student', function ($q) use ($request) {
                     $q->where('section', $request->section);
                 });
@@ -120,12 +137,16 @@ class UserController extends Controller
         $sortDirection = $request->get('direction', 'desc');
 
         // Validate sort field
-        $allowedSortFields = ['name', 'email', 'role', 'created_at'];
+        $allowedSortFields = ['name', 'email', 'created_at'];
         if (!in_array($sortField, $allowedSortFields)) {
             $sortField = 'created_at';
         }
 
-        $query->orderBy($sortField, $sortDirection === 'asc' ? 'asc' : 'desc');
+        if ($sortField === 'name') {
+            $query->orderBy('first_name', $sortDirection === 'asc' ? 'asc' : 'desc');
+        } else {
+            $query->orderBy($sortField, $sortDirection === 'asc' ? 'asc' : 'desc');
+        }
 
         // Eager load student data with enrollments and subjects
         $query->with(['student.user', 'student']);
@@ -135,7 +156,9 @@ class UserController extends Controller
 
         // Transform users to include section and teacher info
         $users->getCollection()->transform(function ($user) {
-            if ($user->role === 'student' && $user->student) {
+            $user->role = $user->roles->pluck('name')->first();
+
+            if ($user->hasRole('student') && $user->student) {
                 $user->section = $user->student->section;
                 $user->grade_level = $user->student->grade_level;
                 $user->strand = $user->student->strand;
@@ -160,15 +183,17 @@ class UserController extends Controller
         if ($departmentId) {
             $roleCountsQuery->where(function ($q) use ($departmentId) {
                 $q->where('department_id', $departmentId)
-                    ->orWhere('role', 'student');
+                    ->orWhereHas('roles', function ($roleQuery) {
+                        $roleQuery->where('name', 'student');
+                    });
             });
         }
 
         $roleCounts = [
             'all' => (clone $roleCountsQuery)->count(),
-            'student' => (clone $roleCountsQuery)->where('role', 'student')->count(),
-            'teacher' => (clone $roleCountsQuery)->where('role', 'teacher')->count(),
-            'admin' => (clone $roleCountsQuery)->where('role', 'admin')->count(),
+            'student' => (clone $roleCountsQuery)->whereHas('roles', fn($q) => $q->where('name', 'student'))->count(),
+            'teacher' => (clone $roleCountsQuery)->whereHas('roles', fn($q) => $q->where('name', 'teacher'))->count(),
+            'admin' => (clone $roleCountsQuery)->whereHas('roles', fn($q) => $q->where('name', 'admin'))->count(),
         ];
 
         // Get unique sections for filter
@@ -465,7 +490,9 @@ class UserController extends Controller
             $query->whereHas('user', function ($q) use ($admin) {
                 $q->where(function ($q2) use ($admin) {
                     $q2->where('department_id', $admin->department_id)
-                        ->orWhere('role', 'student');
+                        ->orWhereHas('roles', function ($roleQuery) {
+                            $roleQuery->where('name', 'student');
+                        });
                 });
             });
         }
@@ -483,7 +510,9 @@ class UserController extends Controller
             $countsQuery->whereHas('user', function ($q) use ($admin) {
                 $q->where(function ($q2) use ($admin) {
                     $q2->where('department_id', $admin->department_id)
-                        ->orWhere('role', 'student');
+                        ->orWhereHas('roles', function ($roleQuery) {
+                            $roleQuery->where('name', 'student');
+                        });
                 });
             });
         }

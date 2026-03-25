@@ -8,12 +8,12 @@ export const adminRoutes = [
     },
     {
         name: "User Management",
-        path: "admin.teachers.index",
+        path: "admin.users.index",
         icon: Users,
     },
     {
         name: "Teacher Registration",
-        path: "admin.teachers-registration.index",
+        path: "admin.teacher-registrations.index",
         icon: UserPlus,
     },
     {

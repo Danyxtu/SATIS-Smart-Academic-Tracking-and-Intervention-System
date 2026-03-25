@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Role;
 use App\Models\TeacherRegistration;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -88,11 +89,15 @@ class TeacherRegistrationController extends Controller
             'last_name' => $registration->last_name,
             'email' => $registration->email,
             'password' => $registration->password, // Already hashed
-            'role' => 'teacher',
             'department_id' => $registration->department_id,
             'status' => 'active',
             'created_by' => $admin->id,
         ]);
+
+        $teacherRoleId = Role::where('name', 'teacher')->value('id');
+        if ($teacherRoleId) {
+            $user->roles()->sync([$teacherRoleId]);
+        }
 
         // Update registration status
         $registration->update([

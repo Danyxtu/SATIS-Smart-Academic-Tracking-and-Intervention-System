@@ -65,6 +65,7 @@ export default function CreateUserModal({ open, onClose, departments }) {
         email: "",
         password: "",
         role: "student",
+        teacher_authority: "teacher",
         department_id: "",
     });
 
@@ -155,11 +156,16 @@ export default function CreateUserModal({ open, onClose, departments }) {
                                                 type="button"
                                                 onClick={() => {
                                                     setData("role", role);
-                                                    if (role === "student")
+                                                    if (role === "student") {
                                                         setData(
                                                             "department_id",
                                                             "",
                                                         );
+                                                        setData(
+                                                            "teacher_authority",
+                                                            "teacher",
+                                                        );
+                                                    }
                                                 }}
                                                 className={`flex items-center gap-2.5 rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
                                                     active
@@ -265,6 +271,36 @@ export default function CreateUserModal({ open, onClose, departments }) {
                                     className={`w-full rounded-xl border bg-slate-50 px-3 py-2 text-sm focus:border-violet-500 focus:ring-violet-500 focus:bg-white transition-colors ${errors.email ? "border-rose-300 bg-rose-50" : "border-slate-200"}`}
                                 />
                             </Field>
+
+                            {isTeacher && (
+                                <Field
+                                    label="Teacher Authority"
+                                    icon={Shield}
+                                    required
+                                    error={errors.teacher_authority}
+                                >
+                                    <select
+                                        value={data.teacher_authority}
+                                        onChange={(e) =>
+                                            setData(
+                                                "teacher_authority",
+                                                e.target.value,
+                                            )
+                                        }
+                                        className={`w-full rounded-xl border bg-slate-50 px-3 py-2 text-sm focus:border-violet-500 focus:ring-violet-500 focus:bg-white transition-colors ${errors.teacher_authority ? "border-rose-300 bg-rose-50" : "border-slate-200"}`}
+                                    >
+                                        <option value="teacher">
+                                            Teacher Only
+                                        </option>
+                                        <option value="admin">
+                                            Teacher with Admin Authority
+                                        </option>
+                                        <option value="super_admin">
+                                            Teacher with Super Admin Authority
+                                        </option>
+                                    </select>
+                                </Field>
+                            )}
 
                             {isTeacher && (
                                 <Field

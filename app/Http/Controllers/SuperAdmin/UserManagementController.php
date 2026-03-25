@@ -90,6 +90,7 @@ class UserManagementController extends Controller
             'email'         => ['required', 'email', 'unique:users,email'],
             'password'      => ['required', Password::min(8)],
             'role'          => ['required', 'in:teacher,student'],
+            'teacher_authority' => ['nullable', 'in:teacher,admin,super_admin'],
             'department_id' => ['nullable', 'exists:departments,id'],
         ]);
 
@@ -97,7 +98,19 @@ class UserManagementController extends Controller
         if ($validated['role'] === 'teacher') {
             $request->validate([
                 'department_id' => ['required', 'exists:departments,id'],
+                'teacher_authority' => ['required', 'in:teacher,admin,super_admin'],
             ]);
+        }
+
+        if ($validated['role'] === 'teacher') {
+            $teacherAuthority = $validated['teacher_authority'] ?? 'teacher';
+            $assignedRoles = ['teacher'];
+
+            if (in_array($teacherAuthority, ['admin', 'super_admin'], true)) {
+                $assignedRoles[] = $teacherAuthority;
+            }
+        } else {
+            $assignedRoles = ['student'];
         }
 
         $user = User::create([
@@ -114,9 +127,9 @@ class UserManagementController extends Controller
             'created_by'           => $superAdmin->id,
         ]);
 
-        $roleId = Role::where('name', $validated['role'])->value('id');
-        if ($roleId) {
-            $user->roles()->sync([$roleId]);
+        $roleIds = Role::whereIn('name', $assignedRoles)->pluck('id')->all();
+        if (!empty($roleIds)) {
+            $user->roles()->sync($roleIds);
         }
 
         return redirect()->route('superadmin.users.index')
