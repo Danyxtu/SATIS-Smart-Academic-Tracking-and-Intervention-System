@@ -49,44 +49,63 @@ const COLOR_OPTIONS = [
 
 const GRADE_LEVEL_OPTIONS = ["Grade 11", "Grade 12"];
 
-const STRAND_OPTIONS = [
-    "Science, Technology, Engineering & Mathematics (STEM)",
-    "Accounting, Business & Management (ABM)",
-    "Humanities and Social Sciences (HUMSS)",
-    "HOME ECONOMICS (HE) HE1 Bread & Pastry Production IBBPI NC II (160 hrs.)",
-    "Cookery NC II (320 hrs.)",
-    "Food and Beverage Services [FBS] NC II (160 hrs.)",
-    "HE2 - Dressmaking NC II (320 hrs.)",
-    "Tailoring NC II (320 hrs.)",
-    "Caregiving NC II (640 hrs.)",
-    "AFA1 - Food (Fish) Processing [FFP] NC II (640 hrs.)",
-    "AFA2 - Aquaculture NC II (640 hrs.)",
-    "Computer System Servicing NC II (CSS) (640 hrs.)",
-    "ICT2 Technical Drafting NC II (320 hrs.)",
-    "Animation NC II (320 hrs.)",
-    "IA1 - Electrical Installation & Maintenance (EIM) NC II (640 hrs.)",
-];
+const parseSectionSuffix = (sectionValue, strandValue) => {
+    const section = String(sectionValue ?? "").trim();
+    const strand = String(strandValue ?? "").trim();
+
+    if (!section) return "";
+    if (!strand) return section;
+
+    const prefix = `${strand}-`;
+    if (section.toUpperCase().startsWith(prefix.toUpperCase())) {
+        return section.slice(prefix.length);
+    }
+
+    return section;
+};
 
 const AddNewClassModal = ({
     onClose,
     defaultSchoolYear,
     currentSemester = 1,
     initialFile = null,
+    mode = "create",
+    classData = null,
+    departments = [],
 }) => {
-    const { data, setData, post, processing, errors, reset, progress } =
+    const { data, setData, post, put, processing, errors, reset, progress } =
         useForm({
-            grade_level: "",
-            section: "",
-            subject_name: "",
-            color: "indigo",
-            school_year: defaultSchoolYear,
-            strand: "",
+            grade_level: classData?.name ?? "",
+            section: parseSectionSuffix(classData?.section, classData?.strand),
+            subject_name: classData?.subject_name ?? classData?.subject ?? "",
+            color: classData?.color ?? "indigo",
+            school_year: classData?.school_year ?? defaultSchoolYear,
+            strand: classData?.strand ?? "",
+            track: classData?.track ?? "",
             classlist: null,
         });
 
     useEffect(() => {
+        if (mode === "edit" && classData) {
+            setData({
+                grade_level: classData?.name ?? "",
+                section: parseSectionSuffix(
+                    classData?.section,
+                    classData?.strand,
+                ),
+                subject_name:
+                    classData?.subject_name ?? classData?.subject ?? "",
+                color: classData?.color ?? "indigo",
+                school_year: classData?.school_year ?? defaultSchoolYear,
+                strand: classData?.strand ?? "",
+                track: classData?.track ?? "",
+                classlist: null,
+            });
+            return;
+        }
+
         setData("school_year", defaultSchoolYear);
-    }, [defaultSchoolYear]);
+    }, [defaultSchoolYear, mode, classData]);
 
     useEffect(() => {
         if (initialFile) {
@@ -102,6 +121,10 @@ const AddNewClassModal = ({
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+        if (name === "section") {
+            setData("section", value.toUpperCase().replace(/[^A-Z]/g, ""));
+            return;
+        }
         setData(name, value);
     };
 
@@ -111,6 +134,16 @@ const AddNewClassModal = ({
 
     const handleSubmit = (e) => {
         e.preventDefault();
+
+        if (mode === "edit" && classData?.id) {
+            put(route("teacher.classes.update", classData.id), {
+                onSuccess: () => {
+                    handleClose();
+                },
+            });
+            return;
+        }
+
         post(route("teacher.classes.store"), {
             forceFormData: true,
             onSuccess: () => {
@@ -130,7 +163,9 @@ const AddNewClassModal = ({
                     <div className="flex justify-between items-center p-6 border-b">
                         <div>
                             <h3 className="text-xl font-bold text-gray-900">
-                                Add New Class
+                                {mode === "edit"
+                                    ? "Edit Class"
+                                    : "Add New Class"}
                             </h3>
                             <p className="text-sm text-gray-500 mt-1">
                                 Showing subjects for{" "}
@@ -179,7 +214,7 @@ const AddNewClassModal = ({
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">
-                                    Section
+                                    Section Letter
                                 </label>
                                 <input
                                     type="text"
@@ -188,7 +223,8 @@ const AddNewClassModal = ({
                                     className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
                                     value={data.section}
                                     onChange={handleChange}
-                                    placeholder="e.g., STEM-C"
+                                    placeholder="e.g., A"
+                                    maxLength={5}
                                 />
                                 {errors.section && (
                                     <p className="text-sm text-red-600 mt-1">
@@ -241,20 +277,25 @@ const AddNewClassModal = ({
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700">
-                                Strand / Program
+                                Strand (Department Code)
                             </label>
                             <select
                                 name="strand"
+                                required
                                 className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
                                 value={data.strand}
                                 onChange={handleChange}
                             >
                                 <option value="" disabled>
-                                    Select Strand
+                                    Select Department Code
                                 </option>
-                                {STRAND_OPTIONS.map((option) => (
-                                    <option key={option} value={option}>
-                                        {option}
+                                {departments.map((dept) => (
+                                    <option
+                                        key={dept.department_code}
+                                        value={dept.department_code}
+                                    >
+                                        {dept.department_code} -{" "}
+                                        {dept.department_name}
                                     </option>
                                 ))}
                             </select>
@@ -400,7 +441,13 @@ const AddNewClassModal = ({
                                     !data.subject_name
                                 }
                             >
-                                {processing ? "Creating…" : "Create Class"}
+                                {processing
+                                    ? mode === "edit"
+                                        ? "Saving…"
+                                        : "Creating…"
+                                    : mode === "edit"
+                                      ? "Save Changes"
+                                      : "Create Class"}
                             </button>
                         </div>
                     </div>

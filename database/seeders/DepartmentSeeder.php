@@ -14,69 +14,60 @@ class DepartmentSeeder extends Seeder
     {
         $departments = [
             [
-                'department_name' => 'Information and Communications Technology',
-                'department_code' => 'ICT',
-                'description' => 'Focuses on computer science, programming, and IT.',
-                'is_active' => true,
-            ],
-            [
-                'department_name' => 'Science, Technology, Engineering, and Mathematics',
+                'department_name' => 'STEM',
                 'department_code' => 'STEM',
-                'description' => 'Emphasizes science and math education.',
+                'description' => 'Science, Technology, Engineering, and Mathematics strand.',
                 'is_active' => true,
             ],
             [
-                'department_name' => 'Accountancy, Business, and Management',
+                'department_name' => 'ABM',
                 'department_code' => 'ABM',
-                'description' => 'Business, finance, and management studies.',
+                'description' => 'Accountancy, Business, and Management strand.',
                 'is_active' => true,
             ],
             [
-                'department_name' => 'Humanities and Social Sciences',
-                'department_code' => 'HUMSS',
-                'description' => 'Covers humanities, social sciences, and communication.',
+                'department_name' => 'HUMMS',
+                'department_code' => 'HUMMS',
+                'description' => 'Humanities and Social Sciences strand.',
                 'is_active' => true,
             ],
             [
-                'department_name' => 'General Academic Strand',
-                'department_code' => 'GAS',
-                'description' => 'General academic curriculum for undecided students.',
+                'department_name' => 'ICT-CSS',
+                'department_code' => 'ICT-CSS',
+                'description' => 'Information and Communications Technology - Computer Systems Servicing.',
                 'is_active' => true,
             ],
             [
-                'department_name' => 'Technical-Vocational-Livelihood',
-                'department_code' => 'TVL',
-                'description' => 'Technical and vocational skills training.',
+                'department_name' => 'ICT-CHS',
+                'department_code' => 'ICT-CHS',
+                'description' => 'Information and Communications Technology - Computer Hardware Servicing.',
                 'is_active' => true,
             ],
             [
-                'department_name' => 'Sports Track',
-                'department_code' => 'SPORTS',
-                'description' => 'Focuses on sports and physical education.',
+                'department_name' => 'ICT-Technical Drafting',
+                'department_code' => 'ICT-TD',
+                'description' => 'Information and Communications Technology - Technical Drafting.',
                 'is_active' => true,
             ],
             [
-                'department_name' => 'Arts and Design Track',
-                'department_code' => 'ARTS',
-                'description' => 'Covers visual arts, music, and design.',
+                'department_name' => 'Cookery',
+                'department_code' => 'COOKERY',
+                'description' => 'Technical-vocational strand focused on cookery skills.',
                 'is_active' => true,
             ],
             [
-                'department_name' => 'Maritime',
-                'department_code' => 'MARITIME',
-                'description' => 'Maritime studies and training.',
-                'is_active' => true,
-            ],
-            [
-                'department_name' => 'Health Allied',
-                'department_code' => 'HEALTH',
-                'description' => 'Health sciences and allied health programs.',
+                'department_name' => 'Embroidery',
+                'department_code' => 'EMBROIDERY',
+                'description' => 'Technical-vocational strand focused on embroidery skills.',
                 'is_active' => true,
             ],
         ];
 
         foreach ($departments as $dept) {
-            Department::create($dept);
+            Department::updateOrCreate(
+                ['department_code' => $dept['department_code']],
+                $dept
+            );
         }
     }
 }

@@ -25,6 +25,7 @@ import { useState } from "react";
 
 import DeleteConfirmModal from "@/Components/Superadmin/DeleteConfirmModal";
 import EditDepartmentModal from "@/Components/Superadmin/EditDepartmentModal";
+import CreateDepartmentModal from "@/Components/Superadmin/CreateDepartmentModal";
 
 export default function Index({ departments, filters }) {
     const [search, setSearch] = useState(filters.search || "");
@@ -34,6 +35,7 @@ export default function Index({ departments, filters }) {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [departmentToDelete, setDepartmentToDelete] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
+    const [showCreateModal, setShowCreateModal] = useState(false);
     const [departmentToEdit, setDepartmentToEdit] = useState(null);
     const [openMenuId, setOpenMenuId] = useState(null);
 
@@ -141,13 +143,14 @@ export default function Index({ departments, filters }) {
                                     {totalMembers} Members
                                 </span>
                             </div>
-                            <Link
-                                href={route("superadmin.departments.create")}
+                            <button
+                                type="button"
+                                onClick={() => setShowCreateModal(true)}
                                 className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-50 transition-colors"
                             >
                                 <Plus size={16} />
                                 Add Department
-                            </Link>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -246,13 +249,14 @@ export default function Index({ departments, filters }) {
                                     ? "Try adjusting your search or filter."
                                     : "Get started by creating your first department."}
                             </p>
-                            <Link
-                                href={route("superadmin.departments.create")}
+                            <button
+                                type="button"
+                                onClick={() => setShowCreateModal(true)}
                                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/25"
                             >
                                 <Plus size={16} />
                                 Create Department
-                            </Link>
+                            </button>
                         </div>
                     ) : (
                         <>
@@ -650,6 +654,11 @@ export default function Index({ departments, filters }) {
                     setDepartmentToEdit(null);
                 }}
                 department={departmentToEdit}
+                onSuccess={() => router.reload({ only: ["departments"] })}
+            />
+            <CreateDepartmentModal
+                isOpen={showCreateModal}
+                onClose={() => setShowCreateModal(false)}
                 onSuccess={() => router.reload({ only: ["departments"] })}
             />
         </>

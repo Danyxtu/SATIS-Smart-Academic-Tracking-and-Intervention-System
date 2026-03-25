@@ -96,7 +96,12 @@ const getRoleConfig = (role) =>
     };
 
 // ─── Main Index Page ──────────────────────────────────────────────────────────
-export default function Index({ users, departments, filters }) {
+export default function Index({
+    users,
+    departments,
+    filters,
+    roleCounts = {},
+}) {
     const [search, setSearch] = useState(filters?.search || "");
     const [roleFilter, setRoleFilter] = useState(filters?.role || "");
     const [createModal, setCreateModal] = useState(false);
@@ -155,9 +160,8 @@ export default function Index({ users, departments, filters }) {
     const userList = users?.data ?? users ?? [];
     const totalUsers = users?.total ?? userList.length;
 
-    // Count per role across ALL users (not just current page)
-    const roleCounts = userList.reduce((acc, u) => {
-        acc[u.role] = (acc[u.role] ?? 0) + 1;
+    const normalizedRoleCounts = ROLE_ORDER.reduce((acc, role) => {
+        acc[role] = Number(roleCounts?.[role] ?? 0);
         return acc;
     }, {});
 
@@ -199,7 +203,8 @@ export default function Index({ users, departments, filters }) {
                                     {totalUsers} Total
                                 </span>
                             </div>
-                            {Object.entries(roleCounts).map(([role, count]) => {
+                            {ROLE_ORDER.map((role) => {
+                                const count = normalizedRoleCounts[role] ?? 0;
                                 const cfg = getRoleConfig(role);
                                 const Icon = cfg.icon;
                                 return (
