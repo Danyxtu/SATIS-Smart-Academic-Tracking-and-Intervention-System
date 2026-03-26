@@ -65,7 +65,7 @@ export default function CreateUserModal({ open, onClose, departments }) {
         email: "",
         password: "",
         role: "student",
-        teacher_authority: "teacher",
+        assign_as_admin: false,
         department_id: "",
     });
 
@@ -162,8 +162,8 @@ export default function CreateUserModal({ open, onClose, departments }) {
                                                             "",
                                                         );
                                                         setData(
-                                                            "teacher_authority",
-                                                            "teacher",
+                                                            "assign_as_admin",
+                                                            false,
                                                         );
                                                     }
                                                 }}
@@ -274,36 +274,6 @@ export default function CreateUserModal({ open, onClose, departments }) {
 
                             {isTeacher && (
                                 <Field
-                                    label="Teacher Authority"
-                                    icon={Shield}
-                                    required
-                                    error={errors.teacher_authority}
-                                >
-                                    <select
-                                        value={data.teacher_authority}
-                                        onChange={(e) =>
-                                            setData(
-                                                "teacher_authority",
-                                                e.target.value,
-                                            )
-                                        }
-                                        className={`w-full rounded-xl border bg-slate-50 px-3 py-2 text-sm focus:border-violet-500 focus:ring-violet-500 focus:bg-white transition-colors ${errors.teacher_authority ? "border-rose-300 bg-rose-50" : "border-slate-200"}`}
-                                    >
-                                        <option value="teacher">
-                                            Teacher Only
-                                        </option>
-                                        <option value="admin">
-                                            Teacher with Admin Authority
-                                        </option>
-                                        <option value="super_admin">
-                                            Teacher with Super Admin Authority
-                                        </option>
-                                    </select>
-                                </Field>
-                            )}
-
-                            {isTeacher && (
-                                <Field
                                     label="Department"
                                     icon={Shield}
                                     required
@@ -336,6 +306,61 @@ export default function CreateUserModal({ open, onClose, departments }) {
                                     </select>
                                 </Field>
                             )}
+
+                            {isTeacher &&
+                                data.department_id &&
+                                (() => {
+                                    const selectedDepartment =
+                                        departments?.find(
+                                            (dept) =>
+                                                String(dept.id) ===
+                                                String(data.department_id),
+                                        ) ?? null;
+
+                                    return (
+                                        <div className="space-y-2">
+                                            {selectedDepartment?.admin_count ===
+                                                0 && (
+                                                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                                                    <p className="text-xs text-amber-800">
+                                                        No admin is currently
+                                                        assigned to the{" "}
+                                                        {
+                                                            selectedDepartment.department_name
+                                                        }{" "}
+                                                        department.
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                                                <label className="flex items-start gap-2.5 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={
+                                                            !!data.assign_as_admin
+                                                        }
+                                                        onChange={(e) =>
+                                                            setData(
+                                                                "assign_as_admin",
+                                                                e.target
+                                                                    .checked,
+                                                            )
+                                                        }
+                                                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                                                    />
+                                                    <span className="text-sm text-slate-700">
+                                                        Assign as an admin of
+                                                        the{" "}
+                                                        {selectedDepartment?.department_name ??
+                                                            "selected"}{" "}
+                                                        department
+                                                    </span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
 
                             <Field
                                 label="Password"

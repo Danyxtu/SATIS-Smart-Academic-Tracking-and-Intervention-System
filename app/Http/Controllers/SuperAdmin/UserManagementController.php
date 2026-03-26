@@ -70,7 +70,16 @@ class UserManagementController extends Controller
             }
         }
 
-        $departments = \App\Models\Department::orderBy('department_name')->get();
+        $departments = \App\Models\Department::query()
+            ->withCount([
+                'users as admin_count' => function ($query) {
+                    $query->whereHas('roles', function ($roleQuery) {
+                        $roleQuery->where('name', 'admin');
+                    });
+                },
+            ])
+            ->orderBy('department_name')
+            ->get();
 
         return Inertia::render('SuperAdmin/UserManagement/Index', [
             'users'       => $users,
@@ -90,7 +99,7 @@ class UserManagementController extends Controller
             'email'         => ['required', 'email', 'unique:users,email'],
             'password'      => ['required', Password::min(8)],
             'role'          => ['required', 'in:teacher,student'],
-            'teacher_authority' => ['nullable', 'in:teacher,admin,super_admin'],
+            'assign_as_admin' => ['nullable', 'boolean'],
             'department_id' => ['nullable', 'exists:departments,id'],
         ]);
 
@@ -98,16 +107,14 @@ class UserManagementController extends Controller
         if ($validated['role'] === 'teacher') {
             $request->validate([
                 'department_id' => ['required', 'exists:departments,id'],
-                'teacher_authority' => ['required', 'in:teacher,admin,super_admin'],
             ]);
         }
 
         if ($validated['role'] === 'teacher') {
-            $teacherAuthority = $validated['teacher_authority'] ?? 'teacher';
             $assignedRoles = ['teacher'];
 
-            if (in_array($teacherAuthority, ['admin', 'super_admin'], true)) {
-                $assignedRoles[] = $teacherAuthority;
+            if (!empty($validated['assign_as_admin'])) {
+                $assignedRoles[] = 'admin';
             }
         } else {
             $assignedRoles = ['student'];

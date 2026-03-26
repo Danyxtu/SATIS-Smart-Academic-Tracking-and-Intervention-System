@@ -19,8 +19,10 @@ class DepartmentController extends Controller
     {
         $this->authorize('manage-departments');
 
-        // $query = Department::withCount(['admins', 'teachers', 'students']);
-        $query = Department::query();
+        $query = Department::withCount(['admins', 'teachers', 'students'])
+            ->with([
+                'admins:id,first_name,middle_name,last_name,email,department_id',
+            ]);
 
         // Search
         if ($request->filled('search')) {
@@ -37,6 +39,20 @@ class DepartmentController extends Controller
         }
 
         $departments = $query->latest()->paginate(10)->withQueryString();
+
+        $departments->setCollection(
+            $departments->getCollection()->map(function (Department $department) {
+                $primaryAdmin = $department->admins->first();
+
+                $department->setAttribute('department_admin', $primaryAdmin ? [
+                    'id' => $primaryAdmin->id,
+                    'name' => $primaryAdmin->name,
+                    'email' => $primaryAdmin->email,
+                ] : null);
+
+                return $department;
+            })
+        );
 
         return Inertia::render('SuperAdmin/Departments/Index', [
             'departments' => $departments,

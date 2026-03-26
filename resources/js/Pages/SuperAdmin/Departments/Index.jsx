@@ -518,6 +518,32 @@ export default function Index({ departments, filters }) {
                                     </div>
                                 )}
 
+                                <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-500 mb-1">
+                                        Department Admin
+                                    </p>
+                                    {selectedDepartment.department_admin ? (
+                                        <>
+                                            <p className="text-sm font-semibold text-blue-900">
+                                                {
+                                                    selectedDepartment
+                                                        .department_admin.name
+                                                }
+                                            </p>
+                                            <p className="text-xs text-blue-700 mt-0.5">
+                                                {
+                                                    selectedDepartment
+                                                        .department_admin.email
+                                                }
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <p className="text-sm text-blue-700">
+                                            No admin assigned yet.
+                                        </p>
+                                    )}
+                                </div>
+
                                 {/* Stats */}
                                 <div className="grid grid-cols-3 gap-3">
                                     <div className="rounded-xl bg-violet-50 border border-violet-100 p-3 text-center">
