@@ -10,7 +10,6 @@ import ConfirmationDialog from "@/Components/ConfirmationDialog";
 import { Link, usePage, router } from "@inertiajs/react";
 import UserPicture from "../../assets/user.png";
 import {
-    Bell,
     Book,
     House,
     Lightbulb,

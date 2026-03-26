@@ -6,7 +6,6 @@ import getInitials from "@/utils/initialsHelper";
 import {
     X,
     ChevronRight,
-    ChevronDown,
     LogOut,
     CheckCircle,
     XCircle,
@@ -120,123 +119,39 @@ function NavItem({ item, section, onLinkClick }) {
     );
 }
 
-// ── Collapsible section ───────────────────────────────────────────
-// ── Collapsible section ───────────────────────────────────────────
-function NavSection({ section, onLinkClick }) {
-    // Auto-open if a child route is currently active
-    const hasActiveRoute = section.routes.some((item) => {
-        const dest = item.destination ?? item.path;
-        const activeCheck = item.activeCheck ?? dest;
-        return route().has(dest) && route().current(activeCheck);
-    });
+const sectionRoleMap = {
+    teacher: "teacher",
+    admin: "admin",
+    superadmin: "super_admin",
+};
 
-    const [isOpen, setIsOpen] = useState(hasActiveRoute);
-
-    // Check if user has the role for this section
-    const { auth } = usePage().props;
-    const userRoles = auth.user.roles?.map((r) => r.name) || [];
-    console.log("User roles:", userRoles);
-
-    // Map section keys to role names
-    const roleMapping = {
-        teacher: "teacher",
-        admin: "admin",
-        superadmin: "super_admin",
-    };
-
-    // Check if user has this section's role
-    const requiredRole = roleMapping[section.key];
-    const isDisabled = !userRoles.includes(requiredRole);
-
-    return (
-        <div>
-            {/* Toggle header */}
-            <button
-                onClick={isDisabled ? undefined : () => setIsOpen((v) => !v)}
-                className={`
-                    w-full flex items-center gap-2 px-2 py-1.5 rounded-lg
-                    transition-all duration-150
-                    ${isOpen ? section.headerActive : section.headerHover}
-                    ${isDisabled ? "opacity-50 cursor-not-allowed hover:bg-slate-800/40" : ""}
-                `}
-                disabled={isDisabled}
-                style={isDisabled ? { pointerEvents: "auto" } : {}}
-                title={
-                    isDisabled
-                        ? "You cannot access this role's portal"
-                        : undefined
-                }
-            >
-                {/* Dot */}
-                <div
-                    className={`w-1.5 h-1.5 rounded-full flex-shrink-0 transition-opacity ${
-                        section.indicator
-                    } ${isOpen ? "opacity-100" : "opacity-50"}`}
-                />
-
-                {/* Label + Stop sign if disabled */}
-                <span
-                    className={`text-[9px] font-bold uppercase tracking-widest flex-1 text-left transition-colors flex items-center gap-1 ${
-                        isOpen
-                            ? section.activeLabelColor
-                            : `${section.labelColor} opacity-70`
-                    }`}
-                >
-                    {section.label}
-                    {isDisabled && (
-                        <span
-                            className="ml-1 text-slate-400 group-hover:text-red-400"
-                            style={{ fontSize: "1.1em" }}
-                            role="img"
-                            aria-label="No entry"
-                        >
-                            &#128683;
-                        </span>
-                    )}
-                </span>
-
-                {/* Chevron rotates on open */}
-                <ChevronDown
-                    size={11}
-                    className={`flex-shrink-0 transition-transform duration-200 ${
-                        isOpen
-                            ? `rotate-0 ${section.activeLabelColor}`
-                            : `-rotate-90 ${section.labelColor} opacity-50`
-                    }`}
-                />
-            </button>
-
-            {/* Items — CSS max-height transition */}
-            <div
-                className={`overflow-hidden transition-all duration-200 ease-in-out ${
-                    isOpen && !isDisabled
-                        ? "max-h-96 opacity-100 mt-0.5"
-                        : "max-h-0 opacity-0"
-                }`}
-            >
-                <div className="space-y-0.5 pl-1">
-                    {!isDisabled &&
-                        section.routes.map((item) => (
-                            <NavItem
-                                key={item.label ?? item.name}
-                                item={item}
-                                section={section}
-                                onLinkClick={onLinkClick}
-                            />
-                        ))}
-                </div>
-            </div>
-        </div>
-    );
-}
+const dashboardRoleConfig = {
+    teacher: {
+        label: "Teacher",
+        routeName: "teacher.dashboard",
+        sectionKey: "teacher",
+    },
+    admin: {
+        label: "Admin",
+        routeName: "admin.dashboard",
+        sectionKey: "admin",
+    },
+    super_admin: {
+        label: "Super admin",
+        routeName: "superadmin.dashboard",
+        sectionKey: "superadmin",
+    },
+};
 
 // ── Sidebar content ───────────────────────────────────────────────
 
 function SidebarContent({ initials, fullName, onLinkClick, onLogout }) {
     const { auth } = usePage().props;
     const userRoles = auth.user.roles?.map((r) => r.name) || [];
+    const visibleSections = ROLE_SECTIONS.filter((section) =>
+        userRoles.includes(sectionRoleMap[section.key]),
+    );
 
-    // Map role names to display labels and colors
     const roleConfig = {
         teacher: {
             label: "Teacher",
@@ -252,12 +167,78 @@ function SidebarContent({ initials, fullName, onLinkClick, onLogout }) {
         },
     };
 
+    const getItemLabel = (item) =>
+        (item.label ?? item.name ?? "").toLowerCase();
+    const isDashboardItem = (item) => getItemLabel(item) === "dashboard";
+
+    const availableDashboardRoles = userRoles
+        .map((role) => dashboardRoleConfig[role])
+        .filter((config) => config && route().has(config.routeName));
+
+    const activeDashboardRole =
+        availableDashboardRoles.find((config) =>
+            route().current(config.routeName),
+        ) ??
+        availableDashboardRoles[0] ??
+        null;
+
+    const dashboardEntryByActiveRole = activeDashboardRole
+        ? visibleSections
+              .filter(
+                  (section) => section.key === activeDashboardRole.sectionKey,
+              )
+              .map((section) => ({
+                  section,
+                  item: section.routes.find((routeItem) =>
+                      isDashboardItem(routeItem),
+                  ),
+              }))
+              .find((entry) => entry.item)
+        : null;
+
+    const dashboardEntry =
+        dashboardEntryByActiveRole ??
+        visibleSections
+            .map((section) => ({
+                section,
+                item: section.routes.find((routeItem) =>
+                    isDashboardItem(routeItem),
+                ),
+            }))
+            .find((entry) => entry.item);
+
+    const teachingEntries = visibleSections
+        .filter((section) => section.key === "teacher")
+        .flatMap((section) =>
+            section.routes
+                .filter((item) => !isDashboardItem(item))
+                .map((item) => ({ section, item })),
+        );
+
+    const administrationEntries = visibleSections
+        .filter(
+            (section) =>
+                section.key === "admin" || section.key === "superadmin",
+        )
+        .flatMap((section) =>
+            section.routes
+                .filter((item) => !isDashboardItem(item))
+                .map((item) => ({ section, item })),
+        );
+
+    const profileLinkRoute =
+        activeDashboardRole?.routeName ?? dashboardEntry?.item?.path;
+
     return (
         <div className="flex flex-col h-full text-xs">
             {/* Brand / User */}
             <div className="flex flex-col gap-2 px-4 py-3 border-b border-slate-700/60">
                 <Link
-                    href={route("superadmin.dashboard")}
+                    href={
+                        profileLinkRoute && route().has(profileLinkRoute)
+                            ? route(profileLinkRoute)
+                            : "#"
+                    }
                     className="flex items-center gap-3 min-w-0"
                     onClick={onLinkClick}
                 >
@@ -273,33 +254,104 @@ function SidebarContent({ initials, fullName, onLinkClick, onLogout }) {
                     </div>
                 </Link>
 
-                {/* Role Badges */}
-                <div className="flex flex-wrap gap-1 pl-0.5">
-                    {userRoles.map((role) => {
-                        const config = roleConfig[role];
-                        if (!config) return null;
+                {/* Role badges + dashboard switcher */}
+                <div className="space-y-2 pl-0.5">
+                    <div className="flex flex-wrap gap-1">
+                        {userRoles.map((role) => {
+                            const config = roleConfig[role];
+                            if (!config) return null;
 
-                        return (
-                            <span
-                                key={role}
-                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-semibold uppercase tracking-wide ring-1 ${config.color}`}
-                            >
-                                {config.label}
-                            </span>
-                        );
-                    })}
+                            return (
+                                <span
+                                    key={role}
+                                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-semibold uppercase tracking-wide ring-1 ${config.color}`}
+                                >
+                                    {config.label}
+                                </span>
+                            );
+                        })}
+                    </div>
+
+                    {availableDashboardRoles.length > 1 && (
+                        <div className="inline-flex w-full rounded-md border border-slate-700/80 bg-slate-800/60 p-0.5">
+                            {availableDashboardRoles.map((dashboardRole) => {
+                                const isActiveRole = route().current(
+                                    dashboardRole.routeName,
+                                );
+
+                                return (
+                                    <Link
+                                        key={dashboardRole.routeName}
+                                        href={route(dashboardRole.routeName)}
+                                        onClick={onLinkClick}
+                                        className={`flex-1 rounded px-2 py-1 text-center text-[10px] font-semibold transition-colors ${
+                                            isActiveRole
+                                                ? "bg-blue-600 text-white"
+                                                : "text-slate-300 hover:bg-slate-700/70"
+                                        }`}
+                                    >
+                                        {dashboardRole.label}
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {/* Collapsible nav sections */}
-            <nav className="flex-1 px-2 py-2 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-                {ROLE_SECTIONS.map((section) => (
-                    <NavSection
-                        key={section.key}
-                        section={section}
-                        onLinkClick={onLinkClick}
-                    />
-                ))}
+            {/* Grouped nav items */}
+            <nav className="flex-1 px-2 py-2 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                {!!dashboardEntry && (
+                    <div>
+                        <p className="px-2 pb-1 text-[9px] font-bold uppercase tracking-widest text-slate-500">
+                            Main
+                        </p>
+                        <div className="space-y-0.5">
+                            <NavItem
+                                key={`main-${dashboardEntry.section.key}-${dashboardEntry.item.label ?? dashboardEntry.item.name}`}
+                                item={dashboardEntry.item}
+                                section={dashboardEntry.section}
+                                onLinkClick={onLinkClick}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {teachingEntries.length > 0 && (
+                    <div className="mt-3">
+                        <p className="px-2 pb-1 text-[9px] font-bold uppercase tracking-widest text-slate-500">
+                            Teaching
+                        </p>
+                        <div className="space-y-0.5">
+                            {teachingEntries.map(({ section, item }) => (
+                                <NavItem
+                                    key={`teaching-${section.key}-${item.label ?? item.name}`}
+                                    item={item}
+                                    section={section}
+                                    onLinkClick={onLinkClick}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {administrationEntries.length > 0 && (
+                    <div className="mt-3">
+                        <p className="px-2 pb-1 text-[9px] font-bold uppercase tracking-widest text-slate-500">
+                            Administration
+                        </p>
+                        <div className="space-y-0.5">
+                            {administrationEntries.map(({ section, item }) => (
+                                <NavItem
+                                    key={`administration-${section.key}-${item.label ?? item.name}`}
+                                    item={item}
+                                    section={section}
+                                    onLinkClick={onLinkClick}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
             </nav>
 
             {/* Logout */}
