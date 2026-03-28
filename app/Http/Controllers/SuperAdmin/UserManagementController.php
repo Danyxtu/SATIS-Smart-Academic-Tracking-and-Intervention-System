@@ -17,7 +17,7 @@ class UserManagementController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::query()->with('roles:id,name');
+        $query = User::query()->with('roles:id,name', 'department:id,department_name,department_code');
         $countQuery = User::query();
 
         if ($search = $request->input('search')) {
@@ -45,7 +45,9 @@ class UserManagementController extends Controller
             ->withQueryString();
 
         $users->getCollection()->transform(function (User $user) {
-            $user->setAttribute('role', $user->roles->pluck('name')->first());
+            $roleNames = $user->roles->pluck('name')->all();
+            $user->setAttribute('role', $roleNames[0] ?? null);
+            $user->setAttribute('roles_list', $roleNames);
             return $user;
         });
 
@@ -102,13 +104,6 @@ class UserManagementController extends Controller
             'assign_as_admin' => ['nullable', 'boolean'],
             'department_id' => ['nullable', 'exists:departments,id'],
         ]);
-
-        // Teachers must have a department
-        if ($validated['role'] === 'teacher') {
-            $request->validate([
-                'department_id' => ['required', 'exists:departments,id'],
-            ]);
-        }
 
         if ($validated['role'] === 'teacher') {
             $assignedRoles = ['teacher'];

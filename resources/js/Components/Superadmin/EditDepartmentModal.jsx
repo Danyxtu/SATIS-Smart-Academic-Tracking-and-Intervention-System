@@ -8,49 +8,85 @@ import {
     Save,
     CheckCircle,
     Users,
-    GraduationCap,
+    Search,
     UserCog,
+    Shield,
 } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
 
-/**
- * EditDepartmentModal
- *
- * A reusable modal for editing a department inline (no full-page navigation).
- *
- * Props:
- * - isOpen       {boolean}        - Controls visibility of the modal
- * - onClose      {function}       - Called when the modal should close
- * - department   {object|null}    - The department object to edit
- * - onSuccess    {function}       - Optional: called after a successful save
- *
- * Usage example:
- *   <EditDepartmentModal
- *     isOpen={showEditModal}
- *     onClose={() => setShowEditModal(false)}
- *     department={selectedDepartment}
- *     onSuccess={() => router.reload({ only: ["departments"] })}
- *   />
- */
+function FieldError({ error }) {
+    if (!error) return null;
+    return (
+        <p className="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+            <Info size={12} /> {error}
+        </p>
+    );
+}
+
 export default function EditDepartmentModal({
     isOpen,
     onClose,
     department,
     onSuccess,
 }) {
+    const [tab, setTab] = useState("info");
+    const [teachers, setTeachers] = useState([]);
+    const [teacherSearch, setTeacherSearch] = useState("");
+    const [loadingTeachers, setLoadingTeachers] = useState(false);
+
     const { data, setData, put, processing, errors, reset, clearErrors } =
         useForm({
-            department_name: department?.name || "",
-            department_code: department?.code || "",
-            description: department?.description || "",
-            is_active: department?.is_active ?? true,
+            department_name: "",
+            department_code: "",
+            description: "",
+            is_active: true,
+            teacher_ids: [],
+            admin_id: "",
         });
 
-    // Sync form when department changes (e.g. opening a different dept)
-    // We do this by key-ing the modal on department?.id in the parent,
-    // but also guard here so stale data never slips through.
+    // Populate form + fetch teachers when department changes
+    useEffect(() => {
+        if (!isOpen || !department) return;
+
+        setData({
+            department_name: department.name || "",
+            department_code: department.code || "",
+            description: department.description || "",
+            is_active: department.is_active ?? true,
+            teacher_ids: [],
+            admin_id: "",
+        });
+        setTab("info");
+        setTeacherSearch("");
+        setTeachers([]);
+    }, [isOpen, department?.id]);
+
+    // Fetch teachers when switching to teachers tab
+    useEffect(() => {
+        if (tab !== "teachers" || !department?.id || teachers.length > 0) return;
+        setLoadingTeachers(true);
+        fetch(route("superadmin.departments.teachers", department.id))
+            .then((r) => r.json())
+            .then(({ teachers: list, admin_id }) => {
+                setTeachers(list);
+                const currentIds = list
+                    .filter((t) => t.department_id === department.id)
+                    .map((t) => t.id);
+                setData((prev) => ({
+                    ...prev,
+                    teacher_ids: currentIds,
+                    admin_id: admin_id ? String(admin_id) : "",
+                }));
+            })
+            .finally(() => setLoadingTeachers(false));
+    }, [tab, department?.id]);
+
     const handleClose = () => {
         clearErrors();
         reset();
+        setTab("info");
+        setTeachers([]);
+        setTeacherSearch("");
         onClose();
     };
 
@@ -65,254 +101,278 @@ export default function EditDepartmentModal({
         });
     };
 
+    const toggleTeacher = (id) => {
+        const next = data.teacher_ids.includes(id)
+            ? data.teacher_ids.filter((t) => t !== id)
+            : [...data.teacher_ids, id];
+        setData("teacher_ids", next);
+        // clear admin if deselected
+        if (!next.includes(id) && String(data.admin_id) === String(id)) {
+            setData("admin_id", "");
+        }
+    };
+
+    const filteredTeachers = useMemo(
+        () =>
+            teachers.filter((t) => {
+                const full =
+                    `${t.first_name} ${t.middle_name ?? ""} ${t.last_name} ${t.email}`.toLowerCase();
+                return full.includes(teacherSearch.toLowerCase());
+            }),
+        [teachers, teacherSearch],
+    );
+
+    const selectedTeachers = teachers.filter((t) =>
+        data.teacher_ids.includes(t.id),
+    );
+
     if (!isOpen || !department) return null;
 
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto">
-            {/* Backdrop */}
             <div
-                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
                 onClick={handleClose}
             />
-
-            {/* Modal */}
             <div className="flex min-h-full items-center justify-center p-4">
-                <div className="relative w-full max-w-2xl transform rounded-2xl bg-white shadow-2xl transition-all">
-                    {/* ── Header ─────────────────────────────────────────── */}
-                    <div className="relative overflow-hidden rounded-t-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-7">
+                <div className="relative w-full max-w-lg transform rounded-2xl bg-white shadow-2xl">
+                    {/* Header */}
+                    <div className="relative overflow-hidden rounded-t-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5">
                         <div className="absolute top-0 right-0 -mt-10 -mr-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
-                        <div className="absolute bottom-0 left-0 -mb-6 -ml-6 h-24 w-24 rounded-full bg-white/10 blur-xl" />
-
-                        {/* Close */}
                         <button
                             type="button"
                             onClick={handleClose}
                             disabled={processing}
-                            className="absolute top-3 right-3 rounded-xl p-3 text-white/80 hover:bg-white/20 hover:text-white transition-colors disabled:opacity-50"
+                            className="absolute top-3 right-3 rounded-xl p-2 text-white/80 hover:bg-white/20 hover:text-white transition-colors disabled:opacity-50"
                         >
-                            <X size={20} />
+                            <X size={18} />
                         </button>
-
-                        <div className="relative flex items-center gap-4">
-                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
-                                <Building2 className="h-7 w-7 text-white" />
+                        <div className="relative flex items-center gap-3">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
+                                <Building2 className="h-6 w-6 text-white" />
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold text-white">
+                                <h2 className="text-lg font-bold text-white">
                                     Edit Department
                                 </h2>
-                                <p className="text-sm text-blue-100 mt-0.5">
-                                    Update department information
+                                <p className="text-xs text-blue-100 mt-0.5 truncate max-w-xs">
+                                    {department.name}
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    {/* ── Form body ───────────────────────────────────────── */}
+                    {/* Tabs */}
+                    <div className="flex border-b border-slate-100 px-6 pt-3 gap-1">
+                        {[
+                            { key: "info", label: "Department Info", icon: Building2 },
+                            { key: "teachers", label: "Teachers & Admin", icon: Users },
+                        ].map(({ key, label, icon: Icon }) => (
+                            <button
+                                key={key}
+                                type="button"
+                                onClick={() => setTab(key)}
+                                className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all -mb-px ${
+                                    tab === key
+                                        ? "border-blue-600 text-blue-600"
+                                        : "border-transparent text-slate-500 hover:text-slate-700"
+                                }`}
+                            >
+                                <Icon size={13} />
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+
                     <form onSubmit={handleSubmit}>
-                        <div className="p-6 space-y-5 max-h-[60vh] overflow-y-auto">
-                            {/* Department Name */}
-                            <div>
-                                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
-                                    <Building2
-                                        size={14}
-                                        className="text-slate-400"
-                                    />
-                                    Department Name
-                                    <span className="text-rose-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={data.department_name}
-                                    onChange={(e) =>
-                                        setData(
-                                            "department_name",
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="e.g., Information and Communications Technology"
-                                    className={`w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors ${
-                                        errors.department_name
-                                            ? "border-rose-300 bg-rose-50/50 focus:border-rose-400 focus:ring-rose-400"
-                                            : ""
-                                    }`}
-                                />
-                                {errors.department_name && (
-                                    <p className="mt-2 text-sm text-rose-600 flex items-center gap-1">
-                                        <Info size={14} />
-                                        {errors.department_name}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Department Code */}
-                            <div>
-                                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
-                                    <Hash
-                                        size={14}
-                                        className="text-slate-400"
-                                    />
-                                    Department Code
-                                    <span className="text-rose-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={data.department_code}
-                                    onChange={(e) =>
-                                        setData(
-                                            "department_code",
-                                            e.target.value.toUpperCase(),
-                                        )
-                                    }
-                                    placeholder="e.g., ICT"
-                                    className={`w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors ${
-                                        errors.department_code
-                                            ? "border-rose-300 bg-rose-50/50 focus:border-rose-400 focus:ring-rose-400"
-                                            : ""
-                                    }`}
-                                />
-                                {errors.department_code && (
-                                    <p className="mt-2 text-sm text-rose-600 flex items-center gap-1">
-                                        <Info size={14} />
-                                        {errors.department_code}
-                                    </p>
-                                )}
-                                <p className="mt-2 text-xs text-slate-400">
-                                    Short unique identifier (e.g., ICT, STEM,
-                                    ABM)
-                                </p>
-                            </div>
-
-                            {/* Description */}
-                            <div>
-                                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
-                                    <FileText
-                                        size={14}
-                                        className="text-slate-400"
-                                    />
-                                    Description
-                                </label>
-                                <textarea
-                                    value={data.description}
-                                    onChange={(e) =>
-                                        setData("description", e.target.value)
-                                    }
-                                    rows={3}
-                                    placeholder="Brief description of the department..."
-                                    className={`w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors resize-none ${
-                                        errors.description
-                                            ? "border-rose-300 bg-rose-50/50 focus:border-rose-400 focus:ring-rose-400"
-                                            : ""
-                                    }`}
-                                />
-                                {errors.description && (
-                                    <p className="mt-2 text-sm text-rose-600 flex items-center gap-1">
-                                        <Info size={14} />
-                                        {errors.description}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Active Status Toggle */}
-                            <div className="rounded-xl bg-slate-50 p-4 border border-slate-100">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div
-                                            className={`h-10 w-10 rounded-lg flex items-center justify-center transition-colors ${
-                                                data.is_active
-                                                    ? "bg-emerald-100"
-                                                    : "bg-slate-200"
-                                            }`}
-                                        >
-                                            <CheckCircle
-                                                size={20}
-                                                className={
-                                                    data.is_active
-                                                        ? "text-emerald-600"
-                                                        : "text-slate-400"
-                                                }
-                                            />
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-slate-900 text-sm">
-                                                Active Department
-                                            </p>
-                                            <p className="text-xs text-slate-500">
-                                                Enable or disable this
-                                                department
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <label className="relative inline-flex cursor-pointer items-center">
+                        <div className="px-6 py-5 space-y-4 max-h-[52vh] overflow-y-auto">
+                            {/* ── Tab: Department Info ── */}
+                            {tab === "info" && (
+                                <>
+                                    <div>
+                                        <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1.5">
+                                            <Building2 size={13} className="text-slate-400" />
+                                            Department Name
+                                            <span className="text-rose-500">*</span>
+                                        </label>
                                         <input
-                                            type="checkbox"
-                                            checked={data.is_active}
-                                            onChange={(e) =>
-                                                setData(
-                                                    "is_active",
-                                                    e.target.checked,
-                                                )
-                                            }
-                                            className="peer sr-only"
+                                            type="text"
+                                            value={data.department_name}
+                                            onChange={(e) => setData("department_name", e.target.value)}
+                                            placeholder="e.g., Information and Communications Technology"
+                                            className={`w-full rounded-xl border bg-slate-50 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors ${errors.department_name ? "border-rose-300 bg-rose-50" : "border-slate-200"}`}
                                         />
-                                        <div className="peer h-6 w-11 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white" />
-                                    </label>
-                                </div>
-                            </div>
+                                        <FieldError error={errors.department_name} />
+                                    </div>
 
-                            {/* Stats (read-only) */}
-                            <div className="rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 p-4 border border-slate-200">
-                                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
-                                    Department Statistics
-                                </h3>
-                                <div className="grid grid-cols-3 gap-3">
-                                    <div className="bg-white rounded-xl p-3 border border-slate-100 text-center">
-                                        <div className="h-8 w-8 mx-auto rounded-lg bg-violet-100 flex items-center justify-center mb-1.5">
-                                            <UserCog
-                                                size={16}
-                                                className="text-violet-600"
-                                            />
-                                        </div>
-                                        <p className="text-xl font-bold text-slate-900">
-                                            {department.admins_count || 0}
-                                        </p>
-                                        <p className="text-xs text-slate-500 font-medium">
-                                            Admins
+                                    <div>
+                                        <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1.5">
+                                            <Hash size={13} className="text-slate-400" />
+                                            Department Code
+                                            <span className="text-rose-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={data.department_code}
+                                            onChange={(e) => setData("department_code", e.target.value.toUpperCase())}
+                                            placeholder="e.g., ICT"
+                                            className={`w-full rounded-xl border bg-slate-50 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors ${errors.department_code ? "border-rose-300 bg-rose-50" : "border-slate-200"}`}
+                                        />
+                                        <FieldError error={errors.department_code} />
+                                        <p className="mt-1 text-xs text-slate-400">
+                                            Short unique identifier (e.g., ICT, STEM, ABM)
                                         </p>
                                     </div>
-                                    <div className="bg-white rounded-xl p-3 border border-slate-100 text-center">
-                                        <div className="h-8 w-8 mx-auto rounded-lg bg-emerald-100 flex items-center justify-center mb-1.5">
-                                            <Users
-                                                size={16}
-                                                className="text-emerald-600"
-                                            />
-                                        </div>
-                                        <p className="text-xl font-bold text-slate-900">
-                                            {department.teachers_count || 0}
-                                        </p>
-                                        <p className="text-xs text-slate-500 font-medium">
-                                            Teachers
-                                        </p>
+
+                                    <div>
+                                        <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1.5">
+                                            <FileText size={13} className="text-slate-400" />
+                                            Description
+                                            <span className="text-slate-400 text-xs">(Optional)</span>
+                                        </label>
+                                        <textarea
+                                            value={data.description}
+                                            onChange={(e) => setData("description", e.target.value)}
+                                            rows={3}
+                                            placeholder="Brief description of the department..."
+                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors resize-none"
+                                        />
                                     </div>
-                                    <div className="bg-white rounded-xl p-3 border border-slate-100 text-center">
-                                        <div className="h-8 w-8 mx-auto rounded-lg bg-amber-100 flex items-center justify-center mb-1.5">
-                                            <GraduationCap
-                                                size={16}
-                                                className="text-amber-600"
-                                            />
+
+                                    <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`h-9 w-9 rounded-lg flex items-center justify-center transition-colors ${data.is_active ? "bg-emerald-100" : "bg-slate-200"}`}>
+                                                    <CheckCircle size={18} className={data.is_active ? "text-emerald-600" : "text-slate-400"} />
+                                                </div>
+                                                <div>
+                                                    <p className="font-medium text-slate-900 text-sm">Active Department</p>
+                                                    <p className="text-xs text-slate-500">Enable or disable this department</p>
+                                                </div>
+                                            </div>
+                                            <label className="relative inline-flex cursor-pointer items-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={data.is_active}
+                                                    onChange={(e) => setData("is_active", e.target.checked)}
+                                                    className="peer sr-only"
+                                                />
+                                                <div className="peer h-6 w-11 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white" />
+                                            </label>
                                         </div>
-                                        <p className="text-xl font-bold text-slate-900">
-                                            {department.students_count || 0}
-                                        </p>
-                                        <p className="text-xs text-slate-500 font-medium">
-                                            Students
-                                        </p>
                                     </div>
-                                </div>
-                            </div>
+                                </>
+                            )}
+
+                            {/* ── Tab: Teachers & Admin ── */}
+                            {tab === "teachers" && (
+                                <>
+                                    <p className="text-xs text-slate-500">
+                                        Manage teachers in this department. Teachers with no department or already in this department are shown.
+                                    </p>
+
+                                    {/* Search */}
+                                    <div className="relative">
+                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search teachers..."
+                                            value={teacherSearch}
+                                            onChange={(e) => setTeacherSearch(e.target.value)}
+                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors"
+                                        />
+                                    </div>
+
+                                    {loadingTeachers ? (
+                                        <div className="flex items-center justify-center py-8 text-slate-400 text-sm">
+                                            Loading teachers...
+                                        </div>
+                                    ) : teachers.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+                                            <div className="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center">
+                                                <Users size={22} className="text-slate-300" />
+                                            </div>
+                                            <p className="text-sm font-medium text-slate-700">No teachers available</p>
+                                            <p className="text-xs text-slate-400">All teachers are assigned to other departments.</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {/* Teacher list */}
+                                            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                                                {filteredTeachers.length === 0 ? (
+                                                    <p className="text-center text-xs text-slate-400 py-4">
+                                                        No teachers match your search.
+                                                    </p>
+                                                ) : (
+                                                    filteredTeachers.map((t) => {
+                                                        const checked = data.teacher_ids.includes(t.id);
+                                                        const isAdmin = String(data.admin_id) === String(t.id);
+                                                        return (
+                                                            <label
+                                                                key={t.id}
+                                                                className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-all ${checked ? "border-blue-300 bg-blue-50" : "border-slate-200 bg-slate-50 hover:border-slate-300"}`}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={checked}
+                                                                    onChange={() => toggleTeacher(t.id)}
+                                                                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                                />
+                                                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-bold">
+                                                                    {t.first_name[0]}{t.last_name[0]}
+                                                                </div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <p className="text-sm font-medium text-slate-800 truncate">
+                                                                        {t.first_name}{t.middle_name ? ` ${t.middle_name}` : ""} {t.last_name}
+                                                                    </p>
+                                                                    <p className="text-xs text-slate-400 truncate">{t.email}</p>
+                                                                </div>
+                                                                {isAdmin && (
+                                                                    <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700 shrink-0">
+                                                                        <Shield size={9} /> Admin
+                                                                    </span>
+                                                                )}
+                                                            </label>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+
+                                            {/* Assign admin — only when teachers are selected */}
+                                            {selectedTeachers.length > 0 && (
+                                                <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 space-y-2">
+                                                    <p className="flex items-center gap-2 text-xs font-semibold text-violet-700">
+                                                        <UserCog size={13} />
+                                                        Department Admin
+                                                        <span className="font-normal text-violet-500">(only one allowed)</span>
+                                                    </p>
+                                                    <select
+                                                        value={data.admin_id}
+                                                        onChange={(e) => setData("admin_id", e.target.value)}
+                                                        className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm focus:border-violet-500 focus:ring-violet-500 transition-colors"
+                                                    >
+                                                        <option value="">— No admin —</option>
+                                                        {selectedTeachers.map((t) => (
+                                                            <option key={t.id} value={t.id}>
+                                                                {t.first_name} {t.last_name}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    {data.admin_id && (
+                                                        <p className="text-xs text-violet-600 flex items-center gap-1">
+                                                            <Info size={11} />
+                                                            Any previous admin in this department will be demoted to teacher.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </>
+                            )}
                         </div>
 
-                        {/* ── Footer ──────────────────────────────────────── */}
+                        {/* Footer */}
                         <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4 bg-slate-50/50 rounded-b-2xl">
                             <button
                                 type="button"
@@ -329,31 +389,15 @@ export default function EditDepartmentModal({
                             >
                                 {processing ? (
                                     <>
-                                        <svg
-                                            className="animate-spin h-4 w-4 text-white"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <circle
-                                                className="opacity-25"
-                                                cx="12"
-                                                cy="12"
-                                                r="10"
-                                                stroke="currentColor"
-                                                strokeWidth="4"
-                                            />
-                                            <path
-                                                className="opacity-75"
-                                                fill="currentColor"
-                                                d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z"
-                                            />
+                                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z" />
                                         </svg>
                                         Saving...
                                     </>
                                 ) : (
                                     <>
-                                        <Save size={15} />
+                                        <Save size={14} />
                                         Save Changes
                                     </>
                                 )}

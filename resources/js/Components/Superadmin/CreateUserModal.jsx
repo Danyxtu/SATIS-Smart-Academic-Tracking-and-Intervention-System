@@ -276,7 +276,7 @@ export default function CreateUserModal({ open, onClose, departments }) {
                                 <Field
                                     label="Department"
                                     icon={Shield}
-                                    required
+                                    optional
                                     error={errors.department_id}
                                 >
                                     <select

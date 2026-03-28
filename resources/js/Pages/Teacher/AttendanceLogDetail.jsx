@@ -1,9 +1,8 @@
 import React, { useRef, useState, useMemo } from "react";
-import TeacherLayout from "../../Layouts/TeacherLayout";
+import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
 import { Head, Link } from "@inertiajs/react";
 import {
     ArrowLeft,
-    Download,
     FileSpreadsheet,
     FileText,
     Check,
@@ -165,7 +164,7 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
     };
 
     return (
-        <TeacherLayout>
+        <>
             <Head title={`Attendance - ${section.label}`} />
 
             {/* --- Breadcrumbs --- */}
@@ -518,8 +517,12 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
                     )}
                 </div>
             </div>
-        </TeacherLayout>
+        </>
     );
 };
+
+AttendanceLogDetail.layout = (page) => (
+    <SuperAdminLayout>{page}</SuperAdminLayout>
+);
 
 export default AttendanceLogDetail;

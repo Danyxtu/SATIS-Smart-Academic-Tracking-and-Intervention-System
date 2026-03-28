@@ -30,6 +30,10 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
         // Department Management
         Route::get('/departments', [DepartmentController::class, 'index'])
             ->name('departments.index');
+        Route::get('/departments/unassigned-teachers', [DepartmentController::class, 'unassignedTeachers'])
+            ->name('departments.unassigned-teachers');
+        Route::get('/departments/{department}/teachers', [DepartmentController::class, 'departmentTeachers'])
+            ->name('departments.teachers');
         Route::post('/departments', [DepartmentController::class, 'store'])
             ->name('departments.store');
         Route::get('/departments/{department}', [DepartmentController::class, 'show'])

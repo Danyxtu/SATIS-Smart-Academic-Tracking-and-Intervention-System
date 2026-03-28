@@ -4,6 +4,8 @@ namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Department;
+use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -22,6 +24,7 @@ class DepartmentController extends Controller
         $query = Department::withCount(['admins', 'teachers', 'students'])
             ->with([
                 'admins:id,first_name,middle_name,last_name,email,department_id',
+                'teachers:id,first_name,middle_name,last_name,email,department_id',
             ]);
 
         // Search
@@ -50,6 +53,15 @@ class DepartmentController extends Controller
                     'email' => $primaryAdmin->email,
                 ] : null);
 
+                $department->setAttribute('department_teachers', $department->teachers->map(fn($t) => [
+                    'id'          => $t->id,
+                    'first_name'  => $t->first_name,
+                    'middle_name' => $t->middle_name,
+                    'last_name'   => $t->last_name,
+                    'email'       => $t->email,
+                    'is_admin'    => $department->admins->contains('id', $t->id),
+                ])->values());
+
                 return $department;
             })
         );
@@ -58,6 +70,19 @@ class DepartmentController extends Controller
             'departments' => $departments,
             'filters' => $request->only(['search', 'status']),
         ]);
+    }
+
+    /**
+     * Return teachers with no department assigned.
+     */
+    public function unassignedTeachers(): JsonResponse
+    {
+        $teachers = User::whereNull('department_id')
+            ->whereHas('roles', fn($q) => $q->where('name', 'teacher'))
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'middle_name', 'last_name', 'email']);
+
+        return response()->json($teachers);
     }
 
     /**
@@ -71,9 +96,31 @@ class DepartmentController extends Controller
             'department_code' => ['required', 'string', 'max:50', 'unique:departments,department_code'],
             'description' => ['nullable', 'string', 'max:1000'],
             'is_active' => ['boolean'],
+            'teacher_ids'   => ['nullable', 'array'],
+            'teacher_ids.*' => ['exists:users,id'],
+            'admin_id'      => ['nullable', 'exists:users,id'],
         ]);
 
-        Department::create($validated);
+        $department = Department::create([
+            'department_name' => $validated['department_name'],
+            'department_code' => $validated['department_code'],
+            'description'     => $validated['description'] ?? null,
+            'is_active'       => $validated['is_active'] ?? true,
+        ]);
+
+        $teacherIds = $validated['teacher_ids'] ?? [];
+        if (!empty($teacherIds)) {
+            User::whereIn('id', $teacherIds)
+                ->update(['department_id' => $department->id]);
+        }
+
+        if (!empty($validated['admin_id'])) {
+            $adminUser = User::find($validated['admin_id']);
+            if ($adminUser) {
+                $adminUser->update(['department_id' => $department->id]);
+                $adminUser->syncRolesByName(['teacher', 'admin']);
+            }
+        }
 
         return redirect()
             ->route('superadmin.departments.index')
@@ -142,6 +189,29 @@ class DepartmentController extends Controller
     }
 
     /**
+     * Return teachers belonging to a department + unassigned teachers (for edit modal).
+     */
+    public function departmentTeachers(Department $department): JsonResponse
+    {
+        $teachers = User::where(function ($q) use ($department) {
+                $q->where('department_id', $department->id)
+                  ->orWhereNull('department_id');
+            })
+            ->whereHas('roles', fn($q) => $q->where('name', 'teacher'))
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'middle_name', 'last_name', 'email', 'department_id']);
+
+        $adminId = User::where('department_id', $department->id)
+            ->whereHas('roles', fn($q) => $q->where('name', 'admin'))
+            ->value('id');
+
+        return response()->json([
+            'teachers' => $teachers,
+            'admin_id' => $adminId,
+        ]);
+    }
+
+    /**
      * Update the specified department.
      */
     public function update(Request $request, Department $department): RedirectResponse
@@ -151,11 +221,44 @@ class DepartmentController extends Controller
         $validated = $request->validate([
             'department_name' => ['required', 'string', 'max:255'],
             'department_code' => ['required', 'string', 'max:50', Rule::unique('departments')->ignore($department->id)],
-            'description' => ['nullable', 'string', 'max:1000'],
-            'is_active' => ['boolean'],
+            'description'     => ['nullable', 'string', 'max:1000'],
+            'is_active'       => ['boolean'],
+            'teacher_ids'     => ['nullable', 'array'],
+            'teacher_ids.*'   => ['exists:users,id'],
+            'admin_id'        => ['nullable', 'exists:users,id'],
         ]);
 
-        $department->update($validated);
+        $department->update([
+            'department_name' => $validated['department_name'],
+            'department_code' => $validated['department_code'],
+            'description'     => $validated['description'] ?? null,
+            'is_active'       => $validated['is_active'] ?? true,
+        ]);
+
+        // Unassign all current teachers from this department first
+        User::where('department_id', $department->id)
+            ->whereHas('roles', fn($q) => $q->where('name', 'teacher'))
+            ->update(['department_id' => null]);
+
+        // Re-assign selected teachers
+        $teacherIds = $validated['teacher_ids'] ?? [];
+        if (!empty($teacherIds)) {
+            User::whereIn('id', $teacherIds)->update(['department_id' => $department->id]);
+        }
+
+        // Strip admin role from any existing admin in this department
+        $currentAdmins = User::where('department_id', $department->id)
+            ->whereHas('roles', fn($q) => $q->where('name', 'admin'))
+            ->get();
+        foreach ($currentAdmins as $oldAdmin) {
+            $oldAdmin->syncRolesByName(['teacher']);
+        }
+
+        // Assign new admin (must be one of the selected teachers)
+        if (!empty($validated['admin_id']) && in_array((int) $validated['admin_id'], array_map('intval', $teacherIds))) {
+            $adminUser = User::find($validated['admin_id']);
+            $adminUser?->syncRolesByName(['teacher', 'admin']);
+        }
 
         return redirect()
             ->route('superadmin.departments.index')

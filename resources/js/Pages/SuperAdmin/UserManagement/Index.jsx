@@ -26,6 +26,7 @@ import {
 import { useState } from "react";
 import EditUserModal from "@/Components/Superadmin/EditUserModal";
 import CreateUserModal from "@/Components/Superadmin/CreateUserModal";
+import UserViewModal from "@/Components/Superadmin/UserViewModal";
 
 // ─── Role config ─────────────────────────────────────────────────────────────
 const ROLE_CONFIG = {
@@ -105,6 +106,7 @@ export default function Index({
     const [search, setSearch] = useState(filters?.search || "");
     const [roleFilter, setRoleFilter] = useState(filters?.role || "");
     const [createModal, setCreateModal] = useState(false);
+    const [viewModal, setViewModal] = useState({ open: false, user: null });
     const [editModal, setEditModal] = useState({ open: false, user: null });
     const [deleteModal, setDeleteModal] = useState({
         open: false,
@@ -394,7 +396,8 @@ export default function Index({
                                     return (
                                         <div
                                             key={user.id}
-                                            className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-50/60 transition-colors group"
+                                            onClick={() => setViewModal({ open: true, user })}
+                                            className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-50/60 transition-colors group cursor-pointer"
                                         >
                                             {/* User */}
                                             <div className="col-span-4 flex items-center gap-3 min-w-0">
@@ -415,13 +418,20 @@ export default function Index({
                                             </div>
 
                                             {/* Role */}
-                                            <div className="col-span-2">
-                                                <span
-                                                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold ${cfg.badgeClass}`}
-                                                >
-                                                    <Icon size={11} />
-                                                    {cfg.label}
-                                                </span>
+                                            <div className="col-span-2 flex flex-wrap gap-1">
+                                                {(user.roles_list ?? [user.role]).map((r) => {
+                                                    const rc = getRoleConfig(r);
+                                                    const RIcon = rc.icon;
+                                                    return (
+                                                        <span
+                                                            key={r}
+                                                            className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-semibold ${rc.badgeClass}`}
+                                                        >
+                                                            <RIcon size={10} />
+                                                            {rc.label}
+                                                        </span>
+                                                    );
+                                                })}
                                             </div>
 
                                             {/* Email */}
@@ -454,7 +464,10 @@ export default function Index({
                                             </div>
 
                                             {/* Actions */}
-                                            <div className="col-span-1 flex items-center justify-end gap-1">
+                                            <div
+                                                className="col-span-1 flex items-center justify-end gap-1"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
                                                 <button
                                                     onClick={() =>
                                                         setEditModal({
@@ -549,6 +562,18 @@ export default function Index({
                 </div>
             </div>
 
+            {/* ── View Modal ───────────────────────────────────────────── */}
+            <UserViewModal
+                open={viewModal.open}
+                onClose={() => setViewModal({ open: false, user: null })}
+                user={viewModal.user}
+                onEdit={(u) => setEditModal({ open: true, user: u })}
+                onDelete={(u) => {
+                    setDeleteModal({ open: true, user: u, password: "" });
+                    setDeleteErrors({});
+                }}
+            />
+
             {/* ── Create Modal ─────────────────────────────────────────── */}
             <CreateUserModal
                 open={createModal}
@@ -613,10 +638,7 @@ export default function Index({
                                 </div>
 
                                 {(() => {
-                                    const cfg = getRoleConfig(
-                                        deleteModal.user?.role,
-                                    );
-                                    const Icon = cfg.icon;
+                                    const cfg = getRoleConfig(deleteModal.user?.role);
                                     return (
                                         <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
                                             <div
@@ -627,20 +649,24 @@ export default function Index({
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <p className="font-semibold text-slate-800 text-sm">
-                                                    {getFullName(
-                                                        deleteModal.user,
-                                                    )}
+                                                    {getFullName(deleteModal.user)}
                                                 </p>
                                                 <p className="text-xs text-slate-500 truncate">
                                                     {deleteModal.user?.email}
                                                 </p>
                                             </div>
-                                            <span
-                                                className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-semibold ${cfg.badgeClass}`}
-                                            >
-                                                <Icon size={10} />
-                                                {cfg.label}
-                                            </span>
+                                            <div className="flex flex-wrap gap-1 justify-end">
+                                                {(deleteModal.user?.roles_list ?? [deleteModal.user?.role]).map((r) => {
+                                                    const rc = getRoleConfig(r);
+                                                    const RIcon = rc.icon;
+                                                    return (
+                                                        <span key={r} className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-semibold ${rc.badgeClass}`}>
+                                                            <RIcon size={10} />
+                                                            {rc.label}
+                                                        </span>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
                                     );
                                 })()}
