@@ -26,14 +26,19 @@ class SettingsController extends Controller
             $schoolYearOptions[] = "{$i}-" . ($i + 1);
         }
 
+        $currentSY  = $settings['current_school_year'] ?? date('Y') . '-' . (date('Y') + 1);
+        $currentSem = $settings['current_semester'] ?? '1';
+        $lockKey    = "grades_locked_{$currentSY}_{$currentSem}";
+
         return Inertia::render('SuperAdmin/Settings/Index', [
             'settings' => [
-                'current_school_year' => $settings['current_school_year'] ?? date('Y') . '-' . (date('Y') + 1),
-                'current_semester' => $settings['current_semester'] ?? '1',
-                'enrollment_open' => filter_var($settings['enrollment_open'] ?? 'true', FILTER_VALIDATE_BOOLEAN),
+                'current_school_year'  => $currentSY,
+                'current_semester'     => $currentSem,
+                'enrollment_open'      => filter_var($settings['enrollment_open'] ?? 'true', FILTER_VALIDATE_BOOLEAN),
                 'grade_submission_open' => filter_var($settings['grade_submission_open'] ?? 'true', FILTER_VALIDATE_BOOLEAN),
-                'school_name' => $settings['school_name'] ?? '',
-                'school_address' => $settings['school_address'] ?? '',
+                'grades_locked'        => filter_var($settings[$lockKey] ?? 'false', FILTER_VALIDATE_BOOLEAN),
+                'school_name'          => $settings['school_name'] ?? '',
+                'school_address'       => $settings['school_address'] ?? '',
             ],
             'schoolYears' => $schoolYearOptions,
         ]);
@@ -115,18 +120,22 @@ class SettingsController extends Controller
             'grades_locked' => ['required', 'boolean'],
         ]);
 
+        $schoolYear = SystemSetting::getCurrentSchoolYear();
+        $semester   = SystemSetting::getCurrentSemester();
+        $key        = "grades_locked_{$schoolYear}_{$semester}";
+
         SystemSetting::updateOrCreate(
-            ['key' => 'grades_locked'],
+            ['key' => $key],
             [
-                'value' => $validated['grades_locked'] ? 'true' : 'false',
-                'type' => 'boolean',
-                'group' => 'academic',
-                'description' => 'Whether grade editing is locked',
-                'updated_by' => Auth::id(),
+                'value'       => $validated['grades_locked'] ? 'true' : 'false',
+                'type'        => 'boolean',
+                'group'       => 'academic',
+                'description' => "Whether grade editing is locked for {$schoolYear} semester {$semester}",
+                'updated_by'  => Auth::id(),
             ]
         );
 
-        cache()->forget('system_setting_grades_locked');
+        cache()->forget("system_setting_{$key}");
 
         $status = $validated['grades_locked'] ? 'locked' : 'unlocked';
         return back()->with('success', "Grades {$status} successfully.");

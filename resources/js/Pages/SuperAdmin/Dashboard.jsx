@@ -93,8 +93,8 @@ export default function Dashboard({
             shadow: "shadow-violet-500/30",
         },
         {
-            name: "System Settings",
-            description: "Configure global settings",
+            name: "School Settings",
+            description: "Configure school-wide settings",
             icon: Settings,
             href: route("superadmin.settings.index"),
             color: "from-slate-600 to-slate-700",

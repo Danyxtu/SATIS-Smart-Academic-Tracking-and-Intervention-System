@@ -51,7 +51,7 @@ export default function Index({ settings, schoolYears }) {
 
     return (
         <>
-            <Head title="System Settings" />
+            <Head title="School Settings" />
 
             <div className="space-y-6">
                 {/* ── Page Header ──────────────────────────────────────── */}
@@ -67,7 +67,7 @@ export default function Index({ settings, schoolYears }) {
                             </div>
                             <div>
                                 <h1 className="text-2xl font-bold text-white tracking-tight">
-                                    System Settings
+                                    School Settings
                                 </h1>
                                 <p className="text-slate-400 text-sm mt-0.5">
                                     Configure global school system parameters
@@ -586,7 +586,7 @@ export default function Index({ settings, schoolYears }) {
                                 ) : (
                                     <>
                                         <Save size={16} />
-                                        Save Settings
+                                        Save School Settings
                                     </>
                                 )}
                             </button>

@@ -17,7 +17,7 @@ export const superAdminRoutes = [
         icon: Users,
     },
     {
-        label: "Settings",
+        label: "School Settings",
         path: "superadmin.settings.index",
         icon: Settings,
     },

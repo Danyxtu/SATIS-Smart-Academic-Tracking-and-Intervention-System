@@ -183,9 +183,6 @@ class ClassesServices
 
     private function currentSchoolYear(): string
     {
-        $year = now()->year;
-        $next = $year + 1;
-
-        return sprintf('%d-%d', $year, $next);
+        return SystemSetting::getCurrentSchoolYear();
     }
 }
