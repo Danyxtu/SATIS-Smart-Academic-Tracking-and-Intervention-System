@@ -298,8 +298,12 @@ export default function Edit({ status, student, pendingPasswordReset }) {
     };
 
     // Get the full name for display
+    const userFullName = [user.first_name, user.middle_name, user.last_name]
+        .filter(Boolean)
+        .join(" ");
+
     const fullName =
-        isStudent && student ? student.student_name || "" : user.name;
+        isStudent && student ? student.student_name || "" : userFullName;
 
     // Determine the correct layout based on user role
     const Layout = isTeacher
@@ -455,7 +459,7 @@ export default function Edit({ status, student, pendingPasswordReset }) {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                                 <InfoField
                                     label="Display Name"
-                                    value={user.name}
+                                    value={userFullName}
                                     icon={User}
                                 />
                                 <InfoField

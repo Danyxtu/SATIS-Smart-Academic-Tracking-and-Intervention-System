@@ -200,7 +200,7 @@ class User extends Authenticatable
      */
     public function scopeRole($query, string $role)
     {
-        return $query->where('role', $role);
+        return $query->whereHas('roles', fn($q) => $q->where('name', $role));
     }
 
     /**

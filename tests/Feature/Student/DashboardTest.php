@@ -15,7 +15,7 @@ class DashboardTest extends TestCase
     public function test_student_can_access_dashboard(): void
     {
         /** @var User $student */
-        $student = User::factory()->create(['role' => 'student']);
+        $student = $this->createUserWithRole('student');
 
         $response = $this->actingAs($student)->get('/dashboard');
 
@@ -41,7 +41,7 @@ class DashboardTest extends TestCase
     public function test_teacher_cannot_access_student_dashboard(): void
     {
         /** @var User $teacher */
-        $teacher = User::factory()->create(['role' => 'teacher']);
+        $teacher = $this->createUserWithRole('teacher');
 
         $response = $this->actingAs($teacher)->get('/dashboard');
 
@@ -54,7 +54,7 @@ class DashboardTest extends TestCase
     public function test_dashboard_displays_enrolled_subjects(): void
     {
         /** @var User $student */
-        $student = User::factory()->create(['role' => 'student']);
+        $student = $this->createUserWithRole('student');
         $subject = Subject::factory()->create();
         Enrollment::factory()->for($student)->for($subject)->create();
 
@@ -72,7 +72,7 @@ class DashboardTest extends TestCase
     public function test_student_can_mark_notification_as_read(): void
     {
         /** @var User $student */
-        $student = User::factory()->create(['role' => 'student']);
+        $student = $this->createUserWithRole('student');
         $notification = \App\Models\StudentNotification::factory()
             ->for($student)
             ->create(['read_at' => null]);
@@ -90,7 +90,7 @@ class DashboardTest extends TestCase
     public function test_student_can_view_analytics(): void
     {
         /** @var User $student */
-        $student = User::factory()->create(['role' => 'student']);
+        $student = $this->createUserWithRole('student');
         $subject = Subject::factory()->create();
         $enrollment = Enrollment::factory()->for($student)->for($subject)->create();
 

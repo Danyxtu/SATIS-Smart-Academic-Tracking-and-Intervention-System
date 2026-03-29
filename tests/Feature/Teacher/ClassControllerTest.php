@@ -5,19 +5,22 @@ use App\Models\Student;
 use App\Models\Subject;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
-// Use $this->actingAs() within pest test closures
+use function Pest\Laravel\actingAs;
+use function Pest\Laravel\post;
 
 test('teacher can add a student and receives the generated password in session', function () {
-    $teacher = User::factory()->create(['role' => 'teacher']);
+    /** @var User $teacher */
+    $teacher = User::factory()->create();
+    $teacher->syncRolesByName(['teacher']);
 
     $subject = Subject::factory()->create(["user_id" => $teacher->id]);
 
-    $response = $this
-        ->actingAs($teacher)
-        ->post(route('teacher.classes.students.store', $subject->id), [
-            'name' => 'Test Student',
-            'lrn' => '111222333444',
-        ]);
+    actingAs($teacher);
+
+    $response = post(route('teacher.classes.students.store', $subject->id), [
+        'name' => 'Test Student',
+        'lrn' => '111222333444',
+    ]);
 
     $response->assertSessionHas('new_student_password');
 
@@ -31,18 +34,20 @@ test('teacher can add a student and receives the generated password in session',
 });
 
 test('teacher can upload a classlist and import summary contains generated passwords for newly-created users', function () {
-    $teacher = User::factory()->create(['role' => 'teacher']);
+    /** @var User $teacher */
+    $teacher = User::factory()->create();
+    $teacher->syncRolesByName(['teacher']);
 
     $subject = Subject::factory()->create(["user_id" => $teacher->id]);
 
     $csv = "Student Name,LRN\nNew Student,123456789012\nAnother Student,987654321098\n";
     $file = UploadedFile::fake()->createWithContent('classlist.csv', $csv);
 
-    $response = $this
-        ->actingAs($teacher)
-        ->post(route('teacher.classes.classlist.store', $subject->id), [
-            'classlist' => $file,
-        ]);
+    actingAs($teacher);
+
+    $response = post(route('teacher.classes.classlist.store', $subject->id), [
+        'classlist' => $file,
+    ]);
 
     $response->assertSessionHas('import_summary');
 
@@ -58,14 +63,16 @@ test('teacher can upload a classlist and import summary contains generated passw
 });
 
 test('teacher can start quarter 2 for a class', function () {
-    $teacher = User::factory()->create(['role' => 'teacher']);
+    /** @var User $teacher */
+    $teacher = User::factory()->create();
+    $teacher->syncRolesByName(['teacher']);
     $subject = Subject::factory()->create(['user_id' => $teacher->id, 'current_quarter' => 1]);
 
-    $response = $this
-        ->actingAs($teacher)
-        ->post(route('teacher.classes.quarter.start', $subject->id), [
-            'quarter' => 2,
-        ]);
+    actingAs($teacher);
+
+    $response = post(route('teacher.classes.quarter.start', $subject->id), [
+        'quarter' => 2,
+    ]);
 
     $response->assertSessionHas('success');
     $this->assertEquals(2, $subject->fresh()->current_quarter);

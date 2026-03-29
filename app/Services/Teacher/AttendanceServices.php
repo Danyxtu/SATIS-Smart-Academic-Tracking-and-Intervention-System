@@ -176,13 +176,22 @@ class AttendanceServices
         ];
     }
 
-    public function createAttendance($data, $teacher)
+    /**
+     * Persist attendance rows for a class and date.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public function createAttendance(array $data, $teacher): array
     {
         $subjectTeacher = SubjectTeacher::with('enrollments')->findOrFail($data['classId']);
 
         // Ensure the teacher owns this subject-teacher assignment
         if ($subjectTeacher->teacher_id !== $teacher->id) {
-            return response()->json(['message' => 'Unauthorized to modify attendance for this class.'], 403);
+            return [
+                'status' => 403,
+                'message' => 'Unauthorized to modify attendance for this class.',
+            ];
         }
 
         $date = $data['date'];
@@ -190,10 +199,11 @@ class AttendanceServices
 
         // Check if the date is a Sunday (0 = Sunday in PHP)
         if ((int)$dateObj->format('w') === 0) {
-            return response()->json([
+            return [
+                'status' => 422,
                 'message' => 'Cannot take attendance on Sunday. Classes are not held on Sundays.',
-                'is_sunday' => true
-            ], 422);
+                'is_sunday' => true,
+            ];
         }
 
         // Check if attendance already exists for this class on this date
@@ -203,10 +213,11 @@ class AttendanceServices
             })->exists();
 
         if ($existingAttendance) {
-            return response()->json([
+            return [
+                'status' => 422,
                 'message' => 'Attendance has already been recorded for this class on ' . $date . '. You can only save attendance once per day.',
-                'already_saved' => true
-            ], 422);
+                'already_saved' => true,
+            ];
         }
 
         foreach ($data['students'] as $s) {
@@ -225,6 +236,7 @@ class AttendanceServices
         }
 
         return [
+            'status' => 200,
             'message' => 'Attendance saved successfully!',
         ];
     }

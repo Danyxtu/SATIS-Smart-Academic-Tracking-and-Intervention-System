@@ -10,7 +10,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -25,7 +24,7 @@ class ProfileController extends Controller
         $student = null;
 
         // If user is a student, get their student profile data
-        if ($user->role === 'student') {
+        if ($user->hasRole('student')) {
             $student = Student::where('user_id', $user->id)->first();
         }
 
@@ -59,26 +58,16 @@ class ProfileController extends Controller
     /**
      * Update the user's profile information.
      */
-    public function update(Request $request): RedirectResponse
+    public function update(ProfileUpdateRequest $request): RedirectResponse
     {
         $user = $request->user();
-
-        // Validate user fields
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
-            // Student-specific fields (optional)
-            'student_name' => ['nullable', 'string', 'max:255'],
-            'lrn' => ['nullable', 'string', 'max:20'],
-            'grade_level' => ['nullable', 'string', 'max:50'],
-            'section' => ['nullable', 'string', 'max:50'],
-            'strand' => ['nullable', 'string', 'max:100'],
-            'track' => ['nullable', 'string', 'max:100'],
-        ]);
+        $validated = $request->validated();
 
         // Update user
         $user->fill([
-            'name' => $validated['name'],
+            'first_name' => $validated['first_name'],
+            'last_name' => $validated['last_name'],
+            'middle_name' => $validated['middle_name'] ?? null,
             'email' => $validated['email'],
         ]);
 
@@ -89,7 +78,7 @@ class ProfileController extends Controller
         $user->save();
 
         // Update student profile if user is a student
-        if ($user->role === 'student') {
+        if ($user->hasRole('student')) {
             $student = Student::where('user_id', $user->id)->first();
 
             if ($student) {

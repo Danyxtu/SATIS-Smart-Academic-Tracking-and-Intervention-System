@@ -1,25 +1,463 @@
-import { Head, useForm } from "@inertiajs/react";
+import { Head, useForm, router } from "@inertiajs/react";
+import axios from "axios";
 import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import { useState } from "react";
 import {
     Settings,
     Save,
     Calendar,
     GraduationCap,
-    Clock,
     Info,
     School,
     MapPin,
     CheckCircle,
     Sparkles,
-    Shield,
     BookOpen,
-    ToggleLeft,
     AlertCircle,
-    ChevronRight,
     Zap,
+    RotateCcw,
+    AlertTriangle,
+    X,
+    Trash2,
 } from "lucide-react";
 
+function NewSchoolYearModal({ currentSY, onClose }) {
+    const [newSY, setNewSY] = useState("");
+    const [confirm, setConfirm] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState("");
+    const [progressStep, setProgressStep] = useState("idle");
+    const [progressPercent, setProgressPercent] = useState(0);
+
+    const parseSchoolYear = (value) => {
+        const match = String(value || "")
+            .trim()
+            .match(/^(\d{4})-(\d{4})$/);
+        if (!match) {
+            return null;
+        }
+
+        return {
+            startYear: Number(match[1]),
+            endYear: Number(match[2]),
+        };
+    };
+
+    const parsedCurrentSY = parseSchoolYear(currentSY);
+    const expectedNextSY = parsedCurrentSY
+        ? `${parsedCurrentSY.startYear + 1}-${parsedCurrentSY.endYear + 1}`
+        : "";
+    const suggestedSY =
+        expectedNextSY ||
+        `${new Date().getFullYear() + 1}-${new Date().getFullYear() + 2}`;
+
+    const trimmedNewSY = newSY.trim();
+    const trimmedConfirm = confirm.trim();
+    const parsedNewSY = parseSchoolYear(trimmedNewSY);
+
+    const hasValidFormat = Boolean(parsedNewSY);
+    const hasConsecutiveYears =
+        Boolean(parsedNewSY) &&
+        parsedNewSY.endYear === parsedNewSY.startYear + 1;
+    const matchesExpectedNext =
+        expectedNextSY.length === 0 || trimmedNewSY === expectedNextSY;
+    const hasMatchingConfirmation =
+        trimmedNewSY.length > 0 && trimmedConfirm === trimmedNewSY;
+
+    const validationMessage = !trimmedNewSY
+        ? "Enter a school year in YYYY-YYYY format."
+        : !hasValidFormat
+          ? "School year must follow YYYY-YYYY format."
+          : !hasConsecutiveYears
+            ? "School year must be consecutive (e.g., 2026-2027)."
+            : !matchesExpectedNext
+              ? `Next school year must be ${expectedNextSY}.`
+              : !hasMatchingConfirmation
+                ? "Confirmation must exactly match the new school year."
+                : "";
+
+    const isValid =
+        hasValidFormat &&
+        hasConsecutiveYears &&
+        matchesExpectedNext &&
+        hasMatchingConfirmation;
+
+    const isArchiving = submitting && progressStep === "archiving";
+    const isCreating = submitting && progressStep === "creating";
+
+    const getFirstErrorMessage = (errorsBag, fallbackMessage) => {
+        if (!errorsBag || typeof errorsBag !== "object") {
+            return fallbackMessage;
+        }
+
+        const firstEntry = Object.values(errorsBag)[0];
+        if (Array.isArray(firstEntry) && firstEntry.length > 0) {
+            return String(firstEntry[0]);
+        }
+
+        if (typeof firstEntry === "string") {
+            return firstEntry;
+        }
+
+        return fallbackMessage;
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!isValid) {
+            setError(validationMessage || "Please fix validation errors.");
+            return;
+        }
+
+        setError("");
+        setSubmitting(true);
+        setProgressStep("archiving");
+        setProgressPercent(35);
+
+        try {
+            const archiveResponse = await axios.post(
+                route("superadmin.settings.archive-current-school-year"),
+                {
+                    new_school_year: trimmedNewSY,
+                },
+            );
+
+            const archiveKey = archiveResponse?.data?.archive_key ?? null;
+
+            setProgressStep("creating");
+            setProgressPercent(75);
+
+            router.post(
+                route("superadmin.settings.rollover"),
+                {
+                    new_school_year: trimmedNewSY,
+                    confirm_school_year: trimmedConfirm,
+                    archive_key: archiveKey,
+                },
+                {
+                    onError: (errs) => {
+                        setError(
+                            getFirstErrorMessage(
+                                errs,
+                                "Unable to create the new school year.",
+                            ),
+                        );
+                        setProgressStep("idle");
+                        setProgressPercent(0);
+                        setSubmitting(false);
+                    },
+                    onSuccess: () => {
+                        setProgressPercent(100);
+                        onClose();
+                    },
+                    onFinish: () => setSubmitting(false),
+                },
+            );
+        } catch (archiveError) {
+            const responseErrors = archiveError?.response?.data?.errors;
+            const backendMessage = getFirstErrorMessage(
+                responseErrors,
+                archiveError?.response?.data?.message,
+            );
+
+            setError(
+                backendMessage ||
+                    "Unable to archive the current school year. Please try again.",
+            );
+            setProgressStep("idle");
+            setProgressPercent(0);
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={submitting ? undefined : onClose}
+            />
+            <div className="relative w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden">
+                {/* Modal header */}
+                <div className="bg-gradient-to-r from-rose-600 to-red-700 px-6 py-5">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
+                                <RotateCcw className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                                <h2 className="font-bold text-white text-lg">
+                                    Start New School Year
+                                </h2>
+                                <p className="text-rose-200 text-xs mt-0.5">
+                                    This rolls over and archives current SY data
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            disabled={submitting}
+                            className="rounded-lg p-1.5 text-white/70 hover:bg-white/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                    {/* Warning */}
+                    <div className="flex gap-3 rounded-xl bg-rose-50 border border-rose-200 px-4 py-3">
+                        <AlertTriangle
+                            size={16}
+                            className="text-rose-500 shrink-0 mt-0.5"
+                        />
+                        <div className="text-xs text-rose-700 space-y-1">
+                            <p className="font-semibold">
+                                The following current school year data will be
+                                archived:
+                            </p>
+                            <ul className="list-disc list-inside space-y-0.5 text-rose-600">
+                                <li>
+                                    All class assignments (subject-teacher
+                                    records)
+                                </li>
+                                <li>All student enrollments</li>
+                                <li>All grades and attendance records</li>
+                                <li>All interventions and tasks</li>
+                                <li>All student notifications</li>
+                            </ul>
+                            <p className="font-semibold mt-1">
+                                No records are deleted. You can review old
+                                school years in Archive.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Current SY info */}
+                    <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 flex items-center justify-between">
+                        <span className="text-xs text-slate-500">
+                            Current school year
+                        </span>
+                        <span className="text-sm font-bold text-slate-800">
+                            {currentSY}
+                        </span>
+                    </div>
+
+                    {/* New SY input */}
+                    <div>
+                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5 block">
+                            New School Year
+                            <span className="text-rose-400 ml-1">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={newSY}
+                            onChange={(e) => {
+                                setNewSY(e.target.value);
+                                setError("");
+                            }}
+                            placeholder={suggestedSY}
+                            className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm font-medium focus:border-rose-500 focus:ring-rose-500 focus:bg-white transition-colors"
+                        />
+                        <p className="text-[11px] text-slate-400 mt-1">
+                            Format: YYYY-YYYY (e.g. {suggestedSY})
+                        </p>
+                        {expectedNextSY && (
+                            <p className="text-[11px] text-slate-500 mt-1">
+                                Expected next school year: {expectedNextSY}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Confirmation input */}
+                    <div>
+                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5 block">
+                            Type the new school year to confirm
+                            <span className="text-rose-400 ml-1">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={confirm}
+                            onChange={(e) => {
+                                setConfirm(e.target.value);
+                                setError("");
+                            }}
+                            placeholder={newSY || suggestedSY}
+                            className={`w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm font-medium focus:ring-rose-500 transition-colors ${
+                                confirm && confirm !== newSY
+                                    ? "border-rose-300 bg-rose-50/50 focus:border-rose-500"
+                                    : confirm && confirm === newSY
+                                      ? "border-emerald-300 bg-emerald-50/50 focus:border-emerald-500"
+                                      : "focus:border-rose-500"
+                            }`}
+                        />
+                        {confirm && confirm !== newSY && (
+                            <p className="text-[11px] text-rose-500 mt-1">
+                                Does not match.
+                            </p>
+                        )}
+                    </div>
+
+                    {validationMessage && (
+                        <p className="text-xs text-rose-600 flex items-center gap-1">
+                            <AlertCircle size={12} />
+                            {validationMessage}
+                        </p>
+                    )}
+
+                    {error && (
+                        <p className="text-xs text-rose-600 flex items-center gap-1">
+                            <AlertCircle size={12} />
+                            {error}
+                        </p>
+                    )}
+
+                    {submitting && (
+                        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+                            <div className="flex items-center justify-between gap-3">
+                                <p className="text-[11px] font-semibold text-blue-700">
+                                    {isArchiving
+                                        ? `Creating ${currentSY || "current school year"} archive...`
+                                        : `Creating new school year ${trimmedNewSY || suggestedSY}...`}
+                                </p>
+                                <span className="text-[11px] font-semibold text-blue-600 tabular-nums">
+                                    {progressPercent}%
+                                </span>
+                            </div>
+
+                            <div className="mt-2 h-2 overflow-hidden rounded-full bg-blue-100">
+                                <div
+                                    className="h-full rounded-full bg-blue-500 transition-all duration-300"
+                                    style={{ width: `${progressPercent}%` }}
+                                />
+                            </div>
+
+                            <div className="mt-3 space-y-1.5 text-[11px]">
+                                <div
+                                    className={`flex items-center gap-2 ${
+                                        isArchiving
+                                            ? "text-blue-700"
+                                            : isCreating
+                                              ? "text-emerald-700"
+                                              : "text-slate-500"
+                                    }`}
+                                >
+                                    {isCreating ? (
+                                        <CheckCircle size={12} />
+                                    ) : (
+                                        <svg
+                                            className={`h-3 w-3 ${isArchiving ? "animate-spin" : ""}`}
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <circle
+                                                className="opacity-25"
+                                                cx="12"
+                                                cy="12"
+                                                r="10"
+                                                stroke="currentColor"
+                                                strokeWidth="4"
+                                            />
+                                            <path
+                                                className="opacity-75"
+                                                fill="currentColor"
+                                                d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z"
+                                            />
+                                        </svg>
+                                    )}
+                                    <span>
+                                        Creating{" "}
+                                        {currentSY || "current school year"}{" "}
+                                        archive
+                                    </span>
+                                </div>
+                                <div
+                                    className={`flex items-center gap-2 ${
+                                        isCreating
+                                            ? "text-blue-700"
+                                            : "text-slate-500"
+                                    }`}
+                                >
+                                    <svg
+                                        className={`h-3 w-3 ${isCreating ? "animate-spin" : ""}`}
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <circle
+                                            className="opacity-25"
+                                            cx="12"
+                                            cy="12"
+                                            r="10"
+                                            stroke="currentColor"
+                                            strokeWidth="4"
+                                        />
+                                        <path
+                                            className="opacity-75"
+                                            fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z"
+                                        />
+                                    </svg>
+                                    <span>
+                                        Creating new school year{" "}
+                                        {trimmedNewSY || suggestedSY}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex gap-3 pt-1">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={submitting}
+                            className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={!isValid || submitting}
+                            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-rose-500/25 hover:shadow-rose-500/40 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            {submitting ? (
+                                <svg
+                                    className="animate-spin h-4 w-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <circle
+                                        className="opacity-25"
+                                        cx="12"
+                                        cy="12"
+                                        r="10"
+                                        stroke="currentColor"
+                                        strokeWidth="4"
+                                    />
+                                    <path
+                                        className="opacity-75"
+                                        fill="currentColor"
+                                        d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z"
+                                    />
+                                </svg>
+                            ) : (
+                                <Trash2 size={15} />
+                            )}
+                            {submitting
+                                ? isArchiving
+                                    ? "Creating Archive..."
+                                    : "Creating School Year..."
+                                : "Start New Year"}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 export default function Index({ settings, schoolYears }) {
+    const [showNewSYModal, setShowNewSYModal] = useState(false);
+
     const { data, setData, post, processing, errors } = useForm({
         current_school_year: settings?.current_school_year || "",
         current_semester: settings?.current_semester || "1",
@@ -593,6 +1031,57 @@ export default function Index({ settings, schoolYears }) {
                         </div>
                     </div>
                 </form>
+
+                {/* ── Danger Zone ───────────────────────────────────── */}
+                <div className="rounded-2xl border-2 border-rose-200 bg-rose-50/50 overflow-hidden">
+                    <div className="flex items-center gap-4 px-6 py-5 border-b border-rose-200">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-red-600 shadow-md shadow-rose-500/20">
+                            <AlertTriangle className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                            <h2 className="font-semibold text-rose-900">
+                                Danger Zone
+                            </h2>
+                            <p className="text-xs text-rose-500">
+                                Irreversible system operations
+                            </p>
+                        </div>
+                    </div>
+                    <div className="p-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                            <div>
+                                <p className="font-semibold text-slate-900 text-sm">
+                                    Start New School Year
+                                </p>
+                                <p className="text-xs text-slate-500 mt-0.5 max-w-md">
+                                    Ends{" "}
+                                    <span className="font-semibold">
+                                        {data.current_school_year}
+                                    </span>{" "}
+                                    and archives current school year data —
+                                    enrollments, grades, attendance,
+                                    interventions, and notifications. No records
+                                    are deleted.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowNewSYModal(true)}
+                                className="shrink-0 inline-flex items-center gap-2 rounded-xl border-2 border-rose-300 bg-white px-5 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all"
+                            >
+                                <RotateCcw size={15} />
+                                Start New School Year
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {showNewSYModal && (
+                    <NewSchoolYearModal
+                        currentSY={data.current_school_year}
+                        onClose={() => setShowNewSYModal(false)}
+                    />
+                )}
             </div>
         </>
     );

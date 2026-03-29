@@ -24,7 +24,7 @@ class AdminSeeder extends Seeder
         );
 
         // Create the admin user
-        User::updateOrCreate(
+        $admin = User::updateOrCreate(
             ['email' => 'admin@satis.edu'],
             [
                 'first_name' => 'Admin',
@@ -32,11 +32,12 @@ class AdminSeeder extends Seeder
                 'password' => bcrypt('admin123'),
                 'temp_password' => 'admin123',
                 'must_change_password' => true,
-                'role' => 'admin',
                 'department_id' => $department->id,
                 'email_verified_at' => now(),
             ]
         );
+
+        $admin->syncRolesByName(['admin']);
 
         $this->command->info('Admin user created successfully!');
         $this->command->table(

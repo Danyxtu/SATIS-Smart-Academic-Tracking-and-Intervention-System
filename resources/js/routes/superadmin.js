@@ -1,4 +1,4 @@
-import { House, Building2, Users, Settings } from "lucide-react";
+import { House, Building2, Users, Settings, Archive } from "lucide-react";
 
 export const superAdminRoutes = [
     {
@@ -15,6 +15,12 @@ export const superAdminRoutes = [
         label: "User Management",
         path: "superadmin.users.index",
         icon: Users,
+    },
+    {
+        label: "Archive",
+        path: "superadmin.archive.index",
+        activeCheck: "superadmin.archive.*",
+        icon: Archive,
     },
     {
         label: "School Settings",

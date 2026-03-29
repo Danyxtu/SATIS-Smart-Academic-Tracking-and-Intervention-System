@@ -156,26 +156,28 @@ class UserController extends Controller
 
         // Transform users to include section and teacher info
         $users->getCollection()->transform(function ($user) {
-            $user->role = $user->roles->pluck('name')->first();
+            $payload = $user->toArray();
+            $payload['role'] = $user->roles->pluck('name')->first();
 
             if ($user->hasRole('student') && $user->student) {
-                $user->section = $user->student->section;
-                $user->grade_level = $user->student->grade_level;
-                $user->strand = $user->student->strand;
+                $payload['section'] = $user->student->section;
+                $payload['grade_level'] = $user->student->grade_level;
+                $payload['strand'] = $user->student->strand;
 
                 // Get teachers for this student's subjects
                 $enrollments = Enrollment::where('user_id', $user->id)
                     ->with(['subjectTeacher.subject', 'subjectTeacher.teacher'])
                     ->get();
 
-                $user->subjects = $enrollments->map(function ($enrollment) {
+                $payload['subjects'] = $enrollments->map(function ($enrollment) {
                     return [
                         'name' => $enrollment->subjectTeacher?->subject?->name ?? 'N/A',
                         'teacher' => $enrollment->subjectTeacher?->teacher?->name ?? 'N/A',
                     ];
                 });
             }
-            return $user;
+
+            return $payload;
         });
 
         // Get role counts for filter badges (scoped to department)
@@ -284,7 +286,6 @@ class UserController extends Controller
             'middle_name' => $validated['middle_name'] ?? null,
             'email' => $validated['email'],
             'password' => Hash::make($password),
-            'role' => $validated['role'],
             'created_by' => $admin->id,
             'email_verified_at' => now(), // Users created by admin are considered verified
         ];
@@ -295,6 +296,7 @@ class UserController extends Controller
         }
 
         $user = User::create($userData);
+        $user->syncRolesByName([$validated['role']]);
 
         // If creating a student, also create the student profile
         if ($validated['role'] === 'student') {
@@ -330,7 +332,7 @@ class UserController extends Controller
         $department = $admin->department;
 
         // Admin can only edit users in their department (teachers) or students
-        if ($user->role === 'teacher' && $user->department_id !== $admin->department_id) {
+        if ($user->hasRole('teacher') && $user->department_id !== $admin->department_id) {
             return redirect()->route('admin.users.index')
                 ->with('error', 'You can only edit teachers in your department.');
         }
@@ -340,7 +342,7 @@ class UserController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'role' => $user->role,
+                'role' => $user->roles->pluck('name')->first(),
                 'department_id' => $user->department_id,
                 'created_at' => $user->created_at->format('M d, Y'),
             ],
@@ -360,7 +362,7 @@ class UserController extends Controller
         $admin = Auth::user();
 
         // Admin can only edit users in their department (teachers) or students
-        if ($user->role === 'teacher' && $user->department_id !== $admin->department_id) {
+        if ($user->hasRole('teacher') && $user->department_id !== $admin->department_id) {
             return redirect()->route('admin.users.index')
                 ->with('error', 'You can only edit teachers in your department.');
         }
@@ -371,13 +373,12 @@ class UserController extends Controller
             'role' => 'required|in:student,teacher', // Admin cannot change role to admin
         ]);
 
-        $oldRole = $user->role;
+        $oldRole = $user->roles->pluck('name')->first();
 
         // Prepare update data
         $updateData = [
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'role' => $validated['role'],
         ];
 
         // If changing to teacher, assign department
@@ -386,6 +387,7 @@ class UserController extends Controller
         }
 
         $user->update($updateData);
+        $user->syncRolesByName([$validated['role']]);
 
         // Handle role change from non-student to student
         if ($oldRole !== 'student' && $validated['role'] === 'student') {
@@ -407,7 +409,7 @@ class UserController extends Controller
         $admin = Auth::user();
 
         // Admin can only delete users in their department (teachers) or students
-        if ($user->role === 'teacher' && $user->department_id !== $admin->department_id) {
+        if ($user->hasRole('teacher') && $user->department_id !== $admin->department_id) {
             return redirect()->route('admin.users.index')
                 ->with('error', 'You can only delete teachers in your department.');
         }

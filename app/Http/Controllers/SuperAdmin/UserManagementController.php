@@ -45,10 +45,12 @@ class UserManagementController extends Controller
             ->withQueryString();
 
         $users->getCollection()->transform(function (User $user) {
-            $roleNames = $user->roles->pluck('name')->all();
-            $user->setAttribute('role', $roleNames[0] ?? null);
-            $user->setAttribute('roles_list', $roleNames);
-            return $user;
+            $roleNames = $user->roles->pluck('name')->values()->all();
+            $payload = $user->toArray();
+            $payload['role'] = $roleNames[0] ?? null;
+            $payload['roles_list'] = $roleNames;
+
+            return $payload;
         });
 
         $roleCounts = [

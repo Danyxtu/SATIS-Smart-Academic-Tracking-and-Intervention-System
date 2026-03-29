@@ -13,7 +13,7 @@ class DashboardTest extends TestCase
     public function test_admin_can_access_dashboard(): void
     {
         /** @var User $admin */
-        $admin = User::factory()->create(['role' => 'admin']);
+        $admin = $this->createUserWithRole('admin');
 
         $response = $this->actingAs($admin)->get('/admin/dashboard');
 
@@ -40,7 +40,7 @@ class DashboardTest extends TestCase
     public function test_student_cannot_access_admin_dashboard(): void
     {
         /** @var User $student */
-        $student = User::factory()->create(['role' => 'student']);
+        $student = $this->createUserWithRole('student');
 
         $response = $this->actingAs($student)->get('/admin/dashboard');
 

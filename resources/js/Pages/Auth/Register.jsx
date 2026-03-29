@@ -9,7 +9,9 @@ import { UserPlus, Sparkles } from "lucide-react";
 
 export default function Register() {
     const { data, setData, post, processing, errors, reset } = useForm({
-        name: "",
+        first_name: "",
+        middle_name: "",
+        last_name: "",
         email: "",
         password: "",
         password_confirmation: "",
@@ -51,22 +53,74 @@ export default function Register() {
                 <div className="space-y-4">
                     <div>
                         <InputLabel
-                            htmlFor="name"
-                            value="Name"
+                            htmlFor="first_name"
+                            value="First Name"
                             className="text-gray-700 font-medium"
                         />
                         <TextInput
-                            id="name"
-                            name="name"
-                            value={data.name}
+                            id="first_name"
+                            name="first_name"
+                            value={data.first_name}
                             className="mt-1.5 block w-full rounded-xl border-gray-200 shadow-sm focus:border-primary focus:ring-primary/30 transition-all duration-200"
-                            autoComplete="name"
+                            autoComplete="given-name"
                             isFocused={true}
-                            placeholder="Enter your name"
-                            onChange={(e) => setData("name", e.target.value)}
+                            placeholder="Enter your first name"
+                            onChange={(e) =>
+                                setData("first_name", e.target.value)
+                            }
                             required
                         />
-                        <InputError message={errors.name} className="mt-2" />
+                        <InputError
+                            message={errors.first_name}
+                            className="mt-2"
+                        />
+                    </div>
+
+                    <div>
+                        <InputLabel
+                            htmlFor="middle_name"
+                            value="Middle Name (Optional)"
+                            className="text-gray-700 font-medium"
+                        />
+                        <TextInput
+                            id="middle_name"
+                            name="middle_name"
+                            value={data.middle_name}
+                            className="mt-1.5 block w-full rounded-xl border-gray-200 shadow-sm focus:border-primary focus:ring-primary/30 transition-all duration-200"
+                            autoComplete="additional-name"
+                            placeholder="Enter your middle name"
+                            onChange={(e) =>
+                                setData("middle_name", e.target.value)
+                            }
+                        />
+                        <InputError
+                            message={errors.middle_name}
+                            className="mt-2"
+                        />
+                    </div>
+
+                    <div>
+                        <InputLabel
+                            htmlFor="last_name"
+                            value="Last Name"
+                            className="text-gray-700 font-medium"
+                        />
+                        <TextInput
+                            id="last_name"
+                            name="last_name"
+                            value={data.last_name}
+                            className="mt-1.5 block w-full rounded-xl border-gray-200 shadow-sm focus:border-primary focus:ring-primary/30 transition-all duration-200"
+                            autoComplete="family-name"
+                            placeholder="Enter your last name"
+                            onChange={(e) =>
+                                setData("last_name", e.target.value)
+                            }
+                            required
+                        />
+                        <InputError
+                            message={errors.last_name}
+                            className="mt-2"
+                        />
                     </div>
 
                     <div>

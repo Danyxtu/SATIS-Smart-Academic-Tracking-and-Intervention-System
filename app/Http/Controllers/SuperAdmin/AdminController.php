@@ -96,10 +96,11 @@ class AdminController extends Controller
             'password' => $plainPassword, // Will be hashed on first login
             'temp_password' => $plainPassword,
             'must_change_password' => true,
-            'role' => 'admin',
             'department_id' => $validated['department_id'],
             'created_by' => Auth::id(),
         ]);
+
+        $admin->syncRolesByName(['admin']);
 
         // Load the department relationship for the email
         $admin->load('department');
@@ -128,7 +129,7 @@ class AdminController extends Controller
      */
     public function show(User $admin): Response
     {
-        if ($admin->role !== 'admin') {
+        if (!$admin->hasRole('admin')) {
             abort(404);
         }
 
@@ -169,7 +170,7 @@ class AdminController extends Controller
      */
     public function edit(User $admin): Response
     {
-        if ($admin->role !== 'admin') {
+        if (!$admin->hasRole('admin')) {
             abort(404);
         }
 
@@ -198,7 +199,7 @@ class AdminController extends Controller
      */
     public function update(Request $request, User $admin): RedirectResponse
     {
-        if ($admin->role !== 'admin') {
+        if (!$admin->hasRole('admin')) {
             abort(404);
         }
 
@@ -239,7 +240,7 @@ class AdminController extends Controller
      */
     public function destroy(Request $request, User $admin): RedirectResponse
     {
-        if ($admin->role !== 'admin') {
+        if (!$admin->hasRole('admin')) {
             abort(404);
         }
 
@@ -265,7 +266,7 @@ class AdminController extends Controller
      */
     public function resetPassword(User $admin): RedirectResponse
     {
-        if ($admin->role !== 'admin') {
+        if (!$admin->hasRole('admin')) {
             abort(404);
         }
 
@@ -294,7 +295,7 @@ class AdminController extends Controller
      */
     public function resendCredentials(User $admin): RedirectResponse
     {
-        if ($admin->role !== 'admin') {
+        if (!$admin->hasRole('admin')) {
             abort(404);
         }
 

@@ -14,7 +14,7 @@ class DashboardTest extends TestCase
     public function test_teacher_can_access_dashboard(): void
     {
         /** @var User $teacher */
-        $teacher = User::factory()->create(['role' => 'teacher']);
+        $teacher = $this->createUserWithRole('teacher');
 
         $response = $this->actingAs($teacher)->get('/teacher/dashboard');
 
@@ -40,7 +40,7 @@ class DashboardTest extends TestCase
     public function test_student_cannot_access_teacher_dashboard(): void
     {
         /** @var User $student */
-        $student = User::factory()->create(['role' => 'student']);
+        $student = $this->createUserWithRole('student');
 
         $response = $this->actingAs($student)->get('/teacher/dashboard');
 
@@ -53,7 +53,7 @@ class DashboardTest extends TestCase
     public function test_pending_teacher_sees_pending_approval_page(): void
     {
         /** @var User $teacher */
-        $teacher = User::factory()->create(['role' => 'teacher']);
+        $teacher = $this->createUserWithRole('teacher');
 
         $response = $this->actingAs($teacher)->get('/teacher/pending-approval');
 

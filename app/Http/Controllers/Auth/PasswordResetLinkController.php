@@ -71,7 +71,7 @@ class PasswordResetLinkController extends Controller
         }
 
         // Only teachers and students can request admin password reset
-        if (!in_array($user->role, ['teacher', 'student'])) {
+        if (!$user->hasRole('teacher') && !$user->hasRole('student')) {
             throw ValidationException::withMessages([
                 'email' => ['Admin password reset is only available for teacher and student accounts.'],
             ]);

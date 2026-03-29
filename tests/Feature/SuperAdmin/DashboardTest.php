@@ -14,7 +14,7 @@ class DashboardTest extends TestCase
     public function test_super_admin_can_access_dashboard(): void
     {
         /** @var User $superAdmin */
-        $superAdmin = User::factory()->create(['role' => 'super_admin']);
+        $superAdmin = $this->createUserWithRole('super_admin');
 
         $response = $this->actingAs($superAdmin)->get('/superadmin/dashboard');
 
@@ -40,7 +40,7 @@ class DashboardTest extends TestCase
     public function test_admin_cannot_access_super_admin_dashboard(): void
     {
         /** @var User $admin */
-        $admin = User::factory()->create(['role' => 'admin']);
+        $admin = $this->createUserWithRole('admin');
 
         $response = $this->actingAs($admin)->get('/superadmin/dashboard');
 
@@ -53,7 +53,7 @@ class DashboardTest extends TestCase
     public function test_super_admin_can_view_departments(): void
     {
         /** @var User $superAdmin */
-        $superAdmin = User::factory()->create(['role' => 'super_admin']);
+        $superAdmin = $this->createUserWithRole('super_admin');
         Department::factory()->count(3)->create();
 
         $response = $this->actingAs($superAdmin)->get('/superadmin/departments');

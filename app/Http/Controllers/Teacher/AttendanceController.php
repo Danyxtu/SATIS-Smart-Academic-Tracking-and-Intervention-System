@@ -145,8 +145,16 @@ class AttendanceController extends Controller
         ]);
 
         $result = $this->attendanceService->createAttendance($data, $teacher);
+        $status = (int) ($result['status'] ?? 200);
 
-        $resultMessage = $result['message'] ?? 'Attendance saved successfully!';
-        return response()->json(['message' => $resultMessage], 200);
+        unset($result['status']);
+
+        if (!isset($result['message'])) {
+            $result['message'] = $status >= 400
+                ? 'Failed to save attendance.'
+                : 'Attendance saved successfully!';
+        }
+
+        return response()->json($result, $status);
     }
 }
