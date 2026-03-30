@@ -1,6 +1,6 @@
 import TeacherLayout from "@/Layouts/TeacherLayout";
 import React, { useState, useEffect, useMemo } from "react";
-import { useForm, usePage, router } from "@inertiajs/react";
+import { Head, useForm, usePage, router } from "@inertiajs/react";
 import { useLoading } from "@/Context/LoadingContext";
 import { ArrowLeft } from "lucide-react";
 import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
@@ -2991,6 +2991,7 @@ function InterventionCenter({ watchlist = [], studentDetails = {} }) {
 const Interventions = ({ watchlist = [], studentDetails = {} }) => {
     return (
         <div className="bg-gray-100 min-h-screen">
+            <Head title="Intervention Center" />
             <InterventionCenter
                 watchlist={watchlist}
                 studentDetails={studentDetails}

@@ -1,6 +1,6 @@
 import React from "react";
 import { Bell, Sun } from "lucide-react";
-import schoolLogo from "../../assets/school-logo.png";
+import systemLogo from "../../assets/system-logo.png";
 
 export default function SATISHeader({ user }) {
     return (
@@ -10,8 +10,8 @@ export default function SATISHeader({ user }) {
             <div className="flex items-center gap-3 min-w-0">
                 <div>
                     <img
-                        src={schoolLogo}
-                        alt="School Logo"
+                        src={systemLogo}
+                        alt="System Logo"
                         className="h-8 w-8 rounded-full object-cover"
                     />
                 </div>

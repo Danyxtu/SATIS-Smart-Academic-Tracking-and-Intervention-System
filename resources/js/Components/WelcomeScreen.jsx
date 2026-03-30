@@ -6,16 +6,16 @@ const WelcomeScreen = ({
     icon: Icon,
     gradient,
 }) => (
-    <div className="flex flex-col items-center justify-center text-center p-6 sm:p-10 animate-fade-in">
+    <div className="flex flex-col items-center justify-center text-center p-5 sm:p-7 animate-fade-in">
         <div
-            className={`w-20 h-20 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center mb-6 shadow-lg`}
+            className={`w-16 h-16 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center mb-4 sm:mb-5 shadow-lg`}
         >
-            <Icon className="w-10 h-10 text-primary" />
+            <Icon className="w-8 h-8 text-primary" />
         </div>
-        <h2 className="text-3xl sm:text-4xl font-bold text-gray-800 mb-4 font-poppins">
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-3 font-poppins">
             {title}
         </h2>
-        <p className="text-base sm:text-lg text-gray-600 max-w-xl mb-8 leading-relaxed">
+        <p className="text-sm sm:text-base text-gray-600 max-w-lg mb-6 leading-relaxed">
             {description}
         </p>
         <div className="flex items-center gap-2">

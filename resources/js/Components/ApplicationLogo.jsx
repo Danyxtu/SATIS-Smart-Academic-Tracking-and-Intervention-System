@@ -1,7 +1,12 @@
-import Logo from '../../assets/school-logo.png';
+import Logo from "../../assets/system-logo.png";
 
-export default function ApplicationLogo(props) {
+export default function ApplicationLogo({ className = "", ...props }) {
     return (
-        <img src={Logo} alt="SATIS" {...props} />
+        <img
+            src={Logo}
+            alt="SATIS"
+            className={`rounded-full object-cover ${className}`.trim()}
+            {...props}
+        />
     );
 }

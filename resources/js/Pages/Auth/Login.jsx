@@ -26,56 +26,59 @@ export default function Login({ status, canResetPassword }) {
     };
 
     return (
-        <GuestLayout>
+        <GuestLayout cardClassName="max-w-sm px-4 py-4 sm:max-w-sm sm:px-5 sm:py-5 max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3rem)] overflow-y-auto">
             <Head title="Log in" />
 
             {status && (
-                <div className="mb-4 text-sm font-medium text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">
+                <div className="mb-2.5 rounded-lg border border-green-200 bg-green-50 px-2.5 py-2 text-xs font-medium text-green-600">
                     {status}
                 </div>
             )}
 
             <form onSubmit={submit}>
                 {/* Logo and Header Section */}
-                <div className="flex flex-col items-center mb-8">
+                <div className="mb-3.5 flex flex-col items-center sm:mb-4">
                     <Link href="/" className="group">
                         <div className="relative">
-                            <div className="absolute -inset-3 bg-primary/20 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                            <ApplicationLogo className="h-32 w-32 relative drop-shadow-md transition-transform duration-300 group-hover:scale-105" />
+                            <div className="absolute -inset-2 rounded-full bg-primary/20 blur-lg opacity-0 transition-opacity duration-300 group-hover:opacity-100 sm:-inset-3" />
+                            <ApplicationLogo className="relative h-14 w-14 drop-shadow-md transition-transform duration-300 group-hover:scale-105 sm:h-16 sm:w-16" />
                         </div>
                     </Link>
-                    <div className="mt-4 flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-primary" />
-                        <h1 className="text-xl font-semibold text-gray-800 font-poppins">
+                    <div className="mt-2.5 flex items-center gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-primary" />
+                        <h1 className="font-poppins text-[15px] sm:text-base font-semibold text-gray-800">
                             Welcome Back
                         </h1>
-                        <Sparkles className="w-4 h-4 text-primary" />
+                        <Sparkles className="h-3.5 w-3.5 text-primary" />
                     </div>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="mt-1 text-[11px] sm:text-xs text-gray-500">
                         Sign in to continue to SATIS
                     </p>
                 </div>
 
-                <div className="space-y-5">
+                <div className="space-y-3">
                     {/* Email Field */}
                     <div>
                         <InputLabel
                             htmlFor="email"
                             value="Email"
-                            className="text-gray-700 font-medium"
+                            className="text-xs font-semibold tracking-wide text-gray-700"
                         />
                         <TextInput
                             id="email"
                             type="email"
                             name="email"
                             value={data.email}
-                            className="mt-1.5 block w-full rounded-xl border-gray-200 shadow-sm focus:border-primary focus:ring-primary/30 transition-all duration-200"
+                            className="mt-1 block h-10 w-full rounded-lg border-gray-200 px-3 text-sm shadow-sm transition-all duration-200 placeholder:text-gray-400 focus:border-primary focus:ring-primary/25"
                             autoComplete="username"
                             isFocused={true}
                             placeholder="Enter your email"
                             onChange={(e) => setData("email", e.target.value)}
                         />
-                        <InputError message={errors.email} className="mt-2" />
+                        <InputError
+                            message={errors.email}
+                            className="mt-1 text-xs"
+                        />
                     </div>
 
                     {/* Password Field */}
@@ -83,7 +86,7 @@ export default function Login({ status, canResetPassword }) {
                         <InputLabel
                             htmlFor="password"
                             value="Password"
-                            className="text-gray-700 font-medium"
+                            className="text-xs font-semibold tracking-wide text-gray-700"
                         />
                         <div className="relative">
                             <TextInput
@@ -91,7 +94,7 @@ export default function Login({ status, canResetPassword }) {
                                 type={showPassword ? "text" : "password"}
                                 name="password"
                                 value={data.password}
-                                className="mt-1.5 block w-full rounded-xl border-gray-200 shadow-sm focus:border-primary focus:ring-primary/30 pr-12 transition-all duration-200"
+                                className="mt-1 block h-10 w-full rounded-lg border-gray-200 px-3 pr-10 text-sm shadow-sm transition-all duration-200 placeholder:text-gray-400 focus:border-primary focus:ring-primary/25"
                                 autoComplete="current-password"
                                 placeholder="Enter your password"
                                 onChange={(e) =>
@@ -101,28 +104,28 @@ export default function Login({ status, canResetPassword }) {
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 hover:bg-gray-100 transition-colors duration-200"
                             >
                                 {showPassword ? (
-                                    <Eye className="w-5 h-5 text-primary" />
+                                    <Eye className="h-4 w-4 text-primary" />
                                 ) : (
-                                    <EyeClosed className="w-5 h-5 text-gray-400" />
+                                    <EyeClosed className="h-4 w-4 text-gray-400" />
                                 )}
                             </button>
                         </div>
                         <InputError
                             message={errors.password}
-                            className="mt-2"
+                            className="mt-1 text-xs"
                         />
                     </div>
 
                     {/* Sign In Button */}
-                    <div className="pt-2">
+                    <div className="pt-1.5">
                         <PrimaryButton
-                            className="w-full justify-center py-3 bg-gradient-to-r from-primary to-pink-400 hover:from-primary/90 hover:to-pink-500 rounded-xl shadow-lg shadow-primary/25 transition-all duration-200 text-sm font-medium"
+                            className="w-full justify-center rounded-lg bg-gradient-to-r from-primary to-pink-400 py-2 text-xs font-semibold tracking-wide shadow-md shadow-primary/20 transition-all duration-200 hover:from-primary/90 hover:to-pink-500 sm:py-2.5"
                             disabled={processing}
                         >
-                            <LogIn className="w-4 h-4 mr-2" />
+                            <LogIn className="mr-1.5 h-3.5 w-3.5" />
                             Sign in
                         </PrimaryButton>
                     </div>
@@ -133,12 +136,12 @@ export default function Login({ status, canResetPassword }) {
                             <Checkbox
                                 name="remember"
                                 checked={data.remember}
-                                className="rounded border-gray-300 text-primary focus:ring-primary/30"
+                                className="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary/30"
                                 onChange={(e) =>
                                     setData("remember", e.target.checked)
                                 }
                             />
-                            <span className="ms-2 text-sm text-gray-600 group-hover:text-gray-800 transition-colors">
+                            <span className="ms-1.5 text-xs text-gray-600 transition-colors group-hover:text-gray-800">
                                 Remember me
                             </span>
                         </label>
@@ -146,10 +149,10 @@ export default function Login({ status, canResetPassword }) {
 
                     {/* Forgot Password */}
                     {canResetPassword && (
-                        <div className="text-center pt-2">
+                        <div className="pt-0.5 text-center">
                             <Link
                                 href={route("password.request")}
-                                className="text-sm text-primary hover:text-pink-500 transition-colors duration-200 font-medium"
+                                className="text-xs font-medium text-primary transition-colors duration-200 hover:text-pink-500"
                             >
                                 Forgot your password?
                             </Link>
@@ -157,15 +160,15 @@ export default function Login({ status, canResetPassword }) {
                     )}
 
                     {/* Teacher Registration Link */}
-                    <div className="text-center pt-4 border-t border-gray-200 mt-4">
-                        <p className="text-sm text-gray-500 mb-2">
+                    <div className="mt-2.5 border-t border-gray-200 pt-2.5 text-center">
+                        <p className="mb-1 text-xs text-gray-500">
                             Are you a teacher?
                         </p>
                         <Link
                             href={route("teacher.registration.create")}
-                            className="inline-flex items-center gap-2 text-sm text-primary hover:text-pink-500 transition-colors duration-200 font-medium"
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-primary transition-colors duration-200 hover:text-pink-500"
                         >
-                            <UserPlus className="w-4 h-4" />
+                            <UserPlus className="h-3.5 w-3.5" />
                             Register as a Teacher
                         </Link>
                     </div>
