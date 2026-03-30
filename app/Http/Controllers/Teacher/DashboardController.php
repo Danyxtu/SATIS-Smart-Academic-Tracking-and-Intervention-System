@@ -59,6 +59,7 @@ class DashboardController extends Controller
         $department = $dashboardData['department'];
 
         $allSubjects = $dashboardData['allSubjects'];
+        $attentionStudents = $dashboardData['attentionStudents'];
 
         return Inertia::render('Teacher/Dashboard', compact(
             'stats',
@@ -67,7 +68,8 @@ class DashboardController extends Controller
             'recentActivity',
             'academicPeriod',
             'department',
-            'allSubjects'
+            'allSubjects',
+            'attentionStudents'
         ));
     }
 
@@ -86,59 +88,30 @@ class DashboardController extends Controller
             ], 501);
         }
 
-        // Get filter options from request
-        $includeCritical = $request->boolean('critical', true);
-        $includeWarning = $request->boolean('warning', true);
-        $includeWatchlist = $request->boolean('watchlist', true);
+        // Get filter options from request (supports legacy params for backward compatibility)
+        $includeAtRisk = $request->boolean('at_risk', $request->boolean('critical', true));
+        $includeNeedsAttention = $request->boolean('needs_attention', $request->boolean('warning', true));
+        $includeRecentDecline = $request->boolean('recent_decline', $request->boolean('watchlist', true));
 
-        // Get current academic period
-        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
-        $currentSemester = SystemSetting::getCurrentSemester();
+        // Reuse dashboard service data so export stays aligned with dashboard logic.
+        $dashboardData = $this->dashboardServices->getDashboardData();
+        $attentionStudents = collect($dashboardData['attentionStudents'] ?? []);
 
-        // Get all enrollments for the teacher's subjects
-        $enrollments = Enrollment::whereHas('subjectTeacher', function ($query) use ($teacher) {
-            $query->where('teacher_id', $teacher->id);
-        })->with([
-            'user',
-            'grades',
-            'student',
-            'subjectTeacher.subject',
-            'attendanceRecords',
-            'intervention',
-        ])->get();
+        // Three real categories used in the teacher dashboard.
+        $atRiskStudents = $attentionStudents
+            ->filter(fn($student) => !empty($student['at_risk']))
+            ->values()
+            ->toArray();
 
-        $students = $enrollments->map(function ($enrollment) {
-            $grades = $enrollment->grades;
-            $hasGrades = $grades->isNotEmpty();
-            $averageGrade = $hasGrades ? $grades->avg('score') : null;
-            $studentProfile = $enrollment->student;
+        $needsAttentionStudents = $attentionStudents
+            ->filter(fn($student) => !empty($student['needs_attention']))
+            ->values()
+            ->toArray();
 
-            return [
-                'id' => $studentProfile?->id ?? $enrollment->user->id,
-                'student_name' => $studentProfile?->student_name ?? $enrollment->user?->name ?? 'Student',
-                'name' => $studentProfile?->student_name ?? $enrollment->user?->name ?? 'Student',
-                'avatar' => $studentProfile?->avatar,
-                'subject' => $enrollment->subjectTeacher?->subject?->name,
-                'grade' => $hasGrades ? round($averageGrade) : null,
-                'has_grades' => $hasGrades,
-                'trend' => $studentProfile?->trend,
-                'enrollment_id' => $enrollment->id,
-                'intervention' => $enrollment->intervention ? [
-                    'id' => $enrollment->intervention->id,
-                    'type' => $enrollment->intervention->type,
-                    'status' => $enrollment->intervention->status,
-                    'notes' => $enrollment->intervention->notes,
-                ] : null,
-            ];
-        });
-
-        // Only consider students WITH grades for risk calculations
-        $studentsWithGrades = $students->filter(fn($s) => $s['has_grades'] === true);
-
-        // Priority Students categories
-        $criticalStudents = $studentsWithGrades->filter(fn($s) => $s['grade'] < 70)->values()->toArray();
-        $warningStudents = $studentsWithGrades->filter(fn($s) => $s['grade'] >= 70 && $s['grade'] < 75)->values()->toArray();
-        $watchlistStudents = $studentsWithGrades->filter(fn($s) => $s['grade'] >= 75 && $s['grade'] < 80 && $s['trend'] === 'Declining')->values()->toArray();
+        $recentDeclineStudents = $attentionStudents
+            ->filter(fn($student) => !empty($student['recent_decline']))
+            ->values()
+            ->toArray();
 
         // Prepare view data
         $viewData = [
@@ -151,15 +124,15 @@ class DashboardController extends Controller
                 'code' => $teacher->department->department_code,
             ] : null,
             'academicPeriod' => [
-                'schoolYear' => $currentSchoolYear,
-                'semester' => $currentSemester,
+                'schoolYear' => $dashboardData['currentSchoolYear'] ?? SystemSetting::getCurrentSchoolYear(),
+                'semester' => $dashboardData['currentSemester'] ?? SystemSetting::getCurrentSemester(),
             ],
-            'criticalStudents' => $criticalStudents,
-            'warningStudents' => $warningStudents,
-            'watchlistStudents' => $watchlistStudents,
-            'includeCritical' => $includeCritical,
-            'includeWarning' => $includeWarning,
-            'includeWatchlist' => $includeWatchlist,
+            'atRiskStudents' => $atRiskStudents,
+            'needsAttentionStudents' => $needsAttentionStudents,
+            'recentDeclineStudents' => $recentDeclineStudents,
+            'includeAtRisk' => $includeAtRisk,
+            'includeNeedsAttention' => $includeNeedsAttention,
+            'includeRecentDecline' => $includeRecentDecline,
         ];
 
         /** @var \Barryvdh\DomPDF\PDF $pdf */

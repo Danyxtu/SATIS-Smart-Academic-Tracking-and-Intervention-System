@@ -4,8 +4,8 @@ import {
     X,
     FileText,
     AlertTriangle,
+    ClipboardList,
     TrendingDown,
-    Eye,
     FileDown,
     Loader2,
 } from "lucide-react";
@@ -13,15 +13,25 @@ import {
 export default function PriorityStudentsReportModal({
     show,
     onClose,
-    priorityStudents,
+    attentionStudents = [],
     academicPeriod,
     department,
 }) {
     const [isGenerating, setIsGenerating] = useState(false);
+    const students = Array.isArray(attentionStudents) ? attentionStudents : [];
+
+    const atRiskCount = students.filter((student) => student.at_risk).length;
+    const needsAttentionCount = students.filter(
+        (student) => student.needs_attention,
+    ).length;
+    const recentDeclineCount = students.filter(
+        (student) => student.recent_decline,
+    ).length;
+
     const [filters, setFilters] = useState({
-        critical: true,
-        warning: true,
-        watchlist: true,
+        at_risk: true,
+        needs_attention: true,
+        recent_decline: true,
     });
 
     const toggleFilter = (key) => {
@@ -33,29 +43,28 @@ export default function PriorityStudentsReportModal({
 
     const selectAll = () => {
         setFilters({
-            critical: true,
-            warning: true,
-            watchlist: true,
+            at_risk: true,
+            needs_attention: true,
+            recent_decline: true,
         });
     };
 
     const deselectAll = () => {
         setFilters({
-            critical: false,
-            warning: false,
-            watchlist: false,
+            at_risk: false,
+            needs_attention: false,
+            recent_decline: false,
         });
     };
 
     const hasAnySelection =
-        filters.critical || filters.warning || filters.watchlist;
+        filters.at_risk || filters.needs_attention || filters.recent_decline;
 
     const getSelectedCount = () => {
         let count = 0;
-        if (filters.critical) count += priorityStudents?.critical?.length || 0;
-        if (filters.warning) count += priorityStudents?.warning?.length || 0;
-        if (filters.watchlist)
-            count += priorityStudents?.watchList?.length || 0;
+        if (filters.at_risk) count += atRiskCount;
+        if (filters.needs_attention) count += needsAttentionCount;
+        if (filters.recent_decline) count += recentDeclineCount;
         return count;
     };
 
@@ -67,9 +76,12 @@ export default function PriorityStudentsReportModal({
         try {
             // Build query parameters
             const params = new URLSearchParams();
-            params.append("critical", filters.critical ? "1" : "0");
-            params.append("warning", filters.warning ? "1" : "0");
-            params.append("watchlist", filters.watchlist ? "1" : "0");
+            params.append("at_risk", filters.at_risk ? "1" : "0");
+            params.append(
+                "needs_attention",
+                filters.needs_attention ? "1" : "0",
+            );
+            params.append("recent_decline", filters.recent_decline ? "1" : "0");
 
             // Trigger download
             window.location.href =
@@ -90,10 +102,10 @@ export default function PriorityStudentsReportModal({
 
     const filterOptions = [
         {
-            key: "critical",
-            label: "Students at Risk (Critical)",
-            description: "Students with grades below 70%",
-            count: priorityStudents?.critical?.length || 0,
+            key: "at_risk",
+            label: "At Risks",
+            description: "Students with grades below 75",
+            count: atRiskCount,
             icon: AlertTriangle,
             color: "red",
             bgColor: "bg-red-50 dark:bg-red-900/20",
@@ -103,11 +115,11 @@ export default function PriorityStudentsReportModal({
             checkedBg: "bg-red-500",
         },
         {
-            key: "warning",
-            label: "Needs Attention (Warning)",
-            description: "Students with grades between 70-74%",
-            count: priorityStudents?.warning?.length || 0,
-            icon: Eye,
+            key: "needs_attention",
+            label: "Needs Attention",
+            description: "Students absent more than 5",
+            count: needsAttentionCount,
+            icon: ClipboardList,
             color: "amber",
             bgColor: "bg-amber-50 dark:bg-amber-900/20",
             borderColor: "border-amber-200 dark:border-amber-800",
@@ -116,10 +128,10 @@ export default function PriorityStudentsReportModal({
             checkedBg: "bg-amber-500",
         },
         {
-            key: "watchlist",
-            label: "Recent Declines (Watchlist)",
-            description: "Students with grades 75-79% and declining trend",
-            count: priorityStudents?.watchList?.length || 0,
+            key: "recent_decline",
+            label: "Recent Declines",
+            description: "Grades dropped from >75 to 75 or below",
+            count: recentDeclineCount,
             icon: TrendingDown,
             color: "blue",
             bgColor: "bg-blue-50 dark:bg-blue-900/20",
@@ -132,9 +144,9 @@ export default function PriorityStudentsReportModal({
 
     return (
         <Modal show={show} onClose={onClose} maxWidth="lg">
-            <div className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden">
+            <div className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-lg bg-white dark:bg-gray-800 sm:max-h-[90vh]">
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-500 to-purple-600">
+                <div className="shrink-0 border-b border-gray-200 bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-4 dark:border-gray-700 sm:px-6">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-white/20 rounded-lg">
@@ -160,13 +172,13 @@ export default function PriorityStudentsReportModal({
                 </div>
 
                 {/* Content */}
-                <div className="p-6">
+                <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
                     {/* Report Info */}
                     <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Report Details
                         </h4>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 sm:gap-4">
                             {academicPeriod && (
                                 <>
                                     <div>
@@ -330,38 +342,42 @@ export default function PriorityStudentsReportModal({
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                        The report will include a summary section at the end
-                    </p>
-                    <div className="flex gap-3">
-                        <button
-                            onClick={onClose}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleGeneratePdf}
-                            disabled={!hasAnySelection || isGenerating}
-                            className={`px-4 py-2 text-sm font-medium text-white rounded-lg flex items-center gap-2 transition-all ${
-                                hasAnySelection && !isGenerating
-                                    ? "bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-lg shadow-indigo-500/25"
-                                    : "bg-gray-400 cursor-not-allowed"
-                            }`}
-                        >
-                            {isGenerating ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    Generating...
-                                </>
-                            ) : (
-                                <>
-                                    <FileDown className="w-4 h-4" />
-                                    Generate PDF
-                                </>
-                            )}
-                        </button>
+                <div className="shrink-0 border-t border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-800/50 sm:px-6 sm:py-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            The report will include a summary section at the end
+                        </p>
+                        <div className="flex w-full gap-2 sm:w-auto sm:gap-3">
+                            <button
+                                onClick={onClose}
+                                className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 sm:flex-none"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleGeneratePdf}
+                                disabled={!hasAnySelection || isGenerating}
+                                className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium text-white transition-all sm:flex-none ${
+                                    hasAnySelection && !isGenerating
+                                        ? "bg-gradient-to-r from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/25 hover:from-indigo-600 hover:to-purple-700"
+                                        : "cursor-not-allowed bg-gray-400"
+                                }`}
+                            >
+                                <span className="flex items-center justify-center gap-2">
+                                    {isGenerating ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            Generating...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FileDown className="w-4 h-4" />
+                                            Generate PDF
+                                        </>
+                                    )}
+                                </span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

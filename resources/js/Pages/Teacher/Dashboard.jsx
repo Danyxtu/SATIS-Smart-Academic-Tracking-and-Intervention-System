@@ -12,17 +12,12 @@ import {
     HelpCircle,
     Printer,
     Upload,
-    Eye,
     FileText,
     Users,
 } from "lucide-react";
-import { getSemesterLabel, getRiskLevelBadge } from "@/Utils/Teacher/Dashboard";
+import { getSemesterLabel } from "@/Utils/Teacher/Dashboard";
 import {
-    StudentRiskCard,
-    StatCard,
-    ActivityFeedItem,
     PriorityStudentsReportModal,
-    PrimaryButton,
     ShowTutorialModal,
     UploadGradesModal,
     StartInterventionModal,
@@ -36,6 +31,7 @@ const Dashboard = ({
     academicPeriod,
     department,
     allSubjects,
+    attentionStudents = [],
 }) => {
     const [showTutorial, setShowTutorial] = useState(false);
     const [studentFilter, setStudentFilter] = useState("all");
@@ -63,7 +59,7 @@ const Dashboard = ({
             value: stats?.studentsAtRisk || 0,
             icon: AlertTriangle,
             iconBgColor: "bg-red-500",
-            label: "grade < 75",
+            label: "students that are below 75",
             gradient: "from-red-500 to-red-600",
         },
         {
@@ -71,7 +67,7 @@ const Dashboard = ({
             value: stats?.needsAttention || 0,
             icon: ClipboardList,
             iconBgColor: "bg-amber-500",
-            label: "missing work",
+            label: "students absent more than 5",
             gradient: "from-amber-500 to-amber-600",
         },
         {
@@ -79,71 +75,58 @@ const Dashboard = ({
             value: stats?.recentDeclines || 0,
             icon: TrendingDown,
             iconBgColor: "bg-blue-500",
-            label: "dropped 10+",
+            label: ">75 down to 75 or below",
             gradient: "from-blue-500 to-blue-600",
         },
     ];
 
-    // Combine all students with their risk level for unified display
-    const allStudentsWithRisk = useMemo(() => {
-        const students = [];
-
-        // Add critical students (red)
-        if (priorityStudents?.critical?.length) {
-            priorityStudents.critical.forEach((student) => {
-                students.push({ ...student, riskLevel: "critical" });
-            });
-        }
-
-        // Add warning students (yellow/orange)
-        if (priorityStudents?.warning?.length) {
-            priorityStudents.warning.forEach((student) => {
-                students.push({ ...student, riskLevel: "warning" });
-            });
-        }
-
-        // Add watchlist students (blue)
-        if (priorityStudents?.watchList?.length) {
-            priorityStudents.watchList.forEach((student) => {
-                students.push({ ...student, riskLevel: "watchlist" });
-            });
-        }
-
-        return students;
-    }, [priorityStudents]);
+    const attentionList = useMemo(
+        () => (Array.isArray(attentionStudents) ? attentionStudents : []),
+        [attentionStudents],
+    );
 
     // Filter students based on selected filter
     const filteredStudents = useMemo(() => {
-        if (studentFilter === "all") return allStudentsWithRisk;
-        return allStudentsWithRisk.filter(
-            (student) => student.riskLevel === studentFilter,
-        );
-    }, [allStudentsWithRisk, studentFilter]);
+        if (studentFilter === "all") return attentionList;
+        if (studentFilter === "at_risk") {
+            return attentionList.filter((student) => student.at_risk);
+        }
+        if (studentFilter === "needs_attention") {
+            return attentionList.filter((student) => student.needs_attention);
+        }
+        if (studentFilter === "recent_decline") {
+            return attentionList.filter((student) => student.recent_decline);
+        }
+
+        return attentionList;
+    }, [attentionList, studentFilter]);
 
     // Filter tabs configuration
     const filterTabs = [
         {
             id: "all",
             label: "All",
-            count: allStudentsWithRisk.length,
+            count: attentionList.length,
             color: "gray",
         },
         {
-            id: "critical",
-            label: "Critical",
-            count: priorityStudents?.critical?.length || 0,
+            id: "at_risk",
+            label: "At Risks",
+            count: attentionList.filter((student) => student.at_risk).length,
             color: "red",
         },
         {
-            id: "warning",
-            label: "Warning",
-            count: priorityStudents?.warning?.length || 0,
+            id: "needs_attention",
+            label: "Needs Attention",
+            count: attentionList.filter((student) => student.needs_attention)
+                .length,
             color: "amber",
         },
         {
-            id: "watchlist",
-            label: "Watch",
-            count: priorityStudents?.watchList?.length || 0,
+            id: "recent_decline",
+            label: "Recent Declines",
+            count: attentionList.filter((student) => student.recent_decline)
+                .length,
             color: "blue",
         },
     ];
@@ -297,10 +280,8 @@ const Dashboard = ({
                                                 Students Needing Attention
                                             </h2>
                                             <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                {allStudentsWithRisk.length}{" "}
-                                                student
-                                                {allStudentsWithRisk.length !==
-                                                1
+                                                {attentionList.length} student
+                                                {attentionList.length !== 1
                                                     ? "s"
                                                     : ""}{" "}
                                                 requiring intervention
@@ -355,42 +336,72 @@ const Dashboard = ({
                                 </div>
                             </div>
 
-                            {/* Student List - More Compact */}
-                            <div className="p-4 space-y-3 max-h-[500px] overflow-y-auto">
+                            {/* Student List - Flat Table */}
+                            <div className="max-h-[500px] overflow-y-auto">
                                 {filteredStudents.length > 0 ? (
-                                    filteredStudents.map((student, index) => {
-                                        const riskStyle = getRiskLevelBadge(
-                                            student.riskLevel,
-                                        );
-                                        const RiskIcon = riskStyle.icon;
-
-                                        return (
-                                            <div
-                                                key={`${student.id}-${student.riskLevel}-${index}`}
-                                                className={`relative p-3 rounded-lg border ${riskStyle.border} ${riskStyle.bg} transition-all hover:shadow-md`}
-                                            >
-                                                {/* Compact Risk Badge */}
-                                                <div
-                                                    className={`absolute top-2 right-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${riskStyle.bg} ${riskStyle.text} border ${riskStyle.border}`}
-                                                >
-                                                    <RiskIcon className="w-3 h-3" />
-                                                    {riskStyle.label}
-                                                </div>
-
-                                                <StudentRiskCard
-                                                    student={student}
-                                                />
-                                            </div>
-                                        );
-                                    })
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                            <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900/40">
+                                                <tr>
+                                                    <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                        Student Name
+                                                    </th>
+                                                    <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                        Section
+                                                    </th>
+                                                    <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                        Subject
+                                                    </th>
+                                                    <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                        Grade
+                                                    </th>
+                                                    <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                        Absences
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                                {filteredStudents.map(
+                                                    (student, index) => (
+                                                        <tr
+                                                            key={`${student.enrollment_id}-${index}`}
+                                                            className="hover:bg-gray-50 dark:hover:bg-gray-700/40"
+                                                        >
+                                                            <td className="px-4 py-2.5 text-sm font-medium text-gray-900 dark:text-white">
+                                                                {
+                                                                    student.student_name
+                                                                }
+                                                            </td>
+                                                            <td className="px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300">
+                                                                {student.section ||
+                                                                    "N/A"}
+                                                            </td>
+                                                            <td className="px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300">
+                                                                {student.subject ||
+                                                                    "N/A"}
+                                                            </td>
+                                                            <td className="px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300">
+                                                                {student.grade ??
+                                                                    "N/A"}
+                                                            </td>
+                                                            <td className="px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300">
+                                                                {student.absences ??
+                                                                    0}
+                                                            </td>
+                                                        </tr>
+                                                    ),
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 ) : (
-                                    <div className="text-center py-8">
+                                    <div className="p-8 text-center">
                                         <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-3">
                                             <CheckCircle2 className="w-6 h-6 text-green-500" />
                                         </div>
                                         <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
                                             {studentFilter === "all"
-                                                ? "All Students Performing Well!"
+                                                ? "No Students Needing Attention"
                                                 : `No ${
                                                       filterTabs.find(
                                                           (t) =>
@@ -401,7 +412,7 @@ const Dashboard = ({
                                         </h3>
                                         <p className="text-xs text-gray-500 dark:text-gray-400">
                                             {studentFilter === "all"
-                                                ? "Great job! No students need intervention."
+                                                ? "No students currently match the alert conditions."
                                                 : "No students in this category."}
                                         </p>
                                     </div>
@@ -508,7 +519,7 @@ const Dashboard = ({
             <PriorityStudentsReportModal
                 show={showReportModal}
                 onClose={() => setShowReportModal(false)}
-                priorityStudents={priorityStudents}
+                attentionStudents={attentionStudents}
                 academicPeriod={academicPeriod}
                 department={department}
             />

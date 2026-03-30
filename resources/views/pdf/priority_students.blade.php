@@ -248,140 +248,116 @@
             @endif
         </div>
 
-        @if($includeCritical && count($criticalStudents) > 0)
+        @if($includeAtRisk && count($atRiskStudents) > 0)
             <div class="section-header critical">
-                Students at Risk (Critical) <span class="section-count">- {{ count($criticalStudents) }} student(s)</span>
+                At Risks <span class="section-count">- {{ count($atRiskStudents) }} student(s)</span>
             </div>
             <p style="font-size: 10px; color: #6b7280; margin: 0 0 10px 0;">
-                Students with grades below 70% - Immediate intervention required
+                Students with grades below 75%
             </p>
             <table>
                 <thead>
                     <tr>
                         <th style="width: 5%;">#</th>
                         <th style="width: 30%;">Student Name</th>
+                        <th style="width: 20%;">Section</th>
                         <th style="width: 25%;">Subject</th>
-                        <th style="width: 12%;">Current Grade</th>
-                        <th style="width: 12%;">Trend</th>
-                        <th style="width: 16%;">Intervention</th>
+                        <th style="width: 10%;">Grade</th>
+                        <th style="width: 10%;">Absences</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($criticalStudents as $index => $student)
+                    @foreach ($atRiskStudents as $index => $student)
                         <tr>
                             <td>{{ $index + 1 }}</td>
-                            <td class="name">{{ $student['first_name'] ?? '' }} {{ $student['last_name'] ?? '' }}</td>
+                            <td class="name">{{ $student['student_name'] ?? 'N/A' }}</td>
+                            <td>{{ $student['section'] ?? 'N/A' }}</td>
                             <td class="subject">{{ $student['subject'] ?? 'N/A' }}</td>
                             <td class="grade critical">{{ $student['grade'] !== null ? $student['grade'] . '%' : 'N/A' }}</td>
-                            <td class="trend {{ strtolower($student['trend'] ?? 'stable') }}">{{ $student['trend'] ?? 'N/A' }}</td>
-                            <td>
-                                @if($student['intervention'])
-                                    <span class="intervention-badge {{ strtolower(str_replace(' ', '', $student['intervention']['type'] ?? '')) }}">
-                                        {{ $student['intervention']['type'] ?? 'Active' }}
-                                    </span>
-                                @else
-                                    <span style="color: #dc2626; font-size: 10px;">No intervention</span>
-                                @endif
-                            </td>
+                            <td>{{ $student['absences'] ?? 0 }}</td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
-        @elseif($includeCritical)
+        @elseif($includeAtRisk)
             <div class="section-header critical">
-                Students at Risk (Critical) <span class="section-count">- 0 student(s)</span>
+                At Risks <span class="section-count">- 0 student(s)</span>
             </div>
             <div class="no-students">No students currently in critical status. Great job!</div>
         @endif
 
-        @if($includeWarning && count($warningStudents) > 0)
+        @if($includeNeedsAttention && count($needsAttentionStudents) > 0)
             <div class="section-header warning">
-                Needs Attention (Warning) <span class="section-count">- {{ count($warningStudents) }} student(s)</span>
+                Needs Attention <span class="section-count">- {{ count($needsAttentionStudents) }} student(s)</span>
             </div>
             <p style="font-size: 10px; color: #6b7280; margin: 0 0 10px 0;">
-                Students with grades between 70-74% - At risk of failing
+                Students absent more than 5 times
             </p>
             <table>
                 <thead>
                     <tr>
                         <th style="width: 5%;">#</th>
                         <th style="width: 30%;">Student Name</th>
+                        <th style="width: 20%;">Section</th>
                         <th style="width: 25%;">Subject</th>
-                        <th style="width: 12%;">Current Grade</th>
-                        <th style="width: 12%;">Trend</th>
-                        <th style="width: 16%;">Intervention</th>
+                        <th style="width: 10%;">Grade</th>
+                        <th style="width: 10%;">Absences</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($warningStudents as $index => $student)
+                    @foreach ($needsAttentionStudents as $index => $student)
                         <tr>
                             <td>{{ $index + 1 }}</td>
-                            <td class="name">{{ $student['first_name'] ?? '' }} {{ $student['last_name'] ?? '' }}</td>
+                            <td class="name">{{ $student['student_name'] ?? 'N/A' }}</td>
+                            <td>{{ $student['section'] ?? 'N/A' }}</td>
                             <td class="subject">{{ $student['subject'] ?? 'N/A' }}</td>
                             <td class="grade warning">{{ $student['grade'] !== null ? $student['grade'] . '%' : 'N/A' }}</td>
-                            <td class="trend {{ strtolower($student['trend'] ?? 'stable') }}">{{ $student['trend'] ?? 'N/A' }}</td>
-                            <td>
-                                @if($student['intervention'])
-                                    <span class="intervention-badge {{ strtolower(str_replace(' ', '', $student['intervention']['type'] ?? '')) }}">
-                                        {{ $student['intervention']['type'] ?? 'Active' }}
-                                    </span>
-                                @else
-                                    <span style="color: #f59e0b; font-size: 10px;">No intervention</span>
-                                @endif
-                            </td>
+                            <td>{{ $student['absences'] ?? 0 }}</td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
-        @elseif($includeWarning)
+        @elseif($includeNeedsAttention)
             <div class="section-header warning">
-                Needs Attention (Warning) <span class="section-count">- 0 student(s)</span>
+                Needs Attention <span class="section-count">- 0 student(s)</span>
             </div>
             <div class="no-students">No students currently need attention.</div>
         @endif
 
-        @if($includeWatchlist && count($watchlistStudents) > 0)
+        @if($includeRecentDecline && count($recentDeclineStudents) > 0)
             <div class="section-header watchlist">
-                Recent Declines (Watchlist) <span class="section-count">- {{ count($watchlistStudents) }} student(s)</span>
+                Recent Declines <span class="section-count">- {{ count($recentDeclineStudents) }} student(s)</span>
             </div>
             <p style="font-size: 10px; color: #6b7280; margin: 0 0 10px 0;">
-                Students with grades between 75-79% and declining trend - Monitor closely
+                Students whose grades dropped from >75 to 75 or below
             </p>
             <table>
                 <thead>
                     <tr>
                         <th style="width: 5%;">#</th>
                         <th style="width: 30%;">Student Name</th>
+                        <th style="width: 20%;">Section</th>
                         <th style="width: 25%;">Subject</th>
-                        <th style="width: 12%;">Current Grade</th>
-                        <th style="width: 12%;">Trend</th>
-                        <th style="width: 16%;">Intervention</th>
+                        <th style="width: 10%;">Grade</th>
+                        <th style="width: 10%;">Absences</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($watchlistStudents as $index => $student)
+                    @foreach ($recentDeclineStudents as $index => $student)
                         <tr>
                             <td>{{ $index + 1 }}</td>
-                            <td class="name">{{ $student['first_name'] ?? '' }} {{ $student['last_name'] ?? '' }}</td>
+                            <td class="name">{{ $student['student_name'] ?? 'N/A' }}</td>
+                            <td>{{ $student['section'] ?? 'N/A' }}</td>
                             <td class="subject">{{ $student['subject'] ?? 'N/A' }}</td>
                             <td class="grade watchlist">{{ $student['grade'] !== null ? $student['grade'] . '%' : 'N/A' }}</td>
-                            <td class="trend {{ strtolower($student['trend'] ?? 'stable') }}">{{ $student['trend'] ?? 'N/A' }}</td>
-                            <td>
-                                @if($student['intervention'])
-                                    <span class="intervention-badge {{ strtolower(str_replace(' ', '', $student['intervention']['type'] ?? '')) }}">
-                                        {{ $student['intervention']['type'] ?? 'Active' }}
-                                    </span>
-                                @else
-                                    <span style="color: #6b7280; font-size: 10px;">None assigned</span>
-                                @endif
-                            </td>
+                            <td>{{ $student['absences'] ?? 0 }}</td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
-        @elseif($includeWatchlist)
+        @elseif($includeRecentDecline)
             <div class="section-header watchlist">
-                Recent Declines (Watchlist) <span class="section-count">- 0 student(s)</span>
+                Recent Declines <span class="section-count">- 0 student(s)</span>
             </div>
             <div class="no-students">No students currently on the watchlist.</div>
         @endif
@@ -400,27 +376,27 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @if($includeCritical)
+                    @if($includeAtRisk)
                     <tr>
-                        <td style="text-align: center;"><strong style="color: #dc2626;">Critical</strong></td>
-                        <td style="text-align: center;"><span class="summary-number critical">{{ count($criticalStudents) }}</span></td>
-                        <td>Grade below 70%</td>
-                        <td>Immediate intervention required</td>
+                        <td style="text-align: center;"><strong style="color: #dc2626;">At Risks</strong></td>
+                        <td style="text-align: center;"><span class="summary-number critical">{{ count($atRiskStudents) }}</span></td>
+                        <td>Grade below 75%</td>
+                        <td>Immediate academic intervention required</td>
                     </tr>
                     @endif
-                    @if($includeWarning)
+                    @if($includeNeedsAttention)
                     <tr>
-                        <td style="text-align: center;"><strong style="color: #f59e0b;">Warning</strong></td>
-                        <td style="text-align: center;"><span class="summary-number warning">{{ count($warningStudents) }}</span></td>
-                        <td>Grade between 70-74%</td>
-                        <td>Scheduled check-in recommended</td>
+                        <td style="text-align: center;"><strong style="color: #f59e0b;">Needs Attention</strong></td>
+                        <td style="text-align: center;"><span class="summary-number warning">{{ count($needsAttentionStudents) }}</span></td>
+                        <td>Absent more than 5 times</td>
+                        <td>Attendance follow-up recommended</td>
                     </tr>
                     @endif
-                    @if($includeWatchlist)
+                    @if($includeRecentDecline)
                     <tr>
-                        <td style="text-align: center;"><strong style="color: #3b82f6;">Watchlist</strong></td>
-                        <td style="text-align: center;"><span class="summary-number watchlist">{{ count($watchlistStudents) }}</span></td>
-                        <td>Grade 75-79% with declining trend</td>
+                        <td style="text-align: center;"><strong style="color: #3b82f6;">Recent Declines</strong></td>
+                        <td style="text-align: center;"><span class="summary-number watchlist">{{ count($recentDeclineStudents) }}</span></td>
+                        <td>Dropped from &gt;75 to 75 or below</td>
                         <td>Monitor progress closely</td>
                     </tr>
                     @endif
@@ -428,7 +404,7 @@
                         <td style="text-align: center;"><strong>Total</strong></td>
                         <td style="text-align: center;">
                             <span class="summary-number total">
-                                {{ ($includeCritical ? count($criticalStudents) : 0) + ($includeWarning ? count($warningStudents) : 0) + ($includeWatchlist ? count($watchlistStudents) : 0) }}
+                                {{ ($includeAtRisk ? count($atRiskStudents) : 0) + ($includeNeedsAttention ? count($needsAttentionStudents) : 0) + ($includeRecentDecline ? count($recentDeclineStudents) : 0) }}
                             </span>
                         </td>
                         <td colspan="2">Students requiring attention</td>
@@ -439,14 +415,14 @@
             <div class="recommendations">
                 <div class="recommendations-title">General Recommendations</div>
                 <ul class="recommendations-list">
-                    @if($includeCritical && count($criticalStudents) > 0)
-                        <li><strong>Critical students:</strong> Schedule immediate one-on-one meetings. Consider Tier 2 or Tier 3 interventions.</li>
+                    @if($includeAtRisk && count($atRiskStudents) > 0)
+                        <li><strong>At risk students:</strong> Schedule immediate one-on-one meetings and create support plans.</li>
                     @endif
-                    @if($includeWarning && count($warningStudents) > 0)
-                        <li><strong>Warning students:</strong> Implement Tier 1 interventions. Monitor assignment completion and attendance.</li>
+                    @if($includeNeedsAttention && count($needsAttentionStudents) > 0)
+                        <li><strong>Needs attention students:</strong> Review attendance concerns and coordinate with guardians.</li>
                     @endif
-                    @if($includeWatchlist && count($watchlistStudents) > 0)
-                        <li><strong>Watchlist students:</strong> Check for any recent issues affecting performance. Provide additional support resources.</li>
+                    @if($includeRecentDecline && count($recentDeclineStudents) > 0)
+                        <li><strong>Recent declines:</strong> Investigate sudden drops and provide targeted remediation support.</li>
                     @endif
                     <li>Document all interventions and track progress regularly.</li>
                     <li>Communicate with parents/guardians about student performance concerns.</li>
