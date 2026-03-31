@@ -97,22 +97,22 @@ const StudentStatusModal = ({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4 overflow-y-auto">
-            <div className="relative w-full max-w-4xl my-4 rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden max-h-[calc(100vh-2rem)] flex flex-col">
+            <div className="relative w-full max-w-3xl my-4 rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden max-h-[calc(100vh-2rem)] flex flex-col">
                 {/* Close button - fixed position, always visible */}
                 <button
                     type="button"
                     onClick={onClose}
-                    className="absolute right-3 top-3 z-10 rounded-full bg-white/90 p-2 text-gray-600 shadow-lg transition hover:bg-white hover:text-gray-900"
+                    className="absolute right-3 top-3 z-10 rounded-full bg-white/90 p-1.5 text-gray-600 shadow-lg transition hover:bg-white hover:text-gray-900"
                     aria-label="Close modal"
                 >
-                    <X size={20} />
+                    <X size={18} />
                 </button>
 
                 {/* Header */}
-                <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 p-6 text-white flex-shrink-0">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pr-8">
-                        <div className="flex items-center gap-4">
-                            <div className="h-16 w-16 overflow-hidden rounded-xl border border-white/40 bg-white/20 flex items-center justify-center text-xl font-semibold flex-shrink-0">
+                <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 p-4 text-white flex-shrink-0">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pr-8">
+                        <div className="flex items-center gap-3">
+                            <div className="h-12 w-12 overflow-hidden rounded-lg border border-white/40 bg-white/20 flex items-center justify-center text-base font-semibold flex-shrink-0">
                                 {student.avatar ? (
                                     <img
                                         src={student.avatar}
@@ -127,10 +127,10 @@ const StudentStatusModal = ({
                                 <p className="text-xs uppercase tracking-widest text-white/80">
                                     Student Status
                                 </p>
-                                <h2 className="text-xl sm:text-2xl font-bold truncate">
+                                <h2 className="text-lg sm:text-xl font-bold truncate">
                                     {student.name}
                                 </h2>
-                                <p className="text-sm text-white/80">
+                                <p className="text-xs text-white/80">
                                     {student.grade_level || ""}{" "}
                                     {student.section
                                         ? `• ${student.section}`
@@ -138,36 +138,36 @@ const StudentStatusModal = ({
                                 </p>
                             </div>
                         </div>
-                        <div className="flex gap-3 flex-shrink-0 flex-wrap">
-                            <div className="rounded-xl bg-white/20 px-4 py-3 text-center backdrop-blur">
-                                <p className="text-xs uppercase tracking-wide text-white/70">
+                        <div className="flex gap-1.5 flex-shrink-0 flex-wrap">
+                            <div className="rounded-lg bg-white/20 px-2.5 py-1.5 text-center backdrop-blur min-w-[78px]">
+                                <p className="text-[10px] uppercase tracking-wide text-white/70">
                                     Q{selectedQuarter} Grade
                                 </p>
-                                <p className="text-2xl font-semibold">
+                                <p className="text-lg font-semibold leading-tight">
                                     {quarterlyGrade}
                                 </p>
                             </div>
-                            <div className="rounded-xl bg-white/20 px-4 py-3 text-center backdrop-blur">
-                                <p className="text-xs uppercase tracking-wide text-white/70">
+                            <div className="rounded-lg bg-white/20 px-2.5 py-1.5 text-center backdrop-blur min-w-[78px]">
+                                <p className="text-[10px] uppercase tracking-wide text-white/70">
                                     Expected Q{selectedQuarter}
                                 </p>
-                                <p className="text-2xl font-semibold text-yellow-200">
+                                <p className="text-lg font-semibold text-yellow-200 leading-tight">
                                     {expectedGrade}
                                 </p>
                             </div>
-                            <div className="rounded-xl bg-white/20 px-4 py-3 text-center backdrop-blur">
-                                <p className="text-xs uppercase tracking-wide text-white/70">
+                            <div className="rounded-lg bg-white/20 px-2.5 py-1.5 text-center backdrop-blur min-w-[78px]">
+                                <p className="text-[10px] uppercase tracking-wide text-white/70">
                                     Final Grade
                                 </p>
-                                <p className="text-2xl font-semibold">
+                                <p className="text-lg font-semibold leading-tight">
                                     {finalGrade}
                                 </p>
                             </div>
-                            <div className="rounded-xl bg-white/20 px-4 py-3 text-center backdrop-blur">
-                                <p className="text-xs uppercase tracking-wide text-white/70">
+                            <div className="rounded-lg bg-white/20 px-2.5 py-1.5 text-center backdrop-blur min-w-[78px]">
+                                <p className="text-[10px] uppercase tracking-wide text-white/70">
                                     Activities
                                 </p>
-                                <p className="text-2xl font-semibold">
+                                <p className="text-lg font-semibold leading-tight">
                                     {assignments.length}
                                 </p>
                             </div>
@@ -176,20 +176,20 @@ const StudentStatusModal = ({
                 </div>
 
                 {/* Scrollable Content */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 overflow-y-auto p-3 space-y-3">
                     {/* Temporary Password Section */}
                     {hasChangedPassword ? (
                         // Student has already changed their password
-                        <div className="rounded-xl border-2 border-gray-200 bg-gray-50 p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-2.5">
+                            <div className="flex items-center gap-2">
+                                <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
                                     <Check
-                                        size={20}
+                                        size={16}
                                         className="text-green-600"
                                     />
                                 </div>
                                 <div>
-                                    <p className="text-sm font-semibold text-gray-800">
+                                    <p className="text-xs font-semibold text-gray-800">
                                         Password Changed
                                     </p>
                                     <p className="text-xs text-gray-500">
@@ -200,10 +200,10 @@ const StudentStatusModal = ({
                         </div>
                     ) : temporaryPassword ? (
                         // Student has a temporary password
-                        <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50 p-4">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2.5">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                 <div>
-                                    <p className="text-sm font-semibold text-emerald-800">
+                                    <p className="text-xs font-semibold text-emerald-800">
                                         Temporary Password
                                     </p>
                                     <p className="text-xs text-emerald-600">
@@ -211,9 +211,9 @@ const StudentStatusModal = ({
                                         initial login
                                     </p>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-2 rounded-lg bg-white border border-emerald-300 px-4 py-2">
-                                        <span className="font-mono text-lg font-semibold text-gray-900 tracking-wider">
+                                <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center gap-1 rounded-lg bg-white border border-emerald-300 px-2.5 py-1">
+                                        <span className="font-mono text-sm font-semibold text-gray-900 tracking-wide">
                                             {showPassword
                                                 ? temporaryPassword
                                                 : "••••••••••••"}
@@ -223,7 +223,7 @@ const StudentStatusModal = ({
                                             onClick={() =>
                                                 setShowPassword(!showPassword)
                                             }
-                                            className="p-1 text-gray-500 hover:text-gray-700 transition"
+                                            className="p-0.5 text-gray-500 hover:text-gray-700 transition"
                                             aria-label={
                                                 showPassword
                                                     ? "Hide password"
@@ -231,24 +231,24 @@ const StudentStatusModal = ({
                                             }
                                         >
                                             {showPassword ? (
-                                                <EyeOff size={18} />
+                                                <EyeOff size={15} />
                                             ) : (
-                                                <Eye size={18} />
+                                                <Eye size={15} />
                                             )}
                                         </button>
                                         <button
                                             type="button"
                                             onClick={handleCopyPassword}
-                                            className="p-1 text-gray-500 hover:text-gray-700 transition"
+                                            className="p-0.5 text-gray-500 hover:text-gray-700 transition"
                                             aria-label="Copy password"
                                         >
                                             {copied ? (
                                                 <Check
-                                                    size={18}
+                                                    size={15}
                                                     className="text-green-600"
                                                 />
                                             ) : (
-                                                <Copy size={18} />
+                                                <Copy size={15} />
                                             )}
                                         </button>
                                     </div>
@@ -257,13 +257,13 @@ const StudentStatusModal = ({
                         </div>
                     ) : (
                         // No temporary password available
-                        <div className="rounded-xl border-2 border-amber-200 bg-amber-50 p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
-                                    <Eye size={20} className="text-amber-600" />
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-2.5">
+                            <div className="flex items-center gap-2">
+                                <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center">
+                                    <Eye size={16} className="text-amber-600" />
                                 </div>
                                 <div>
-                                    <p className="text-sm font-semibold text-amber-800">
+                                    <p className="text-xs font-semibold text-amber-800">
                                         No Temporary Password
                                     </p>
                                     <p className="text-xs text-amber-600">
@@ -276,16 +276,16 @@ const StudentStatusModal = ({
                     )}
 
                     {/* Meta Information Grid */}
-                    <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
+                    <div className="grid gap-2 grid-cols-2 md:grid-cols-3">
                         {metaItems.map((item) => (
                             <div
                                 key={item.label}
-                                className="rounded-xl border border-gray-100 bg-gray-50/70 p-3"
+                                className="rounded-lg border border-gray-100 bg-gray-50/70 p-2"
                             >
-                                <p className="text-xs font-medium uppercase tracking-widest text-gray-500">
+                                <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
                                     {item.label}
                                 </p>
-                                <p className="mt-1 text-sm font-semibold text-gray-900 truncate">
+                                <p className="mt-0.5 text-xs font-semibold text-gray-900 truncate">
                                     {item.value || "—"}
                                 </p>
                             </div>
@@ -294,10 +294,10 @@ const StudentStatusModal = ({
 
                     {/* Grades Overview */}
                     {currentCategories.length > 0 && (
-                        <div className="rounded-xl border border-gray-100 p-4">
-                            <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 pb-3">
+                        <div className="rounded-lg border border-gray-100 p-2.5">
+                            <div className="flex flex-wrap items-center gap-1.5 border-b border-gray-100 pb-2">
                                 <div>
-                                    <h3 className="text-lg font-semibold text-gray-900">
+                                    <h3 className="text-base font-semibold text-gray-900">
                                         Grades Overview
                                     </h3>
                                     <p className="text-xs text-gray-500">
@@ -349,7 +349,7 @@ const StudentStatusModal = ({
                                 </div>
                             </div>
 
-                            <div className="flex flex-wrap gap-2 mt-3 mb-3">
+                            <div className="flex flex-wrap gap-1.5 mt-2 mb-2">
                                 {currentCategories.map((category) => (
                                     <span
                                         key={category.id}
@@ -365,7 +365,7 @@ const StudentStatusModal = ({
                                 ))}
                             </div>
 
-                            <div className="mt-3 max-h-72 overflow-y-auto rounded-xl border border-gray-100">
+                            <div className="mt-2 max-h-72 overflow-y-auto rounded-lg border border-gray-100">
                                 <table className="min-w-full divide-y divide-gray-200 text-left">
                                     <thead className="bg-gray-50/80 text-xs font-semibold uppercase tracking-wider text-gray-500 sticky top-0">
                                         <tr>
@@ -562,11 +562,11 @@ const StudentStatusModal = ({
                 </div>
 
                 {/* Footer */}
-                <div className="flex justify-end bg-gray-50 px-6 py-4 border-t border-gray-100 flex-shrink-0">
+                <div className="flex justify-end bg-gray-50 px-3 py-2.5 border-t border-gray-100 flex-shrink-0">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/30 transition hover:bg-indigo-700"
+                        className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-indigo-600/30 transition hover:bg-indigo-700"
                     >
                         Close
                     </button>

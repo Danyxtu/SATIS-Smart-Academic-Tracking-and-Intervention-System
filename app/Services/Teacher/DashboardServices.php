@@ -202,10 +202,20 @@ class DashboardServices
             ->with('subject')
             ->get();
 
+        // Fallback: if strict current period filters return no rows,
+        // expose available teacher assignments so grade upload can still proceed.
+        if ($subjectTeachers->isEmpty()) {
+            $subjectTeachers = \App\Models\SubjectTeacher::where('teacher_id', $teacher->id)
+                ->with('subject')
+                ->orderByDesc('school_year')
+                ->orderBy('semester')
+                ->get();
+        }
+
         return $subjectTeachers->map(function ($subjectTeacher) {
             return [
                 'id' => $subjectTeacher->subject->id,
-                'name' => $subjectTeacher->subject->subject_name,
+                'name' => $subjectTeacher->subject->subject_name ?? $subjectTeacher->subject->name,
                 'code' => $subjectTeacher->subject->subject_code ?? null,
                 'subject_teacher_id' => $subjectTeacher->id,
             ];

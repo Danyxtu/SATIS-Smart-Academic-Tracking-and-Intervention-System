@@ -58,15 +58,40 @@ export default function UploadGradesModal({ show, onClose, allSubjects = [] }) {
     const fileInputRef = useRef(null);
 
     /* ── derived ── */
+    const normalizedSubjects = useMemo(() => {
+        const source = Array.isArray(allSubjects) ? allSubjects : [];
+
+        return source
+            .map((subject) => ({
+                id: subject?.id ?? subject?.subject_id ?? null,
+                name:
+                    subject?.name ??
+                    subject?.subject_name ??
+                    subject?.subject ??
+                    "",
+                code: subject?.code ?? subject?.subject_code ?? "",
+                subject_teacher_id:
+                    subject?.subject_teacher_id ??
+                    subject?.id ??
+                    subject?.subject_teachers_id ??
+                    null,
+            }))
+            .filter(
+                (subject) =>
+                    Boolean(subject.subject_teacher_id) &&
+                    Boolean(subject.name?.trim()),
+            );
+    }, [allSubjects]);
+
     const filteredSubjects = useMemo(() => {
-        if (!searchQuery.trim()) return allSubjects;
+        if (!searchQuery.trim()) return normalizedSubjects;
         const q = searchQuery.toLowerCase();
-        return allSubjects.filter(
+        return normalizedSubjects.filter(
             (subject) =>
                 subject.name?.toLowerCase().includes(q) ||
                 subject.code?.toLowerCase().includes(q),
         );
-    }, [allSubjects, searchQuery]);
+    }, [normalizedSubjects, searchQuery]);
 
     /* ── helpers ── */
     const resetAll = useCallback(() => {

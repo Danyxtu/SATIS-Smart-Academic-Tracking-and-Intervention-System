@@ -41,7 +41,9 @@ const StartQ2ConfirmModal = ({
         }
 
         router.post(`/teacher/classes/${classId}/quarter`, payload, {
+            preserveState: true,
             preserveScroll: true,
+            replace: true,
             onSuccess: () => {
                 setIsSubmitting(false);
                 setPassword("");

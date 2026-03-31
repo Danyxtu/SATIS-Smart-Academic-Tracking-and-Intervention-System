@@ -24,19 +24,22 @@ class AttendanceServices
 
 
         $rosters = $subjectTeachers->mapWithKeys(fn($st) => [
-            $st->id => $st->enrollments->map(function ($enrollment) {
-                $user = $enrollment->user;
-                $studentProfile = $user?->student;
-                $fullName = $studentProfile?->student_name ?? $user?->name ?? 'Student';
+            $st->id => $st->enrollments
+                ->map(function ($enrollment) {
+                    $user = $enrollment->user;
+                    $studentProfile = $user?->student;
+                    $fullName = $studentProfile?->student_name ?? $user?->name ?? 'Student';
 
-                return [
-                    'id' => $enrollment->id,
-                    'name' => $fullName,
-                    'avatar' => $studentProfile?->avatar ?? $this->avatarFor($fullName),
-                    'email' => $user?->email,
-                    'status' => 'present',
-                ];
-            })->values(),
+                    return [
+                        'id' => $enrollment->id,
+                        'name' => $fullName,
+                        'avatar' => $studentProfile?->avatar ?? $this->avatarFor($fullName),
+                        'email' => $user?->email,
+                        'status' => 'present',
+                    ];
+                })
+                ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+                ->values(),
         ])->all();
 
         $classes =  $subjectTeachers->map(fn($st) => [

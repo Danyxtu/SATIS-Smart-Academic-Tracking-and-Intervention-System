@@ -533,7 +533,7 @@ const Dashboard = ({
             <StartInterventionModal
                 show={showInterventionModal}
                 onClose={() => setShowInterventionModal(false)}
-                priorityStudents={priorityStudents}
+                attentionStudents={attentionStudents}
             />
         </SuperAdminLayout>
     );

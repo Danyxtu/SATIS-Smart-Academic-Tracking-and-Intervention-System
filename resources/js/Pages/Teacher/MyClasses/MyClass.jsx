@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import EmptyStudentState from "@/Components/Teacher/MyClasses/EmptyStudentState";
 import { router } from "@inertiajs/react";
 
@@ -116,6 +116,64 @@ const formatAcademicMeta = (student) => {
         .join(" • ");
 };
 
+const stripGradePrefix = (value) => {
+    if (value === null || value === undefined) return "";
+    return String(value)
+        .replace(/^grade\s+/i, "")
+        .trim();
+};
+
+const VIEW_QUERY_PARAM = "view";
+const TAB_QUERY_PARAM = "tab";
+const GRADES_VIEW_QUERY_VALUE = "grades";
+
+const resolveTabFromQuery = ({ tabValue, isQ2Unlocked, isFinalUnlocked }) => {
+    if (tabValue === "q2" && isQ2Unlocked) {
+        return "q2";
+    }
+
+    if (tabValue === "final" && isFinalUnlocked) {
+        return "final";
+    }
+
+    return "q1";
+};
+
+const applyQuarterCategoriesToGradeStructure = ({
+    currentGradeStructure,
+    quarter,
+    categories,
+}) => {
+    const quarterKey = String(quarter ?? 1);
+    const baseStructure =
+        currentGradeStructure && typeof currentGradeStructure === "object"
+            ? currentGradeStructure
+            : {};
+
+    const nextStructure = { ...baseStructure };
+    const existingQuarterEntry = nextStructure[quarterKey];
+
+    if (
+        existingQuarterEntry &&
+        typeof existingQuarterEntry === "object" &&
+        !Array.isArray(existingQuarterEntry)
+    ) {
+        nextStructure[quarterKey] = {
+            ...existingQuarterEntry,
+            categories,
+        };
+    } else {
+        nextStructure[quarterKey] = { categories };
+    }
+
+    // Legacy shape fallback: some views still read from top-level categories.
+    if (quarterKey === "1") {
+        nextStructure.categories = categories;
+    }
+
+    return nextStructure;
+};
+
 // Main Component
 const MyClass = (props) => {
     const {
@@ -124,6 +182,7 @@ const MyClass = (props) => {
         roster = [],
         gradeStructure,
         gradeSummaries = {},
+        onRefreshClassData,
     } = props;
 
     // State Management
@@ -131,6 +190,7 @@ const MyClass = (props) => {
     const isGradeView = studentViewMode === "gradeOverview";
     const [selectedQuarter, setSelectedQuarter] = useState(1);
     const [selectedTab, setSelectedTab] = useState("q1");
+    const [showFinalUnlockInfo, setShowFinalUnlockInfo] = useState(false);
     const [isStartQ2ModalOpen, setIsStartQ2ModalOpen] = useState(false);
     const currentQuarter = selectedClass?.current_quarter ?? 1;
     const isQ2Unlocked = currentQuarter >= 2;
@@ -165,6 +225,9 @@ const MyClass = (props) => {
     const [uploadSuccess, setUploadSuccess] = useState(null);
     const classlistUploadRef = useRef(null);
     const gradeUploadRef = useRef(null);
+    const hasHydratedViewFromUrl = useRef(false);
+    const [localGradeStructure, setLocalGradeStructure] =
+        useState(gradeStructure);
 
     // Helper Functions
     const isCategoryCollapsed = (categoryId) =>
@@ -200,29 +263,29 @@ const MyClass = (props) => {
     const dirtyGradeCount = Object.keys(dirtyGrades).length;
     const hasGradeChanges = dirtyGradeCount > 0;
     const quarterStructure =
-        gradeStructure?.[selectedQuarter] ??
-        gradeStructure?.[String(selectedQuarter)];
+        localGradeStructure?.[selectedQuarter] ??
+        localGradeStructure?.[String(selectedQuarter)];
     const gradeCategories =
         quarterStructure?.categories ||
-        gradeStructure?.categories ||
+        localGradeStructure?.categories ||
         FALLBACK_GRADE_CATEGORIES;
     const students = roster;
 
     const q1Categories = useMemo(
         () =>
-            gradeStructure?.["1"]?.categories ??
-            gradeStructure?.[1]?.categories ??
-            gradeStructure?.categories ??
+            localGradeStructure?.["1"]?.categories ??
+            localGradeStructure?.[1]?.categories ??
+            localGradeStructure?.categories ??
             FALLBACK_GRADE_CATEGORIES,
-        [gradeStructure],
+        [localGradeStructure],
     );
     const q2Categories = useMemo(
         () =>
-            gradeStructure?.["2"]?.categories ??
-            gradeStructure?.[2]?.categories ??
-            gradeStructure?.categories ??
+            localGradeStructure?.["2"]?.categories ??
+            localGradeStructure?.[2]?.categories ??
+            localGradeStructure?.categories ??
             FALLBACK_GRADE_CATEGORIES,
-        [gradeStructure],
+        [localGradeStructure],
     );
 
     const q1HasQuarterlyExam = useMemo(() => {
@@ -237,12 +300,16 @@ const MyClass = (props) => {
         );
     }, [students, q2Categories]);
 
-    const isFinalUnlocked = useMemo(() => {
-        if (currentQuarter < 2) return false;
+    const hasEligibleFinalGradeData = useMemo(() => {
         return Object.values(gradeSummaries).some(
             (s) => s.q1_grade != null && s.q2_grade != null,
         );
-    }, [currentQuarter, gradeSummaries]);
+    }, [gradeSummaries]);
+
+    const isFinalUnlocked = useMemo(() => {
+        if (currentQuarter < 2) return false;
+        return hasEligibleFinalGradeData;
+    }, [currentQuarter, hasEligibleFinalGradeData]);
 
     const filteredStudents = useMemo(() => {
         if (!searchTerm.trim()) return students;
@@ -323,12 +390,145 @@ const MyClass = (props) => {
         return columns;
     }, [gradeCategories]);
 
+    const classTitleName = stripGradePrefix(selectedClass?.name);
+    const classTitleSection =
+        selectedClass?.section?.trim?.() ?? selectedClass?.section ?? "";
+    const classTitleLabel =
+        [classTitleName, classTitleSection].filter(Boolean).join(" ").trim() ||
+        stripGradePrefix(selectedClassHeading);
+
+    const selectedSubjectLabel = (() => {
+        const rawSubject = selectedClass?.subject;
+
+        if (typeof rawSubject === "string" && rawSubject.trim()) {
+            return rawSubject.trim();
+        }
+
+        if (rawSubject && typeof rawSubject === "object") {
+            const nestedSubject =
+                rawSubject.subject_name ??
+                rawSubject.name ??
+                rawSubject.subject ??
+                "";
+
+            if (typeof nestedSubject === "string" && nestedSubject.trim()) {
+                return nestedSubject.trim();
+            }
+        }
+
+        if (
+            typeof selectedClass?.subject_name === "string" &&
+            selectedClass.subject_name.trim()
+        ) {
+            return selectedClass.subject_name.trim();
+        }
+
+        return "";
+    })();
+
     const hasAssignments = assignmentColumns.length > 0;
 
     const selectedTaskCategory = useMemo(() => {
         if (!activeGradeCategoryId) return null;
         return gradeCategories.find((cat) => cat.id === activeGradeCategoryId);
     }, [activeGradeCategoryId, gradeCategories]);
+
+    const refreshCurrentClassData = async () => {
+        if (!selectedClass?.id || typeof onRefreshClassData !== "function") {
+            return;
+        }
+
+        await onRefreshClassData(selectedClass.id);
+    };
+
+    useEffect(() => {
+        setLocalGradeStructure(gradeStructure);
+    }, [gradeStructure, selectedClass?.id]);
+
+    const applyCategoriesForQuarter = (
+        quarterToUpdate,
+        categoriesForQuarter,
+    ) => {
+        setLocalGradeStructure((prevGradeStructure) =>
+            applyQuarterCategoriesToGradeStructure({
+                currentGradeStructure: prevGradeStructure,
+                quarter: quarterToUpdate,
+                categories: categoriesForQuarter,
+            }),
+        );
+    };
+
+    useEffect(() => {
+        if (!selectedClass?.id) {
+            hasHydratedViewFromUrl.current = false;
+            return;
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        const requestedView = params.get(VIEW_QUERY_PARAM);
+        const requestedTab = params.get(TAB_QUERY_PARAM);
+
+        const shouldUseGradesView = requestedView === GRADES_VIEW_QUERY_VALUE;
+
+        if (!shouldUseGradesView) {
+            setStudentViewMode("classList");
+            setSelectedTab("q1");
+            setSelectedQuarter(1);
+            hasHydratedViewFromUrl.current = true;
+            return;
+        }
+
+        const resolvedTab = resolveTabFromQuery({
+            tabValue: requestedTab,
+            isQ2Unlocked,
+            isFinalUnlocked,
+        });
+
+        setStudentViewMode("gradeOverview");
+        setSelectedTab(resolvedTab);
+        setSelectedQuarter(resolvedTab === "q2" ? 2 : 1);
+        hasHydratedViewFromUrl.current = true;
+    }, [selectedClass?.id, isQ2Unlocked, isFinalUnlocked]);
+
+    useEffect(() => {
+        if (!selectedClass?.id || !hasHydratedViewFromUrl.current) {
+            return;
+        }
+
+        const params = new URLSearchParams(window.location.search);
+
+        if (studentViewMode === "gradeOverview") {
+            params.set(VIEW_QUERY_PARAM, GRADES_VIEW_QUERY_VALUE);
+
+            const tabForUrl = resolveTabFromQuery({
+                tabValue: selectedTab,
+                isQ2Unlocked,
+                isFinalUnlocked,
+            });
+
+            params.set(TAB_QUERY_PARAM, tabForUrl);
+        } else {
+            params.delete(VIEW_QUERY_PARAM);
+            params.delete(TAB_QUERY_PARAM);
+        }
+
+        const nextQuery = params.toString();
+        const nextUrl = nextQuery
+            ? `${window.location.pathname}?${nextQuery}`
+            : window.location.pathname;
+
+        const currentUrl = `${window.location.pathname}${window.location.search}`;
+
+        if (nextUrl !== currentUrl) {
+            window.history.replaceState({}, "", nextUrl);
+        }
+    }, [
+        selectedClass?.id,
+        studentViewMode,
+        selectedTab,
+        isQ2Unlocked,
+        isFinalUnlocked,
+    ]);
 
     // Event Handlers
     const handleSaveGrades = async () => {
@@ -361,15 +561,17 @@ const MyClass = (props) => {
             `/teacher/classes/${selectedClass.id}/grades/bulk`,
             { grades: payload },
             {
+                preserveState: true,
                 preserveScroll: true,
-                onSuccess: (page) => {
+                replace: true,
+                onSuccess: async () => {
                     setDirtyGrades({});
                     setGradeSubmissionModal({
                         isOpen: true,
                         status: "success",
                         message: "The grades have been submitted successfully!",
                     });
-                    router.reload({ only: ["roster", "gradeStructure"] });
+                    await refreshCurrentClassData();
                 },
                 onError: (errors) => {
                     console.error("Error saving grades:", errors);
@@ -446,7 +648,12 @@ const MyClass = (props) => {
                 {
                     preserveState: true,
                     preserveScroll: true,
+                    replace: true,
                     onSuccess: () => {
+                        applyCategoriesForQuarter(
+                            selectedQuarter,
+                            updatedCategories,
+                        );
                         setActiveGradeCategoryId(null);
                     },
                     onError: (errors) => {
@@ -484,14 +691,17 @@ const MyClass = (props) => {
                 formData,
                 {
                     forceFormData: true,
+                    preserveState: true,
                     preserveScroll: true,
-                    onSuccess: () => {
+                    replace: true,
+                    onSuccess: async () => {
                         setUploadSuccess(
                             "Classlist uploaded successfully! Students have been added.",
                         );
                         if (classlistUploadRef.current) {
                             classlistUploadRef.current.value = "";
                         }
+                        await refreshCurrentClassData();
                     },
                     onError: (errors) => {
                         const errorMsg =
@@ -534,11 +744,13 @@ const MyClass = (props) => {
                     forceFormData: true,
                     preserveState: true,
                     preserveScroll: true,
-                    onSuccess: () => {
+                    replace: true,
+                    onSuccess: async () => {
                         setUploadSuccess("Grades imported successfully!");
                         if (gradeUploadRef.current) {
                             gradeUploadRef.current.value = "";
                         }
+                        await refreshCurrentClassData();
                     },
                     onError: (errors) => {
                         const errorMsg =
@@ -564,7 +776,7 @@ const MyClass = (props) => {
         const sampleRow = [
             "Juan Dela Cruz",
             "123456789012",
-            "Grade 11",
+            "11",
             "Section A",
             "juan@example.com",
         ];
@@ -658,7 +870,17 @@ const MyClass = (props) => {
                     <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                             <h2 className="text-lg font-bold text-gray-900">
-                                {selectedClassHeading}
+                                {classTitleLabel}
+                                {selectedSubjectLabel && (
+                                    <>
+                                        <span className="text-gray-500">
+                                            :{" "}
+                                        </span>
+                                        <span className="text-indigo-600 dark:text-indigo-400">
+                                            {selectedSubjectLabel}
+                                        </span>
+                                    </>
+                                )}
                             </h2>
                             {selectedClass?.current_quarter && (
                                 <span className="px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-700 font-medium">
@@ -693,9 +915,6 @@ const MyClass = (props) => {
                                 </button>
                             </div>
                         </div>
-                        <p className="text-xs text-gray-600 mt-0.5">
-                            {selectedClass.subject}
-                        </p>
                     </div>
 
                     {/* Action Buttons - More Compact */}
@@ -810,17 +1029,18 @@ const MyClass = (props) => {
                                 <span className="text-xs font-medium text-gray-700">
                                     View:
                                 </span>
-                                <div className="flex items-center p-0.5 bg-gray-100 rounded-md">
+                                <div className="flex items-center p-0.5 bg-gray-100 rounded-md ring-1 ring-gray-200">
                                     <button
                                         onClick={() => {
                                             setSelectedTab("q1");
                                             setSelectedQuarter(1);
                                             setDirtyGrades({});
                                         }}
-                                        className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                                        aria-pressed={selectedTab === "q1"}
+                                        className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 ${
                                             selectedTab === "q1"
-                                                ? "bg-white text-indigo-700 shadow-sm"
-                                                : "text-gray-600 hover:bg-gray-200"
+                                                ? "bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-600"
+                                                : "text-gray-700 hover:bg-white hover:text-indigo-700"
                                         }`}
                                     >
                                         Q1
@@ -834,12 +1054,13 @@ const MyClass = (props) => {
                                             }
                                         }}
                                         disabled={!isQ2Unlocked}
-                                        className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                                        aria-pressed={selectedTab === "q2"}
+                                        className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 ${
                                             selectedTab === "q2"
-                                                ? "bg-white text-indigo-700 shadow-sm"
+                                                ? "bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-600"
                                                 : !isQ2Unlocked
-                                                  ? "text-gray-400 cursor-not-allowed"
-                                                  : "text-gray-600 hover:bg-gray-200"
+                                                  ? "text-gray-400 cursor-not-allowed opacity-75"
+                                                  : "text-gray-700 hover:bg-white hover:text-indigo-700"
                                         }`}
                                         title={
                                             !isQ2Unlocked
@@ -856,12 +1077,13 @@ const MyClass = (props) => {
                                             }
                                         }}
                                         disabled={!isFinalUnlocked}
-                                        className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                                        aria-pressed={selectedTab === "final"}
+                                        className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 ${
                                             selectedTab === "final"
-                                                ? "bg-white text-indigo-700 shadow-sm"
+                                                ? "bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-600"
                                                 : !isFinalUnlocked
-                                                  ? "text-gray-400 cursor-not-allowed"
-                                                  : "text-gray-600 hover:bg-gray-200"
+                                                  ? "text-gray-400 cursor-not-allowed opacity-75"
+                                                  : "text-gray-700 hover:bg-white hover:text-indigo-700"
                                         }`}
                                         title={
                                             !isFinalUnlocked
@@ -871,6 +1093,65 @@ const MyClass = (props) => {
                                     >
                                         Final
                                     </button>
+                                    <div className="relative ml-1">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setShowFinalUnlockInfo(
+                                                    (prev) => !prev,
+                                                )
+                                            }
+                                            aria-expanded={showFinalUnlockInfo}
+                                            aria-controls="final-unlock-conditions"
+                                            className="flex h-5 w-5 items-center justify-center rounded-full border border-indigo-300 bg-indigo-50 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
+                                            title="Show Final tab conditions"
+                                        >
+                                            ?
+                                        </button>
+
+                                        {showFinalUnlockInfo && (
+                                            <div
+                                                id="final-unlock-conditions"
+                                                role="status"
+                                                className="absolute left-full top-1/2 z-30 ml-2 w-72 -translate-y-1/2 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs text-indigo-900 shadow-lg"
+                                            >
+                                                <div className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rotate-45 border-b border-l border-indigo-200 bg-white" />
+                                                <p className="font-semibold">
+                                                    Final opens when:
+                                                </p>
+                                                <ul className="mt-1 list-disc space-y-1 pl-4">
+                                                    <li>
+                                                        Quarter 2 is started.
+                                                        <span className="ml-1 font-medium text-indigo-800">
+                                                            (
+                                                            {currentQuarter >= 2
+                                                                ? "Met"
+                                                                : "Pending"}
+                                                            )
+                                                        </span>
+                                                    </li>
+                                                    <li>
+                                                        At least one student has
+                                                        both Q1 and Q2 quarterly
+                                                        exam grades.
+                                                        <span className="ml-1 font-medium text-indigo-800">
+                                                            (
+                                                            {hasEligibleFinalGradeData
+                                                                ? "Met"
+                                                                : "Pending"}
+                                                            )
+                                                        </span>
+                                                    </li>
+                                                </ul>
+                                                <p className="mt-1 font-medium">
+                                                    Status:{" "}
+                                                    {isFinalUnlocked
+                                                        ? "Final tab is open."
+                                                        : "Final tab is locked."}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                                 {currentQuarter < 2 && (
                                     <button
@@ -1021,6 +1302,7 @@ const MyClass = (props) => {
                                                                                     {
                                                                                         tasks.length
                                                                                     }
+
                                                                                     )
                                                                                 </span>
                                                                             )}
@@ -1648,11 +1930,18 @@ const MyClass = (props) => {
                 subjectId={selectedClass?.id}
                 categories={gradeCategories}
                 quarter={selectedQuarter}
+                onSuccess={({ categories: updatedCategories, quarter }) => {
+                    applyCategoriesForQuarter(quarter, updatedCategories);
+                }}
             />
             {isAddStudentModalOpen && selectedClass && (
                 <AddStudentModal
                     subjectId={selectedClass.id}
                     subjectLabel={selectedClassHeading}
+                    existingLrns={students
+                        .map((student) => student?.lrn)
+                        .filter(Boolean)}
+                    onSuccess={refreshCurrentClassData}
                     onClose={() => setIsAddStudentModalOpen(false)}
                 />
             )}
@@ -1681,7 +1970,7 @@ const MyClass = (props) => {
                     student={selectedStudentForStatus}
                     assignments={assignmentColumns}
                     gradeCategories={gradeCategories}
-                    gradeStructure={gradeStructure}
+                    gradeStructure={localGradeStructure}
                 />
             )}
             <GradeSubmissionModal
@@ -1695,10 +1984,10 @@ const MyClass = (props) => {
                 onClose={() => setIsStartQ2ModalOpen(false)}
                 classId={selectedClass?.id}
                 hasQuarterlyExam={q1HasQuarterlyExam}
-                onSuccess={() => {
+                onSuccess={async () => {
                     setSelectedTab("q2");
                     setSelectedQuarter(2);
-                    router.reload({ only: ["classes", "rosters"] });
+                    await refreshCurrentClassData();
                 }}
             />
         </>

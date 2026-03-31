@@ -97,22 +97,13 @@ const ClassCreateSummaryModal = ({
 
                     <div className="flex justify-end gap-2 border-t border-gray-100 pt-3">
                         {summary.duplicate_section ? (
-                            <>
-                                <button
-                                    type="button"
-                                    onClick={onSkip || onClose}
-                                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                                >
-                                    Keep as Correct
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={onSaveChanges || onClose}
-                                    className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
-                                >
-                                    Review and Edit
-                                </button>
-                            </>
+                            <button
+                                type="button"
+                                onClick={onSaveChanges || onClose}
+                                className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+                            >
+                                Review and Edit
+                            </button>
                         ) : (
                             <button
                                 type="button"

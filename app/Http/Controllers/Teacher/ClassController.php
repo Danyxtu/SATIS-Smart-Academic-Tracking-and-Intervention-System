@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\EnrollmentGradeService;
 use App\Services\GradeCalculationService;
 use App\Support\Concerns\HasDefaultAssignments;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -125,6 +126,114 @@ class ClassController extends Controller
         ));
     }
 
+    public function archiveSummary(Request $request): JsonResponse
+    {
+        $teacherId = $request->user()->id;
+        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
+
+        $archivedClasses = SubjectTeacher::query()
+            ->withCount('enrollments')
+            ->where('teacher_id', $teacherId)
+            ->where('school_year', '!=', $currentSchoolYear)
+            ->get(['id', 'subject_id', 'school_year', 'semester', 'updated_at']);
+
+        $archives = $archivedClasses
+            ->groupBy('school_year')
+            ->map(function ($classes, $schoolYear) {
+                $latestClass = $classes->sortByDesc('updated_at')->first();
+
+                return [
+                    'school_year' => $schoolYear,
+                    'classes_count' => $classes->count(),
+                    'subjects_count' => $classes->pluck('subject_id')->unique()->count(),
+                    'students_count' => (int) $classes->sum('enrollments_count'),
+                    'semester1_count' => $classes->where('semester', '1')->count(),
+                    'semester2_count' => $classes->where('semester', '2')->count(),
+                    'last_updated_at' => $latestClass?->updated_at?->toISOString(),
+                ];
+            })
+            ->sortByDesc('school_year')
+            ->values();
+
+        return response()->json([
+            'current_school_year' => $currentSchoolYear,
+            'archives' => $archives,
+        ]);
+    }
+
+    public function archiveShow(Request $request, string $schoolYear): JsonResponse
+    {
+        if (!preg_match('/^\d{4}-\d{4}$/', $schoolYear)) {
+            return response()->json([
+                'message' => 'Invalid school year format.',
+            ], 422);
+        }
+
+        $selectedSemester = (string) $request->query('semester', '1');
+
+        if (!in_array($selectedSemester, ['1', '2'], true)) {
+            $selectedSemester = '1';
+        }
+
+        $teacherId = $request->user()->id;
+
+        $archivedClasses = SubjectTeacher::query()
+            ->with([
+                'subject',
+                'enrollments.user.student',
+            ])
+            ->withCount('enrollments')
+            ->where('teacher_id', $teacherId)
+            ->where('school_year', $schoolYear)
+            ->orderBy('grade_level')
+            ->get();
+
+        if ($archivedClasses->isEmpty()) {
+            return response()->json([
+                'message' => 'Archive school year not found.',
+            ], 404);
+        }
+
+        $summary = [
+            'school_year' => $schoolYear,
+            'classes_count' => $archivedClasses->count(),
+            'subjects_count' => $archivedClasses->pluck('subject_id')->unique()->count(),
+            'students_count' => (int) $archivedClasses->sum('enrollments_count'),
+            'semester1_count' => $archivedClasses->where('semester', '1')->count(),
+            'semester2_count' => $archivedClasses->where('semester', '2')->count(),
+            'last_updated_at' => $archivedClasses
+                ->sortByDesc('updated_at')
+                ->first()?->updated_at?->toISOString(),
+        ];
+
+        $classes = $archivedClasses
+            ->filter(fn($subjectTeacher) => (string) $subjectTeacher->semester === $selectedSemester)
+            ->values()
+            ->map(fn($subjectTeacher) => [
+                'id' => $subjectTeacher->id,
+                'name' => $subjectTeacher->grade_level,
+                'section' => $subjectTeacher->section,
+                'subject' => $subjectTeacher->subject?->subject_name ?? 'N/A',
+                'subject_name' => $subjectTeacher->subject?->subject_name ?? 'N/A',
+                'color' => $subjectTeacher->color,
+                'strand' => $subjectTeacher->strand,
+                'track' => $subjectTeacher->track,
+                'school_year' => $subjectTeacher->school_year,
+                'student_count' => $subjectTeacher->enrollments_count,
+                'current_quarter' => $subjectTeacher->current_quarter ?? 1,
+                'semester' => $subjectTeacher->semester,
+            ]);
+
+        return response()->json([
+            'school_year' => $schoolYear,
+            'selected_semester' => (int) $selectedSemester,
+            'semester1_count' => $summary['semester1_count'],
+            'semester2_count' => $summary['semester2_count'],
+            'summary' => $summary,
+            'classes' => $classes,
+        ]);
+    }
+
     public function createAClass(Request $request): RedirectResponse
     {
         $teacher = $request->user();
@@ -133,13 +242,14 @@ class ClassController extends Controller
 
         // Get current semester from system settings
         $currentSemester = SystemSetting::getCurrentSemester();
+        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
 
         $data = $request->validate([
             'grade_level' => 'required|string|max:255',
             'section' => ['required', 'string', 'max:20', 'regex:/^[A-Za-z]+$/'],
             'subject_name' => 'required|string|max:255',
             'color' => 'required|string|in:' . implode(',', self::COLOR_OPTIONS),
-            'school_year' => 'required|string|max:255',
+            'school_year' => ['required', 'string', 'max:255', Rule::in([$currentSchoolYear])],
             'strand' => ['required', 'string', Rule::exists('departments', 'department_code')],
             'track' => 'nullable|string|max:255',
             'classlist' => 'nullable|file|mimes:csv,txt,xls,xlsx|max:4096',
@@ -170,7 +280,7 @@ class ClassController extends Controller
             'strand' => strtoupper(trim($data['strand'])),
             'track' => $data['track'] ?? null,
             'color' => $data['color'],
-            'school_year' => $data['school_year'],
+            'school_year' => $currentSchoolYear,
             'semester' => (string) $currentSemester,
             'grade_categories' => $this->defaultGradeCategories(),
         ]);
@@ -201,7 +311,7 @@ class ClassController extends Controller
                 'subject_name' => $data['subject_name'],
                 'color' => $data['color'],
                 'track' => $data['track'] ?? null,
-                'school_year' => $data['school_year'],
+                'school_year' => $currentSchoolYear,
                 'semester' => (string) $currentSemester,
                 'duplicate_basis' => 'grade_section',
                 'duplicate_section' => $duplicateSectionCount > 0,
@@ -214,12 +324,14 @@ class ClassController extends Controller
     {
         $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
+        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
+
         $data = $request->validate([
             'grade_level' => 'required|string|max:255',
             'section' => ['required', 'string', 'max:20', 'regex:/^[A-Za-z]+$/'],
             'subject_name' => 'required|string|max:255',
             'color' => 'required|string|in:' . implode(',', self::COLOR_OPTIONS),
-            'school_year' => 'required|string|max:255',
+            'school_year' => ['required', 'string', 'max:255', Rule::in([$currentSchoolYear])],
             'strand' => ['required', 'string', Rule::exists('departments', 'department_code')],
             'track' => 'nullable|string|max:255',
         ]);
@@ -240,7 +352,7 @@ class ClassController extends Controller
             'strand' => strtoupper(trim($data['strand'])),
             'track' => $data['track'] ?? null,
             'color' => $data['color'],
-            'school_year' => $data['school_year'],
+            'school_year' => $currentSchoolYear,
         ]);
 
         return redirect()
@@ -273,10 +385,24 @@ class ClassController extends Controller
     {
         $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
+        $normalizedLrn = $this->sanitizeLrn($request->input('lrn'));
+        $request->merge(['lrn' => $normalizedLrn]);
+
         $data = $request->validate([
-            'student_name' => 'required|string|max:255',
-            'lrn' => 'required|string|max:255',
+            'student_name' => ['required', 'string', 'max:255', 'not_regex:/\d/'],
+            'lrn' => [
+                'required',
+                'string',
+                'digits:12',
+                'not_in:000000000000',
+                Rule::unique('students', 'lrn'),
+            ],
             'email' => 'nullable|email|max:255',
+        ], [
+            'student_name.not_regex' => 'Student name cannot contain numbers.',
+            'lrn.digits' => 'LRN must be exactly 12 digits.',
+            'lrn.not_in' => 'LRN cannot be 000000000000.',
+            'lrn.unique' => 'This LRN is already registered and cannot be added again.',
         ]);
 
         // Normalize the student name (remove extra spaces)
@@ -463,13 +589,15 @@ class ClassController extends Controller
     private function persistStudentRecord(SubjectTeacher $subjectTeacher, array $payload): array
     {
         $validator = Validator::make($payload, [
-            'student_name' => 'required|string|max:255',
-            'lrn' => 'required|string|max:255',
+            'student_name' => ['required', 'string', 'max:255', 'not_regex:/\d/'],
+            'lrn' => ['required', 'string', 'digits:12', 'not_in:000000000000'],
             'grade_level' => 'required|string|max:255',
             'section' => 'nullable|string|max:255',
             'strand' => 'nullable|string|max:255',
             'track' => 'nullable|string|max:255',
             'email' => 'nullable|email|max:255',
+        ], [
+            'student_name.not_regex' => 'Student name cannot contain numbers.',
         ]);
 
         if ($validator->fails()) {
@@ -979,6 +1107,7 @@ class ClassController extends Controller
                 'id' => $subjectTeacher->id,
                 'name' => $subjectTeacher->grade_level,
                 'section' => $subjectTeacher->section,
+                'subject' => $subjectTeacher->subject?->subject_name ?? 'N/A',
                 'subject_name' => $subjectTeacher->subject?->subject_name ?? 'N/A',
                 'color' => $subjectTeacher->color,
                 'strand' => $subjectTeacher->strand,
@@ -989,34 +1118,37 @@ class ClassController extends Controller
                 'school_year' => $subjectTeacher->school_year,
             ];
 
-            $roster = $subjectTeacher->enrollments->map(function ($enrollment) use ($subjectTeacher) {
-                $user = $enrollment->user;
-                $studentProfile = $user?->student;
+            $roster = $subjectTeacher->enrollments
+                ->map(function ($enrollment) use ($subjectTeacher) {
+                    $user = $enrollment->user;
+                    $studentProfile = $user?->student;
 
-                // Get name from student_name field, or fallback to user name
-                $fullName = $studentProfile?->student_name
-                    ?? $user?->name
-                    ?? 'Student';
+                    // Get name from student_name field, or fallback to user name
+                    $fullName = $studentProfile?->student_name
+                        ?? $user?->name
+                        ?? 'Student';
 
-                return [
-                    'id' => $enrollment->id,
-                    'name' => $fullName,
-                    'lrn' => $studentProfile?->lrn,
-                    'email' => $user?->email,
-                    'avatar' => $studentProfile?->avatar,
-                    'grade_level' => $studentProfile?->grade_level ?? $subjectTeacher->grade_level,
-                    'section' => $studentProfile?->section ?? $subjectTeacher->section,
-                    'strand' => $studentProfile?->strand ?? $subjectTeacher->strand,
-                    'track' => $studentProfile?->track ?? $subjectTeacher->track,
-                    'temp_password' => $user?->temp_password,
-                    'must_change_password' => $user?->must_change_password ?? true,
-                    'grades' => $enrollment->grades->groupBy('quarter')->map(function ($quarterGrades) {
-                        return $quarterGrades->mapWithKeys(fn($grade) => [
-                            $grade->assignment_key ?: Str::slug($grade->assignment_name, '_') => $grade->score,
-                        ])->all();
-                    })->toArray(),
-                ];
-            })->values();
+                    return [
+                        'id' => $enrollment->id,
+                        'name' => $fullName,
+                        'lrn' => $studentProfile?->lrn,
+                        'email' => $user?->email,
+                        'avatar' => $studentProfile?->avatar,
+                        'grade_level' => $studentProfile?->grade_level ?? $subjectTeacher->grade_level,
+                        'section' => $studentProfile?->section ?? $subjectTeacher->section,
+                        'strand' => $studentProfile?->strand ?? $subjectTeacher->strand,
+                        'track' => $studentProfile?->track ?? $subjectTeacher->track,
+                        'temp_password' => $user?->temp_password,
+                        'must_change_password' => $user?->must_change_password ?? true,
+                        'grades' => $enrollment->grades->groupBy('quarter')->map(function ($quarterGrades) {
+                            return $quarterGrades->mapWithKeys(fn($grade) => [
+                                $grade->assignment_key ?: Str::slug($grade->assignment_name, '_') => $grade->score,
+                            ])->all();
+                        })->toArray(),
+                    ];
+                })
+                ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+                ->values();
 
             // Calculate grades for all students using the service
             $calculatedGrades = $this->gradeCalculationService->calculateClassGrades(

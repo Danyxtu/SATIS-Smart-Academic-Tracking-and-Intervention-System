@@ -1,5 +1,12 @@
 import { Users, Book, Megaphone, Loader2, Pencil, Trash2 } from "lucide-react";
 
+const stripGradePrefix = (value) => {
+    if (value === null || value === undefined) return "";
+    return String(value)
+        .replace(/^grade\s+/i, "")
+        .trim();
+};
+
 const ClassCard = ({
     handleClassSelect,
     cls,
@@ -8,8 +15,10 @@ const ClassCard = ({
     onEditClass,
     onDeleteClass,
     isLoading = false,
+    showActions = true,
 }) => {
-    const className = cls?.name?.trim?.() ?? cls?.name ?? "";
+    const rawClassName = cls?.name?.trim?.() ?? cls?.name ?? "";
+    const className = stripGradePrefix(rawClassName);
     const classSection = cls?.section?.trim?.() ?? cls?.section ?? "";
     const badgeLabel = className || classSection || "Class";
 
@@ -108,30 +117,31 @@ const ClassCard = ({
                 </div>
             </button>
 
-            {/* Actions */}
-            <div className="px-4 pb-3 border-t border-gray-100 pt-3 flex items-center gap-2">
-                <button
-                    onClick={handleNudgeClick}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-md transition-colors text-xs font-medium"
-                >
-                    <Megaphone size={14} />
-                    Nudge
-                </button>
-                <button
-                    onClick={handleEditClick}
-                    className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md transition-colors"
-                    title="Edit class"
-                >
-                    <Pencil size={14} />
-                </button>
-                <button
-                    onClick={handleDeleteClick}
-                    className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-md transition-colors"
-                    title="Delete class"
-                >
-                    <Trash2 size={14} />
-                </button>
-            </div>
+            {showActions && (
+                <div className="px-4 pb-3 border-t border-gray-100 pt-3 flex items-center gap-2">
+                    <button
+                        onClick={handleNudgeClick}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-md transition-colors text-xs font-medium"
+                    >
+                        <Megaphone size={14} />
+                        Nudge
+                    </button>
+                    <button
+                        onClick={handleEditClick}
+                        className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md transition-colors"
+                        title="Edit class"
+                    >
+                        <Pencil size={14} />
+                    </button>
+                    <button
+                        onClick={handleDeleteClick}
+                        className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-md transition-colors"
+                        title="Delete class"
+                    >
+                        <Trash2 size={14} />
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

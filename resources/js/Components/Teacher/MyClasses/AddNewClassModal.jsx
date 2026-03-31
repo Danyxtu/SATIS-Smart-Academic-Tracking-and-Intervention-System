@@ -262,11 +262,14 @@ const AddNewClassModal = ({
                                     type="text"
                                     name="school_year"
                                     required
-                                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                                    className="mt-1 block w-full rounded-lg border-gray-300 bg-gray-50 text-gray-600 shadow-sm"
                                     value={data.school_year}
-                                    onChange={handleChange}
+                                    readOnly
                                     placeholder="e.g., 2025-2026"
                                 />
+                                <p className="mt-1 text-xs text-gray-500">
+                                    School year is managed in system settings.
+                                </p>
                                 {errors.school_year && (
                                     <p className="text-sm text-red-600 mt-1">
                                         {errors.school_year}

@@ -23,15 +23,21 @@ class ClassesServices
         $teacher = $request->user();
 
         // Get current system semester and allow user to select which semester to view
-        $currentSemester = SystemSetting::getCurrentSemester();
-        $selectedSemester = $request->query('semester', $currentSemester);
+        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
+        $currentSemester = (string) SystemSetting::getCurrentSemester();
+        $selectedSemester = (string) $request->query('semester', $currentSemester);
 
-        // Get ALL subject-teacher assignments for this teacher (for counting)
+        if (!in_array($selectedSemester, ['1', '2'], true)) {
+            $selectedSemester = $currentSemester;
+        }
+
+        // Only show active classes for the configured school year.
         $allSubjectTeachers = SubjectTeacher::with([
             'subject',
             'enrollments.user.student',
             'enrollments.grades',
         ])->where('teacher_id', $teacher->id)
+            ->where('school_year', $currentSchoolYear)
             ->orderBy('grade_level')
             ->get();
 
@@ -62,19 +68,22 @@ class ClassesServices
 
         $roster = $subjectTeachers->mapWithKeys(function ($st) {
             return [
-                $st->id => $st->enrollments->map(function ($enrollment) {
-                    return [
-                        'id' => $enrollment->user_id,
-                        'name' => $enrollment->user->name,
-                        'student_number' => $enrollment->user->student?->student_number ?? 'N/A',
-                    ];
-                }),
+                $st->id => $st->enrollments
+                    ->map(function ($enrollment) {
+                        return [
+                            'id' => $enrollment->user_id,
+                            'name' => $enrollment->user->name,
+                            'student_number' => $enrollment->user->student?->student_number ?? 'N/A',
+                        ];
+                    })
+                    ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+                    ->values(),
             ];
         });
         return [
             'classes' => $classes,
-            'defaultSchoolYear' => $this->currentSchoolYear(),
-            'currentSemester' => $currentSemester,
+            'defaultSchoolYear' => $currentSchoolYear,
+            'currentSemester' => (int) $currentSemester,
             'selectedSemester' => (int) $selectedSemester,
             'semester1Count' => $semester1Count,
             'semester2Count' => $semester2Count,
