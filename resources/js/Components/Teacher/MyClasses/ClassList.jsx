@@ -57,10 +57,17 @@ const ClassList = ({
                                         <div className="text-sm font-medium text-gray-900">
                                             {student.name || "N/A"}
                                         </div>
-                                        {student.email && (
+                                        {(student.personal_email ||
+                                            student.email) && (
                                             <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
                                                 <Mail size={12} />
-                                                {student.email}
+                                                {student.personal_email ||
+                                                    student.email}
+                                            </div>
+                                        )}
+                                        {student.username && (
+                                            <div className="text-xs text-gray-500 mt-0.5">
+                                                Username: {student.username}
                                             </div>
                                         )}
                                     </div>

@@ -47,7 +47,7 @@ class UserController extends Controller
                 ->with('roles:id,name')
                 ->latest()
                 ->take(5)
-                ->get(['id', 'first_name', 'last_name', 'email', 'created_at'])
+                ->get(['id', 'first_name', 'last_name', 'personal_email', 'created_at'])
                 ->map(fn($user) => [
                     'id' => $user->id,
                     'name' => trim($user->first_name . ' ' . $user->last_name),
@@ -111,7 +111,8 @@ class UserController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('first_name', 'like', "%{$search}%")
                     ->orWhere('last_name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('username', 'like', "%{$search}%")
+                    ->orWhere('personal_email', 'like', "%{$search}%");
             });
         }
 
@@ -144,6 +145,8 @@ class UserController extends Controller
 
         if ($sortField === 'name') {
             $query->orderBy('first_name', $sortDirection === 'asc' ? 'asc' : 'desc');
+        } elseif ($sortField === 'email') {
+            $query->orderBy('personal_email', $sortDirection === 'asc' ? 'asc' : 'desc');
         } else {
             $query->orderBy($sortField, $sortDirection === 'asc' ? 'asc' : 'desc');
         }
@@ -254,9 +257,14 @@ class UserController extends Controller
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
             'role' => 'required|in:student,teacher', // Admin cannot create other admins
         ];
+
+        if ($request->role === 'student') {
+            $rules['email'] = 'nullable|string|email|max:255|unique:users,personal_email';
+        } else {
+            $rules['email'] = 'required|string|email|max:255|unique:users,personal_email';
+        }
 
         // Require LRN for student role
         if ($request->role === 'student') {
@@ -284,11 +292,16 @@ class UserController extends Controller
             'first_name' => $validated['first_name'],
             'last_name' => $validated['last_name'],
             'middle_name' => $validated['middle_name'] ?? null,
-            'email' => $validated['email'],
+            'personal_email' => $validated['email'] ?? null,
             'password' => Hash::make($password),
             'created_by' => $admin->id,
             'email_verified_at' => now(), // Users created by admin are considered verified
         ];
+
+        if ($validated['role'] === 'student') {
+            $seed = trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? ''));
+            $userData['username'] = User::generateUniqueUsername($seed);
+        }
 
         // Assign department for teachers
         if ($validated['role'] === 'teacher' && $departmentId) {
@@ -369,7 +382,7 @@ class UserController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'email' => ['nullable', 'string', 'email', 'max:255', Rule::unique('users', 'personal_email')->ignore($user->id)],
             'role' => 'required|in:student,teacher', // Admin cannot change role to admin
         ]);
 
@@ -378,7 +391,7 @@ class UserController extends Controller
         // Prepare update data
         $updateData = [
             'name' => $validated['name'],
-            'email' => $validated['email'],
+            'personal_email' => $validated['email'] ?? null,
         ];
 
         // If changing to teacher, assign department

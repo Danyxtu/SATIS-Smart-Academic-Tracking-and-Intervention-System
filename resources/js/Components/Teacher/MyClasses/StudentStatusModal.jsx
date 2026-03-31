@@ -72,7 +72,11 @@ const StudentStatusModal = ({
 
     const metaItems = [
         { label: "LRN", value: student.lrn || "—" },
-        { label: "Email", value: student.email || "—" },
+        { label: "Username", value: student.username || "—" },
+        {
+            label: "Personal Email",
+            value: student.personal_email || student.email || "—",
+        },
         { label: "Grade Level", value: student.grade_level || "—" },
         { label: "Section", value: student.section || "—" },
         { label: "Strand", value: student.strand || "—" },

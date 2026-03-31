@@ -57,22 +57,22 @@ export default function Login({ status, canResetPassword }) {
                 </div>
 
                 <div className="space-y-3">
-                    {/* Email Field */}
+                    {/* Username or Email Field */}
                     <div>
                         <InputLabel
                             htmlFor="email"
-                            value="Email"
+                            value="Username or Email"
                             className="text-xs font-semibold tracking-wide text-gray-700"
                         />
                         <TextInput
                             id="email"
-                            type="email"
+                            type="text"
                             name="email"
                             value={data.email}
                             className="mt-1 block h-10 w-full rounded-lg border-gray-200 px-3 text-sm shadow-sm transition-all duration-200 placeholder:text-gray-400 focus:border-primary focus:ring-primary/25"
                             autoComplete="username"
                             isFocused={true}
-                            placeholder="Enter your email"
+                            placeholder="Enter your username or email"
                             onChange={(e) => setData("email", e.target.value)}
                         />
                         <InputError

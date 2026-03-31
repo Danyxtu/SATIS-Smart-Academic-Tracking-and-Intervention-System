@@ -5,19 +5,37 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
     public function login(Request $request)
     {
         $request->validate([
-            'email' => 'required|email',
+            'login' => 'nullable|string|max:255|required_without:email',
+            'email' => 'nullable|string|max:255|required_without:login',
             'password' => 'required',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $identifier = Str::lower(trim((string) ($request->input('login') ?? $request->input('email'))));
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        $query = User::query()->where('username', $identifier);
+
+        if (filter_var($identifier, FILTER_VALIDATE_EMAIL)) {
+            $query->orWhere('personal_email', $identifier);
+        }
+
+        $user = $query->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'Invalid credentials'], 401);
+        }
+
+        $validPassword = $user->must_change_password
+            ? $request->password === $user->password
+            : Hash::check($request->password, $user->password);
+
+        if (! $validPassword) {
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 

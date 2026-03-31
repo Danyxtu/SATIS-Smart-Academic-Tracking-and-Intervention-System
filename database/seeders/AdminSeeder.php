@@ -25,10 +25,11 @@ class AdminSeeder extends Seeder
 
         // Create the admin user
         $admin = User::updateOrCreate(
-            ['email' => 'admin@satis.edu'],
+            ['personal_email' => 'admin@satis.edu'],
             [
                 'first_name' => 'Admin',
                 'last_name' => 'User',
+                'username' => 'admin',
                 'password' => bcrypt('admin123'),
                 'temp_password' => 'admin123',
                 'must_change_password' => true,

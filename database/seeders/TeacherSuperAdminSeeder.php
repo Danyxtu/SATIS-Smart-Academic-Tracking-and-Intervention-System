@@ -15,10 +15,11 @@ class TeacherSuperAdminSeeder extends Seeder
     public function run(): void
     {
         $teacherSuperAdmin = User::updateOrCreate(
-            ['email' => 'teachsa@satis.edu'],
+            ['personal_email' => 'teachsa@satis.edu'],
             [
                 'first_name' => 'Teach',
                 'last_name' => 'SA',
+                'username' => 'teachsa',
                 'password' => Hash::make('teachsa123'),
                 'temp_password' => 'teachsa123',
                 'must_change_password' => true,

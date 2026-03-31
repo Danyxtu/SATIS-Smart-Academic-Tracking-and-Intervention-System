@@ -11,6 +11,7 @@ import {
     ChevronUp,
     ChevronDown,
     ChevronRight,
+    Trash2,
     Users,
 } from "lucide-react";
 // Utils
@@ -25,6 +26,7 @@ import {
 import {
     AddGradeTaskModal,
     AddStudentModal,
+    DeleteGradeTaskModal,
     EditGradeCategoriesModal,
     StudentStatusModal,
     TemporaryPasswordModal,
@@ -174,6 +176,44 @@ const applyQuarterCategoriesToGradeStructure = ({
     return nextStructure;
 };
 
+const GRADE_INPUT_PATTERN = /^\d*(?:\.\d{0,2})?$/;
+
+const normalizeGradeInput = (rawValue, maxScore) => {
+    if (rawValue === "" || rawValue === null || rawValue === undefined) {
+        return "";
+    }
+
+    const value = String(rawValue).trim();
+
+    if (value === "." || !GRADE_INPUT_PATTERN.test(value)) {
+        return null;
+    }
+
+    const numericValue = Number(value);
+
+    if (Number.isNaN(numericValue)) {
+        return null;
+    }
+
+    const parsedMaxScore = Number(maxScore);
+    const maxNumericScore = Number.isFinite(parsedMaxScore)
+        ? parsedMaxScore
+        : Number.POSITIVE_INFINITY;
+    const clampedValue = Math.max(0, Math.min(maxNumericScore, numericValue));
+
+    return clampedValue !== numericValue ? String(clampedValue) : value;
+};
+
+const DEFAULT_DELETE_TASK_MODAL_STATE = {
+    isOpen: false,
+    categoryId: null,
+    categoryLabel: "",
+    taskId: null,
+    taskLabel: "",
+    gradedStudentCount: 0,
+    requiresTypedConfirmation: false,
+};
+
 // Main Component
 const MyClass = (props) => {
     const {
@@ -215,6 +255,9 @@ const MyClass = (props) => {
     const [isImportingGrades, setIsImportingGrades] = useState(false);
     const [isSavingGrades, setIsSavingGrades] = useState(false);
     const [isSavingCategoryTask, setIsSavingCategoryTask] = useState(false);
+    const [deleteTaskModal, setDeleteTaskModal] = useState(
+        DEFAULT_DELETE_TASK_MODAL_STATE,
+    );
     const [collapsedCategories, setCollapsedCategories] = useState({});
     const [sortConfig, setSortConfig] = useState({
         column: null,
@@ -594,13 +637,10 @@ const MyClass = (props) => {
     };
 
     const handleGradeChange = (studentId, assignmentId, maxScore, rawValue) => {
-        let nextValue;
-        if (rawValue === "" || rawValue === null || rawValue === undefined) {
-            nextValue = "";
-        } else {
-            const numericValue = Number(rawValue);
-            if (Number.isNaN(numericValue)) return;
-            nextValue = Math.max(0, Math.min(maxScore, numericValue));
+        const nextValue = normalizeGradeInput(rawValue, maxScore);
+
+        if (nextValue === null) {
+            return;
         }
 
         setDirtyGrades((prev) => {
@@ -614,6 +654,38 @@ const MyClass = (props) => {
 
     const handleCloseGradeModal = () => {
         setGradeSubmissionModal({ isOpen: false, status: null, message: "" });
+    };
+
+    const closeDeleteTaskModal = () => {
+        setDeleteTaskModal(DEFAULT_DELETE_TASK_MODAL_STATE);
+    };
+
+    const clearTaskFromDirtyGrades = (taskId) => {
+        setDirtyGrades((prev) => {
+            const next = {};
+
+            Object.entries(prev).forEach(([studentId, studentGrades]) => {
+                if (!studentGrades || typeof studentGrades !== "object") {
+                    return;
+                }
+
+                if (
+                    !Object.prototype.hasOwnProperty.call(studentGrades, taskId)
+                ) {
+                    next[studentId] = studentGrades;
+                    return;
+                }
+
+                const remainingGrades = { ...studentGrades };
+                delete remainingGrades[taskId];
+
+                if (Object.keys(remainingGrades).length > 0) {
+                    next[studentId] = remainingGrades;
+                }
+            });
+
+            return next;
+        });
     };
 
     const handleCategoryTaskSave = async (categoryId, taskData) => {
@@ -660,12 +732,128 @@ const MyClass = (props) => {
                         console.error("Failed to add task:", errors);
                         alert("Failed to add task. Please try again.");
                     },
+                    onFinish: () => {
+                        setIsSavingCategoryTask(false);
+                    },
                 },
             );
         } catch (error) {
             console.error("Error saving task:", error);
             alert("An error occurred while adding the task.");
-        } finally {
+            setIsSavingCategoryTask(false);
+        }
+    };
+
+    const handleCategoryTaskDelete = (categoryId, taskId) => {
+        if (!selectedClass || isSavingCategoryTask) return;
+
+        const category = gradeCategories.find((item) => item.id === categoryId);
+        const task = category?.tasks?.find((item) => item.id === taskId);
+
+        if (!category || !task) {
+            return;
+        }
+
+        const gradedStudentCount = students.reduce((count, student) => {
+            const draftValue = dirtyGrades?.[student.id]?.[taskId];
+            const persistedValue = student?.grades?.[selectedQuarter]?.[taskId];
+            const value =
+                draftValue !== undefined ? draftValue : persistedValue;
+
+            if (value !== "" && value !== null && value !== undefined) {
+                return count + 1;
+            }
+
+            return count;
+        }, 0);
+
+        setDeleteTaskModal({
+            isOpen: true,
+            categoryId,
+            categoryLabel: category.label,
+            taskId,
+            taskLabel: task.label,
+            gradedStudentCount,
+            requiresTypedConfirmation: gradedStudentCount > 0,
+        });
+    };
+
+    const handleConfirmCategoryTaskDelete = async () => {
+        if (!selectedClass || !deleteTaskModal.isOpen) return;
+
+        const categoryId = deleteTaskModal.categoryId;
+        const taskId = deleteTaskModal.taskId;
+
+        if (!categoryId || !taskId) {
+            closeDeleteTaskModal();
+            return;
+        }
+
+        const category = gradeCategories.find((item) => item.id === categoryId);
+        const task = category?.tasks?.find((item) => item.id === taskId);
+
+        if (!category || !task) {
+            closeDeleteTaskModal();
+            return;
+        }
+
+        setIsSavingCategoryTask(true);
+
+        try {
+            const updatedCategories = gradeCategories.map((item) => {
+                const tasks = item.tasks || [];
+
+                if (item.id !== categoryId) {
+                    return {
+                        id: item.id,
+                        label: item.label,
+                        weight: item.weight,
+                        tasks,
+                    };
+                }
+
+                return {
+                    id: item.id,
+                    label: item.label,
+                    weight: item.weight,
+                    tasks: tasks.filter(
+                        (existingTask) => existingTask.id !== taskId,
+                    ),
+                };
+            });
+
+            router.post(
+                `/teacher/classes/${selectedClass.id}/grade-structure`,
+                {
+                    categories: updatedCategories,
+                    quarter: selectedQuarter,
+                    delete_task_grades: true,
+                    deleted_task_ids: [taskId],
+                },
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                    onSuccess: () => {
+                        applyCategoriesForQuarter(
+                            selectedQuarter,
+                            updatedCategories,
+                        );
+                        clearTaskFromDirtyGrades(taskId);
+                        closeDeleteTaskModal();
+                    },
+                    onError: (errors) => {
+                        console.error("Failed to delete task:", errors);
+                        alert("Failed to delete activity. Please try again.");
+                    },
+                    onFinish: () => {
+                        setIsSavingCategoryTask(false);
+                    },
+                },
+            );
+        } catch (error) {
+            console.error("Error deleting task:", error);
+            alert("An error occurred while deleting the activity.");
             setIsSavingCategoryTask(false);
         }
     };
@@ -772,13 +960,19 @@ const MyClass = (props) => {
     };
 
     const handleDownloadClasslistTemplate = () => {
-        const headers = ["name", "lrn", "grade_level", "section", "email"];
+        const headers = [
+            "name",
+            "lrn",
+            "grade_level",
+            "section",
+            "personal_email",
+        ];
         const sampleRow = [
             "Juan Dela Cruz",
             "123456789012",
             "11",
             "Section A",
-            "juan@example.com",
+            "juan.personal@example.com",
         ];
         const csvContent = [headers.join(","), sampleRow.join(",")].join("\n");
         const blob = new Blob([csvContent], { type: "text/csv" });
@@ -1408,11 +1602,34 @@ const MyClass = (props) => {
                                                                     key={`${category.id}-collapsed`}
                                                                     className="px-3 py-1.5 text-left text-[10px] font-medium text-gray-500 border-r border-gray-200"
                                                                 >
-                                                                    <span className="block truncate max-w-[120px]">
-                                                                        {
-                                                                            latestTask.label
-                                                                        }
-                                                                    </span>
+                                                                    <div className="flex items-start justify-between gap-1">
+                                                                        <span className="block truncate max-w-[96px]">
+                                                                            {
+                                                                                latestTask.label
+                                                                            }
+                                                                        </span>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() =>
+                                                                                handleCategoryTaskDelete(
+                                                                                    category.id,
+                                                                                    latestTask.id,
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                isSavingCategoryTask
+                                                                            }
+                                                                            className="rounded p-0.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                                                            title="Delete activity"
+                                                                            aria-label={`Delete ${latestTask.label}`}
+                                                                        >
+                                                                            <Trash2
+                                                                                size={
+                                                                                    10
+                                                                                }
+                                                                            />
+                                                                        </button>
+                                                                    </div>
                                                                     <span className="text-[9px] font-normal text-gray-400">
                                                                         /{" "}
                                                                         {
@@ -1441,11 +1658,34 @@ const MyClass = (props) => {
                                                                             : ""
                                                                     }`}
                                                                 >
-                                                                    <span className="block truncate max-w-[120px]">
-                                                                        {
-                                                                            task.label
-                                                                        }
-                                                                    </span>
+                                                                    <div className="flex items-start justify-between gap-1">
+                                                                        <span className="block truncate max-w-[96px]">
+                                                                            {
+                                                                                task.label
+                                                                            }
+                                                                        </span>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() =>
+                                                                                handleCategoryTaskDelete(
+                                                                                    category.id,
+                                                                                    task.id,
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                isSavingCategoryTask
+                                                                            }
+                                                                            className="rounded p-0.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                                                            title="Delete activity"
+                                                                            aria-label={`Delete ${task.label}`}
+                                                                        >
+                                                                            <Trash2
+                                                                                size={
+                                                                                    10
+                                                                                }
+                                                                            />
+                                                                        </button>
+                                                                    </div>
                                                                     <span className="text-[9px] font-normal text-gray-400">
                                                                         /{" "}
                                                                         {
@@ -1628,12 +1868,9 @@ const MyClass = (props) => {
                                                                                 className="px-3 py-2 text-xs text-gray-700 border-r border-gray-200"
                                                                             >
                                                                                 <input
-                                                                                    type="number"
-                                                                                    min="0"
-                                                                                    max={
-                                                                                        latestTask.total
-                                                                                    }
-                                                                                    step="0.01"
+                                                                                    type="text"
+                                                                                    inputMode="decimal"
+                                                                                    pattern="^\\d*(\\.\\d{0,2})?$"
                                                                                     value={
                                                                                         inputValue
                                                                                     }
@@ -1649,6 +1886,7 @@ const MyClass = (props) => {
                                                                                                 .value,
                                                                                         )
                                                                                     }
+                                                                                    autoComplete="off"
                                                                                     className="w-16 rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300"
                                                                                 />
                                                                             </td>
@@ -1699,12 +1937,9 @@ const MyClass = (props) => {
                                                                                     }`}
                                                                                 >
                                                                                     <input
-                                                                                        type="number"
-                                                                                        min="0"
-                                                                                        max={
-                                                                                            task.total
-                                                                                        }
-                                                                                        step="0.01"
+                                                                                        type="text"
+                                                                                        inputMode="decimal"
+                                                                                        pattern="^\\d*(\\.\\d{0,2})?$"
                                                                                         value={
                                                                                             inputValue
                                                                                         }
@@ -1720,6 +1955,7 @@ const MyClass = (props) => {
                                                                                                     .value,
                                                                                             )
                                                                                         }
+                                                                                        autoComplete="off"
                                                                                         className="w-16 rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300"
                                                                                     />
                                                                                 </td>
@@ -1978,6 +2214,18 @@ const MyClass = (props) => {
                 onClose={handleCloseGradeModal}
                 status={gradeSubmissionModal.status}
                 message={gradeSubmissionModal.message}
+            />
+            <DeleteGradeTaskModal
+                isOpen={deleteTaskModal.isOpen}
+                categoryLabel={deleteTaskModal.categoryLabel}
+                taskLabel={deleteTaskModal.taskLabel}
+                gradedStudentCount={deleteTaskModal.gradedStudentCount}
+                requiresTypedConfirmation={
+                    deleteTaskModal.requiresTypedConfirmation
+                }
+                isSubmitting={isSavingCategoryTask}
+                onClose={closeDeleteTaskModal}
+                onConfirm={handleConfirmCategoryTaskDelete}
             />
             <StartQ2ConfirmModal
                 isOpen={isStartQ2ModalOpen}

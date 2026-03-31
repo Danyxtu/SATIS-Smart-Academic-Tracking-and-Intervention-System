@@ -28,7 +28,7 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
+            'email' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string'],
         ];
     }
@@ -42,8 +42,18 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
+        $identifier = trim((string) $this->input('email'));
+        $normalizedIdentifier = Str::lower($identifier);
+
+        $userQuery = User::query()
+            ->where('username', $normalizedIdentifier);
+
+        if (filter_var($normalizedIdentifier, FILTER_VALIDATE_EMAIL)) {
+            $userQuery->orWhere('personal_email', $normalizedIdentifier);
+        }
+
         // First, check if user exists and needs to change password (plain text auth)
-        $user = User::where('email', $this->email)->first();
+        $user = $userQuery->first();
 
         if ($user && $user->must_change_password) {
             // Check plain text password match for first-time login
@@ -55,7 +65,23 @@ class LoginRequest extends FormRequest
         }
 
         // Normal hashed password authentication
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        $authenticated = false;
+
+        if (filter_var($normalizedIdentifier, FILTER_VALIDATE_EMAIL)) {
+            $authenticated = Auth::attempt([
+                'personal_email' => $normalizedIdentifier,
+                'password' => $this->input('password'),
+            ], $this->boolean('remember'));
+        }
+
+        if (! $authenticated) {
+            $authenticated = Auth::attempt([
+                'username' => $normalizedIdentifier,
+                'password' => $this->input('password'),
+            ], $this->boolean('remember'));
+        }
+
+        if (! $authenticated) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([

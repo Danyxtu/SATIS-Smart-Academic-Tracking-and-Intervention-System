@@ -24,13 +24,15 @@ class UserManagementController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('first_name', 'like', "%{$search}%")
                     ->orWhere('last_name',  'like', "%{$search}%")
-                    ->orWhere('email',      'like', "%{$search}%");
+                    ->orWhere('username',   'like', "%{$search}%")
+                    ->orWhere('personal_email', 'like', "%{$search}%");
             });
 
             $countQuery->where(function ($q) use ($search) {
                 $q->where('first_name', 'like', "%{$search}%")
                     ->orWhere('last_name',  'like', "%{$search}%")
-                    ->orWhere('email',      'like', "%{$search}%");
+                    ->orWhere('username',   'like', "%{$search}%")
+                    ->orWhere('personal_email', 'like', "%{$search}%");
             });
         }
 
@@ -100,7 +102,7 @@ class UserManagementController extends Controller
             'first_name'    => ['required', 'string', 'max:100'],
             'last_name'     => ['required', 'string', 'max:100'],
             'middle_name'   => ['nullable', 'string', 'max:100'],
-            'email'         => ['required', 'email', 'unique:users,email'],
+            'email'         => ['nullable', 'email', 'unique:users,personal_email'],
             'password'      => ['required', Password::min(8)],
             'role'          => ['required', 'in:teacher,student'],
             'assign_as_admin' => ['nullable', 'boolean'],
@@ -121,7 +123,7 @@ class UserManagementController extends Controller
             'first_name'           => $validated['first_name'],
             'last_name'            => $validated['last_name'],
             'middle_name'          => $validated['middle_name'] ?? null,
-            'email'                => $validated['email'],
+            'personal_email'       => $validated['email'] ?? null,
             'password'             => Hash::make($validated['password']),
             'department_id'        => $validated['role'] === 'teacher'
                 ? $validated['department_id']
@@ -129,6 +131,9 @@ class UserManagementController extends Controller
             'must_change_password' => true,
             'status'               => 'active',
             'created_by'           => $superAdmin->id,
+            'username'             => $validated['role'] === 'student'
+                ? User::generateUniqueUsername(trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? '')))
+                : null,
         ]);
 
         $roleIds = Role::whereIn('name', $assignedRoles)->pluck('id')->all();
@@ -163,7 +168,7 @@ class UserManagementController extends Controller
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'middle_name' => ['nullable', 'string', 'max:100'],
-            'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($user->id)],
+            'email' => ['nullable', 'email', Rule::unique('users', 'personal_email')->ignore($user->id)],
             'password' => ['nullable', Password::min(8)],
             'role' => ['required', 'in:super_admin,admin,teacher,student'],
             'department_id' => ['nullable', 'exists:departments,id'],
@@ -180,7 +185,7 @@ class UserManagementController extends Controller
         $user->first_name = $validated['first_name'];
         $user->last_name = $validated['last_name'];
         $user->middle_name = $validated['middle_name'] ?? null;
-        $user->email = $validated['email'];
+        $user->personal_email = $validated['email'] ?? null;
         $user->status = $validated['status'];
         $user->department_id = $validated['role'] === 'teacher'
             ? $validated['department_id']

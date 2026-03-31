@@ -62,7 +62,7 @@ class GradeController extends Controller
             'grades' => 'required|array|min:1',
             'grades.*.enrollment_id' => 'required|integer',
             'grades.*.assignment_id' => 'required|string',
-            'grades.*.score' => 'nullable|numeric|min:0',
+            'grades.*.score' => ['nullable', 'numeric', 'min:0', 'regex:/^\d+(?:\.\d{1,2})?$/'],
             'grades.*.quarter' => 'nullable|integer|min:1|max:4',
         ]);
 

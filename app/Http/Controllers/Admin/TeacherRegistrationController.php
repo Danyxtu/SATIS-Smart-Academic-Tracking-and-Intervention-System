@@ -87,7 +87,7 @@ class TeacherRegistrationController extends Controller
         $user = User::create([
             'first_name' => $registration->first_name,
             'last_name' => $registration->last_name,
-            'email' => $registration->email,
+            'personal_email' => $registration->email,
             'password' => $registration->password, // Already hashed
             'department_id' => $registration->department_id,
             'status' => 'active',

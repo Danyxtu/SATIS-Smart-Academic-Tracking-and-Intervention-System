@@ -838,6 +838,14 @@ const MyClasses = ({
                                             <span className="text-xs text-emerald-700 dark:text-emerald-300">
                                                 {newStudentPassword.name}
                                             </span>
+                                            {newStudentPassword.username && (
+                                                <code className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-200 rounded text-[10px] font-mono">
+                                                    @
+                                                    {
+                                                        newStudentPassword.username
+                                                    }
+                                                </code>
+                                            )}
                                             <code className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-200 rounded text-[10px] font-mono">
                                                 {newStudentPassword.password}
                                             </code>

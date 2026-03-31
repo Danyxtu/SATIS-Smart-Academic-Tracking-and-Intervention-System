@@ -59,11 +59,26 @@ const BulkStudentImportSummaryModal = ({ summary, onClose }) => {
                             className="rounded-md border border-gray-100 bg-gray-50 p-2"
                         >
                             <p className="text-sm font-medium text-gray-900">
-                                {student?.name || student?.email || "Student"}
+                                {student?.name ||
+                                    student?.username ||
+                                    student?.personal_email ||
+                                    student?.email ||
+                                    "Student"}
                             </p>
                             <p className="text-xs text-gray-600">
                                 LRN: {student?.lrn || "N/A"}
                             </p>
+                            {student?.username && (
+                                <p className="text-xs text-gray-600">
+                                    Username: {student.username}
+                                </p>
+                            )}
+                            {(student?.personal_email || student?.email) && (
+                                <p className="text-xs text-gray-600">
+                                    Personal Email:{" "}
+                                    {student.personal_email || student.email}
+                                </p>
+                            )}
                             {showPassword && student?.password && (
                                 <div className="mt-1 flex items-center gap-2">
                                     <code className="rounded bg-indigo-100 px-2 py-0.5 text-xs text-indigo-900">

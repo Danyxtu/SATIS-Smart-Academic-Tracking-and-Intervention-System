@@ -7,6 +7,7 @@
 
 export { default as AddGradeTaskModal } from "./AddGradeTaskModal";
 export { default as AddStudentModal } from "./AddStudentModal";
+export { default as DeleteGradeTaskModal } from "./DeleteGradeTaskModal";
 export { default as ClassCard } from "./ClassCard";
 export { default as ClassCreateSummaryModal } from "./ClassCreateSummaryModal";
 export { default as EditGradeCategoriesModal } from "./EditGradeCategoriesModal";

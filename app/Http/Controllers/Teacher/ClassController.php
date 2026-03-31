@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Teacher;
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\Department;
+use App\Models\Grade;
 use App\Models\Role;
 use App\Models\Student;
 use App\Models\StudentNotification;
@@ -20,6 +21,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -94,7 +96,7 @@ class ClassController extends Controller
         'section' => ['section', 'class_section', 'class section'],
         'strand' => ['strand', 'track_strand', 'track strand'],
         'track' => ['track', 'tvl_track', 'tvl track', 'program', 'specialization'],
-        'email' => ['email', 'student_email', 'student email', 'email_address', 'email address'],
+        'personal_email' => ['personal_email', 'personal email', 'email', 'student_email', 'student email', 'email_address', 'email address'],
     ];
 
 
@@ -386,7 +388,10 @@ class ClassController extends Controller
         $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
         $normalizedLrn = $this->sanitizeLrn($request->input('lrn'));
-        $request->merge(['lrn' => $normalizedLrn]);
+        $request->merge([
+            'lrn' => $normalizedLrn,
+            'personal_email' => $request->input('personal_email', $request->input('email')),
+        ]);
 
         $data = $request->validate([
             'student_name' => ['required', 'string', 'max:255', 'not_regex:/\d/'],
@@ -397,7 +402,7 @@ class ClassController extends Controller
                 'not_in:000000000000',
                 Rule::unique('students', 'lrn'),
             ],
-            'email' => 'nullable|email|max:255',
+            'personal_email' => 'nullable|email|max:255',
         ], [
             'student_name.not_regex' => 'Student name cannot contain numbers.',
             'lrn.digits' => 'LRN must be exactly 12 digits.',
@@ -415,7 +420,7 @@ class ClassController extends Controller
             'strand' => $subjectTeacher->strand,
             'track' => $subjectTeacher->track,
             'lrn' => $data['lrn'],
-            'email' => $data['email'] ?? null,
+            'personal_email' => $data['personal_email'] ?? null,
         ]);
 
         $statusMessage = match ($result['status']) {
@@ -432,7 +437,8 @@ class ClassController extends Controller
             $redirect = $redirect->with('new_student_password', [
                 'name' => $studentName,
                 'lrn' => $data['lrn'],
-                'email' => $data['email'] ?? null,
+                'username' => $result['username'] ?? null,
+                'personal_email' => $result['personal_email'] ?? null,
                 'password' => $result['password'],
             ]);
         }
@@ -474,6 +480,9 @@ class ClassController extends Controller
             'categories.*.tasks.*.id' => 'nullable|string|max:255',
             'categories.*.tasks.*.label' => 'required|string|max:255',
             'categories.*.tasks.*.total' => 'required|numeric|min:1',
+            'delete_task_grades' => 'sometimes|boolean',
+            'deleted_task_ids' => 'sometimes|array',
+            'deleted_task_ids.*' => 'string|max:255',
         ]);
 
         $quarter = $data['quarter'] ?? ($subjectTeacher->current_quarter ?? 1);
@@ -486,9 +495,33 @@ class ClassController extends Controller
             $structure['categories'],
         );
 
-        $subjectTeacher->update([
-            'grade_categories' => $perQuarter,
-        ]);
+        $shouldDeleteTaskGrades = (bool) ($data['delete_task_grades'] ?? false);
+        $deletedTaskIds = collect($data['deleted_task_ids'] ?? [])
+            ->filter(fn($taskId) => is_string($taskId) && trim($taskId) !== '')
+            ->map(fn($taskId) => trim($taskId))
+            ->unique()
+            ->values();
+
+        DB::transaction(function () use ($subjectTeacher, $perQuarter, $quarter, $shouldDeleteTaskGrades, $deletedTaskIds) {
+            $subjectTeacher->update([
+                'grade_categories' => $perQuarter,
+            ]);
+
+            if (! $shouldDeleteTaskGrades || $deletedTaskIds->isEmpty()) {
+                return;
+            }
+
+            $enrollmentIds = $subjectTeacher->enrollments()->pluck('id');
+
+            if ($enrollmentIds->isEmpty()) {
+                return;
+            }
+
+            Grade::whereIn('enrollment_id', $enrollmentIds)
+                ->where('quarter', $quarter)
+                ->whereIn('assignment_key', $deletedTaskIds)
+                ->delete();
+        });
 
         return back()->with('success', 'Grade structure updated.');
     }
@@ -551,7 +584,8 @@ class ClassController extends Controller
                     $summary['newly_created_students'][] = [
                         'name' => $payload['student_name'] ?? null,
                         'lrn' => $payload['lrn'] ?? null,
-                        'email' => $payload['email'] ?? null,
+                        'username' => $result['username'] ?? null,
+                        'personal_email' => $result['personal_email'] ?? null,
                         'password' => $result['password'],
                     ];
                 } elseif ($result['status'] === 'assigned_existing') {
@@ -559,14 +593,16 @@ class ClassController extends Controller
                     $summary['assigned_existing_students'][] = [
                         'name' => $payload['student_name'] ?? null,
                         'lrn' => $payload['lrn'] ?? null,
-                        'email' => $payload['email'] ?? null,
+                        'username' => $result['username'] ?? null,
+                        'personal_email' => $result['personal_email'] ?? null,
                     ];
                 } elseif ($result['status'] === 'already_assigned') {
                     $summary['already_enrolled']++;
                     $summary['already_enrolled_students'][] = [
                         'name' => $payload['student_name'] ?? null,
                         'lrn' => $payload['lrn'] ?? null,
-                        'email' => $payload['email'] ?? null,
+                        'username' => $result['username'] ?? null,
+                        'personal_email' => $result['personal_email'] ?? null,
                     ];
                 }
             } catch (ValidationException $exception) {
@@ -588,6 +624,10 @@ class ClassController extends Controller
 
     private function persistStudentRecord(SubjectTeacher $subjectTeacher, array $payload): array
     {
+        if (! array_key_exists('personal_email', $payload) && array_key_exists('email', $payload)) {
+            $payload['personal_email'] = $payload['email'];
+        }
+
         $validator = Validator::make($payload, [
             'student_name' => ['required', 'string', 'max:255', 'not_regex:/\d/'],
             'lrn' => ['required', 'string', 'digits:12', 'not_in:000000000000'],
@@ -595,7 +635,7 @@ class ClassController extends Controller
             'section' => 'nullable|string|max:255',
             'strand' => 'nullable|string|max:255',
             'track' => 'nullable|string|max:255',
-            'email' => 'nullable|email|max:255',
+            'personal_email' => 'nullable|email|max:255',
         ], [
             'student_name.not_regex' => 'Student name cannot contain numbers.',
         ]);
@@ -623,23 +663,45 @@ class ClassController extends Controller
             $student = Student::where('lrn', $lrn)->first();
         }
 
+        $normalizedPersonalEmail = ! empty($payload['personal_email'])
+            ? Str::lower(trim((string) $payload['personal_email']))
+            : null;
+
+        if ($normalizedPersonalEmail !== null) {
+            $emailOwner = User::where('personal_email', $normalizedPersonalEmail)->first();
+
+            if ($emailOwner && (! $student || $emailOwner->id !== $student->user_id)) {
+                throw new RuntimeException('Personal email is already assigned to another account.');
+            }
+        }
+
         if ($student) {
             $user = $student->user;
 
             if (!$user) {
-                $created = $this->createStudentUser($firstName, $lastName, $middleName, $payload['email'] ?? null);
+                $created = $this->createStudentUser($firstName, $lastName, $middleName, $normalizedPersonalEmail, $lrn);
                 $user = $created['user'];
                 $generatedPlainPassword = $created['password'];
                 $student->user()->associate($user);
             } else {
-                $user->update([
+                $user->fill([
                     'first_name' => $firstName,
                     'last_name' => $lastName,
                     'middle_name' => $middleName,
                 ]);
+
+                if (! filled($user->username)) {
+                    $user->username = $this->generateStudentUsername($firstName, $lastName, $lrn);
+                }
+
+                if ($normalizedPersonalEmail !== null) {
+                    $user->personal_email = $normalizedPersonalEmail;
+                }
+
+                $user->save();
             }
         } else {
-            $created = $this->createStudentUser($firstName, $lastName, $middleName, $payload['email'] ?? null);
+            $created = $this->createStudentUser($firstName, $lastName, $middleName, $normalizedPersonalEmail, $lrn);
             $user = $created['user'];
             $generatedPlainPassword = $created['password'];
             $student = Student::firstOrNew(['user_id' => $user->id]);
@@ -687,6 +749,8 @@ class ClassController extends Controller
         return [
             'status' => $status,
             'password' => $generatedPlainPassword,
+            'username' => $user->username,
+            'personal_email' => $user->personal_email,
             'user' => $user,
         ];
     }
@@ -806,24 +870,26 @@ class ClassController extends Controller
         return $digits !== '' ? $digits : null;
     }
 
-    private function createStudentUser(string $firstName, string $lastName, ?string $middleName = null, ?string $preferredEmail = null): array
-    {
-        $fullName = trim("{$firstName} {$lastName}" . ($middleName ? " {$middleName}" : ''));
-        $email = strtolower($preferredEmail ?: $this->generateSchoolEmail($fullName));
-
+    private function createStudentUser(
+        string $firstName,
+        string $lastName,
+        ?string $middleName = null,
+        ?string $preferredPersonalEmail = null,
+        ?string $lrn = null,
+    ): array {
         $plainPassword = Str::random(12);
+        $username = $this->generateStudentUsername($firstName, $lastName, $lrn);
 
-        $user = User::firstOrCreate(
-            ['email' => $email],
-            [
-                'first_name' => $firstName,
-                'last_name' => $lastName,
-                'middle_name' => $middleName,
-                'password' => $plainPassword, // Store plain text initially - will be hashed on first login change
-                'temp_password' => $plainPassword, // Store for teacher to view
-                'must_change_password' => true,
-            ]
-        );
+        $user = User::create([
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'middle_name' => $middleName,
+            'username' => $username,
+            'personal_email' => $preferredPersonalEmail,
+            'password' => $plainPassword, // Store plain text initially - will be hashed on first login change
+            'temp_password' => $plainPassword, // Store for teacher to view
+            'must_change_password' => true,
+        ]);
 
         $studentRoleId = Role::where('name', 'student')->value('id');
         if ($studentRoleId) {
@@ -833,7 +899,7 @@ class ClassController extends Controller
         // Only return the generated plaintext password when a user was newly created
         return [
             'user' => $user,
-            'password' => $user->wasRecentlyCreated ? $plainPassword : null,
+            'password' => $plainPassword,
         ];
     }
 
@@ -847,21 +913,11 @@ class ClassController extends Controller
         ];
     }
 
-    private function generateSchoolEmail(string $fullName): string
+    private function generateStudentUsername(string $firstName, string $lastName, ?string $lrn = null): string
     {
-        $initials = Str::of($fullName)
-            ->replaceMatches('/[^a-zA-Z\s]/', '')
-            ->trim()
-            ->explode(' ')
-            ->map(fn($segment) => Str::lower(Str::substr($segment, 0, 1)))
-            ->implode('');
+        $seed = trim("{$firstName} {$lastName}");
 
-        $year = now()->format('Y');
-        $random = random_int(1000, 9999);
-
-        $fallback = $initials ?: 'student';
-
-        return sprintf('%s%s%04d@bshs.edu.ph', $fallback, $year, $random);
+        return User::generateUniqueUsername($seed);
     }
 
     private function avatarFor(string $fullName): string
@@ -1132,7 +1188,9 @@ class ClassController extends Controller
                         'id' => $enrollment->id,
                         'name' => $fullName,
                         'lrn' => $studentProfile?->lrn,
-                        'email' => $user?->email,
+                        'username' => $user?->username,
+                        'personal_email' => $user?->personal_email,
+                        'email' => $user?->personal_email,
                         'avatar' => $studentProfile?->avatar,
                         'grade_level' => $studentProfile?->grade_level ?? $subjectTeacher->grade_level,
                         'section' => $studentProfile?->section ?? $subjectTeacher->section,

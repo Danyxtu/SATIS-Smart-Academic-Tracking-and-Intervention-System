@@ -68,10 +68,10 @@ class ProfileController extends Controller
             'first_name' => $validated['first_name'],
             'last_name' => $validated['last_name'],
             'middle_name' => $validated['middle_name'] ?? null,
-            'email' => $validated['email'],
+            'personal_email' => $validated['email'],
         ]);
 
-        if ($user->isDirty('email')) {
+        if ($user->isDirty('personal_email')) {
             $user->email_verified_at = null;
         }
 

@@ -39,7 +39,7 @@ class TeacherRegistrationController extends Controller
         $request->validate([
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
-            'email' => 'required|string|lowercase|email|max:255|unique:users,email|unique:teacher_registrations,email',
+            'email' => 'required|string|lowercase|email|max:255|unique:users,personal_email|unique:teacher_registrations,email',
             'department_id' => 'required|exists:departments,id',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'document' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240', // 10MB max

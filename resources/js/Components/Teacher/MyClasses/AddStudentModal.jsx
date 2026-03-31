@@ -6,8 +6,6 @@ const LRN_LENGTH = 12;
 const INVALID_ZERO_LRN = "000000000000";
 const FIELD_CLASS =
     "block w-full h-9 rounded-sm border border-slate-300 bg-white px-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200/80";
-const READONLY_FIELD_CLASS =
-    "block w-full h-9 rounded-sm border border-slate-300 bg-slate-50 px-2.5 text-sm text-slate-700 placeholder:text-slate-400 shadow-sm";
 
 const AddStudentModal = ({
     subjectId,
@@ -22,7 +20,7 @@ const AddStudentModal = ({
         middle_initial: "",
         student_name: "",
         lrn: "",
-        email: "",
+        personal_email: "",
     });
 
     const normalizedFirstName = data.first_name.replace(/\s+/g, " ").trim();
@@ -40,19 +38,7 @@ const AddStudentModal = ({
         if (data.student_name !== studentNamePayload) {
             setData("student_name", studentNamePayload);
         }
-
-        if (!studentNamePayload) {
-            if (data.email) {
-                setData("email", "");
-            }
-            return;
-        }
-
-        const nextEmail = generateEmail(studentNamePayload);
-        if (data.email !== nextEmail) {
-            setData("email", nextEmail);
-        }
-    }, [studentNamePayload, data.student_name, data.email, setData]);
+    }, [studentNamePayload, data.student_name, setData]);
 
     const normalizedExistingLrns = useMemo(
         () =>
@@ -251,19 +237,25 @@ const AddStudentModal = ({
                         </div>
                         <div>
                             <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                Email (auto-generated)
+                                Personal Email (optional)
                             </label>
                             <input
                                 type="email"
-                                name="email"
-                                readOnly
-                                className={`mt-1 ${READONLY_FIELD_CLASS}`}
-                                value={data.email}
-                                placeholder="Auto-generated"
+                                name="personal_email"
+                                className={`mt-1 ${FIELD_CLASS}`}
+                                value={data.personal_email}
+                                onChange={(e) =>
+                                    setData("personal_email", e.target.value)
+                                }
+                                placeholder="e.g., student@example.com"
                             />
-                            {errors.email && (
+                            <p className="mt-1 text-[11px] text-slate-500">
+                                Username is generated automatically and used as
+                                the student login credential.
+                            </p>
+                            {errors.personal_email && (
                                 <p className="text-xs text-red-600 mt-1">
-                                    {errors.email}
+                                    {errors.personal_email}
                                 </p>
                             )}
                         </div>
@@ -289,22 +281,6 @@ const AddStudentModal = ({
             </div>
         </div>
     );
-};
-
-const generateEmail = (name) => {
-    const cleaned =
-        name
-            .toLowerCase()
-            .replace(/[^a-z\s]/g, "")
-            .trim()
-            .split(" ")
-            .map((segment) => segment.charAt(0))
-            .join("") || "student";
-
-    const year = new Date().getFullYear();
-    const random = Math.floor(Math.random() * 9000) + 1000;
-
-    return `${cleaned}${year}${random}@bshs.edu.ph`;
 };
 
 export default AddStudentModal;

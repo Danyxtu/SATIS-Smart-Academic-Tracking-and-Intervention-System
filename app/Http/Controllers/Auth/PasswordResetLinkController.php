@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -39,7 +40,7 @@ class PasswordResetLinkController extends Controller
         // to send the link, we will examine the response then see the message we
         // need to show to the user. Finally, we'll send out a proper response.
         $status = Password::sendResetLink(
-            $request->only('email')
+            ['personal_email' => Str::lower($request->email)]
         );
 
         if ($status == Password::RESET_LINK_SENT) {
@@ -62,7 +63,7 @@ class PasswordResetLinkController extends Controller
         ]);
 
         // Find the user by email
-        $user = User::where('email', $request->email)->first();
+        $user = User::where('personal_email', Str::lower($request->email))->first();
 
         if (!$user) {
             throw ValidationException::withMessages([

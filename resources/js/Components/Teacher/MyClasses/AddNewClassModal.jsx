@@ -402,8 +402,9 @@ const AddNewClassModal = ({
                             <p className="text-sm text-blue-700">
                                 <strong>Note:</strong> Once the class list is
                                 added, the system will automatically generate a
-                                unique email for each student (e.g.,
-                                hz202300349@bshs.edu.ph).
+                                unique username for each student. Any personal
+                                email in your file is stored only as contact
+                                information.
                             </p>
                         </div>
                     </div>

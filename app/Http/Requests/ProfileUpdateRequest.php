@@ -33,7 +33,7 @@ class ProfileUpdateRequest extends FormRequest
                 'lowercase',
                 'email',
                 'max:255',
-                Rule::unique(User::class)->ignore($this->user()->id),
+                Rule::unique(User::class, 'personal_email')->ignore($this->user()->id),
             ],
             // Student-specific fields (optional)
             'student_name' => ['nullable', 'string', 'max:255'],

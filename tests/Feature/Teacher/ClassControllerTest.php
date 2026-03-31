@@ -26,6 +26,7 @@ test('teacher can add a student and receives the generated password in session',
 
     $sessionData = session('new_student_password');
     $this->assertNotNull($sessionData['password']);
+    $this->assertNotNull($sessionData['username'] ?? null);
 
     $studentRecord = Student::where('lrn', '111222333444')->first();
     $user = User::find($studentRecord->user_id ?? null);
@@ -56,7 +57,7 @@ test('teacher can upload a classlist and import summary contains generated passw
     foreach ($summary['created_students'] as $student) {
         $this->assertArrayHasKey('password', $student);
         $this->assertNotNull($student['password']);
-        $user = User::where('email', $student['email'] ?? null)->first();
+        $user = User::where('username', $student['username'] ?? null)->first();
         $this->assertNotNull($user);
         $this->assertTrue(Hash::check($student['password'], $user->password));
     }

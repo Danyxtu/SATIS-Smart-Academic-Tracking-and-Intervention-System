@@ -33,7 +33,8 @@ class AdminController extends Controller
                 $q->where('first_name', 'like', "%{$search}%")
                     ->orWhere('last_name', 'like', "%{$search}%")
                     ->orWhere('middle_name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('username', 'like', "%{$search}%")
+                    ->orWhere('personal_email', 'like', "%{$search}%");
             });
         }
 
@@ -80,7 +81,7 @@ class AdminController extends Controller
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'middle_name' => ['nullable', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,personal_email'],
             'department_id' => ['required', 'exists:departments,id'],
             'password' => ['nullable', Rules\Password::defaults()],
         ]);
@@ -92,7 +93,7 @@ class AdminController extends Controller
             'first_name' => $validated['first_name'],
             'last_name' => $validated['last_name'],
             'middle_name' => $validated['middle_name'] ?? null,
-            'email' => $validated['email'],
+            'personal_email' => $validated['email'],
             'password' => $plainPassword, // Will be hashed on first login
             'temp_password' => $plainPassword,
             'must_change_password' => true,
@@ -207,7 +208,7 @@ class AdminController extends Controller
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'middle_name' => ['nullable', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($admin->id)],
+            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'personal_email')->ignore($admin->id)],
             'department_id' => ['required', 'exists:departments,id'],
             'password' => ['nullable', 'string', 'min:8'],
         ]);
@@ -216,7 +217,7 @@ class AdminController extends Controller
             'first_name' => $validated['first_name'],
             'last_name' => $validated['last_name'],
             'middle_name' => $validated['middle_name'],
-            'email' => $validated['email'],
+            'personal_email' => $validated['email'],
             'department_id' => $validated['department_id'],
         ];
 

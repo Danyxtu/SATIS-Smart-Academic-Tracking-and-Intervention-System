@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -26,6 +27,7 @@ class User extends Authenticatable
         'first_name',
         'last_name',
         'middle_name',
+        'username',
         'email',
         'personal_email',
         'password',
@@ -35,6 +37,15 @@ class User extends Authenticatable
         'temp_password',
         'must_change_password',
         'password_changed_at',
+    ];
+
+    /**
+     * Append virtual attributes when serializing to arrays/JSON.
+     *
+     * @var list<string>
+     */
+    protected $appends = [
+        'email',
     ];
 
     /**
@@ -73,7 +84,108 @@ class User extends Authenticatable
             $this->middle_name,
             $this->last_name,
         ]);
-        return implode(' ', $parts) ?: $this->email;
+        return implode(' ', $parts) ?: ($this->username ?? $this->personal_email ?? 'User');
+    }
+
+    /**
+     * Backward-compatible alias so existing code that reads `$user->email`
+     * transparently uses the `personal_email` column.
+     */
+    public function getEmailAttribute(): ?string
+    {
+        return $this->attributes['personal_email']
+            ?? $this->attributes['email']
+            ?? null;
+    }
+
+    /**
+     * Backward-compatible alias so existing code that writes `$user->email`
+     * stores the value in `personal_email`.
+     */
+    public function setEmailAttribute(?string $value): void
+    {
+        $this->attributes['personal_email'] = $value !== null
+            ? Str::lower(trim($value))
+            : null;
+    }
+
+    /**
+     * Password broker should resolve users by personal email.
+     */
+    public function getEmailForPasswordReset(): string
+    {
+        return (string) ($this->personal_email ?? '');
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $user): void {
+            if (! filled($user->username)) {
+                $base = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? ''));
+
+                if ($base === '' && filled($user->personal_email)) {
+                    $base = Str::before((string) $user->personal_email, '@');
+                }
+
+                $user->username = self::generateUniqueUsername($base);
+            }
+        });
+    }
+
+    public static function generateUniqueUsername(?string $seed = null, ?int $year = null): string
+    {
+        $normalizedSeed = Str::of((string) $seed)
+            ->ascii()
+            ->lower()
+            ->replaceMatches('/[^a-z0-9\s]+/', ' ')
+            ->replaceMatches('/\s+/', ' ')
+            ->trim()
+            ->value();
+
+        $tokens = $normalizedSeed !== '' ? preg_split('/\s+/', $normalizedSeed) : [];
+
+        if (is_array($tokens) && count($tokens) >= 2) {
+            $firstToken = (string) ($tokens[0] ?? '');
+            $lastToken = (string) ($tokens[count($tokens) - 1] ?? '');
+            $prefix = Str::substr($firstToken, 0, 1) . Str::substr($lastToken, 0, 1);
+        } elseif (is_array($tokens) && count($tokens) === 1) {
+            $token = (string) ($tokens[0] ?? '');
+            $prefix = Str::substr($token, 0, 2);
+        } else {
+            $prefix = 'xx';
+        }
+
+        $prefix = strtolower(preg_replace('/[^a-z0-9]/', 'x', $prefix) ?: 'xx');
+        $prefix = substr($prefix . 'xx', 0, 2);
+
+        $resolvedYear = $year ?: (int) now()->format('Y');
+        $yearPart = str_pad((string) $resolvedYear, 4, '0', STR_PAD_LEFT);
+        $usernamePrefix = $prefix . $yearPart;
+
+        $usernamePattern = '/^' . preg_quote($usernamePrefix, '/') . '\\d{5}$/';
+
+        $latestMatching = self::query()
+            ->where('username', 'like', $usernamePrefix . '%')
+            ->orderByDesc('username')
+            ->pluck('username')
+            ->first(function ($value) use ($usernamePattern) {
+                return is_string($value) && preg_match($usernamePattern, $value) === 1;
+            });
+
+        $nextSequence = 1;
+
+        if (is_string($latestMatching) && preg_match('/(\d{5})$/', $latestMatching, $matches) === 1) {
+            $nextSequence = ((int) $matches[1]) + 1;
+        }
+
+        $candidate = sprintf('%s%05d', $usernamePrefix, $nextSequence);
+
+        while (self::query()->where('username', $candidate)->exists()) {
+            $nextSequence++;
+            $candidate = sprintf('%s%05d', $usernamePrefix, $nextSequence);
+        }
+
+        return $candidate;
     }
 
     /**

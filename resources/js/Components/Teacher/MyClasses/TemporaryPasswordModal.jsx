@@ -1,12 +1,23 @@
 import { useState } from "react";
-import { X, Copy, Check, Key, AlertTriangle, User, Mail } from "lucide-react";
+import {
+    X,
+    Copy,
+    Check,
+    Key,
+    AlertTriangle,
+    User,
+    Mail,
+    AtSign,
+} from "lucide-react";
 
 const TemporaryPasswordModal = ({ studentInfo, onClose }) => {
     const [copied, setCopied] = useState(false);
 
     if (!studentInfo) return null;
 
-    const { name, email, lrn, password } = studentInfo;
+    const { name, username, personal_email, email, lrn, password } =
+        studentInfo;
+    const contactEmail = personal_email || email;
 
     const handleCopy = async () => {
         try {
@@ -19,7 +30,9 @@ const TemporaryPasswordModal = ({ studentInfo, onClose }) => {
     };
 
     const handleCopyAll = async () => {
-        const credentials = `Student: ${name}\nEmail: ${email}\nLRN: ${
+        const credentials = `Student: ${name}\nUsername: ${
+            username || "N/A"
+        }\nPersonal Email: ${contactEmail || "N/A"}\nLRN: ${
             lrn || "N/A"
         }\nTemporary Password: ${password}`;
         try {
@@ -80,6 +93,20 @@ const TemporaryPasswordModal = ({ studentInfo, onClose }) => {
 
                     {/* Student Info */}
                     <div className="space-y-2">
+                        {username && (
+                            <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                                <AtSign className="w-4 h-4 text-gray-400" />
+                                <div>
+                                    <p className="text-xs text-gray-500">
+                                        Username
+                                    </p>
+                                    <p className="text-sm font-medium text-gray-900">
+                                        {username}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
                             <User className="w-4 h-4 text-gray-400" />
                             <div>
@@ -92,15 +119,15 @@ const TemporaryPasswordModal = ({ studentInfo, onClose }) => {
                             </div>
                         </div>
 
-                        {email && (
+                        {contactEmail && (
                             <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
                                 <Mail className="w-4 h-4 text-gray-400" />
                                 <div>
                                     <p className="text-xs text-gray-500">
-                                        Email
+                                        Personal Email
                                     </p>
                                     <p className="text-sm font-medium text-gray-900">
-                                        {email}
+                                        {contactEmail}
                                     </p>
                                 </div>
                             </div>
