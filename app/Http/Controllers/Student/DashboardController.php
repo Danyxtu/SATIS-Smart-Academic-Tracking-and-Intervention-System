@@ -35,6 +35,9 @@ class DashboardController extends Controller
             'intervention.tasks',
         ])
             ->where('user_id', $user->id)
+            ->whereHas('subjectTeacher', function ($query) use ($currentSchoolYear) {
+                $query->where('school_year', $currentSchoolYear);
+            })
             ->get();
 
         // Filter enrollments by semester

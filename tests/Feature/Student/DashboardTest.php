@@ -5,6 +5,9 @@ namespace Tests\Feature\Student;
 use App\Models\User;
 use App\Models\Enrollment;
 use App\Models\Subject;
+use App\Models\SubjectTeacher;
+use App\Models\SystemSetting;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class DashboardTest extends TestCase
@@ -102,5 +105,57 @@ class DashboardTest extends TestCase
             fn($page) =>
             $page->has('enrollment')
         );
+    }
+
+    public function test_student_dashboard_is_scoped_to_current_school_year(): void
+    {
+        /** @var User $student */
+        $student = $this->createUserWithRole('student');
+        /** @var User $teacher */
+        $teacher = $this->createUserWithRole('teacher');
+
+        SystemSetting::set('current_school_year', '2026-2027', $teacher->id);
+        SystemSetting::set('current_semester', 1, $teacher->id);
+
+        $currentSubject = Subject::create([
+            'subject_name' => 'Current Year Subject',
+            'subject_code' => 'STU-CURR-' . uniqid(),
+        ]);
+        $endedSubject = Subject::create([
+            'subject_name' => 'Ended Year Subject',
+            'subject_code' => 'STU-END-' . uniqid(),
+        ]);
+
+        $currentClass = SubjectTeacher::create([
+            'subject_id' => $currentSubject->id,
+            'teacher_id' => $teacher->id,
+            'school_year' => '2026-2027',
+            'semester' => '1',
+        ]);
+        $endedClass = SubjectTeacher::create([
+            'subject_id' => $endedSubject->id,
+            'teacher_id' => $teacher->id,
+            'school_year' => '2025-2026',
+            'semester' => '1',
+        ]);
+
+        Enrollment::create([
+            'user_id' => $student->id,
+            'subject_teachers_id' => $currentClass->id,
+        ]);
+        Enrollment::create([
+            'user_id' => $student->id,
+            'subject_teachers_id' => $endedClass->id,
+        ]);
+
+        $response = $this->actingAs($student)->get('/dashboard');
+
+        $response->assertOk();
+        $response->assertInertia(fn(Assert $page) => $page
+            ->component('Student/Dashboard')
+            ->where('semesters.schoolYear', '2026-2027')
+            ->where('stats.totalSubjects', 1)
+            ->where('semesters.semester1Count', 1)
+            ->where('semesters.semester2Count', 0));
     }
 }

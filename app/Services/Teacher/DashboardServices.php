@@ -20,11 +20,14 @@ class DashboardServices
     public function getDashboardData(): array
     {
         $teacher = Auth::user(); // For the name of the teacher
+        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
+        $currentSemester = SystemSetting::getCurrentSemester();
 
         $teacher->load('department');
         // Get all enrollments for the teacher's subjects
-        $enrollments = Enrollment::whereHas('subjectTeacher', function ($query) use ($teacher) {
-            $query->where('teacher_id', $teacher->id);
+        $enrollments = Enrollment::whereHas('subjectTeacher', function ($query) use ($teacher, $currentSchoolYear) {
+            $query->where('teacher_id', $teacher->id)
+                ->where('school_year', $currentSchoolYear);
         })->with([
             'user',
             'grades',
@@ -130,8 +133,6 @@ class DashboardServices
             ->latest()->limit(5)->with('enrollment.user')->get();
 
         $totalStudents = $students->count();
-        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
-        $currentSemester = SystemSetting::getCurrentSemester();
 
         $department = $teacher->department ? [
             'id' => $teacher->department->id,
@@ -203,11 +204,11 @@ class DashboardServices
             ->get();
 
         // Fallback: if strict current period filters return no rows,
-        // expose available teacher assignments so grade upload can still proceed.
+        // expose current-school-year assignments across semesters.
         if ($subjectTeachers->isEmpty()) {
             $subjectTeachers = \App\Models\SubjectTeacher::where('teacher_id', $teacher->id)
+                ->where('school_year', $currentSchoolYear)
                 ->with('subject')
-                ->orderByDesc('school_year')
                 ->orderBy('semester')
                 ->get();
         }
