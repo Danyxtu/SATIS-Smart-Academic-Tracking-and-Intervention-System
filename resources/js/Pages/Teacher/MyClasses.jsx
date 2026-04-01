@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import axios from "axios";
 import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import { useLoading } from "@/Context/LoadingContext";
@@ -36,6 +37,8 @@ import {
     ClassCard,
     ClassCreateSummaryModal,
     DeleteClassModal,
+    ReuseArchivedClassesModal,
+    ReuseArchivedClassesSummaryModal,
     SendNudgeModal,
 } from "@/Components/Teacher/MyClasses";
 import MyClass from "./MyClasses/MyClass";
@@ -164,6 +167,14 @@ const MyClasses = ({
     const [archiveDetail, setArchiveDetail] = useState(null);
     const [archiveDetailError, setArchiveDetailError] = useState("");
     const [archiveDetailLoading, setArchiveDetailLoading] = useState(false);
+    const [isArchiveReuseModalOpen, setIsArchiveReuseModalOpen] =
+        useState(false);
+    const [archiveReuseSelection, setArchiveReuseSelection] = useState([]);
+    const [archiveReuseError, setArchiveReuseError] = useState("");
+    const [archiveReuseSubmitting, setArchiveReuseSubmitting] = useState(false);
+    const [archiveReuseSummary, setArchiveReuseSummary] = useState(null);
+    const [isArchiveReuseSummaryOpen, setIsArchiveReuseSummaryOpen] =
+        useState(false);
 
     // Check for highlight query parameter from tutorial
     useEffect(() => {
@@ -411,6 +422,13 @@ const MyClasses = ({
     const pageSubtitle = hasSelectedClass
         ? selectedClass.subject
         : "Monitor rosters, imports, and grades from a single workspace.";
+    const archiveSelectedSemester = Number(
+        archiveDetail?.selected_semester ?? 1,
+    );
+    const archiveReuseBlockedReason =
+        archiveSelectedSemester === 2 && Number(currentSemester) < 2
+            ? "Second semester should start to proceed with this operation."
+            : "";
 
     const clearClassQueryParam = ({ replace = true } = {}) => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -546,6 +564,9 @@ const MyClasses = ({
         setSelectedArchiveYear(null);
         setArchiveDetail(null);
         setArchiveDetailError("");
+        setIsArchiveReuseModalOpen(false);
+        setArchiveReuseSelection([]);
+        setArchiveReuseError("");
 
         await fetchArchiveSummary();
     };
@@ -557,6 +578,9 @@ const MyClasses = ({
         setSelectedArchiveYear(null);
         setArchiveDetail(null);
         setArchiveDetailError("");
+        setIsArchiveReuseModalOpen(false);
+        setArchiveReuseSelection([]);
+        setArchiveReuseError("");
     };
 
     const handleBackToArchiveYears = () => {
@@ -565,6 +589,9 @@ const MyClasses = ({
         setSelectedArchiveYear(null);
         setArchiveDetail(null);
         setArchiveDetailError("");
+        setIsArchiveReuseModalOpen(false);
+        setArchiveReuseSelection([]);
+        setArchiveReuseError("");
     };
 
     const handleArchiveYearSelect = async (schoolYear) => {
@@ -576,10 +603,147 @@ const MyClasses = ({
             return;
         }
 
+        setIsArchiveReuseModalOpen(false);
+        setArchiveReuseSelection([]);
+        setArchiveReuseError("");
+
         await fetchArchiveYearDetail({
             schoolYear: selectedArchiveYear,
             semester,
         });
+    };
+
+    const handleOpenArchiveReuseModal = () => {
+        const archiveClasses = Array.isArray(archiveDetail?.classes)
+            ? archiveDetail.classes
+            : [];
+
+        if (archiveClasses.length === 0) {
+            return;
+        }
+
+        setArchiveReuseSelection(
+            archiveClasses
+                .map((cls) => Number(cls?.id))
+                .filter((classId) => Number.isInteger(classId) && classId > 0),
+        );
+        setArchiveReuseError("");
+        setIsArchiveReuseModalOpen(true);
+    };
+
+    const handleToggleArchiveReuseClass = (classId) => {
+        const targetId = Number(classId);
+        if (!Number.isInteger(targetId) || targetId <= 0) {
+            return;
+        }
+
+        setArchiveReuseSelection((prev) => {
+            const selectedSet = new Set(prev.map((id) => Number(id)));
+
+            if (selectedSet.has(targetId)) {
+                selectedSet.delete(targetId);
+            } else {
+                selectedSet.add(targetId);
+            }
+
+            return Array.from(selectedSet);
+        });
+    };
+
+    const handleSelectAllArchiveReuseClasses = () => {
+        const archiveClasses = Array.isArray(archiveDetail?.classes)
+            ? archiveDetail.classes
+            : [];
+
+        setArchiveReuseSelection(
+            archiveClasses
+                .map((cls) => Number(cls?.id))
+                .filter((classId) => Number.isInteger(classId) && classId > 0),
+        );
+    };
+
+    const handleClearArchiveReuseClasses = () => {
+        setArchiveReuseSelection([]);
+    };
+
+    const handleSubmitArchiveReuse = async () => {
+        if (!selectedArchiveYear || !archiveDetail?.selected_semester) {
+            setArchiveReuseError(
+                "Select an archived school year and semester first.",
+            );
+            return;
+        }
+
+        if (archiveReuseBlockedReason) {
+            setArchiveReuseError(archiveReuseBlockedReason);
+            return;
+        }
+
+        if (archiveReuseSelection.length === 0) {
+            setArchiveReuseError("Select at least one class to continue.");
+            return;
+        }
+
+        setArchiveReuseSubmitting(true);
+        setArchiveReuseError("");
+        startLoading();
+
+        try {
+            const response = await axios.post(
+                "/teacher/classes/archive/use",
+                {
+                    school_year: selectedArchiveYear,
+                    semester: String(archiveDetail.selected_semester),
+                    class_ids: archiveReuseSelection,
+                },
+                {
+                    headers: {
+                        Accept: "application/json",
+                    },
+                    withCredentials: true,
+                },
+            );
+
+            const payload = response?.data ?? {};
+
+            setIsArchiveReuseModalOpen(false);
+            setArchiveReuseSelection([]);
+            setArchiveReuseSummary(payload?.summary ?? null);
+            setIsArchiveReuseSummaryOpen(true);
+
+            router.reload({
+                only: [
+                    "classes",
+                    "defaultSchoolYear",
+                    "currentSemester",
+                    "selectedSemester",
+                    "semester1Count",
+                    "semester2Count",
+                ],
+                preserveState: true,
+                preserveScroll: true,
+            });
+        } catch (error) {
+            console.error("Archive reuse request error:", error);
+
+            const responsePayload = error?.response?.data ?? null;
+            const firstError = responsePayload?.errors
+                ? Object.values(responsePayload.errors)[0]
+                : null;
+            const firstErrorMessage = Array.isArray(firstError)
+                ? firstError[0]
+                : null;
+
+            setArchiveReuseError(
+                responsePayload?.message ||
+                    firstErrorMessage ||
+                    error?.message ||
+                    "Unable to add archived classes.",
+            );
+        } finally {
+            setArchiveReuseSubmitting(false);
+            stopLoading();
+        }
     };
 
     const formatArchiveTimestamp = (timestamp) => {
@@ -1158,27 +1322,49 @@ const MyClasses = ({
                                                 </h2>
                                             </div>
 
-                                            {archiveDetail?.summary && (
-                                                <div className="flex flex-wrap items-center gap-2 text-xs">
-                                                    <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-700">
-                                                        Classes:{" "}
-                                                        {archiveDetail.summary
-                                                            .classes_count ?? 0}
-                                                    </span>
-                                                    <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-700">
-                                                        Subjects:{" "}
-                                                        {archiveDetail.summary
-                                                            .subjects_count ??
-                                                            0}
-                                                    </span>
-                                                    <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-700">
-                                                        Students:{" "}
-                                                        {archiveDetail.summary
-                                                            .students_count ??
-                                                            0}
-                                                    </span>
-                                                </div>
-                                            )}
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                {archiveDetail?.summary && (
+                                                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                                                        <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+                                                            Classes:{" "}
+                                                            {archiveDetail
+                                                                .summary
+                                                                .classes_count ??
+                                                                0}
+                                                        </span>
+                                                        <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+                                                            Subjects:{" "}
+                                                            {archiveDetail
+                                                                .summary
+                                                                .subjects_count ??
+                                                                0}
+                                                        </span>
+                                                        <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+                                                            Students:{" "}
+                                                            {archiveDetail
+                                                                .summary
+                                                                .students_count ??
+                                                                0}
+                                                        </span>
+                                                    </div>
+                                                )}
+
+                                                <button
+                                                    type="button"
+                                                    onClick={
+                                                        handleOpenArchiveReuseModal
+                                                    }
+                                                    disabled={
+                                                        archiveDetailLoading ||
+                                                        (archiveDetail?.classes
+                                                            ?.length ?? 0) === 0
+                                                    }
+                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                >
+                                                    <Copy size={14} />
+                                                    Use Archived Classes
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -1240,6 +1426,14 @@ const MyClasses = ({
                                             })}
                                         </div>
                                     </div>
+
+                                    {archiveReuseBlockedReason && (
+                                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                                            <p className="text-sm font-medium text-amber-700">
+                                                {archiveReuseBlockedReason}
+                                            </p>
+                                        </div>
+                                    )}
 
                                     {archiveDetailLoading ? (
                                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-8 text-center">
@@ -1506,6 +1700,7 @@ const MyClasses = ({
                         gradeStructure={gradeStructure}
                         gradeSummaries={gradeSummaries}
                         onRefreshClassData={refreshClassData}
+                        isReadOnly={isArchiveMode}
                     />
                 )}
             </div>
@@ -1536,6 +1731,34 @@ const MyClasses = ({
                     departments={departments}
                 />
             )}
+
+            <ReuseArchivedClassesModal
+                isOpen={isArchiveReuseModalOpen}
+                classes={archiveDetail?.classes ?? []}
+                selectedClassIds={archiveReuseSelection}
+                schoolYear={selectedArchiveYear}
+                semester={archiveDetail?.selected_semester ?? 1}
+                blockedReason={archiveReuseBlockedReason}
+                error={archiveReuseError}
+                isSubmitting={archiveReuseSubmitting}
+                onToggleClass={handleToggleArchiveReuseClass}
+                onSelectAll={handleSelectAllArchiveReuseClasses}
+                onClearAll={handleClearArchiveReuseClasses}
+                onClose={() => {
+                    setIsArchiveReuseModalOpen(false);
+                    setArchiveReuseError("");
+                }}
+                onSubmit={handleSubmitArchiveReuse}
+            />
+
+            <ReuseArchivedClassesSummaryModal
+                isOpen={isArchiveReuseSummaryOpen}
+                summary={archiveReuseSummary}
+                onClose={() => {
+                    setIsArchiveReuseSummaryOpen(false);
+                    setArchiveReuseSummary(null);
+                }}
+            />
 
             <ClassCreateSummaryModal
                 isOpen={isClassCreateSummaryOpen}

@@ -13,6 +13,7 @@ use App\Models\StudentNotification;
 use App\Models\SubjectTeacher;
 use App\Models\SystemSetting;
 use App\Models\User;
+use App\Services\SchoolYearArchiveDetailsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -298,12 +299,14 @@ class SettingsController extends Controller
         $classIds = SubjectTeacher::where('school_year', $oldSY)->pluck('id');
         $enrollmentIds = Enrollment::whereIn('subject_teachers_id', $classIds)->pluck('id');
         $interventionIds = Intervention::whereIn('enrollment_id', $enrollmentIds)->pluck('id');
+        $details = app(SchoolYearArchiveDetailsService::class)->build($oldSY);
 
         $snapshot = [
             'school_year' => $oldSY,
             'next_school_year' => $newSY,
             'semester' => SystemSetting::getCurrentSemester(),
             'stats' => $this->buildSyStats($oldSY),
+            'details' => $details,
             'totals' => [
                 'classes' => (int) $classIds->count(),
                 'enrollments' => (int) $enrollmentIds->count(),

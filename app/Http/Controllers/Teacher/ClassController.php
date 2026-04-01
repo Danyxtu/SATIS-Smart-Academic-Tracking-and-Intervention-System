@@ -236,6 +236,180 @@ class ClassController extends Controller
         ]);
     }
 
+    public function useArchivedClasses(Request $request): JsonResponse
+    {
+        $teacherId = (int) $request->user()->id;
+        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
+        $currentSemester = (string) SystemSetting::getCurrentSemester();
+
+        $validator = Validator::make($request->all(), [
+            'school_year' => ['required', 'string', 'regex:/^\d{4}-\d{4}$/'],
+            'semester' => ['required', Rule::in(['1', '2'])],
+            'class_ids' => ['required', 'array', 'min:1'],
+            'class_ids.*' => ['integer'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Invalid archived class selection.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $data = $validator->validated();
+
+        $sourceSchoolYear = (string) $data['school_year'];
+        $targetSemester = (string) $data['semester'];
+
+        if ($sourceSchoolYear === $currentSchoolYear) {
+            return response()->json([
+                'message' => 'Only archived school years can be reused.',
+            ], 422);
+        }
+
+        if ($targetSemester === '2' && $currentSemester !== '2') {
+            return response()->json([
+                'message' => 'Second semester should start to proceed with this operation.',
+            ], 422);
+        }
+
+        $requestedClassIds = collect($data['class_ids'])
+            ->map(fn($id) => (int) $id)
+            ->filter(fn($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($requestedClassIds->isEmpty()) {
+            return response()->json([
+                'message' => 'Select at least one archived class to continue.',
+            ], 422);
+        }
+
+        $archivedClasses = SubjectTeacher::query()
+            ->with('subject:id,subject_name')
+            ->where('teacher_id', $teacherId)
+            ->where('school_year', $sourceSchoolYear)
+            ->where('semester', $targetSemester)
+            ->whereIn('id', $requestedClassIds)
+            ->get([
+                'id',
+                'subject_id',
+                'grade_level',
+                'section',
+                'color',
+                'strand',
+                'track',
+                'grade_categories',
+                'semester',
+            ]);
+
+        if ($archivedClasses->isEmpty()) {
+            return response()->json([
+                'message' => 'No matching archived classes were found.',
+            ], 404);
+        }
+
+        $foundClassIds = $archivedClasses
+            ->pluck('id')
+            ->map(fn($id) => (int) $id);
+
+        $skippedMissingIds = $requestedClassIds
+            ->diff($foundClassIds)
+            ->values()
+            ->all();
+
+        $existingSignatures = SubjectTeacher::query()
+            ->where('teacher_id', $teacherId)
+            ->where('school_year', $currentSchoolYear)
+            ->where('semester', $targetSemester)
+            ->get(['subject_id', 'grade_level', 'section'])
+            ->mapWithKeys(fn($class) => [
+                $this->buildClassReuseSignature(
+                    (int) $class->subject_id,
+                    (string) $class->grade_level,
+                    (string) $class->section,
+                ) => true,
+            ])
+            ->all();
+
+        $createdClasses = [];
+        $skippedDuplicates = [];
+
+        DB::transaction(function () use (
+            $archivedClasses,
+            $teacherId,
+            $currentSchoolYear,
+            $targetSemester,
+            &$existingSignatures,
+            &$createdClasses,
+            &$skippedDuplicates,
+        ) {
+            foreach ($archivedClasses as $archivedClass) {
+                $signature = $this->buildClassReuseSignature(
+                    (int) $archivedClass->subject_id,
+                    (string) $archivedClass->grade_level,
+                    (string) $archivedClass->section,
+                );
+
+                if (isset($existingSignatures[$signature])) {
+                    $skippedDuplicates[] = [
+                        'source_id' => (int) $archivedClass->id,
+                        'subject' => $archivedClass->subject?->subject_name ?? 'N/A',
+                        'grade_level' => $archivedClass->grade_level,
+                        'section' => $archivedClass->section,
+                        'reason' => 'Class already exists in the active school year.',
+                    ];
+
+                    continue;
+                }
+
+                $newClass = SubjectTeacher::create([
+                    'subject_id' => $archivedClass->subject_id,
+                    'teacher_id' => $teacherId,
+                    'grade_level' => $archivedClass->grade_level,
+                    'section' => $archivedClass->section,
+                    'color' => $archivedClass->color ?: 'indigo',
+                    'strand' => $archivedClass->strand,
+                    'track' => $archivedClass->track,
+                    'school_year' => $currentSchoolYear,
+                    'current_quarter' => 1,
+                    'grade_categories' => $archivedClass->grade_categories ?: $this->defaultGradeCategories(),
+                    'semester' => $targetSemester,
+                ]);
+
+                $createdClasses[] = [
+                    'id' => (int) $newClass->id,
+                    'source_id' => (int) $archivedClass->id,
+                    'subject' => $archivedClass->subject?->subject_name ?? 'N/A',
+                    'grade_level' => $newClass->grade_level,
+                    'section' => $newClass->section,
+                    'semester' => $newClass->semester,
+                ];
+
+                $existingSignatures[$signature] = true;
+            }
+        });
+
+        return response()->json([
+            'message' => count($createdClasses) > 0
+                ? 'Archived classes added successfully.'
+                : 'No archived classes were added.',
+            'summary' => [
+                'source_school_year' => $sourceSchoolYear,
+                'target_school_year' => $currentSchoolYear,
+                'semester' => (int) $targetSemester,
+                'requested_count' => $requestedClassIds->count(),
+                'found_count' => $archivedClasses->count(),
+                'created_count' => count($createdClasses),
+                'skipped_duplicate_count' => count($skippedDuplicates),
+                'skipped_missing_count' => count($skippedMissingIds),
+                'created_classes' => $createdClasses,
+                'skipped_duplicates' => $skippedDuplicates,
+                'skipped_missing_ids' => $skippedMissingIds,
+            ],
+        ]);
+    }
+
     public function createAClass(Request $request): RedirectResponse
     {
         $teacher = $request->user();
@@ -941,6 +1115,15 @@ class ClassController extends Controller
         if ($subjectTeacher->teacher_id !== $teacherId) {
             abort(403, 'You are not allowed to modify this class.');
         }
+    }
+
+    private function buildClassReuseSignature(int $subjectId, string $gradeLevel, string $section): string
+    {
+        return implode('|', [
+            $subjectId,
+            mb_strtolower(trim($gradeLevel)),
+            mb_strtolower(trim($section)),
+        ]);
     }
 
 

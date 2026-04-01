@@ -23,8 +23,8 @@ class DepartmentController extends Controller
 
         $query = Department::withCount(['admins', 'teachers', 'students'])
             ->with([
-                'admins:id,first_name,middle_name,last_name,email,department_id',
-                'teachers:id,first_name,middle_name,last_name,email,department_id',
+                'admins:id,first_name,middle_name,last_name,personal_email,department_id',
+                'teachers:id,first_name,middle_name,last_name,personal_email,department_id',
             ]);
 
         // Search
@@ -80,7 +80,7 @@ class DepartmentController extends Controller
         $teachers = User::whereNull('department_id')
             ->whereHas('roles', fn($q) => $q->where('name', 'teacher'))
             ->orderBy('last_name')
-            ->get(['id', 'first_name', 'middle_name', 'last_name', 'email']);
+            ->get(['id', 'first_name', 'middle_name', 'last_name', 'personal_email']);
 
         return response()->json($teachers);
     }
@@ -194,12 +194,12 @@ class DepartmentController extends Controller
     public function departmentTeachers(Department $department): JsonResponse
     {
         $teachers = User::where(function ($q) use ($department) {
-                $q->where('department_id', $department->id)
-                  ->orWhereNull('department_id');
-            })
+            $q->where('department_id', $department->id)
+                ->orWhereNull('department_id');
+        })
             ->whereHas('roles', fn($q) => $q->where('name', 'teacher'))
             ->orderBy('last_name')
-            ->get(['id', 'first_name', 'middle_name', 'last_name', 'email', 'department_id']);
+            ->get(['id', 'first_name', 'middle_name', 'last_name', 'personal_email', 'department_id']);
 
         $adminId = User::where('department_id', $department->id)
             ->whereHas('roles', fn($q) => $q->where('name', 'admin'))

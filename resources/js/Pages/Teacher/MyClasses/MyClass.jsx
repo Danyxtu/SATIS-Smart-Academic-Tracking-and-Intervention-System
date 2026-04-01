@@ -223,6 +223,7 @@ const MyClass = (props) => {
         gradeStructure,
         gradeSummaries = {},
         onRefreshClassData,
+        isReadOnly = false,
     } = props;
 
     // State Management
@@ -233,7 +234,8 @@ const MyClass = (props) => {
     const [showFinalUnlockInfo, setShowFinalUnlockInfo] = useState(false);
     const [isStartQ2ModalOpen, setIsStartQ2ModalOpen] = useState(false);
     const currentQuarter = selectedClass?.current_quarter ?? 1;
-    const isQ2Unlocked = currentQuarter >= 2;
+    const isArchiveReadOnly = Boolean(isReadOnly);
+    const isQ2Unlocked = isArchiveReadOnly || currentQuarter >= 2;
     const [searchTerm, setSearchTerm] = useState("");
     const [gradesExpanded, setGradesExpanded] = useState(false);
     const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
@@ -350,9 +352,10 @@ const MyClass = (props) => {
     }, [gradeSummaries]);
 
     const isFinalUnlocked = useMemo(() => {
+        if (isArchiveReadOnly) return true;
         if (currentQuarter < 2) return false;
         return hasEligibleFinalGradeData;
-    }, [currentQuarter, hasEligibleFinalGradeData]);
+    }, [isArchiveReadOnly, currentQuarter, hasEligibleFinalGradeData]);
 
     const filteredStudents = useMemo(() => {
         if (!searchTerm.trim()) return students;
@@ -575,6 +578,7 @@ const MyClass = (props) => {
 
     // Event Handlers
     const handleSaveGrades = async () => {
+        if (isArchiveReadOnly) return;
         if (!hasGradeChanges || !selectedClass) return;
 
         const payload = [];
@@ -637,6 +641,10 @@ const MyClass = (props) => {
     };
 
     const handleGradeChange = (studentId, assignmentId, maxScore, rawValue) => {
+        if (isArchiveReadOnly) {
+            return;
+        }
+
         const nextValue = normalizeGradeInput(rawValue, maxScore);
 
         if (nextValue === null) {
@@ -689,6 +697,7 @@ const MyClass = (props) => {
     };
 
     const handleCategoryTaskSave = async (categoryId, taskData) => {
+        if (isArchiveReadOnly) return;
         if (!selectedClass) return;
         setIsSavingCategoryTask(true);
 
@@ -745,6 +754,7 @@ const MyClass = (props) => {
     };
 
     const handleCategoryTaskDelete = (categoryId, taskId) => {
+        if (isArchiveReadOnly) return;
         if (!selectedClass || isSavingCategoryTask) return;
 
         const category = gradeCategories.find((item) => item.id === categoryId);
@@ -779,6 +789,7 @@ const MyClass = (props) => {
     };
 
     const handleConfirmCategoryTaskDelete = async () => {
+        if (isArchiveReadOnly) return;
         if (!selectedClass || !deleteTaskModal.isOpen) return;
 
         const categoryId = deleteTaskModal.categoryId;
@@ -859,10 +870,12 @@ const MyClass = (props) => {
     };
 
     const handleClasslistUploadClick = () => {
+        if (isArchiveReadOnly) return;
         classlistUploadRef.current?.click();
     };
 
     const handleClasslistFileChange = async (event) => {
+        if (isArchiveReadOnly) return;
         const file = event.target.files?.[0];
         if (!file || !selectedClass) return;
 
@@ -910,10 +923,12 @@ const MyClass = (props) => {
     };
 
     const handleGradesUploadClick = () => {
+        if (isArchiveReadOnly) return;
         gradeUploadRef.current?.click();
     };
 
     const handleGradesFileChange = async (event) => {
+        if (isArchiveReadOnly) return;
         const file = event.target.files?.[0];
         if (!file || !selectedClass) return;
 
@@ -1081,6 +1096,11 @@ const MyClass = (props) => {
                                     Q{selectedClass.current_quarter}
                                 </span>
                             )}
+                            {isArchiveReadOnly && (
+                                <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 font-medium">
+                                    Archive View Only
+                                </span>
+                            )}
                             {/* View Mode Toggle - Compact */}
                             <div className="flex items-center p-0.5 bg-gray-100 rounded-md">
                                 <button
@@ -1115,9 +1135,17 @@ const MyClass = (props) => {
                     <div className="flex items-center gap-1.5 flex-wrap">
                         <button
                             onClick={handleClasslistUploadClick}
-                            disabled={!selectedClass || isUploadingClasslist}
+                            disabled={
+                                !selectedClass ||
+                                isUploadingClasslist ||
+                                isArchiveReadOnly
+                            }
                             className="flex items-center gap-1 rounded-md border border-indigo-300 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
-                            title="Upload students from CSV"
+                            title={
+                                isArchiveReadOnly
+                                    ? "Archive classes are view-only"
+                                    : "Upload students from CSV"
+                            }
                         >
                             <Users size={14} />
                             {isUploadingClasslist ? "Uploading…" : "Upload"}
@@ -1141,9 +1169,16 @@ const MyClass = (props) => {
                                 <button
                                     onClick={handleGradesUploadClick}
                                     disabled={
-                                        !selectedClass || isImportingGrades
+                                        !selectedClass ||
+                                        isImportingGrades ||
+                                        isArchiveReadOnly
                                     }
                                     className="flex items-center gap-1 bg-gray-100 text-gray-700 font-medium py-1.5 px-2.5 rounded-md hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60 text-xs"
+                                    title={
+                                        isArchiveReadOnly
+                                            ? "Archive classes are view-only"
+                                            : "Upload grades from CSV"
+                                    }
                                 >
                                     <Upload size={14} />
                                     {isImportingGrades
@@ -1153,9 +1188,16 @@ const MyClass = (props) => {
                                 <button
                                     onClick={handleSaveGrades}
                                     disabled={
-                                        !hasGradeChanges || isSavingGrades
+                                        !hasGradeChanges ||
+                                        isSavingGrades ||
+                                        isArchiveReadOnly
                                     }
                                     className="flex items-center gap-1 bg-emerald-600 text-white font-medium py-1.5 px-2.5 rounded-md hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 text-xs"
+                                    title={
+                                        isArchiveReadOnly
+                                            ? "Archive classes are view-only"
+                                            : "Save updated grades"
+                                    }
                                 >
                                     {isSavingGrades
                                         ? "Saving…"
@@ -1167,9 +1209,17 @@ const MyClass = (props) => {
                         )}
 
                         <button
-                            onClick={() => setIsAddStudentModalOpen(true)}
+                            onClick={() => {
+                                if (isArchiveReadOnly) return;
+                                setIsAddStudentModalOpen(true);
+                            }}
                             className="flex items-center gap-1 bg-indigo-600 text-white font-medium py-1.5 px-2.5 rounded-md hover:bg-indigo-700 disabled:opacity-50 text-xs"
-                            disabled={!selectedClass}
+                            disabled={!selectedClass || isArchiveReadOnly}
+                            title={
+                                isArchiveReadOnly
+                                    ? "Archive classes are view-only"
+                                    : "Add student"
+                            }
                         >
                             <Plus size={14} />
                             Add
@@ -1209,9 +1259,10 @@ const MyClass = (props) => {
                             <EmptyStudentState
                                 hasSearchTerm={Boolean(searchTerm)}
                                 searchTerm={searchTerm}
-                                onAddStudent={() =>
-                                    setIsAddStudentModalOpen(true)
-                                }
+                                onAddStudent={() => {
+                                    if (isArchiveReadOnly) return;
+                                    setIsAddStudentModalOpen(true);
+                                }}
                             />
                         )}
                     </div>
@@ -1347,7 +1398,7 @@ const MyClass = (props) => {
                                         )}
                                     </div>
                                 </div>
-                                {currentQuarter < 2 && (
+                                {currentQuarter < 2 && !isArchiveReadOnly && (
                                     <button
                                         type="button"
                                         onClick={() =>
@@ -1363,11 +1414,17 @@ const MyClass = (props) => {
                             {selectedTab !== "final" && (
                                 <div className="flex items-center gap-1.5">
                                     <button
-                                        onClick={() =>
-                                            setIsEditCategoriesModalOpen(true)
+                                        onClick={() => {
+                                            if (isArchiveReadOnly) return;
+                                            setIsEditCategoriesModalOpen(true);
+                                        }}
+                                        disabled={isArchiveReadOnly}
+                                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition disabled:cursor-not-allowed disabled:opacity-60"
+                                        title={
+                                            isArchiveReadOnly
+                                                ? "Archive classes are view-only"
+                                                : "Edit grade category percentages"
                                         }
-                                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition"
-                                        title="Edit grade category percentages"
                                     >
                                         <Settings size={12} />
                                         Edit %
@@ -1501,21 +1558,22 @@ const MyClass = (props) => {
                                                                                 </span>
                                                                             )}
                                                                     </span>
-                                                                    {(!isQE ||
-                                                                        tasks.length ===
-                                                                            0) && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() =>
-                                                                                setActiveGradeCategoryId(
-                                                                                    category.id,
-                                                                                )
-                                                                            }
-                                                                            className="text-[10px] font-semibold text-indigo-600 transition hover:text-indigo-700"
-                                                                        >
-                                                                            +
-                                                                        </button>
-                                                                    )}
+                                                                    {!isArchiveReadOnly &&
+                                                                        (!isQE ||
+                                                                            tasks.length ===
+                                                                                0) && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    setActiveGradeCategoryId(
+                                                                                        category.id,
+                                                                                    )
+                                                                                }
+                                                                                className="text-[10px] font-semibold text-indigo-600 transition hover:text-indigo-700"
+                                                                            >
+                                                                                +
+                                                                            </button>
+                                                                        )}
                                                                 </div>
                                                             </th>
                                                         );
@@ -1608,27 +1666,29 @@ const MyClass = (props) => {
                                                                                 latestTask.label
                                                                             }
                                                                         </span>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() =>
-                                                                                handleCategoryTaskDelete(
-                                                                                    category.id,
-                                                                                    latestTask.id,
-                                                                                )
-                                                                            }
-                                                                            disabled={
-                                                                                isSavingCategoryTask
-                                                                            }
-                                                                            className="rounded p-0.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
-                                                                            title="Delete activity"
-                                                                            aria-label={`Delete ${latestTask.label}`}
-                                                                        >
-                                                                            <Trash2
-                                                                                size={
-                                                                                    10
+                                                                        {!isArchiveReadOnly && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    handleCategoryTaskDelete(
+                                                                                        category.id,
+                                                                                        latestTask.id,
+                                                                                    )
                                                                                 }
-                                                                            />
-                                                                        </button>
+                                                                                disabled={
+                                                                                    isSavingCategoryTask
+                                                                                }
+                                                                                className="rounded p-0.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                                                                title="Delete activity"
+                                                                                aria-label={`Delete ${latestTask.label}`}
+                                                                            >
+                                                                                <Trash2
+                                                                                    size={
+                                                                                        10
+                                                                                    }
+                                                                                />
+                                                                            </button>
+                                                                        )}
                                                                     </div>
                                                                     <span className="text-[9px] font-normal text-gray-400">
                                                                         /{" "}
@@ -1664,27 +1724,29 @@ const MyClass = (props) => {
                                                                                 task.label
                                                                             }
                                                                         </span>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() =>
-                                                                                handleCategoryTaskDelete(
-                                                                                    category.id,
-                                                                                    task.id,
-                                                                                )
-                                                                            }
-                                                                            disabled={
-                                                                                isSavingCategoryTask
-                                                                            }
-                                                                            className="rounded p-0.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
-                                                                            title="Delete activity"
-                                                                            aria-label={`Delete ${task.label}`}
-                                                                        >
-                                                                            <Trash2
-                                                                                size={
-                                                                                    10
+                                                                        {!isArchiveReadOnly && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    handleCategoryTaskDelete(
+                                                                                        category.id,
+                                                                                        task.id,
+                                                                                    )
                                                                                 }
-                                                                            />
-                                                                        </button>
+                                                                                disabled={
+                                                                                    isSavingCategoryTask
+                                                                                }
+                                                                                className="rounded p-0.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                                                                title="Delete activity"
+                                                                                aria-label={`Delete ${task.label}`}
+                                                                            >
+                                                                                <Trash2
+                                                                                    size={
+                                                                                        10
+                                                                                    }
+                                                                                />
+                                                                            </button>
+                                                                        )}
                                                                     </div>
                                                                     <span className="text-[9px] font-normal text-gray-400">
                                                                         /{" "}
@@ -1874,6 +1936,9 @@ const MyClass = (props) => {
                                                                                     value={
                                                                                         inputValue
                                                                                     }
+                                                                                    disabled={
+                                                                                        isArchiveReadOnly
+                                                                                    }
                                                                                     onChange={(
                                                                                         event,
                                                                                     ) =>
@@ -1887,7 +1952,7 @@ const MyClass = (props) => {
                                                                                         )
                                                                                     }
                                                                                     autoComplete="off"
-                                                                                    className="w-16 rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                                                                                    className="w-16 rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                                                                                 />
                                                                             </td>
                                                                         );
@@ -1943,6 +2008,9 @@ const MyClass = (props) => {
                                                                                         value={
                                                                                             inputValue
                                                                                         }
+                                                                                        disabled={
+                                                                                            isArchiveReadOnly
+                                                                                        }
                                                                                         onChange={(
                                                                                             event,
                                                                                         ) =>
@@ -1956,7 +2024,7 @@ const MyClass = (props) => {
                                                                                             )
                                                                                         }
                                                                                         autoComplete="off"
-                                                                                        className="w-16 rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                                                                                        className="w-16 rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                                                                                     />
                                                                                 </td>
                                                                             );
@@ -2014,9 +2082,10 @@ const MyClass = (props) => {
                                     <EmptyStudentState
                                         hasSearchTerm={Boolean(searchTerm)}
                                         searchTerm={searchTerm}
-                                        onAddStudent={() =>
-                                            setIsAddStudentModalOpen(true)
-                                        }
+                                        onAddStudent={() => {
+                                            if (isArchiveReadOnly) return;
+                                            setIsAddStudentModalOpen(true);
+                                        }}
                                     />
                                 )}
                             </div>
@@ -2132,18 +2201,19 @@ const MyClass = (props) => {
                                     <EmptyStudentState
                                         hasSearchTerm={Boolean(searchTerm)}
                                         searchTerm={searchTerm}
-                                        onAddStudent={() =>
-                                            setIsAddStudentModalOpen(true)
-                                        }
+                                        onAddStudent={() => {
+                                            if (isArchiveReadOnly) return;
+                                            setIsAddStudentModalOpen(true);
+                                        }}
                                     />
                                 )}
                             </div>
                         )}
                         {selectedTab !== "final" && !hasAssignments && (
                             <p className="text-center text-gray-500 py-4 text-xs">
-                                Add your first activity under Written Works,
-                                Performance Task, or Quarterly Exam to begin
-                                encoding scores.
+                                {isArchiveReadOnly
+                                    ? "No activity records are available for this archive quarter."
+                                    : "Add your first activity under Written Works, Performance Task, or Quarterly Exam to begin encoding scores."}
                             </p>
                         )}
                     </div>
@@ -2160,17 +2230,19 @@ const MyClass = (props) => {
                     }}
                 />
             )}
-            <EditGradeCategoriesModal
-                isOpen={isEditCategoriesModalOpen}
-                onClose={() => setIsEditCategoriesModalOpen(false)}
-                subjectId={selectedClass?.id}
-                categories={gradeCategories}
-                quarter={selectedQuarter}
-                onSuccess={({ categories: updatedCategories, quarter }) => {
-                    applyCategoriesForQuarter(quarter, updatedCategories);
-                }}
-            />
-            {isAddStudentModalOpen && selectedClass && (
+            {!isArchiveReadOnly && (
+                <EditGradeCategoriesModal
+                    isOpen={isEditCategoriesModalOpen}
+                    onClose={() => setIsEditCategoriesModalOpen(false)}
+                    subjectId={selectedClass?.id}
+                    categories={gradeCategories}
+                    quarter={selectedQuarter}
+                    onSuccess={({ categories: updatedCategories, quarter }) => {
+                        applyCategoriesForQuarter(quarter, updatedCategories);
+                    }}
+                />
+            )}
+            {!isArchiveReadOnly && isAddStudentModalOpen && selectedClass && (
                 <AddStudentModal
                     subjectId={selectedClass.id}
                     subjectLabel={selectedClassHeading}
@@ -2181,7 +2253,7 @@ const MyClass = (props) => {
                     onClose={() => setIsAddStudentModalOpen(false)}
                 />
             )}
-            {selectedTaskCategory && selectedClass && (
+            {!isArchiveReadOnly && selectedTaskCategory && selectedClass && (
                 <AddGradeTaskModal
                     category={selectedTaskCategory}
                     onClose={() => setActiveGradeCategoryId(null)}
@@ -2215,29 +2287,33 @@ const MyClass = (props) => {
                 status={gradeSubmissionModal.status}
                 message={gradeSubmissionModal.message}
             />
-            <DeleteGradeTaskModal
-                isOpen={deleteTaskModal.isOpen}
-                categoryLabel={deleteTaskModal.categoryLabel}
-                taskLabel={deleteTaskModal.taskLabel}
-                gradedStudentCount={deleteTaskModal.gradedStudentCount}
-                requiresTypedConfirmation={
-                    deleteTaskModal.requiresTypedConfirmation
-                }
-                isSubmitting={isSavingCategoryTask}
-                onClose={closeDeleteTaskModal}
-                onConfirm={handleConfirmCategoryTaskDelete}
-            />
-            <StartQ2ConfirmModal
-                isOpen={isStartQ2ModalOpen}
-                onClose={() => setIsStartQ2ModalOpen(false)}
-                classId={selectedClass?.id}
-                hasQuarterlyExam={q1HasQuarterlyExam}
-                onSuccess={async () => {
-                    setSelectedTab("q2");
-                    setSelectedQuarter(2);
-                    await refreshCurrentClassData();
-                }}
-            />
+            {!isArchiveReadOnly && (
+                <DeleteGradeTaskModal
+                    isOpen={deleteTaskModal.isOpen}
+                    categoryLabel={deleteTaskModal.categoryLabel}
+                    taskLabel={deleteTaskModal.taskLabel}
+                    gradedStudentCount={deleteTaskModal.gradedStudentCount}
+                    requiresTypedConfirmation={
+                        deleteTaskModal.requiresTypedConfirmation
+                    }
+                    isSubmitting={isSavingCategoryTask}
+                    onClose={closeDeleteTaskModal}
+                    onConfirm={handleConfirmCategoryTaskDelete}
+                />
+            )}
+            {!isArchiveReadOnly && (
+                <StartQ2ConfirmModal
+                    isOpen={isStartQ2ModalOpen}
+                    onClose={() => setIsStartQ2ModalOpen(false)}
+                    classId={selectedClass?.id}
+                    hasQuarterlyExam={q1HasQuarterlyExam}
+                    onSuccess={async () => {
+                        setSelectedTab("q2");
+                        setSelectedQuarter(2);
+                        await refreshCurrentClassData();
+                    }}
+                />
+            )}
         </>
     );
 };

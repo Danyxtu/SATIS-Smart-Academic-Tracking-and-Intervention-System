@@ -52,6 +52,8 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
             ->name('classes.archive.summary');
         Route::get('/classes/archive/{schoolYear}', [ClassController::class, 'archiveShow'])
             ->name('classes.archive.show');
+        Route::post('/classes/archive/use', [ClassController::class, 'useArchivedClasses'])
+            ->name('classes.archive.use');
         Route::get('/classes/{subjectTeacher}', [ClassController::class, 'myClass'])->name('class');
         Route::post('/classes', [ClassController::class, 'createAClass'])->name('classes.store');
         Route::put('/classes/{subjectTeacher}', [ClassController::class, 'updateClass'])

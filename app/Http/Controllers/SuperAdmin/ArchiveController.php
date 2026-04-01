@@ -3,12 +3,11 @@
 namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Department;
 use App\Models\Enrollment;
 use App\Models\Intervention;
 use App\Models\SubjectTeacher;
 use App\Models\SystemSetting;
-use App\Models\User;
+use App\Services\SchoolYearArchiveDetailsService;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -84,6 +83,7 @@ class ArchiveController extends Controller
     public function show(string $schoolYear): Response
     {
         $currentSY = SystemSetting::getCurrentSchoolYear();
+        $details = app(SchoolYearArchiveDetailsService::class)->build($schoolYear);
 
         $classIds = SubjectTeacher::where('school_year', $schoolYear)->pluck('id');
 
@@ -97,15 +97,6 @@ class ArchiveController extends Controller
             ->selectRaw('semester, count(*) as total')
             ->groupBy('semester')
             ->pluck('total', 'semester');
-
-        $departments = Department::withCount([
-            'users as teachers_count' => fn($q) => $q->whereHas('roles', fn($r) => $r->where('name', 'teacher')),
-        ])->get()->map(fn($d) => [
-            'id'             => $d->id,
-            'name'           => $d->department_name,
-            'code'           => $d->department_code,
-            'teachers_count' => (int) $d->teachers_count,
-        ])->values();
 
         // Grade distribution for the school year
         $gradeStats = Enrollment::whereIn('subject_teachers_id', $classIds)
@@ -138,7 +129,8 @@ class ArchiveController extends Controller
                 'total_graded'       => (int) ($gradeStats->total ?? 0),
                 'interventions'      => $interventionCounts,
             ],
-            'departments'        => $departments,
+            'teachers'           => $details['teachers'],
+            'departments'        => $details['departments'],
         ]);
     }
 
@@ -157,6 +149,18 @@ class ArchiveController extends Controller
         $schoolYear = data_get($payload, 'school_year');
         if (!$schoolYear) {
             abort(404, 'Archive snapshot is missing school year metadata.');
+        }
+
+        $details = app(SchoolYearArchiveDetailsService::class)->build((string) $schoolYear);
+        $teachers = data_get($payload, 'details.teachers');
+        $departments = data_get($payload, 'details.departments');
+
+        if (!is_array($teachers)) {
+            $teachers = $details['teachers'];
+        }
+
+        if (!is_array($departments)) {
+            $departments = $details['departments'];
         }
 
         return Inertia::render('SuperAdmin/Archive/Snapshot', [
@@ -183,6 +187,8 @@ class ArchiveController extends Controller
                     'student_notifications' => (int) data_get($payload, 'totals.student_notifications', 0),
                 ],
             ],
+            'teachers' => $teachers,
+            'departments' => $departments,
         ]);
     }
 }
