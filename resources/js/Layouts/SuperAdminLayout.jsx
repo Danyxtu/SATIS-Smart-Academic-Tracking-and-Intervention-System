@@ -3,14 +3,7 @@ import SATISHeader from "@/Components/SATISHeader";
 import ConfirmationDialog from "@/Components/ConfirmationDialog";
 import { Link, usePage, router } from "@inertiajs/react";
 import getInitials from "@/utils/initialsHelper";
-import {
-    X,
-    ChevronRight,
-    LogOut,
-    CheckCircle,
-    XCircle,
-    Menu,
-} from "lucide-react";
+import { X, ChevronRight, LogOut, CheckCircle, XCircle } from "lucide-react";
 import { superAdminRoutes } from "@/routes/superadmin";
 import { adminRoutes } from "@/routes/admin";
 import { teachersRoutes } from "@/routes/teachers";
@@ -171,6 +164,12 @@ function SidebarContent({ initials, fullName, onLinkClick, onLogout }) {
         (item.label ?? item.name ?? "").toLowerCase();
     const isDashboardItem = (item) => getItemLabel(item) === "dashboard";
 
+    const hasTeacherRole = userRoles.includes("teacher");
+    const hasAdminRole = userRoles.includes("admin");
+    const hasSuperAdminRole = userRoles.includes("super_admin");
+    const shouldMoveDashboardSwitcherToPage =
+        hasTeacherRole && (hasAdminRole || hasSuperAdminRole);
+
     const availableDashboardRoles = userRoles
         .map((role) => dashboardRoleConfig[role])
         .filter((config) => config && route().has(config.routeName));
@@ -272,30 +271,35 @@ function SidebarContent({ initials, fullName, onLinkClick, onLogout }) {
                         })}
                     </div>
 
-                    {availableDashboardRoles.length > 1 && (
-                        <div className="inline-flex w-full rounded-md border border-slate-700/80 bg-slate-800/60 p-0.5">
-                            {availableDashboardRoles.map((dashboardRole) => {
-                                const isActiveRole = route().current(
-                                    dashboardRole.routeName,
-                                );
+                    {availableDashboardRoles.length > 1 &&
+                        !shouldMoveDashboardSwitcherToPage && (
+                            <div className="inline-flex w-full rounded-md border border-slate-700/80 bg-slate-800/60 p-0.5">
+                                {availableDashboardRoles.map(
+                                    (dashboardRole) => {
+                                        const isActiveRole = route().current(
+                                            dashboardRole.routeName,
+                                        );
 
-                                return (
-                                    <Link
-                                        key={dashboardRole.routeName}
-                                        href={route(dashboardRole.routeName)}
-                                        onClick={onLinkClick}
-                                        className={`flex-1 rounded px-2 py-1 text-center text-[10px] font-semibold transition-colors ${
-                                            isActiveRole
-                                                ? "bg-blue-600 text-white"
-                                                : "text-slate-300 hover:bg-slate-700/70"
-                                        }`}
-                                    >
-                                        {dashboardRole.label}
-                                    </Link>
-                                );
-                            })}
-                        </div>
-                    )}
+                                        return (
+                                            <Link
+                                                key={dashboardRole.routeName}
+                                                href={route(
+                                                    dashboardRole.routeName,
+                                                )}
+                                                onClick={onLinkClick}
+                                                className={`flex-1 rounded px-2 py-1 text-center text-[10px] font-semibold transition-colors ${
+                                                    isActiveRole
+                                                        ? "bg-blue-600 text-white"
+                                                        : "text-slate-300 hover:bg-slate-700/70"
+                                                }`}
+                                            >
+                                                {dashboardRole.label}
+                                            </Link>
+                                        );
+                                    },
+                                )}
+                            </div>
+                        )}
                 </div>
             </div>
 
@@ -374,11 +378,15 @@ function SidebarContent({ initials, fullName, onLinkClick, onLogout }) {
 export default function SuperAdminLayout({ children }) {
     const { auth, flash } = usePage().props;
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] =
+        useState(false);
     const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
     const [flashVisible, setFlashVisible] = useState(true);
 
     const handleLogoutClick = () => setShowLogoutConfirmation(true);
     const handleConfirmLogout = () => router.post(route("logout"));
+    const handleToggleDesktopSidebar = () =>
+        setIsDesktopSidebarCollapsed((prev) => !prev);
 
     const fullName =
         `${auth.user.first_name} ${auth.user.last_name}`.trim() || "Superadmin";
@@ -387,13 +395,28 @@ export default function SuperAdminLayout({ children }) {
     return (
         <div className="flex h-screen overflow-hidden bg-slate-100 dark:bg-slate-900 text-[13px]">
             {/* ── Desktop Sidebar ── */}
-            <aside className="hidden lg:flex lg:flex-col w-56 shrink-0 bg-slate-900 relative">
-                <SidebarContent
-                    initials={initials}
-                    fullName={fullName}
-                    onLinkClick={undefined}
-                    onLogout={handleLogoutClick}
-                />
+            <aside
+                className={`relative hidden shrink-0 overflow-hidden bg-slate-900 transition-all duration-300 ease-in-out lg:flex lg:flex-col ${
+                    isDesktopSidebarCollapsed
+                        ? "w-0 -translate-x-3 opacity-0"
+                        : "w-56 translate-x-0 opacity-100"
+                }`}
+                aria-hidden={isDesktopSidebarCollapsed}
+            >
+                <div
+                    className={`h-full w-56 transition-opacity duration-200 ${
+                        isDesktopSidebarCollapsed
+                            ? "pointer-events-none opacity-0"
+                            : "opacity-100 delay-100"
+                    }`}
+                >
+                    <SidebarContent
+                        initials={initials}
+                        fullName={fullName}
+                        onLinkClick={undefined}
+                        onLogout={handleLogoutClick}
+                    />
+                </div>
             </aside>
 
             {/* ── Mobile Sidebar Overlay ── */}
@@ -403,7 +426,7 @@ export default function SuperAdminLayout({ children }) {
                         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                         onClick={() => setSidebarOpen(false)}
                     />
-                    <aside className="absolute left-0 top-0 bottom-0 w-64 bg-slate-900 shadow-2xl">
+                    <aside className="absolute left-0 top-0 bottom-0 w-64 bg-slate-900 shadow-2xl animate-in slide-in-from-left-6 duration-200">
                         <button
                             onClick={() => setSidebarOpen(false)}
                             className="absolute top-4 right-4 rounded-lg p-1.5 text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
@@ -422,28 +445,20 @@ export default function SuperAdminLayout({ children }) {
 
             {/* ── Main Area ── */}
             <div className="flex flex-col flex-1 min-w-0 overflow-hidden text-[13px]">
-                {/* Mobile top bar */}
-                <div className="lg:hidden flex items-center gap-2 px-4 py-2 bg-slate-900 border-b border-slate-700/60">
-                    <button
-                        onClick={() => setSidebarOpen(true)}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
-                    >
-                        <Menu size={18} />
-                    </button>
-                    <span className="text-xs font-bold text-white tracking-tight">
-                        {fullName}
-                    </span>
-                    <span className="text-[9px] font-semibold text-amber-400 uppercase tracking-widest">
-                        · Super Admin
-                    </span>
-                </div>
-
                 <SATISHeader
                     user={{
                         name: fullName,
                         role: "Superadmin",
                         initials: initials,
+                        email: auth.user.email,
+                        roles:
+                            auth.user.roles?.map((roleObj) => roleObj.name) ||
+                            [],
                     }}
+                    onOpenMobileSidebar={() => setSidebarOpen(true)}
+                    onToggleDesktopSidebar={handleToggleDesktopSidebar}
+                    isDesktopSidebarCollapsed={isDesktopSidebarCollapsed}
+                    onLogout={handleLogoutClick}
                 />
 
                 {/* Flash Messages */}

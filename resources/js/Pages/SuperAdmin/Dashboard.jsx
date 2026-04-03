@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Head, Link } from "@inertiajs/react";
 import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import UnifiedDashboardSwitcher from "@/Components/UnifiedDashboardSwitcher";
 import {
     Building2,
     Users,
@@ -211,6 +212,8 @@ export default function Dashboard({
             <Head title="Super Admin Dashboard" />
 
             <div className="space-y-6">
+                <UnifiedDashboardSwitcher />
+
                 {/* ── Hero Banner ──────────────────────────────────────── */}
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 px-8 py-7 shadow-xl">
                     <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-blue-500/15 blur-3xl" />

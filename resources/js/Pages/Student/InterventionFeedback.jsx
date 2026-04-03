@@ -31,15 +31,15 @@ const FilterTabs = ({ activeTab, setActiveTab, counts }) => {
     ];
 
     return (
-        <div className="flex items-center space-x-2 rounded-full bg-pink-100 p-1.5">
+        <div className="flex items-center space-x-2 rounded-full bg-pink-100 dark:bg-pink-900/25 p-1.5">
             {tabs.map((tab) => (
                 <button
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key)}
                     className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
                         activeTab === tab.key
-                            ? "bg-white text-pink-700 shadow-md"
-                            : "text-gray-600 hover:bg-white/50"
+                            ? "bg-white dark:bg-gray-900 text-pink-700 dark:text-pink-300 shadow-md"
+                            : "text-gray-600 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-800"
                     }`}
                 >
                     {tab.label}
@@ -47,8 +47,8 @@ const FilterTabs = ({ activeTab, setActiveTab, counts }) => {
                         <span
                             className={`text-xs px-1.5 py-0.5 rounded-full ${
                                 activeTab === tab.key
-                                    ? "bg-pink-100 text-pink-700"
-                                    : "bg-gray-200 text-gray-600"
+                                    ? "bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300"
+                                    : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
                             }`}
                         >
                             {tab.count}
@@ -63,20 +63,24 @@ const FilterTabs = ({ activeTab, setActiveTab, counts }) => {
 // --- Stat Card Component ---
 const StatCard = ({ label, value, icon: Icon, color = "pink" }) => {
     const colorClasses = {
-        pink: "text-pink-600 bg-pink-100",
-        green: "text-green-600 bg-green-100",
-        blue: "text-blue-600 bg-blue-100",
-        orange: "text-orange-600 bg-orange-100",
+        pink: "text-pink-600 bg-pink-100 dark:text-pink-300 dark:bg-pink-900/30",
+        green: "text-green-600 bg-green-100 dark:text-green-300 dark:bg-green-900/30",
+        blue: "text-blue-600 bg-blue-100 dark:text-blue-300 dark:bg-blue-900/30",
+        orange: "text-orange-600 bg-orange-100 dark:text-orange-300 dark:bg-orange-900/30",
     };
 
     return (
-        <div className="bg-white rounded-2xl shadow-md p-4 flex items-center gap-4">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-4 flex items-center gap-4 border border-transparent dark:border-gray-700">
             <div className={`p-3 rounded-xl ${colorClasses[color]}`}>
                 <Icon size={24} />
             </div>
             <div>
-                <p className="text-2xl font-bold text-gray-800">{value}</p>
-                <p className="text-sm font-medium text-gray-500">{label}</p>
+                <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                    {value}
+                </p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {label}
+                </p>
             </div>
         </div>
     );
@@ -85,9 +89,9 @@ const StatCard = ({ label, value, icon: Icon, color = "pink" }) => {
 // --- Priority Tag Component ---
 const PriorityTag = ({ level }) => {
     const colors = {
-        High: "bg-red-100 text-red-700 border border-red-200",
-        Medium: "bg-yellow-100 text-yellow-700 border border-yellow-200",
-        Low: "bg-green-100 text-green-700 border border-green-200",
+        High: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700/50",
+        Medium: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700/50",
+        Low: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700/50",
     };
     const icons = {
         High: AlertTriangle,
@@ -109,9 +113,11 @@ const PriorityTag = ({ level }) => {
 // --- Status Badge Component ---
 const StatusBadge = ({ status }) => {
     const styles = {
-        active: "bg-blue-100 text-blue-700 border-blue-200",
-        completed: "bg-green-100 text-green-700 border-green-200",
-        pending: "bg-yellow-100 text-yellow-700 border-yellow-200",
+        active: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700/50",
+        completed:
+            "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700/50",
+        pending:
+            "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-700/50",
     };
 
     return (
@@ -128,10 +134,10 @@ const StatusBadge = ({ status }) => {
 // --- Mini Stat Component ---
 const MiniStat = ({ label, value, color = "pink" }) => {
     const bgColors = {
-        pink: "bg-pink-50 border-pink-100",
-        red: "bg-red-50 border-red-100",
-        yellow: "bg-yellow-50 border-yellow-100",
-        green: "bg-green-50 border-green-100",
+        pink: "bg-pink-50 dark:bg-pink-900/20 border-pink-100 dark:border-pink-700/40",
+        red: "bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-700/40",
+        yellow: "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-100 dark:border-yellow-700/40",
+        green: "bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-700/40",
     };
 
     const textColors = {
@@ -148,7 +154,7 @@ const MiniStat = ({ label, value, color = "pink" }) => {
             <p className={`text-xl font-bold ${textColors[color]}`}>
                 {value ?? "N/A"}
             </p>
-            <p className="text-xs text-gray-600">{label}</p>
+            <p className="text-xs text-gray-600 dark:text-gray-300">{label}</p>
         </div>
     );
 };
@@ -167,20 +173,20 @@ const TaskItem = ({ task }) => {
             {
                 preserveScroll: true,
                 onFinish: () => setIsLoading(false),
-            }
+            },
         );
     };
 
     return (
         <div className="flex items-center justify-between py-2">
-            <div className="flex items-center gap-2 text-gray-700 flex-1">
+            <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300 flex-1">
                 <button
                     onClick={handleComplete}
                     disabled={task.completed || isLoading}
                     className={`flex-shrink-0 transition-colors ${
                         task.completed
                             ? "text-pink-600"
-                            : "text-gray-400 hover:text-pink-500"
+                            : "text-gray-400 dark:text-gray-500 hover:text-pink-500"
                     }`}
                 >
                     {isLoading ? (
@@ -193,7 +199,9 @@ const TaskItem = ({ task }) => {
                 </button>
                 <span
                     className={`text-sm ${
-                        task.completed ? "line-through text-gray-400" : ""
+                        task.completed
+                            ? "line-through text-gray-400 dark:text-gray-500"
+                            : ""
                     }`}
                 >
                     {task.text}
@@ -215,16 +223,16 @@ const InterventionCard = ({ intervention }) => {
             ? intervention.currentGrade < 70
                 ? "red"
                 : intervention.currentGrade < 75
-                ? "yellow"
-                : "green"
+                  ? "yellow"
+                  : "green"
             : "pink";
 
     const attendanceColor =
         intervention.attendanceRate < 80
             ? "red"
             : intervention.attendanceRate < 90
-            ? "yellow"
-            : "green";
+              ? "yellow"
+              : "green";
 
     const handleRequestCompletion = () => {
         setIsSubmitting(true);
@@ -240,18 +248,18 @@ const InterventionCard = ({ intervention }) => {
                     setCompletionNotes("");
                 },
                 onFinish: () => setIsSubmitting(false),
-            }
+            },
         );
     };
 
     return (
-        <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden">
             {/* Header */}
-            <div className="p-5 border-b border-gray-100">
+            <div className="p-5 border-b border-gray-100 dark:border-gray-700">
                 <div className="flex justify-between items-start mb-2">
                     <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-lg font-bold text-gray-800">
+                            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">
                                 {intervention.subjectName}
                             </h3>
                             <StatusBadge status={intervention.status} />
@@ -262,7 +270,7 @@ const InterventionCard = ({ intervention }) => {
                             )}
                         </div>
                         {intervention.subjectSection && (
-                            <p className="text-xs text-gray-500 mt-0.5">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                 Section: {intervention.subjectSection}
                             </p>
                         )}
@@ -270,7 +278,7 @@ const InterventionCard = ({ intervention }) => {
                     <PriorityTag level={intervention.priority} />
                 </div>
 
-                <div className="flex items-center gap-4 text-xs text-gray-500 mt-2">
+                <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mt-2">
                     <span className="flex items-center gap-1">
                         <User size={12} />
                         {intervention.teacherName}
@@ -325,7 +333,7 @@ const InterventionCard = ({ intervention }) => {
             <div className="p-5">
                 {/* Notes */}
                 {intervention.notes && (
-                    <p className="text-gray-600 text-sm mb-4 bg-gray-50 p-3 rounded-lg">
+                    <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
                         {intervention.notes}
                     </p>
                 )}
@@ -358,7 +366,7 @@ const InterventionCard = ({ intervention }) => {
                     <div>
                         <button
                             onClick={() => setIsExpanded(!isExpanded)}
-                            className="flex items-center justify-between w-full text-sm font-semibold text-gray-800 mb-2 hover:text-pink-600 transition-colors"
+                            className="flex items-center justify-between w-full text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2 hover:text-pink-600 transition-colors"
                         >
                             <span className="flex items-center gap-2">
                                 <ListTodo size={16} />
@@ -382,7 +390,7 @@ const InterventionCard = ({ intervention }) => {
 
                         {/* Progress bar */}
                         <div className="mt-3">
-                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
                                 <div
                                     className="bg-pink-500 h-1.5 rounded-full transition-all duration-500"
                                     style={{
@@ -401,14 +409,14 @@ const InterventionCard = ({ intervention }) => {
                 )}
 
                 {intervention.tasks.length === 0 && (
-                    <p className="text-sm text-gray-500 italic">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 italic">
                         No action plan assigned yet.
                     </p>
                 )}
 
                 {/* Tier 3 Completion Request Button */}
                 {intervention.isTier3 && intervention.canRequestCompletion && (
-                    <div className="mt-4 pt-4 border-t border-gray-100">
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
                         <button
                             onClick={() => setShowCompletionModal(true)}
                             className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-3 rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all font-medium shadow-lg shadow-green-200"
@@ -416,7 +424,7 @@ const InterventionCard = ({ intervention }) => {
                             <CheckCircle2 size={18} />
                             Request Intervention Completion
                         </button>
-                        <p className="text-xs text-gray-500 text-center mt-2">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">
                             Your teacher will review and approve your completion
                             request
                         </p>
@@ -426,15 +434,15 @@ const InterventionCard = ({ intervention }) => {
                 {/* Completed Badge */}
                 {intervention.status === "completed" &&
                     intervention.approvedAt && (
-                        <div className="mt-4 pt-4 border-t border-gray-100">
-                            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/40 rounded-xl p-4">
                                 <div className="flex items-center gap-2 text-green-700">
                                     <CheckCircle2 size={20} />
                                     <p className="font-semibold">
                                         Intervention Completed!
                                     </p>
                                 </div>
-                                <p className="text-sm text-green-600 mt-1">
+                                <p className="text-sm text-green-600 dark:text-green-300 mt-1">
                                     Approved on {intervention.approvedAt}
                                 </p>
                             </div>
@@ -445,7 +453,7 @@ const InterventionCard = ({ intervention }) => {
             {/* Completion Request Modal */}
             {showCompletionModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-transparent dark:border-gray-700">
                         <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-4">
                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
                                 <CheckCircle2 size={20} />
@@ -456,13 +464,13 @@ const InterventionCard = ({ intervention }) => {
                             </p>
                         </div>
                         <div className="p-6">
-                            <p className="text-gray-600 text-sm mb-4">
+                            <p className="text-gray-600 dark:text-gray-300 text-sm mb-4">
                                 You're requesting to mark this Tier 3
                                 intervention as complete. Your teacher will
                                 review and approve your request.
                             </p>
                             <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     Notes for your teacher (optional)
                                 </label>
                                 <textarea
@@ -471,10 +479,10 @@ const InterventionCard = ({ intervention }) => {
                                         setCompletionNotes(e.target.value)
                                     }
                                     placeholder="Describe what you've accomplished or any additional information..."
-                                    className="w-full border border-gray-300 rounded-xl p-3 text-sm resize-none h-24 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-xl p-3 text-sm resize-none h-24 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                                     maxLength={1000}
                                 />
-                                <p className="text-xs text-gray-400 text-right mt-1">
+                                <p className="text-xs text-gray-400 dark:text-gray-500 text-right mt-1">
                                     {completionNotes.length}/1000
                                 </p>
                             </div>
@@ -484,7 +492,7 @@ const InterventionCard = ({ intervention }) => {
                                         setShowCompletionModal(false);
                                         setCompletionNotes("");
                                     }}
-                                    className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-medium transition-colors"
+                                    className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 font-medium transition-colors"
                                 >
                                     Cancel
                                 </button>
@@ -540,10 +548,11 @@ const FeedbackItem = ({ feedback, isHighlighted }) => {
     };
 
     const typeColors = {
-        feedback: "text-blue-600 bg-blue-100",
-        nudge: "text-purple-600 bg-purple-100",
-        task: "text-green-600 bg-green-100",
-        alert: "text-red-600 bg-red-100",
+        feedback:
+            "text-blue-600 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30",
+        nudge: "text-purple-600 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/30",
+        task: "text-green-600 dark:text-green-300 bg-green-100 dark:bg-green-900/30",
+        alert: "text-red-600 dark:text-red-300 bg-red-100 dark:bg-red-900/30",
     };
 
     const Icon = typeIcons[feedback.type] || MessageSquare;
@@ -559,7 +568,7 @@ const FeedbackItem = ({ feedback, isHighlighted }) => {
             {
                 preserveScroll: true,
                 onFinish: () => setIsLoading(false),
-            }
+            },
         );
     };
 
@@ -568,8 +577,8 @@ const FeedbackItem = ({ feedback, isHighlighted }) => {
             ref={itemRef}
             className={`p-4 rounded-xl border transition-colors ${
                 feedback.isRead
-                    ? "bg-white border-gray-100"
-                    : "bg-pink-50 border-pink-200"
+                    ? "bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-700"
+                    : "bg-pink-50 dark:bg-pink-900/20 border-pink-200 dark:border-pink-700/50"
             } ${
                 isHighlighted
                     ? "animate-highlight-blink ring-2 ring-pink-500"
@@ -583,7 +592,7 @@ const FeedbackItem = ({ feedback, isHighlighted }) => {
                 <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start gap-2">
                         <div>
-                            <p className="font-semibold text-gray-800 text-sm">
+                            <p className="font-semibold text-gray-800 dark:text-gray-100 text-sm">
                                 {feedback.senderName}
                             </p>
                             {feedback.subjectName && (
@@ -592,16 +601,16 @@ const FeedbackItem = ({ feedback, isHighlighted }) => {
                                 </p>
                             )}
                         </div>
-                        <span className="text-xs text-gray-400 whitespace-nowrap">
+                        <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
                             {feedback.time}
                         </span>
                     </div>
                     {feedback.title && (
-                        <p className="font-medium text-gray-700 text-sm mt-1">
+                        <p className="font-medium text-gray-700 dark:text-gray-200 text-sm mt-1">
                             {feedback.title}
                         </p>
                     )}
-                    <p className="text-sm text-gray-600 mt-1">
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
                         {feedback.message}
                     </p>
                     {!feedback.isRead && (
@@ -632,7 +641,7 @@ const RecentFeedbackCard = ({ feedback, highlightId }) => {
     useEffect(() => {
         if (highlightId && feedback.length > 3) {
             const highlightIndex = feedback.findIndex(
-                (fb) => fb.id.toString() === highlightId
+                (fb) => fb.id.toString() === highlightId,
             );
             if (highlightIndex >= 3) {
                 setShowAll(true);
@@ -644,15 +653,20 @@ const RecentFeedbackCard = ({ feedback, highlightId }) => {
 
     if (feedback.length === 0) {
         return (
-            <div className="bg-white rounded-2xl shadow-md p-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-6 border border-transparent dark:border-gray-700">
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
                     <MessageSquare size={20} className="text-pink-600" />
                     Recent Feedback
                 </h3>
                 <div className="text-center py-6">
-                    <Inbox size={40} className="mx-auto text-gray-300 mb-2" />
-                    <p className="text-gray-500 text-sm">No feedback yet</p>
-                    <p className="text-gray-400 text-xs mt-1">
+                    <Inbox
+                        size={40}
+                        className="mx-auto text-gray-300 dark:text-gray-500 mb-2"
+                    />
+                    <p className="text-gray-500 dark:text-gray-400 text-sm">
+                        No feedback yet
+                    </p>
+                    <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
                         Teacher feedback will appear here
                     </p>
                 </div>
@@ -661,8 +675,8 @@ const RecentFeedbackCard = ({ feedback, highlightId }) => {
     }
 
     return (
-        <div className="bg-white rounded-2xl shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-6 border border-transparent dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
                 <MessageSquare size={20} className="text-pink-600" />
                 Recent Feedback
             </h3>
@@ -678,7 +692,7 @@ const RecentFeedbackCard = ({ feedback, highlightId }) => {
             {feedback.length > 3 && (
                 <button
                     onClick={() => setShowAll(!showAll)}
-                    className="flex items-center gap-1.5 justify-center w-full mt-4 text-sm font-medium text-gray-600 hover:text-pink-600 transition-colors"
+                    className="flex items-center gap-1.5 justify-center w-full mt-4 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-pink-600 transition-colors"
                 >
                     {showAll ? "Show Less" : `View All (${feedback.length})`}
                     {showAll ? (
@@ -721,12 +735,14 @@ const EmptyState = ({ filter }) => {
     const Icon = msg.icon;
 
     return (
-        <div className="bg-white rounded-2xl shadow-md p-12 text-center">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-12 text-center border border-transparent dark:border-gray-700">
             <Icon size={64} className={`mx-auto ${msg.iconColor} mb-4`} />
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-2">
                 {msg.title}
             </h3>
-            <p className="text-gray-500">{msg.description}</p>
+            <p className="text-gray-500 dark:text-gray-400">
+                {msg.description}
+            </p>
         </div>
     );
 };
@@ -786,11 +802,11 @@ const InterventionFeedback = ({
                 {/* Header */}
                 <div className="flex flex-wrap justify-between items-center gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
                             <ListTodo size={32} className="text-pink-600" />
                             Interventions & Feedback
                         </h1>
-                        <p className="text-gray-500 mt-1">
+                        <p className="text-gray-500 dark:text-gray-400 mt-1">
                             Track your academic interventions and teacher
                             feedback
                         </p>

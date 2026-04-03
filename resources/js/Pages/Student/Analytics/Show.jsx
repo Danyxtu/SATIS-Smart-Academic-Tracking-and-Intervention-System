@@ -62,7 +62,11 @@ const getGradeColor = (grade) => {
 // Helper function to get remarks
 const getRemarks = (grade) => {
     if (grade === null)
-        return { text: "N/A", bg: "bg-gray-100", color: "text-gray-600" };
+        return {
+            text: "N/A",
+            bg: "bg-gray-100 dark:bg-gray-700",
+            color: "text-gray-600 dark:text-gray-300",
+        };
     if (grade >= 90)
         return {
             text: "Excellent",
@@ -103,24 +107,29 @@ const QuarterGradeCard = ({
     // Card for quarters that haven't started - NO expected grade, just message
     if (!hasStarted) {
         return (
-            <div className="bg-white rounded-2xl shadow-md p-5 border border-dashed border-gray-200">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-5 border border-dashed border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                            <span className="text-lg font-bold text-gray-400">
+                        <div className="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
+                            <span className="text-lg font-bold text-gray-400 dark:text-gray-500">
                                 Q{quarterNum}
                             </span>
                         </div>
-                        <h3 className="text-base font-semibold text-gray-700">
+                        <h3 className="text-base font-semibold text-gray-700 dark:text-gray-200">
                             Quarter {quarterNum}
                         </h3>
                     </div>
-                    <Clock size={20} className="text-gray-300" />
+                    <Clock
+                        size={20}
+                        className="text-gray-300 dark:text-gray-500"
+                    />
                 </div>
 
-                <div className="bg-gray-50 rounded-lg p-4 text-center">
-                    <p className="text-4xl font-bold text-gray-300 mb-2">--</p>
-                    <p className="text-sm text-gray-500">
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                    <p className="text-4xl font-bold text-gray-300 dark:text-gray-500 mb-2">
+                        --
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
                         Quarter {quarterNum} has not started yet.
                     </p>
                 </div>
@@ -130,16 +139,16 @@ const QuarterGradeCard = ({
 
     // Card for active quarters with actual data
     return (
-        <div className="bg-white rounded-2xl shadow-md p-5 hover:shadow-lg transition-shadow">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-5 hover:shadow-lg transition-shadow border border-transparent dark:border-gray-700">
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                     <div
                         className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                             grade !== null && grade >= 75
-                                ? "bg-green-100"
+                                ? "bg-green-100 dark:bg-green-900/30"
                                 : grade !== null
-                                  ? "bg-red-100"
-                                  : "bg-gray-100"
+                                  ? "bg-red-100 dark:bg-red-900/30"
+                                  : "bg-gray-100 dark:bg-gray-800"
                         }`}
                     >
                         <span
@@ -148,14 +157,14 @@ const QuarterGradeCard = ({
                                     ? "text-green-600"
                                     : grade !== null
                                       ? "text-red-600"
-                                      : "text-gray-400"
+                                      : "text-gray-400 dark:text-gray-500"
                             }`}
                         >
                             Q{quarterNum}
                         </span>
                     </div>
                     <div>
-                        <h3 className="text-base font-semibold text-gray-800">
+                        <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
                             Quarter {quarterNum}
                         </h3>
                         <span
@@ -171,8 +180,8 @@ const QuarterGradeCard = ({
             </div>
 
             {/* Current Grade */}
-            <div className="bg-gray-50 rounded-lg p-3 text-center mb-3">
-                <p className="text-xs text-gray-500 uppercase tracking-wider">
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-center mb-3">
+                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Current Grade
                 </p>
                 <p className={`text-4xl font-bold ${gradeColor}`}>
@@ -181,11 +190,11 @@ const QuarterGradeCard = ({
             </div>
 
             {/* Expected Grade - only show if quarter has started */}
-            <div className="bg-blue-50 rounded-lg p-3 mb-3">
+            <div className="bg-blue-50 dark:bg-blue-900/25 rounded-lg p-3 mb-3">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                         <TrendingUp size={14} className="text-blue-600" />
-                        <span className="text-xs font-medium text-blue-700">
+                        <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
                             Expected
                         </span>
                     </div>
@@ -197,17 +206,21 @@ const QuarterGradeCard = ({
 
             {/* Stats Row */}
             <div className="grid grid-cols-2 gap-2">
-                <div className="bg-green-50 rounded-lg p-2 text-center">
+                <div className="bg-green-50 dark:bg-green-900/25 rounded-lg p-2 text-center">
                     <p className="text-sm font-bold text-green-600">
                         {attendance}
                     </p>
-                    <p className="text-xs text-gray-500">Attendance</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Attendance
+                    </p>
                 </div>
-                <div className="bg-purple-50 rounded-lg p-2 text-center">
+                <div className="bg-purple-50 dark:bg-purple-900/25 rounded-lg p-2 text-center">
                     <p className="text-sm font-bold text-purple-600">
                         {assignmentCount}
                     </p>
-                    <p className="text-xs text-gray-500">Items</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Items
+                    </p>
                 </div>
             </div>
         </div>
@@ -241,8 +254,8 @@ const QuarterlyGradesCards = ({ data }) => {
     // If no data at all
     if (!data || data.length === 0) {
         return (
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-                <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-6 border border-transparent dark:border-gray-700">
+                <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
                     <Calendar size={22} className="text-pink-600" />
                     Quarterly Grades
                 </h3>
@@ -272,7 +285,7 @@ const QuarterlyGradesCards = ({ data }) => {
 
     return (
         <div className="space-y-4">
-            <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                 <Calendar size={22} className="text-pink-600" />
                 Quarterly Grades
             </h3>
@@ -401,16 +414,18 @@ const GradeBreakdown = ({ data }) => {
 
     if (!hasAny) {
         return (
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-6 border border-transparent dark:border-gray-700">
+                <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4">
                     Grade Breakdown
                 </h3>
                 <div className="text-center py-8">
                     <BookOpen
                         size={40}
-                        className="mx-auto text-gray-300 mb-3"
+                        className="mx-auto text-gray-300 dark:text-gray-500 mb-3"
                     />
-                    <p className="text-gray-500">No assignments graded yet.</p>
+                    <p className="text-gray-500 dark:text-gray-400">
+                        No assignments graded yet.
+                    </p>
                 </div>
             </div>
         );
@@ -418,10 +433,12 @@ const GradeBreakdown = ({ data }) => {
 
     // Render function for a single card
     const renderCard = (title, list, emptyMessage) => (
-        <div className="bg-gray-50 rounded-xl p-3 h-full flex flex-col">
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 h-full flex flex-col">
             <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-gray-800">{title}</h4>
-                <span className="text-xs text-gray-500">
+                <h4 className="font-semibold text-gray-800 dark:text-gray-100">
+                    {title}
+                </h4>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
                     {list.length} items
                 </span>
             </div>
@@ -430,7 +447,7 @@ const GradeBreakdown = ({ data }) => {
                 {list.length === 0 ? (
                     <div className="h-full flex items-center justify-center p-4">
                         <div className="text-center">
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
                                 {emptyMessage}
                             </p>
                         </div>
@@ -442,22 +459,22 @@ const GradeBreakdown = ({ data }) => {
                                 item.id ||
                                 `${item.name}-${item.date || item.createdAt}`
                             }
-                            className="flex items-center justify-between p-2 bg-white rounded-lg shadow-sm"
+                            className="flex items-center justify-between p-2 bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-transparent dark:border-gray-700"
                         >
                             <div className="min-w-0">
-                                <p className="font-medium text-gray-800 truncate">
+                                <p className="font-medium text-gray-800 dark:text-gray-100 truncate">
                                     {item.name}
                                 </p>
-                                <p className="text-xs text-gray-500">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
                                     {item.date || item.createdAt} • Q
                                     {item.quarter}
                                 </p>
                             </div>
                             <div className="text-right ml-4">
-                                <p className="text-sm font-bold text-gray-800">
+                                <p className="text-sm font-bold text-gray-800 dark:text-gray-100">
                                     {item.score}/{item.totalScore}
                                 </p>
-                                <p className="text-xs text-gray-500">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
                                     {item.percentage}%
                                 </p>
                             </div>
@@ -469,8 +486,8 @@ const GradeBreakdown = ({ data }) => {
     );
 
     return (
-        <div className="bg-white rounded-2xl shadow-lg p-6">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-6 border border-transparent dark:border-gray-700">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4">
                 Grade Breakdown
             </h3>
 
@@ -547,13 +564,15 @@ const GradeChart = ({ data }) => {
 
     if (validItems.length === 0) {
         return (
-            <div className="bg-white rounded-2xl shadow-md p-4">
-                <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-4 border border-transparent dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
                     <TrendingUp size={16} className="text-pink-600" />
                     Grade Trend
                 </h3>
-                <div className="h-32 flex items-center justify-center bg-gray-50 rounded-lg">
-                    <p className="text-gray-400 text-sm">No data yet</p>
+                <div className="h-32 flex items-center justify-center bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <p className="text-gray-400 dark:text-gray-500 text-sm">
+                        No data yet
+                    </p>
                 </div>
             </div>
         );
@@ -605,8 +624,8 @@ const GradeChart = ({ data }) => {
     const CustomTooltip = ({ active, payload, label }) => {
         if (!active || !payload || payload.length === 0) return null;
         return (
-            <div className="bg-white rounded-lg shadow-lg border border-gray-100 p-3 text-xs">
-                <p className="font-semibold text-gray-700 mb-1.5">
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-100 dark:border-gray-700 p-3 text-xs">
+                <p className="font-semibold text-gray-700 dark:text-gray-200 mb-1.5">
                     Item #{label}
                 </p>
                 {payload.map((entry) => {
@@ -625,11 +644,11 @@ const GradeChart = ({ data }) => {
                                 className="inline-block w-2.5 h-2.5 rounded-full"
                                 style={{ backgroundColor: entry.color }}
                             />
-                            <span className="text-gray-600">
+                            <span className="text-gray-600 dark:text-gray-300">
                                 {catInfo.label}
                                 {itemLabel ? ` – ${itemLabel}` : ""}:
                             </span>
-                            <span className="font-bold text-gray-800">
+                            <span className="font-bold text-gray-800 dark:text-gray-100">
                                 {entry.value}%
                             </span>
                         </div>
@@ -640,8 +659,8 @@ const GradeChart = ({ data }) => {
     };
 
     return (
-        <div className="bg-white rounded-2xl shadow-md p-4">
-            <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-4 border border-transparent dark:border-gray-700">
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2 flex items-center gap-2">
                 <TrendingUp size={16} className="text-pink-600" />
                 Grade Trend
             </h3>
@@ -656,7 +675,7 @@ const GradeChart = ({ data }) => {
                     return (
                         <div
                             key={cat}
-                            className="flex items-center gap-1.5 text-xs text-gray-600"
+                            className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300"
                         >
                             <span
                                 className="inline-block w-3 h-0.5 rounded"
@@ -728,35 +747,43 @@ const AttendanceSummary = ({ attendance }) => {
     if (!attendance) return null;
 
     return (
-        <div className="bg-white rounded-2xl shadow-md p-4">
-            <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-4 border border-transparent dark:border-gray-700">
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
                 <Calendar size={16} className="text-pink-600" />
                 Attendance
             </h3>
             <div className="grid grid-cols-2 gap-2">
-                <div className="bg-green-50 rounded-lg p-2 text-center">
+                <div className="bg-green-50 dark:bg-green-900/25 rounded-lg p-2 text-center">
                     <p className="text-xl font-bold text-green-600">
                         {attendance.rate}%
                     </p>
-                    <p className="text-xs text-gray-500">Rate</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Rate
+                    </p>
                 </div>
-                <div className="bg-blue-50 rounded-lg p-2 text-center">
+                <div className="bg-blue-50 dark:bg-blue-900/25 rounded-lg p-2 text-center">
                     <p className="text-xl font-bold text-blue-600">
                         {attendance.presentDays}
                     </p>
-                    <p className="text-xs text-gray-500">Present</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Present
+                    </p>
                 </div>
-                <div className="bg-red-50 rounded-lg p-2 text-center">
+                <div className="bg-red-50 dark:bg-red-900/25 rounded-lg p-2 text-center">
                     <p className="text-xl font-bold text-red-600">
                         {attendance.absentDays}
                     </p>
-                    <p className="text-xs text-gray-500">Absent</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Absent
+                    </p>
                 </div>
-                <div className="bg-yellow-50 rounded-lg p-2 text-center">
+                <div className="bg-yellow-50 dark:bg-yellow-900/25 rounded-lg p-2 text-center">
                     <p className="text-xl font-bold text-yellow-600">
                         {attendance.lateDays}
                     </p>
-                    <p className="text-xs text-gray-500">Late</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Late
+                    </p>
                 </div>
             </div>
         </div>
@@ -775,13 +802,13 @@ const InterventionCard = ({ intervention }) => {
             : 0;
 
     return (
-        <div className="bg-white rounded-2xl shadow-md p-4 border border-orange-200">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-4 border border-orange-200 dark:border-orange-700/50">
             <div className="flex items-center gap-2 mb-3">
-                <div className="p-1.5 bg-orange-100 rounded-lg">
+                <div className="p-1.5 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
                     <Target size={16} className="text-orange-600" />
                 </div>
                 <div>
-                    <h3 className="text-sm font-semibold text-gray-800">
+                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
                         Intervention
                     </h3>
                     <p className="text-xs text-orange-600">
@@ -791,7 +818,7 @@ const InterventionCard = ({ intervention }) => {
             </div>
 
             {intervention.notes && (
-                <p className="text-gray-600 text-xs mb-3 bg-orange-50 p-2 rounded-lg line-clamp-2">
+                <p className="text-gray-600 dark:text-gray-300 text-xs mb-3 bg-orange-50 dark:bg-orange-900/20 p-2 rounded-lg line-clamp-2">
                     {intervention.notes}
                 </p>
             )}
@@ -799,13 +826,15 @@ const InterventionCard = ({ intervention }) => {
             {intervention.totalTasks > 0 && (
                 <div>
                     <div className="flex justify-between text-xs mb-1">
-                        <span className="text-gray-500">Progress</span>
-                        <span className="font-medium text-gray-700">
+                        <span className="text-gray-500 dark:text-gray-400">
+                            Progress
+                        </span>
+                        <span className="font-medium text-gray-700 dark:text-gray-200">
                             {intervention.completedTasks}/
                             {intervention.totalTasks}
                         </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
                         <div
                             className="bg-orange-500 h-1.5 rounded-full transition-all duration-500"
                             style={{ width: `${progressPercent}%` }}
@@ -866,8 +895,8 @@ const SuggestionsCard = ({ suggestions }) => {
     };
 
     return (
-        <div className="bg-white rounded-2xl shadow-lg p-6">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-6 border border-transparent dark:border-gray-700">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
                 <Lightbulb size={22} className="text-pink-600" />
                 Suggestions & Tips
             </h3>
@@ -906,14 +935,14 @@ const SuggestionsCard = ({ suggestions }) => {
 
 // Study Aids Component
 const StudyAids = () => (
-    <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-pink-200">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-6 border-2 border-pink-200 dark:border-pink-700/50">
         <div className="flex items-center gap-3 mb-2">
             <Bot className="w-6 h-6 text-pink-600" />
-            <h3 className="text-xl font-semibold text-gray-800">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
                 Personalized Study Aids
             </h3>
         </div>
-        <p className="text-gray-700 mb-4">
+        <p className="text-gray-700 dark:text-gray-300 mb-4">
             Struggling in certain areas? Let A.I. create a custom reviewer to
             help you catch up!
         </p>
@@ -930,7 +959,7 @@ const ExpectedGradeFactorsCard = () => {
     const factors = [
         {
             icon: TrendingUp,
-            iconBg: "bg-blue-100",
+            iconBg: "bg-blue-100 dark:bg-blue-900/30",
             iconColor: "text-blue-600",
             title: "Current Performance",
             description:
@@ -938,7 +967,7 @@ const ExpectedGradeFactorsCard = () => {
         },
         {
             icon: Calendar,
-            iconBg: "bg-green-100",
+            iconBg: "bg-green-100 dark:bg-green-900/30",
             iconColor: "text-green-600",
             title: "Attendance Rate",
             description:
@@ -946,7 +975,7 @@ const ExpectedGradeFactorsCard = () => {
         },
         {
             icon: Target,
-            iconBg: "bg-purple-100",
+            iconBg: "bg-purple-100 dark:bg-purple-900/30",
             iconColor: "text-purple-600",
             title: "Grade Trend",
             description:
@@ -954,7 +983,7 @@ const ExpectedGradeFactorsCard = () => {
         },
         {
             icon: CheckCircle,
-            iconBg: "bg-pink-100",
+            iconBg: "bg-pink-100 dark:bg-pink-900/30",
             iconColor: "text-pink-600",
             title: "Previous Quarter",
             description:
@@ -963,16 +992,16 @@ const ExpectedGradeFactorsCard = () => {
     ];
 
     return (
-        <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-6 border border-gray-100 dark:border-gray-700">
             <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
                     <Info size={20} className="text-blue-600" />
                 </div>
                 <div>
-                    <h3 className="text-xl font-bold text-gray-900">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
                         Expected Grade Factors
                     </h3>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
                         Your expected grade is calculated based on these key
                         factors:
                     </p>
@@ -996,10 +1025,10 @@ const ExpectedGradeFactorsCard = () => {
                                 />
                             </div>
                             <div>
-                                <h4 className="font-semibold text-gray-800">
+                                <h4 className="font-semibold text-gray-800 dark:text-gray-100">
                                     {factor.title}
                                 </h4>
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-gray-600 dark:text-gray-300">
                                     {factor.description}
                                 </p>
                             </div>
@@ -1598,17 +1627,17 @@ const ForYourCaseCard = ({
 
     return (
         <>
-            <div className="bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl shadow-lg p-6 border border-pink-200">
+            <div className="bg-gradient-to-br from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 rounded-2xl shadow-lg p-6 border border-pink-200 dark:border-pink-700/50">
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-5">
                     <div className="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center">
                         <Zap size={20} className="text-pink-600" />
                     </div>
                     <div>
-                        <h3 className="text-xl font-bold text-gray-900">
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
                             For Your Case
                         </h3>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
                             Personalized Grade Analysis & Insights
                         </p>
                     </div>
@@ -1617,8 +1646,8 @@ const ForYourCaseCard = ({
                 {/* Grade Summary Row */}
                 <div className="grid grid-cols-2 gap-4 mb-5">
                     {/* Current Grade */}
-                    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
                             Current Grade
                         </p>
                         <p
@@ -1635,25 +1664,25 @@ const ForYourCaseCard = ({
                         </p>
                     </div>
                     {/* Expected Grade */}
-                    <div className="bg-white rounded-xl p-4 shadow-sm border border-pink-200">
-                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl p-4 shadow-sm border border-pink-200 dark:border-pink-700/50">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
                             Expected Grade
                         </p>
                         <p className={`text-3xl font-bold ${gradeColor}`}>
                             {insights.expectedGrade}%
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
                             Computed Projection
                         </p>
                     </div>
                 </div>
 
                 {/* Why Expected Grade Section */}
-                <div className="bg-white rounded-xl p-4 mb-5 shadow-sm">
-                    <h4 className="text-sm font-semibold text-gray-800 mb-2">
+                <div className="bg-white dark:bg-gray-900 rounded-xl p-4 mb-5 shadow-sm border border-transparent dark:border-gray-700">
+                    <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2">
                         📊 Why is your expected grade {insights.expectedGrade}%?
                     </h4>
-                    <p className="text-xs text-gray-500 mb-4">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
                         Your expected grade is calculated using multiple
                         performance factors:
                     </p>
@@ -1663,13 +1692,13 @@ const ForYourCaseCard = ({
                         {insights.gradeExplanation?.map((item, idx) => (
                             <div
                                 key={idx}
-                                className="flex items-center justify-between text-sm border-b border-gray-100 pb-2"
+                                className="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-700 pb-2"
                             >
                                 <div>
-                                    <span className="text-gray-700 font-medium">
+                                    <span className="text-gray-700 dark:text-gray-200 font-medium">
                                         {item.label}
                                     </span>
-                                    <p className="text-xs text-gray-400">
+                                    <p className="text-xs text-gray-400 dark:text-gray-500">
                                         {item.formula}
                                     </p>
                                 </div>
@@ -1690,7 +1719,7 @@ const ForYourCaseCard = ({
 
                         {/* Final Calculation */}
                         <div className="flex items-center justify-between pt-2 mt-2 border-t-2 border-pink-200">
-                            <span className="font-bold text-gray-800">
+                            <span className="font-bold text-gray-800 dark:text-gray-100">
                                 Final Expected Grade
                             </span>
                             <span className={`text-xl font-bold ${gradeColor}`}>
@@ -1712,12 +1741,14 @@ const ForYourCaseCard = ({
 
                 {/* Key Metrics Grid */}
                 <div className="grid grid-cols-4 gap-3 mb-5">
-                    <div className="bg-white rounded-xl p-3 shadow-sm text-center">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl p-3 shadow-sm text-center border border-transparent dark:border-gray-700">
                         <Calendar
                             size={16}
                             className="text-blue-600 mx-auto mb-1"
                         />
-                        <p className="text-xs text-gray-500">Attendance</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Attendance
+                        </p>
                         <p
                             className={`text-lg font-bold ${
                                 insights.attendanceRate >= 90
@@ -1730,12 +1761,14 @@ const ForYourCaseCard = ({
                             {insights.attendanceRate}%
                         </p>
                     </div>
-                    <div className="bg-white rounded-xl p-3 shadow-sm text-center">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl p-3 shadow-sm text-center border border-transparent dark:border-gray-700">
                         <CheckCircle
                             size={16}
                             className="text-green-600 mx-auto mb-1"
                         />
-                        <p className="text-xs text-gray-500">Completion</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Completion
+                        </p>
                         <p
                             className={`text-lg font-bold ${
                                 insights.completionRate >= 80
@@ -1748,12 +1781,14 @@ const ForYourCaseCard = ({
                             {insights.completionRate}%
                         </p>
                     </div>
-                    <div className="bg-white rounded-xl p-3 shadow-sm text-center">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl p-3 shadow-sm text-center border border-transparent dark:border-gray-700">
                         <TrendingUp
                             size={16}
                             className="text-purple-600 mx-auto mb-1"
                         />
-                        <p className="text-xs text-gray-500">Trend</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Trend
+                        </p>
                         <p
                             className={`text-lg font-bold ${
                                 insights.trendDirection === "improving"
@@ -1770,12 +1805,14 @@ const ForYourCaseCard = ({
                                   : "→ Stable"}
                         </p>
                     </div>
-                    <div className="bg-white rounded-xl p-3 shadow-sm text-center">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl p-3 shadow-sm text-center border border-transparent dark:border-gray-700">
                         <AlertTriangle
                             size={16}
                             className="text-yellow-600 mx-auto mb-1"
                         />
-                        <p className="text-xs text-gray-500">Risk</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Risk
+                        </p>
                         <p
                             className={`text-lg font-bold ${insights.riskColor}`}
                         >
@@ -1786,13 +1823,13 @@ const ForYourCaseCard = ({
 
                 {/* Category Performance */}
                 {insights.weakestCategory && (
-                    <div className="bg-white rounded-xl p-4 mb-5 shadow-sm">
-                        <h4 className="text-sm font-semibold text-gray-800 mb-3">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl p-4 mb-5 shadow-sm border border-transparent dark:border-gray-700">
+                        <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">
                             Category Performance:
                         </h4>
                         <div className="grid grid-cols-3 gap-3 mb-3">
-                            <div className="text-center p-2 bg-gray-50 rounded-lg">
-                                <p className="text-xs text-gray-500">
+                            <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
                                     Written Works
                                 </p>
                                 <p
@@ -1803,8 +1840,8 @@ const ForYourCaseCard = ({
                                     {insights.writtenWorksAvg || "--"}%
                                 </p>
                             </div>
-                            <div className="text-center p-2 bg-gray-50 rounded-lg">
-                                <p className="text-xs text-gray-500">
+                            <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
                                     Performance
                                 </p>
                                 <p
@@ -1815,8 +1852,10 @@ const ForYourCaseCard = ({
                                     {insights.performanceTaskAvg || "--"}%
                                 </p>
                             </div>
-                            <div className="text-center p-2 bg-gray-50 rounded-lg">
-                                <p className="text-xs text-gray-500">Exam</p>
+                            <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Exam
+                                </p>
                                 <p
                                     className={`text-lg font-bold ${getGradeColorClass(
                                         insights.quarterlyExamAvg,
@@ -1927,7 +1966,7 @@ const ForYourCaseCard = ({
                                 leaveFrom="opacity-100 scale-100"
                                 leaveTo="opacity-0 scale-95"
                             >
-                                <Dialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white shadow-xl transition-all max-h-[90vh] flex flex-col">
+                                <Dialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-xl transition-all max-h-[90vh] flex flex-col border border-transparent dark:border-gray-700">
                                     {/* Modal Header */}
                                     <div className="bg-gradient-to-r from-pink-600 to-purple-600 px-6 py-5">
                                         <div className="flex items-start justify-between">
@@ -1962,14 +2001,14 @@ const ForYourCaseCard = ({
                                     {/* Modal Content - Scrollable */}
                                     <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
                                         {/* Goal Summary */}
-                                        <div className="bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-200 rounded-xl p-4">
-                                            <h4 className="text-sm font-bold text-gray-800 mb-3">
+                                        <div className="bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 border border-pink-200 dark:border-pink-700/50 rounded-xl p-4">
+                                            <h4 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">
                                                 🎯 Improvement Goal: Reach Very
                                                 Satisfactory (85%)
                                             </h4>
                                             <div className="flex items-center justify-center gap-2 mb-3">
-                                                <div className="text-center bg-white rounded-lg p-3 flex-1">
-                                                    <p className="text-xs text-gray-500">
+                                                <div className="text-center bg-white dark:bg-gray-900 rounded-lg p-3 flex-1 border border-transparent dark:border-gray-700">
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
                                                         Current
                                                     </p>
                                                     <p
@@ -1984,8 +2023,8 @@ const ForYourCaseCard = ({
                                                     className="text-pink-400"
                                                     size={20}
                                                 />
-                                                <div className="text-center bg-white rounded-lg p-3 flex-1">
-                                                    <p className="text-xs text-gray-500">
+                                                <div className="text-center bg-white dark:bg-gray-900 rounded-lg p-3 flex-1 border border-transparent dark:border-gray-700">
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
                                                         Expected
                                                     </p>
                                                     <p
@@ -2000,7 +2039,7 @@ const ForYourCaseCard = ({
                                                     size={20}
                                                 />
                                                 <div className="text-center bg-blue-50 border border-blue-200 rounded-lg p-3 flex-1">
-                                                    <p className="text-xs text-gray-500">
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
                                                         Target
                                                     </p>
                                                     <p className="text-2xl font-bold text-blue-600">
@@ -2008,7 +2047,7 @@ const ForYourCaseCard = ({
                                                     </p>
                                                 </div>
                                             </div>
-                                            <p className="text-sm text-center text-gray-600">
+                                            <p className="text-sm text-center text-gray-600 dark:text-gray-300">
                                                 Gap to close:{" "}
                                                 <span className="font-bold text-pink-600">
                                                     {improvementPlan?.gapToTarget ||
@@ -2046,7 +2085,7 @@ const ForYourCaseCard = ({
                                                     return (
                                                         <div
                                                             key={idx}
-                                                            className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm"
+                                                            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm"
                                                         >
                                                             <div className="flex items-start gap-3 mb-3">
                                                                 <div className="w-8 h-8 bg-pink-100 rounded-full flex items-center justify-center text-pink-600 font-bold text-sm flex-shrink-0">
@@ -2065,12 +2104,12 @@ const ForYourCaseCard = ({
                                                                     />
                                                                 </div>
                                                                 <div className="flex-1">
-                                                                    <h4 className="font-bold text-gray-800">
+                                                                    <h4 className="font-bold text-gray-800 dark:text-gray-100">
                                                                         {
                                                                             step.title
                                                                         }
                                                                     </h4>
-                                                                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                                                                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                                                                         <span>
                                                                             {
                                                                                 step.currentValue
@@ -2090,12 +2129,12 @@ const ForYourCaseCard = ({
                                                                 </div>
                                                             </div>
 
-                                                            <p className="text-sm text-gray-600 mb-3">
+                                                            <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
                                                                 {step.action}
                                                             </p>
 
                                                             {/* Step Details */}
-                                                            <div className="bg-gray-50 rounded-lg p-3 mb-3">
+                                                            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 mb-3">
                                                                 <ul className="space-y-1">
                                                                     {step.details?.map(
                                                                         (
@@ -2108,7 +2147,7 @@ const ForYourCaseCard = ({
                                                                                 }
                                                                                 className="text-sm text-gray-600 flex items-start gap-2"
                                                                             >
-                                                                                <span className="text-gray-400">
+                                                                                <span className="text-gray-400 dark:text-gray-500">
                                                                                     •
                                                                                 </span>
                                                                                 {
@@ -2157,8 +2196,8 @@ const ForYourCaseCard = ({
                                                     </h4>
 
                                                     <div className="grid grid-cols-3 gap-3 mb-4">
-                                                        <div className="text-center bg-white rounded-lg p-3">
-                                                            <p className="text-xs text-gray-500">
+                                                        <div className="text-center bg-white dark:bg-gray-900 rounded-lg p-3 border border-transparent dark:border-gray-700">
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400">
                                                                 Current
                                                             </p>
                                                             <p
@@ -2176,8 +2215,8 @@ const ForYourCaseCard = ({
                                                                 %
                                                             </p>
                                                         </div>
-                                                        <div className="text-center bg-white rounded-lg p-3">
-                                                            <p className="text-xs text-gray-500">
+                                                        <div className="text-center bg-white dark:bg-gray-900 rounded-lg p-3 border border-transparent dark:border-gray-700">
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400">
                                                                 Expected
                                                             </p>
                                                             <p
@@ -2196,7 +2235,7 @@ const ForYourCaseCard = ({
                                                             </p>
                                                         </div>
                                                         <div className="text-center bg-green-100 border border-green-200 rounded-lg p-3">
-                                                            <p className="text-xs text-gray-500">
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400">
                                                                 Projected
                                                             </p>
                                                             <p className="text-xl font-bold text-green-600">
@@ -2211,8 +2250,8 @@ const ForYourCaseCard = ({
                                                         </div>
                                                     </div>
 
-                                                    <div className="bg-white rounded-lg p-3 mb-3">
-                                                        <p className="text-sm text-gray-600">
+                                                    <div className="bg-white dark:bg-gray-900 rounded-lg p-3 mb-3 border border-transparent dark:border-gray-700">
+                                                        <p className="text-sm text-gray-600 dark:text-gray-300">
                                                             {
                                                                 improvementPlan
                                                                     .conclusion
@@ -2237,16 +2276,16 @@ const ForYourCaseCard = ({
                                             )}
 
                                         {/* Formula Reference */}
-                                        <div className="bg-gray-50 rounded-xl p-4">
-                                            <h4 className="text-sm font-bold text-gray-700 mb-3">
+                                        <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4">
+                                            <h4 className="text-sm font-bold text-gray-700 dark:text-gray-200 mb-3">
                                                 📊 Calculation Methodology
                                             </h4>
                                             <div className="space-y-2 text-sm">
                                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                                                    <span className="font-medium text-gray-600 min-w-[140px]">
+                                                    <span className="font-medium text-gray-600 dark:text-gray-300 min-w-[140px]">
                                                         Expected Grade:
                                                     </span>
-                                                    <span className="text-gray-500">
+                                                    <span className="text-gray-500 dark:text-gray-400">
                                                         Base + Attendance Adj +
                                                         Trend Adj + Completion
                                                         Adj + Improvement
@@ -2254,29 +2293,29 @@ const ForYourCaseCard = ({
                                                     </span>
                                                 </div>
                                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                                                    <span className="font-medium text-gray-600 min-w-[140px]">
+                                                    <span className="font-medium text-gray-600 dark:text-gray-300 min-w-[140px]">
                                                         Attendance Impact:
                                                     </span>
-                                                    <span className="text-gray-500">
+                                                    <span className="text-gray-500 dark:text-gray-400">
                                                         ≥90%: +1 | 80-89%: 0 |{" "}
                                                         {"<"}80%: -(90-rate)×0.3
                                                     </span>
                                                 </div>
                                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                                                    <span className="font-medium text-gray-600 min-w-[140px]">
+                                                    <span className="font-medium text-gray-600 dark:text-gray-300 min-w-[140px]">
                                                         Category Weight (DepEd):
                                                     </span>
-                                                    <span className="text-gray-500">
+                                                    <span className="text-gray-500 dark:text-gray-400">
                                                         Written: 25% |
                                                         Performance: 50% | Exam:
                                                         25%
                                                     </span>
                                                 </div>
                                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                                                    <span className="font-medium text-gray-600 min-w-[140px]">
+                                                    <span className="font-medium text-gray-600 dark:text-gray-300 min-w-[140px]">
                                                         Risk Score:
                                                     </span>
-                                                    <span className="text-gray-500">
+                                                    <span className="text-gray-500 dark:text-gray-400">
                                                         Grade(40%) +
                                                         Attendance(30%) +
                                                         Trend(20%) +
@@ -2288,7 +2327,7 @@ const ForYourCaseCard = ({
                                     </div>
 
                                     {/* Modal Footer */}
-                                    <div className="px-6 py-4 bg-gray-50 border-t">
+                                    <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
                                         <button
                                             onClick={() =>
                                                 setShowApproachModal(false)
@@ -2369,7 +2408,7 @@ const AnalyticsShow = ({
 
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Breadcrumbs */}
-                <div className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2">
                     <Link
                         href={route("analytics.index")}
                         className="hover:text-pink-600 transition-colors"
@@ -2377,16 +2416,18 @@ const AnalyticsShow = ({
                         Performance Analytics
                     </Link>
                     <ChevronRight size={16} />
-                    <span className="text-gray-900">{subject.name}</span>
+                    <span className="text-gray-900 dark:text-gray-100">
+                        {subject.name}
+                    </span>
                 </div>
 
                 {/* Header */}
                 <div className="flex flex-wrap justify-between items-start gap-4">
                     <div>
-                        <h1 className="text-4xl font-bold text-gray-900">
+                        <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
                             {subject.name}
                         </h1>
-                        <p className="text-lg text-gray-600">
+                        <p className="text-lg text-gray-600 dark:text-gray-300">
                             {subject.teacher} • {subject.schoolYear}
                             {subject.section && ` • ${subject.section}`}
                         </p>
@@ -2400,7 +2441,7 @@ const AnalyticsShow = ({
                             Export PDF
                         </button>
                         <div className="text-right">
-                            <p className="text-sm font-medium text-gray-500">
+                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
                                 CURRENT GRADE
                             </p>
                             <div className="flex items-end gap-2">

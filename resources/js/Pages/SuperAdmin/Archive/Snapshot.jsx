@@ -302,7 +302,7 @@ export default function Snapshot({
                                               setActiveCardKey(item.key),
                                       }
                                     : {})}
-                                className={`rounded-2xl border border-slate-100 bg-white p-5 shadow-sm ${isInteractive ? "transition hover:-translate-y-0.5 hover:shadow-md" : ""}`}
+                                className={`rounded-2xl border border-slate-100 bg-white dark:bg-gray-900 p-5 shadow-sm ${isInteractive ? "transition hover:-translate-y-0.5 hover:shadow-md" : ""}`}
                             >
                                 <div
                                     className={`mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${item.color} shadow-md ${item.shadow}`}
@@ -329,7 +329,7 @@ export default function Snapshot({
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                    <div className="rounded-2xl border border-slate-100 bg-white dark:bg-gray-900 p-4 shadow-sm">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                             Highest Teaching Load
                         </p>
@@ -343,7 +343,7 @@ export default function Snapshot({
                         </p>
                     </div>
 
-                    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                    <div className="rounded-2xl border border-slate-100 bg-white dark:bg-gray-900 p-4 shadow-sm">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                             Largest Class Enrollment
                         </p>
@@ -357,7 +357,7 @@ export default function Snapshot({
                         </p>
                     </div>
 
-                    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                    <div className="rounded-2xl border border-slate-100 bg-white dark:bg-gray-900 p-4 shadow-sm">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                             Department Coverage
                         </p>
@@ -372,7 +372,7 @@ export default function Snapshot({
 
                 {activeCardKey && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-                        <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                        <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white dark:bg-gray-900 shadow-2xl">
                             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-4">
                                 <div>
                                     <h3 className="text-base font-semibold text-slate-900">
@@ -427,7 +427,7 @@ export default function Snapshot({
                                                                     "No email"}
                                                             </p>
                                                         </div>
-                                                        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
+                                                        <span className="rounded-full bg-white dark:bg-gray-900 px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
                                                             {
                                                                 student.enrolled_classes_count
                                                             }{" "}
@@ -510,12 +510,12 @@ export default function Snapshot({
                                                             ).map((role) => (
                                                                 <span
                                                                     key={`${teacher.id}-${role}`}
-                                                                    className="rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200"
+                                                                    className="rounded-md bg-white dark:bg-gray-900 px-2 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200"
                                                                 >
                                                                     {role}
                                                                 </span>
                                                             ))}
-                                                            <span className="rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
+                                                            <span className="rounded-md bg-white dark:bg-gray-900 px-2 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
                                                                 {
                                                                     teacher.classes_count
                                                                 }{" "}
@@ -590,7 +590,7 @@ export default function Snapshot({
                                                             </div>
 
                                                             <div className="flex items-center gap-2">
-                                                                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
+                                                                <span className="rounded-full bg-white dark:bg-gray-900 px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
                                                                     {
                                                                         classItem.students_count
                                                                     }{" "}
@@ -641,7 +641,7 @@ export default function Snapshot({
                                                                             ) => (
                                                                                 <span
                                                                                     key={`${classItem.id}-${student.id}`}
-                                                                                    className="rounded-md bg-white px-2 py-1 text-[11px] text-slate-700 ring-1 ring-slate-200"
+                                                                                    className="rounded-md bg-white dark:bg-gray-900 px-2 py-1 text-[11px] text-slate-700 ring-1 ring-slate-200"
                                                                                 >
                                                                                     {
                                                                                         student.name
@@ -664,7 +664,7 @@ export default function Snapshot({
                     </div>
                 )}
 
-                <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+                <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white dark:bg-gray-900 shadow-sm">
                     <div className="border-b border-slate-100 px-6 py-5">
                         <h2 className="font-semibold text-slate-900">
                             Snapshot Details
@@ -701,7 +701,7 @@ export default function Snapshot({
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                    <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+                    <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white dark:bg-gray-900 shadow-sm">
                         <div className="flex items-center gap-4 border-b border-slate-100 px-6 py-5">
                             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-md shadow-violet-500/20">
                                 <Users className="h-5 w-5 text-white" />
@@ -742,17 +742,17 @@ export default function Snapshot({
                                                     (role) => (
                                                         <span
                                                             key={`${teacher.id}-${role}`}
-                                                            className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200"
+                                                            className="rounded-full bg-white dark:bg-gray-900 px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200"
                                                         >
                                                             {role}
                                                         </span>
                                                     ),
                                                 )}
-                                                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
+                                                <span className="rounded-full bg-white dark:bg-gray-900 px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
                                                     {teacher.classes_count ?? 0}{" "}
                                                     classes
                                                 </span>
-                                                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
+                                                <span className="rounded-full bg-white dark:bg-gray-900 px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
                                                     {teacher.students_count ??
                                                         0}{" "}
                                                     students
@@ -765,7 +765,7 @@ export default function Snapshot({
                                                 (classItem) => (
                                                     <div
                                                         key={classItem.id}
-                                                        className="rounded-lg border border-slate-200 bg-white p-3"
+                                                        className="rounded-lg border border-slate-200 bg-white dark:bg-gray-900 p-3"
                                                     >
                                                         <p className="text-sm font-semibold text-slate-900">
                                                             {classItem?.subject
@@ -825,7 +825,7 @@ export default function Snapshot({
                         </div>
                     </div>
 
-                    <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+                    <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white dark:bg-gray-900 shadow-sm">
                         <div className="flex items-center gap-4 border-b border-slate-100 px-6 py-5">
                             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-600 to-slate-700 shadow-md shadow-slate-500/20">
                                 <Building2 className="h-5 w-5 text-white" />
@@ -944,7 +944,7 @@ export default function Snapshot({
                 <div className="flex flex-col gap-3 sm:flex-row">
                     <Link
                         href={route("superadmin.archive.index")}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white dark:bg-gray-900 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                     >
                         <ArrowLeft size={14} />
                         Back to Archive

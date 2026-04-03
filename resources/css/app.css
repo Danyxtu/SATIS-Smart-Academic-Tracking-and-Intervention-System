@@ -2,6 +2,106 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+    :root {
+        color-scheme: light;
+    }
+
+    .dark {
+        color-scheme: dark;
+    }
+
+    body {
+        @apply bg-gray-50 text-gray-900 antialiased;
+    }
+
+    .dark body {
+        @apply bg-slate-950 text-slate-100;
+    }
+}
+
+@layer utilities {
+    .dark [class~="bg-white"]:not([class*="dark:bg-"]) {
+        @apply bg-slate-900;
+    }
+
+    .dark [class~="bg-gray-50"]:not([class*="dark:bg-"]) {
+        @apply bg-slate-800;
+    }
+
+    .dark [class~="bg-gray-100"]:not([class*="dark:bg-"]) {
+        @apply bg-slate-700;
+    }
+
+    .dark [class~="border-gray-100"]:not([class*="dark:border-"]) {
+        @apply border-slate-700;
+    }
+
+    .dark [class~="border-gray-200"]:not([class*="dark:border-"]) {
+        @apply border-slate-700;
+    }
+
+    .dark [class~="border-gray-300"]:not([class*="dark:border-"]) {
+        @apply border-slate-600;
+    }
+
+    .dark [class~="text-gray-900"]:not([class*="dark:text-"]) {
+        @apply text-slate-100;
+    }
+
+    .dark [class~="text-gray-800"]:not([class*="dark:text-"]) {
+        @apply text-slate-200;
+    }
+
+    .dark [class~="text-gray-700"]:not([class*="dark:text-"]) {
+        @apply text-slate-300;
+    }
+
+    .dark [class~="text-gray-600"]:not([class*="dark:text-"]) {
+        @apply text-slate-400;
+    }
+
+    .dark [class~="text-gray-500"]:not([class*="dark:text-"]) {
+        @apply text-slate-400;
+    }
+
+    .dark [class~="text-gray-400"]:not([class*="dark:text-"]) {
+        @apply text-slate-500;
+    }
+
+    .dark
+        [class~="placeholder-gray-400"]:not(
+            [class*="dark:placeholder-"]
+        )::placeholder {
+        @apply text-slate-500;
+    }
+
+    .dark
+        [class~="placeholder-gray-500"]:not(
+            [class*="dark:placeholder-"]
+        )::placeholder {
+        @apply text-slate-500;
+    }
+
+    .dark [class*="hover:bg-gray-50"]:not([class*="dark:hover:bg-"]):hover {
+        @apply bg-slate-800;
+    }
+
+    .dark [class*="hover:bg-gray-100"]:not([class*="dark:hover:bg-"]):hover {
+        @apply bg-slate-700;
+    }
+
+    .dark
+        [class*="hover:text-gray-700"]:not([class*="dark:hover:text-"]):hover {
+        @apply text-slate-200;
+    }
+
+    .dark
+        [class*="hover:text-gray-800"]:not([class*="dark:hover:text-"]):hover {
+        @apply text-slate-100;
+    }
+}
+
 /* Pulse highlight animation for Add New Class button */
 @keyframes pulse-highlight {
     0%,

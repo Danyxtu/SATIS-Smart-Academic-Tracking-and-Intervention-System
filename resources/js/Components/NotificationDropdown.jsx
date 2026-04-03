@@ -19,38 +19,38 @@ const getNotificationStyle = (type) => {
     const styles = {
         nudge: {
             icon: <Clock size={18} />,
-            bgColor: "bg-blue-100",
-            iconColor: "text-blue-600",
+            bgColor: "bg-blue-100 dark:bg-blue-900/40",
+            iconColor: "text-blue-600 dark:text-blue-300",
             label: "Reminder",
         },
         feedback: {
             icon: <MessageSquare size={18} />,
-            bgColor: "bg-green-100",
-            iconColor: "text-green-600",
+            bgColor: "bg-green-100 dark:bg-green-900/40",
+            iconColor: "text-green-600 dark:text-green-300",
             label: "Feedback",
         },
         task: {
             icon: <FileText size={18} />,
-            bgColor: "bg-purple-100",
-            iconColor: "text-purple-600",
+            bgColor: "bg-purple-100 dark:bg-purple-900/40",
+            iconColor: "text-purple-600 dark:text-purple-300",
             label: "Task",
         },
         alert: {
             icon: <AlertTriangle size={18} />,
-            bgColor: "bg-red-100",
-            iconColor: "text-red-600",
+            bgColor: "bg-red-100 dark:bg-red-900/40",
+            iconColor: "text-red-600 dark:text-red-300",
             label: "Alert",
         },
         extension: {
             icon: <CheckCircle size={18} />,
-            bgColor: "bg-yellow-100",
-            iconColor: "text-yellow-600",
+            bgColor: "bg-yellow-100 dark:bg-yellow-900/40",
+            iconColor: "text-yellow-600 dark:text-yellow-300",
             label: "Extension",
         },
         intervention: {
             icon: <AlertTriangle size={18} />,
-            bgColor: "bg-orange-100",
-            iconColor: "text-orange-600",
+            bgColor: "bg-orange-100 dark:bg-orange-900/40",
+            iconColor: "text-orange-600 dark:text-orange-300",
             label: "Intervention",
         },
     };
@@ -77,19 +77,19 @@ const NotificationItem = ({ notification, onClose }) => {
                             `?highlight=${notification.id}`,
                         {
                             preserveState: false,
-                        }
+                        },
                     );
                     onClose();
                 },
-            }
+            },
         );
     };
 
     return (
         <button
             onClick={handleClick}
-            className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 flex items-start gap-3 ${
-                !notification.is_read ? "bg-blue-50/50" : ""
+            className={`w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors border-b border-gray-100 dark:border-gray-700 last:border-b-0 flex items-start gap-3 ${
+                !notification.is_read ? "bg-blue-50/50 dark:bg-blue-900/20" : ""
             }`}
         >
             {/* Icon */}
@@ -114,17 +114,17 @@ const NotificationItem = ({ notification, onClose }) => {
                 <p
                     className={`text-sm mt-1 line-clamp-2 ${
                         !notification.is_read
-                            ? "font-semibold text-gray-900"
-                            : "text-gray-700"
+                            ? "font-semibold text-gray-900 dark:text-gray-100"
+                            : "text-gray-700 dark:text-gray-300"
                     }`}
                 >
                     {notification.title}
                 </p>
                 <div className="flex items-center justify-between mt-1">
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
                         From: {notification.sender_name}
                     </p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
                         {notification.created_at}
                     </p>
                 </div>
@@ -133,7 +133,7 @@ const NotificationItem = ({ notification, onClose }) => {
             {/* Arrow */}
             <ChevronRight
                 size={16}
-                className="text-gray-400 flex-shrink-0 mt-2"
+                className="text-gray-400 dark:text-gray-500 flex-shrink-0 mt-2"
             />
         </button>
     );
@@ -144,9 +144,14 @@ const NotificationItem = ({ notification, onClose }) => {
  */
 const EmptyState = () => (
     <div className="py-8 text-center">
-        <Bell size={40} className="mx-auto text-gray-300 mb-3" />
-        <p className="text-gray-500 text-sm">No notifications yet</p>
-        <p className="text-gray-400 text-xs mt-1">
+        <Bell
+            size={40}
+            className="mx-auto text-gray-300 dark:text-gray-600 mb-3"
+        />
+        <p className="text-gray-500 dark:text-gray-400 text-sm">
+            No notifications yet
+        </p>
+        <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
             You'll see updates from teachers here
         </p>
     </div>
@@ -209,7 +214,7 @@ export default function NotificationDropdown() {
                 onSuccess: () => {
                     // The page will refresh with updated notification count
                 },
-            }
+            },
         );
     };
 
@@ -223,7 +228,7 @@ export default function NotificationDropdown() {
             {/* Bell Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="relative p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-pink-300"
+                className="relative p-2 rounded-full text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-pink-300"
                 aria-label={`Notifications ${
                     unreadCount > 0 ? `(${unreadCount} unread)` : ""
                 }`}
@@ -242,11 +247,11 @@ export default function NotificationDropdown() {
                     />
 
                     {/* Dropdown */}
-                    <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                         {/* Header */}
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80">
                             <div className="flex items-center gap-2">
-                                <h3 className="font-semibold text-gray-900">
+                                <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                                     Notifications
                                 </h3>
                                 {unreadCount > 0 && (
@@ -257,7 +262,7 @@ export default function NotificationDropdown() {
                             </div>
                             <button
                                 onClick={() => setIsOpen(false)}
-                                className="p-1 rounded-full hover:bg-gray-200 text-gray-500"
+                                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-300"
                             >
                                 <X size={18} />
                             </button>
@@ -280,7 +285,7 @@ export default function NotificationDropdown() {
 
                         {/* Footer */}
                         {items.length > 0 && (
-                            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
+                            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80">
                                 {unreadCount > 0 && (
                                     <button
                                         onClick={handleMarkAllRead}
@@ -291,7 +296,7 @@ export default function NotificationDropdown() {
                                 )}
                                 <button
                                     onClick={handleViewAll}
-                                    className="text-sm text-gray-600 hover:text-gray-800 font-medium ml-auto"
+                                    className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 font-medium ml-auto"
                                 >
                                     View all →
                                 </button>

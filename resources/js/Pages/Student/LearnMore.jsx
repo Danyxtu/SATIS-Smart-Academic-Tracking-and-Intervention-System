@@ -9,10 +9,10 @@ import { BookOpen } from "lucide-react";
 // --- FAQ Accordion Item ---
 const FAQItem = ({ question, answer, icon, isOpen, onClick }) => (
     <div
-        className={`bg-white rounded-2xl border transition-all duration-300 overflow-hidden ${
+        className={`bg-white dark:bg-gray-900 rounded-2xl border transition-all duration-300 overflow-hidden ${
             isOpen
-                ? "border-indigo-200 shadow-md"
-                : "border-gray-100 hover:border-gray-200"
+                ? "border-indigo-200 dark:border-indigo-700/50 shadow-md"
+                : "border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:hover:border-gray-600"
         }`}
     >
         <button
@@ -21,21 +21,33 @@ const FAQItem = ({ question, answer, icon, isOpen, onClick }) => (
         >
             <div
                 className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
-                    isOpen ? "bg-indigo-100" : "bg-gray-100"
+                    isOpen
+                        ? "bg-indigo-100 dark:bg-indigo-900/40"
+                        : "bg-gray-100 dark:bg-gray-800"
                 }`}
             >
-                <span className={isOpen ? "text-indigo-600" : "text-gray-500"}>
+                <span
+                    className={
+                        isOpen
+                            ? "text-indigo-600 dark:text-indigo-300"
+                            : "text-gray-500 dark:text-gray-400"
+                    }
+                >
                     {icon}
                 </span>
             </div>
             <div className="flex-1">
-                <h3 className="font-semibold text-gray-900">{question}</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                    {question}
+                </h3>
                 <div
                     className={`overflow-hidden transition-all duration-300 ${
                         isOpen ? "max-h-96 mt-3" : "max-h-0"
                     }`}
                 >
-                    <p className="text-gray-600 leading-relaxed">{answer}</p>
+                    <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                        {answer}
+                    </p>
                 </div>
             </div>
             <div
@@ -44,7 +56,7 @@ const FAQItem = ({ question, answer, icon, isOpen, onClick }) => (
                 }`}
             >
                 <svg
-                    className="w-5 h-5 text-gray-400"
+                    className="w-5 h-5 text-gray-400 dark:text-gray-500"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -63,14 +75,16 @@ const FAQItem = ({ question, answer, icon, isOpen, onClick }) => (
 
 // --- Feature Card ---
 const FeatureCard = ({ title, description, icon, color, link, linkText }) => (
-    <div className="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-lg transition-all duration-300 group">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-300 group">
         <div
             className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 ${color} group-hover:scale-110 transition-transform`}
         >
             {icon}
         </div>
-        <h3 className="font-bold text-gray-900 text-lg mb-2">{title}</h3>
-        <p className="text-gray-600 text-sm leading-relaxed mb-4">
+        <h3 className="font-bold text-gray-900 dark:text-gray-100 text-lg mb-2">
+            {title}
+        </h3>
+        <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed mb-4">
             {description}
         </p>
         {link && (
@@ -122,14 +136,18 @@ const ContactCard = ({
     actionText,
     gradient,
 }) => (
-    <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center hover:shadow-lg transition-all duration-300 group">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 p-6 text-center hover:shadow-lg transition-all duration-300 group">
         <div
             className={`w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center ${gradient} group-hover:scale-110 transition-transform`}
         >
             {icon}
         </div>
-        <h3 className="font-bold text-gray-900 mb-1">{title}</h3>
-        <p className="text-gray-500 text-sm mb-4">{subtitle}</p>
+        <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-1">
+            {title}
+        </h3>
+        <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
+            {subtitle}
+        </p>
         <button
             onClick={action}
             className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
@@ -410,7 +428,7 @@ const LearnMore = () => {
         <AuthenticatedLayout>
             <Head title="Learn More" />
 
-            <div className="min-h-screen bg-gray-50/50">
+            <div className="min-h-screen bg-gray-50/50 dark:bg-gray-950">
                 {/* Hero Header */}
                 <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-2xl mx-4 mt-4 p-8 text-white relative overflow-hidden">
                     <div className="absolute inset-0 opacity-10">
@@ -473,7 +491,7 @@ const LearnMore = () => {
                     {/* Platform Features */}
                     <section>
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+                            <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center">
                                 <svg
                                     className="w-5 h-5 text-indigo-600"
                                     fill="none"
@@ -489,10 +507,10 @@ const LearnMore = () => {
                                 </svg>
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900">
+                                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                                     Platform Features
                                 </h2>
-                                <p className="text-gray-500">
+                                <p className="text-gray-500 dark:text-gray-400">
                                     Everything you need to track and improve
                                     your academics
                                 </p>
@@ -508,14 +526,14 @@ const LearnMore = () => {
                     {/* Tutorials Section */}
                     <section>
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center">
+                            <div className="w-10 h-10 bg-pink-100 dark:bg-pink-900/30 rounded-xl flex items-center justify-center">
                                 <BookOpen className="w-5 h-5 text-pink-600" />
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900">
+                                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                                     Step-by-Step Tutorials
                                 </h2>
-                                <p className="text-gray-500">
+                                <p className="text-gray-500 dark:text-gray-400">
                                     Learn how to use each feature of SATIS
                                 </p>
                             </div>
@@ -540,7 +558,7 @@ const LearnMore = () => {
                     {/* FAQ Section */}
                     <section>
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                            <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center">
                                 <svg
                                     className="w-5 h-5 text-purple-600"
                                     fill="none"
@@ -556,10 +574,10 @@ const LearnMore = () => {
                                 </svg>
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900">
+                                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                                     Frequently Asked Questions
                                 </h2>
-                                <p className="text-gray-500">
+                                <p className="text-gray-500 dark:text-gray-400">
                                     Find answers to common questions about SATIS
                                 </p>
                             </div>
@@ -572,7 +590,7 @@ const LearnMore = () => {
                                     isOpen={openFAQ === index}
                                     onClick={() =>
                                         setOpenFAQ(
-                                            openFAQ === index ? -1 : index
+                                            openFAQ === index ? -1 : index,
                                         )
                                     }
                                 />
@@ -583,7 +601,7 @@ const LearnMore = () => {
                     {/* Study Tips */}
                     <section>
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                            <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center">
                                 <svg
                                     className="w-5 h-5 text-amber-600"
                                     fill="none"
@@ -599,10 +617,10 @@ const LearnMore = () => {
                                 </svg>
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900">
+                                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                                     Study Tips for Success
                                 </h2>
-                                <p className="text-gray-500">
+                                <p className="text-gray-500 dark:text-gray-400">
                                     Proven strategies to improve your academic
                                     performance
                                 </p>
@@ -616,9 +634,9 @@ const LearnMore = () => {
                     </section>
 
                     {/* Understanding Your Progress */}
-                    <section className="bg-white rounded-2xl border border-gray-100 p-8">
+                    <section className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 p-8">
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                            <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center">
                                 <svg
                                     className="w-5 h-5 text-emerald-600"
                                     fill="none"
@@ -634,10 +652,10 @@ const LearnMore = () => {
                                 </svg>
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900">
+                                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                                     Understanding Your Progress
                                 </h2>
-                                <p className="text-gray-500">
+                                <p className="text-gray-500 dark:text-gray-400">
                                     Learn what the different status indicators
                                     mean
                                 </p>
@@ -645,48 +663,48 @@ const LearnMore = () => {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="p-5 rounded-xl bg-emerald-50 border border-emerald-100">
+                            <div className="p-5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-700/40">
                                 <div className="flex items-center gap-3 mb-3">
                                     <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-sm font-semibold rounded-full border border-emerald-200">
                                         On Track
                                     </span>
                                 </div>
-                                <h3 className="font-semibold text-gray-900 mb-2">
+                                <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
                                     You're Doing Great!
                                 </h3>
-                                <p className="text-gray-600 text-sm">
+                                <p className="text-gray-600 dark:text-gray-300 text-sm">
                                     Your grade is 75% or higher. Keep up the
                                     excellent work and maintain your study
                                     habits.
                                 </p>
                             </div>
 
-                            <div className="p-5 rounded-xl bg-amber-50 border border-amber-100">
+                            <div className="p-5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-700/40">
                                 <div className="flex items-center gap-3 mb-3">
                                     <span className="px-3 py-1 bg-amber-100 text-amber-700 text-sm font-semibold rounded-full border border-amber-200">
                                         Needs Attention
                                     </span>
                                 </div>
-                                <h3 className="font-semibold text-gray-900 mb-2">
+                                <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
                                     Room for Improvement
                                 </h3>
-                                <p className="text-gray-600 text-sm">
+                                <p className="text-gray-600 dark:text-gray-300 text-sm">
                                     Your grade is between 70-75%. Consider
                                     dedicating more time to this subject or
                                     asking for help.
                                 </p>
                             </div>
 
-                            <div className="p-5 rounded-xl bg-red-50 border border-red-100">
+                            <div className="p-5 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-700/40">
                                 <div className="flex items-center gap-3 mb-3">
                                     <span className="px-3 py-1 bg-red-100 text-red-700 text-sm font-semibold rounded-full border border-red-200">
                                         At Risk
                                     </span>
                                 </div>
-                                <h3 className="font-semibold text-gray-900 mb-2">
+                                <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
                                     Take Action Now
                                 </h3>
-                                <p className="text-gray-600 text-sm">
+                                <p className="text-gray-600 dark:text-gray-300 text-sm">
                                     Your grade is below 70%. Reach out to your
                                     teacher immediately and follow any
                                     intervention tasks assigned.
@@ -698,7 +716,7 @@ const LearnMore = () => {
                     {/* Contact & Resources */}
                     <section>
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
                                 <svg
                                     className="w-5 h-5 text-blue-600"
                                     fill="none"
@@ -714,10 +732,10 @@ const LearnMore = () => {
                                 </svg>
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900">
+                                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                                     Contact & Resources
                                 </h2>
-                                <p className="text-gray-500">
+                                <p className="text-gray-500 dark:text-gray-400">
                                     Get help when you need it
                                 </p>
                             </div>

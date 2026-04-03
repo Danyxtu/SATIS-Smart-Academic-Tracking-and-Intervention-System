@@ -41,20 +41,6 @@ class AttendanceController extends Controller
     }
 
     /**
-     * Display the attendance log grouped by sections.
-     */
-    public function attendanceLogsGroupedBySection(Request $request): Response
-    {
-        $teacher = $request->user();
-
-        $sections = $this->attendanceService->attendanceLogsGroupedBySection($teacher);
-
-        return Inertia::render('Teacher/AttendanceLog', [
-            'sections' => $sections->toArray(),
-        ]);
-    }
-
-    /**
      * Get detailed attendance data for a specific section.
      */
     public function attendanceLogOfSpecificSection(Request $request, SubjectTeacher $subjectTeacher): Response

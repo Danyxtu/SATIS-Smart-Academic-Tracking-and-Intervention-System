@@ -90,8 +90,6 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
          */
         Route::get('/attendance', [AttendanceController::class, 'index'])
             ->name('attendance.index');
-        Route::get('/attendance/log', [AttendanceController::class, 'attendanceLogsGroupedBySection'])
-            ->name('attendance.log');
         Route::get('/attendance/log/{subjectTeacher}', [AttendanceController::class, 'attendanceLogOfSpecificSection'])
             ->name('attendance.log.show');
         Route::get('/attendance/log/{subjectTeacher}/export', [AttendanceController::class, 'exportCSV'])

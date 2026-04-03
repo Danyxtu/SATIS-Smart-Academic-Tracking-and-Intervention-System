@@ -101,12 +101,12 @@ const StudentStatusModal = ({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4 overflow-y-auto">
-            <div className="relative w-full max-w-3xl my-4 rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden max-h-[calc(100vh-2rem)] flex flex-col">
+            <div className="relative w-full max-w-3xl my-4 rounded-2xl bg-white dark:bg-gray-900 shadow-2xl ring-1 ring-black/5 overflow-hidden max-h-[calc(100vh-2rem)] flex flex-col">
                 {/* Close button - fixed position, always visible */}
                 <button
                     type="button"
                     onClick={onClose}
-                    className="absolute right-3 top-3 z-10 rounded-full bg-white/90 p-1.5 text-gray-600 shadow-lg transition hover:bg-white hover:text-gray-900"
+                    className="absolute right-3 top-3 z-10 rounded-full bg-white/90 dark:bg-gray-900/90 p-1.5 text-gray-600 shadow-lg transition hover:bg-white dark:hover:bg-gray-900 hover:text-gray-900 dark:text-gray-100"
                     aria-label="Close modal"
                 >
                     <X size={18} />
@@ -116,7 +116,7 @@ const StudentStatusModal = ({
                 <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 p-4 text-white flex-shrink-0">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pr-8">
                         <div className="flex items-center gap-3">
-                            <div className="h-12 w-12 overflow-hidden rounded-lg border border-white/40 bg-white/20 flex items-center justify-center text-base font-semibold flex-shrink-0">
+                            <div className="h-12 w-12 overflow-hidden rounded-lg border border-white/40 bg-white/20 dark:bg-gray-900/20 flex items-center justify-center text-base font-semibold flex-shrink-0">
                                 {student.avatar ? (
                                     <img
                                         src={student.avatar}
@@ -143,7 +143,7 @@ const StudentStatusModal = ({
                             </div>
                         </div>
                         <div className="flex gap-1.5 flex-shrink-0 flex-wrap">
-                            <div className="rounded-lg bg-white/20 px-2.5 py-1.5 text-center backdrop-blur min-w-[78px]">
+                            <div className="rounded-lg bg-white/20 dark:bg-gray-900/20 px-2.5 py-1.5 text-center backdrop-blur min-w-[78px]">
                                 <p className="text-[10px] uppercase tracking-wide text-white/70">
                                     Q{selectedQuarter} Grade
                                 </p>
@@ -151,7 +151,7 @@ const StudentStatusModal = ({
                                     {quarterlyGrade}
                                 </p>
                             </div>
-                            <div className="rounded-lg bg-white/20 px-2.5 py-1.5 text-center backdrop-blur min-w-[78px]">
+                            <div className="rounded-lg bg-white/20 dark:bg-gray-900/20 px-2.5 py-1.5 text-center backdrop-blur min-w-[78px]">
                                 <p className="text-[10px] uppercase tracking-wide text-white/70">
                                     Expected Q{selectedQuarter}
                                 </p>
@@ -159,7 +159,7 @@ const StudentStatusModal = ({
                                     {expectedGrade}
                                 </p>
                             </div>
-                            <div className="rounded-lg bg-white/20 px-2.5 py-1.5 text-center backdrop-blur min-w-[78px]">
+                            <div className="rounded-lg bg-white/20 dark:bg-gray-900/20 px-2.5 py-1.5 text-center backdrop-blur min-w-[78px]">
                                 <p className="text-[10px] uppercase tracking-wide text-white/70">
                                     Final Grade
                                 </p>
@@ -167,7 +167,7 @@ const StudentStatusModal = ({
                                     {finalGrade}
                                 </p>
                             </div>
-                            <div className="rounded-lg bg-white/20 px-2.5 py-1.5 text-center backdrop-blur min-w-[78px]">
+                            <div className="rounded-lg bg-white/20 dark:bg-gray-900/20 px-2.5 py-1.5 text-center backdrop-blur min-w-[78px]">
                                 <p className="text-[10px] uppercase tracking-wide text-white/70">
                                     Activities
                                 </p>
@@ -184,7 +184,7 @@ const StudentStatusModal = ({
                     {/* Temporary Password Section */}
                     {hasChangedPassword ? (
                         // Student has already changed their password
-                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-2.5">
+                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-2.5">
                             <div className="flex items-center gap-2">
                                 <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
                                     <Check
@@ -193,10 +193,10 @@ const StudentStatusModal = ({
                                     />
                                 </div>
                                 <div>
-                                    <p className="text-xs font-semibold text-gray-800">
+                                    <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">
                                         Password Changed
                                     </p>
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
                                         This student has set their own password
                                     </p>
                                 </div>
@@ -216,8 +216,8 @@ const StudentStatusModal = ({
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-1.5">
-                                    <div className="flex items-center gap-1 rounded-lg bg-white border border-emerald-300 px-2.5 py-1">
-                                        <span className="font-mono text-sm font-semibold text-gray-900 tracking-wide">
+                                    <div className="flex items-center gap-1 rounded-lg bg-white dark:bg-gray-900 border border-emerald-300 px-2.5 py-1">
+                                        <span className="font-mono text-sm font-semibold text-gray-900 dark:text-gray-100 tracking-wide">
                                             {showPassword
                                                 ? temporaryPassword
                                                 : "••••••••••••"}
@@ -227,7 +227,7 @@ const StudentStatusModal = ({
                                             onClick={() =>
                                                 setShowPassword(!showPassword)
                                             }
-                                            className="p-0.5 text-gray-500 hover:text-gray-700 transition"
+                                            className="p-0.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 dark:text-gray-300 transition"
                                             aria-label={
                                                 showPassword
                                                     ? "Hide password"
@@ -243,7 +243,7 @@ const StudentStatusModal = ({
                                         <button
                                             type="button"
                                             onClick={handleCopyPassword}
-                                            className="p-0.5 text-gray-500 hover:text-gray-700 transition"
+                                            className="p-0.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 dark:text-gray-300 transition"
                                             aria-label="Copy password"
                                         >
                                             {copied ? (
@@ -284,12 +284,12 @@ const StudentStatusModal = ({
                         {metaItems.map((item) => (
                             <div
                                 key={item.label}
-                                className="rounded-lg border border-gray-100 bg-gray-50/70 p-2"
+                                className="rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/70 p-2"
                             >
-                                <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                                <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                                     {item.label}
                                 </p>
-                                <p className="mt-0.5 text-xs font-semibold text-gray-900 truncate">
+                                <p className="mt-0.5 text-xs font-semibold text-gray-900 dark:text-gray-100 truncate">
                                     {item.value || "—"}
                                 </p>
                             </div>
@@ -298,31 +298,31 @@ const StudentStatusModal = ({
 
                     {/* Grades Overview */}
                     {currentCategories.length > 0 && (
-                        <div className="rounded-lg border border-gray-100 p-2.5">
-                            <div className="flex flex-wrap items-center gap-1.5 border-b border-gray-100 pb-2">
+                        <div className="rounded-lg border border-gray-100 dark:border-gray-700 p-2.5">
+                            <div className="flex flex-wrap items-center gap-1.5 border-b border-gray-100 dark:border-gray-700 pb-2">
                                 <div>
-                                    <h3 className="text-base font-semibold text-gray-900">
+                                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
                                         Grades Overview
                                     </h3>
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
                                         Breakdown by assessment category
                                     </p>
                                 </div>
 
                                 {/* Quarter Toggle */}
                                 <div className="flex items-center gap-2 ml-auto">
-                                    <span className="text-xs font-medium text-gray-500">
+                                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
                                         Quarter:
                                     </span>
-                                    <div className="flex items-center p-0.5 bg-gray-100 rounded-lg">
+                                    <div className="flex items-center p-0.5 bg-gray-100 dark:bg-gray-700 rounded-lg">
                                         <button
                                             onClick={() =>
                                                 setSelectedQuarter(1)
                                             }
                                             className={`px-3 py-1 rounded-md font-medium text-xs transition-colors ${
                                                 selectedQuarter === 1
-                                                    ? "bg-white text-indigo-700 shadow-sm"
-                                                    : "text-gray-600 hover:bg-gray-200"
+                                                    ? "bg-white dark:bg-gray-900 text-indigo-700 shadow-sm"
+                                                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-200"
                                             }`}
                                         >
                                             Q1
@@ -336,10 +336,10 @@ const StudentStatusModal = ({
                                             disabled={!q1Finished}
                                             className={`px-3 py-1 rounded-md font-medium text-xs transition-colors ${
                                                 selectedQuarter === 2
-                                                    ? "bg-white text-indigo-700 shadow-sm"
+                                                    ? "bg-white dark:bg-gray-900 text-indigo-700 shadow-sm"
                                                     : !q1Finished
-                                                      ? "text-gray-400 cursor-not-allowed"
-                                                      : "text-gray-600 hover:bg-gray-200"
+                                                      ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                                                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-200"
                                             }`}
                                             title={
                                                 !q1Finished
@@ -357,7 +357,7 @@ const StudentStatusModal = ({
                                 {currentCategories.map((category) => (
                                     <span
                                         key={category.id}
-                                        className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-600"
+                                        className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 dark:border-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:text-gray-400"
                                     >
                                         <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
                                         {category.label} (
@@ -369,9 +369,9 @@ const StudentStatusModal = ({
                                 ))}
                             </div>
 
-                            <div className="mt-2 max-h-72 overflow-y-auto rounded-lg border border-gray-100">
+                            <div className="mt-2 max-h-72 overflow-y-auto rounded-lg border border-gray-100 dark:border-gray-700">
                                 <table className="min-w-full divide-y divide-gray-200 text-left">
-                                    <thead className="bg-gray-50/80 text-xs font-semibold uppercase tracking-wider text-gray-500 sticky top-0">
+                                    <thead className="bg-gray-50 dark:bg-gray-800/80 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 sticky top-0">
                                         <tr>
                                             <th className="px-3 py-2">
                                                 Activity
@@ -384,7 +384,7 @@ const StudentStatusModal = ({
                                             </th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100 bg-white text-sm text-gray-700">
+                                    <tbody className="divide-y divide-gray-100 bg-white dark:bg-gray-900 text-sm text-gray-700 dark:text-gray-300">
                                         {currentCategories.every(
                                             (cat) =>
                                                 !cat.tasks ||
@@ -392,7 +392,7 @@ const StudentStatusModal = ({
                                         ) && (
                                             <tr>
                                                 <td
-                                                    className="px-3 py-4 text-center text-gray-400"
+                                                    className="px-3 py-4 text-center text-gray-400 dark:text-gray-500"
                                                     colSpan={3}
                                                 >
                                                     No assignments defined for
@@ -444,21 +444,21 @@ const StudentStatusModal = ({
                                                     key={category.id}
                                                 >
                                                     {/* Category Header Row */}
-                                                    <tr className="bg-gray-50/90">
+                                                    <tr className="bg-gray-50 dark:bg-gray-800/90">
                                                         <td
                                                             colSpan={3}
                                                             className="px-3 py-2"
                                                         >
                                                             <div className="flex items-center justify-between">
-                                                                <span className="font-semibold text-gray-900">
+                                                                <span className="font-semibold text-gray-900 dark:text-gray-100">
                                                                     {shortLabel}{" "}
-                                                                    <span className="font-normal text-gray-500">
+                                                                    <span className="font-normal text-gray-500 dark:text-gray-400">
                                                                         —{" "}
                                                                         {
                                                                             category.label
                                                                         }
                                                                     </span>
-                                                                    <span className="ml-1 text-xs text-gray-500">
+                                                                    <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
                                                                         (
                                                                         {
                                                                             percent
@@ -489,7 +489,7 @@ const StudentStatusModal = ({
                                                             ];
                                                         return (
                                                             <tr key={task.id}>
-                                                                <td className="px-3 py-1.5 pl-6 text-gray-600">
+                                                                <td className="px-3 py-1.5 pl-6 text-gray-600 dark:text-gray-400">
                                                                     {task.label}
                                                                 </td>
                                                                 <td className="px-3 py-1.5 text-right font-semibold text-indigo-600">
@@ -501,7 +501,7 @@ const StudentStatusModal = ({
                                                                         ? score
                                                                         : "—"}
                                                                 </td>
-                                                                <td className="px-3 py-1.5 text-right text-gray-500">
+                                                                <td className="px-3 py-1.5 text-right text-gray-500 dark:text-gray-400">
                                                                     {task.total}
                                                                 </td>
                                                             </tr>
@@ -516,7 +516,7 @@ const StudentStatusModal = ({
                                                 cat.tasks.length > 0,
                                         ) && (
                                             <>
-                                                <tr className="bg-gray-50/80 text-gray-900">
+                                                <tr className="bg-gray-50 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100">
                                                     <td className="px-3 py-2 font-semibold">
                                                         Q{selectedQuarter} Grade
                                                     </td>
@@ -527,11 +527,11 @@ const StudentStatusModal = ({
                                                         {quarterlyGrade}
                                                     </td>
                                                 </tr>
-                                                <tr className="bg-indigo-50/50 text-gray-900">
+                                                <tr className="bg-indigo-50/50 text-gray-900 dark:text-gray-100">
                                                     <td className="px-3 py-2 font-semibold">
                                                         Expected Q
                                                         {selectedQuarter} Grade
-                                                        <span className="ml-2 text-xs font-normal text-gray-500">
+                                                        <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
                                                             (Projected)
                                                         </span>
                                                     </td>
@@ -542,10 +542,10 @@ const StudentStatusModal = ({
                                                         {expectedGrade}
                                                     </td>
                                                 </tr>
-                                                <tr className="bg-indigo-100/70 text-gray-900">
+                                                <tr className="bg-indigo-100/70 text-gray-900 dark:text-gray-100">
                                                     <td className="px-3 py-2 font-bold">
                                                         Final Grade
-                                                        <span className="ml-2 text-xs font-normal text-gray-500">
+                                                        <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
                                                             (Q1 + Q2 Average)
                                                         </span>
                                                     </td>
@@ -566,7 +566,7 @@ const StudentStatusModal = ({
                 </div>
 
                 {/* Footer */}
-                <div className="flex justify-end bg-gray-50 px-3 py-2.5 border-t border-gray-100 flex-shrink-0">
+                <div className="flex justify-end bg-gray-50 dark:bg-gray-800 px-3 py-2.5 border-t border-gray-100 dark:border-gray-700 flex-shrink-0">
                     <button
                         type="button"
                         onClick={onClose}

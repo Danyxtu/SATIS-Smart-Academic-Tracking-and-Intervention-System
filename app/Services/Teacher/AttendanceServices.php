@@ -17,10 +17,16 @@ class AttendanceServices
 
     public function index($teacher): array
     {
-        $subjectTeachers = SubjectTeacher::with(['subject', 'enrollments.user.student'])
+        $subjectTeachers = SubjectTeacher::with([
+            'subject',
+            'enrollments.user.student',
+            'enrollments.attendanceRecords',
+        ])
             ->where('teacher_id', $teacher->id)
             ->orderBy('grade_level')
             ->get();
+
+        $today = now()->toDateString();
 
 
         $rosters = $subjectTeachers->mapWithKeys(fn($st) => [
@@ -42,69 +48,63 @@ class AttendanceServices
                 ->values(),
         ])->all();
 
-        $classes =  $subjectTeachers->map(fn($st) => [
-            'id' => $st->id,
-            'label' => sprintf(
-                '%s - %s (%s)',
-                $st->grade_level,
-                $st->section,
-                $st->subject?->subject_name ?? $st->name
-            ),
-            'grade_level' => $st->grade_level,
-            'section' => $st->section,
-            'subject' => $st->subject?->subject_name ?? $st->name,
-        ])->values()->all();
+        $classes = $subjectTeachers->map(function ($st) use ($today) {
+            $allRecords = $st->enrollments
+                ->flatMap(fn($enrollment) => $enrollment->attendanceRecords);
+
+            $todayRecords = $allRecords->filter(
+                fn($record) => $record->date && $record->date->format('Y-m-d') === $today
+            );
+
+            $lastRecordedDate = $allRecords
+                ->pluck('date')
+                ->filter()
+                ->sortDesc()
+                ->first();
+
+            $daysRecorded = $allRecords
+                ->pluck('date')
+                ->filter()
+                ->map(fn($date) => $date->format('Y-m-d'))
+                ->unique()
+                ->count();
+
+            return [
+                'id' => $st->id,
+                'label' => sprintf(
+                    '%s - %s (%s)',
+                    $st->grade_level,
+                    $st->section,
+                    $st->subject?->subject_name ?? $st->name
+                ),
+                'grade_level' => $st->grade_level,
+                'section' => $st->section,
+                'subject' => $st->subject?->subject_name ?? $st->name,
+                'color' => $st->color ?? 'indigo',
+                'student_count' => $st->enrollments->count(),
+                'attendance_summary' => [
+                    'days_recorded' => $daysRecorded,
+                    'total_records' => $allRecords->count(),
+                    'present' => $allRecords->where('status', 'present')->count(),
+                    'absent' => $allRecords->where('status', 'absent')->count(),
+                    'late' => $allRecords->where('status', 'late')->count(),
+                    'last_recorded_date' => $lastRecordedDate?->format('Y-m-d'),
+                    'today' => [
+                        'is_recorded' => $todayRecords->isNotEmpty(),
+                        'present' => $todayRecords->where('status', 'present')->count(),
+                        'absent' => $todayRecords->where('status', 'absent')->count(),
+                        'late' => $todayRecords->where('status', 'late')->count(),
+                    ],
+                ],
+            ];
+        })->values()->all();
 
         return [
             'classes' => $classes,
             'rosters' => $rosters,
         ];
     }
-    public function attendanceLogsGroupedBySection($teacher)
-    {
-        // Get all subject-teacher assignments belonging to this teacher
-        $subjectTeachers = SubjectTeacher::with([
-            'subject',
-            'enrollments.user.student',
-            'enrollments.attendanceRecords',
-        ])
-            ->where('teacher_id', $teacher->id)
-            ->orderBy('grade_level')
-            ->orderBy('section')
-            ->get();
 
-        // Build sections list with attendance summary
-        $results = $subjectTeachers->map(function ($st) {
-            $allRecords = $st->enrollments->flatMap(fn($enrollment) => $enrollment->attendanceRecords);
-
-            // Get unique dates
-            $dates = $allRecords->pluck('date')->unique()->sort()->values();
-
-            // Calculate overall stats
-            $totalRecords = $allRecords->count();
-            $presentCount = $allRecords->where('status', 'present')->count();
-            $absentCount = $allRecords->where('status', 'absent')->count();
-            $lateCount = $allRecords->where('status', 'late')->count();
-
-            return [
-                'id' => $st->id,
-                'name' => $st->subject?->subject_name ?? $st->name,
-                'grade_level' => $st->grade_level,
-                'section' => $st->section,
-                'label' => sprintf('%s - %s (%s)', $st->grade_level, $st->section, $st->subject?->subject_name ?? $st->name),
-                'student_count' => $st->enrollments->count(),
-                'total_days' => $dates->count(),
-                'stats' => [
-                    'present' => $presentCount,
-                    'absent' => $absentCount,
-                    'late' => $lateCount,
-                ],
-                'color' => $st->color ?? 'indigo',
-            ];
-        });
-
-        return $results;
-    }
     public function attendanceLogsOfSpecificSection($teacher, $subjectTeacher)
     {
         // Ensure teacher owns this subject-teacher assignment

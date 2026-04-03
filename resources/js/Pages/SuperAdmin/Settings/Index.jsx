@@ -176,12 +176,12 @@ function NewSchoolYearModal({ currentSY, onClose }) {
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                 onClick={submitting ? undefined : onClose}
             />
-            <div className="relative w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden">
+            <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-gray-900 shadow-2xl overflow-hidden">
                 {/* Modal header */}
                 <div className="bg-gradient-to-r from-rose-600 to-red-700 px-6 py-5">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 dark:bg-gray-900/20">
                                 <RotateCcw className="h-5 w-5 text-white" />
                             </div>
                             <div>
@@ -196,7 +196,7 @@ function NewSchoolYearModal({ currentSY, onClose }) {
                         <button
                             onClick={onClose}
                             disabled={submitting}
-                            className="rounded-lg p-1.5 text-white/70 hover:bg-white/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="rounded-lg p-1.5 text-white/70 hover:bg-white/20 dark:hover:bg-gray-900/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                             <X size={18} />
                         </button>
@@ -256,7 +256,7 @@ function NewSchoolYearModal({ currentSY, onClose }) {
                                 setError("");
                             }}
                             placeholder={suggestedSY}
-                            className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm font-medium focus:border-rose-500 focus:ring-rose-500 focus:bg-white transition-colors"
+                            className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm font-medium focus:border-rose-500 focus:ring-rose-500 focus:bg-white dark:bg-gray-900 transition-colors"
                         />
                         <p className="text-[11px] text-slate-400 mt-1">
                             Format: YYYY-YYYY (e.g. {suggestedSY})
@@ -556,7 +556,7 @@ export default function Index({ settings, schoolYears }) {
                         {/* ── LEFT COLUMN (2/3 width) ───────────────────── */}
                         <div className="xl:col-span-2 space-y-6">
                             {/* Academic Period Card */}
-                            <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
+                            <div className="rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-slate-100 overflow-hidden">
                                 <div className="flex items-center gap-4 px-6 py-5 border-b border-slate-100">
                                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md shadow-blue-500/20">
                                         <Calendar className="h-5 w-5 text-white" />
@@ -590,7 +590,7 @@ export default function Index({ settings, schoolYears }) {
                                                         e.target.value,
                                                     )
                                                 }
-                                                className={`w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm font-medium focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors ${
+                                                className={`w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm font-medium focus:border-blue-500 focus:ring-blue-500 focus:bg-white dark:bg-gray-900 transition-colors ${
                                                     errors.current_school_year
                                                         ? "border-rose-300 bg-rose-50/50"
                                                         : ""
@@ -642,7 +642,7 @@ export default function Index({ settings, schoolYears }) {
                                                         className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all ${
                                                             data.current_semester ===
                                                             sem
-                                                                ? "bg-white text-blue-600 shadow-sm ring-1 ring-slate-200"
+                                                                ? "bg-white dark:bg-gray-900 text-blue-600 shadow-sm ring-1 ring-slate-200"
                                                                 : "text-slate-500 hover:text-slate-700"
                                                         }`}
                                                     >
@@ -682,7 +682,7 @@ export default function Index({ settings, schoolYears }) {
                             </div>
 
                             {/* School Information Card */}
-                            <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
+                            <div className="rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-slate-100 overflow-hidden">
                                 <div className="flex items-center gap-4 px-6 py-5 border-b border-slate-100">
                                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-md shadow-emerald-500/20">
                                         <School className="h-5 w-5 text-white" />
@@ -714,7 +714,7 @@ export default function Index({ settings, schoolYears }) {
                                                 )
                                             }
                                             placeholder="e.g., Sample Senior High School"
-                                            className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors"
+                                            className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white dark:bg-gray-900 transition-colors"
                                         />
                                     </div>
 
@@ -733,7 +733,7 @@ export default function Index({ settings, schoolYears }) {
                                             }
                                             rows={3}
                                             placeholder="Full school address including barangay, city, and province..."
-                                            className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors resize-none"
+                                            className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white dark:bg-gray-900 transition-colors resize-none"
                                         />
                                     </div>
 
@@ -759,7 +759,7 @@ export default function Index({ settings, schoolYears }) {
                         {/* ── RIGHT COLUMN (1/3 width) ──────────────────── */}
                         <div className="space-y-6">
                             {/* System Controls Card */}
-                            <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
+                            <div className="rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-slate-100 overflow-hidden">
                                 <div className="flex items-center gap-4 px-6 py-5 border-b border-slate-100">
                                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-md shadow-amber-500/20">
                                         <Zap className="h-5 w-5 text-white" />
@@ -826,7 +826,7 @@ export default function Index({ settings, schoolYears }) {
                                                     }
                                                     className="peer sr-only"
                                                 />
-                                                <div className="peer h-5 w-9 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white" />
+                                                <div className="peer h-5 w-9 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-slate-300 after:bg-white dark:bg-gray-900 after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white" />
                                             </label>
                                         </div>
                                     </div>
@@ -882,7 +882,7 @@ export default function Index({ settings, schoolYears }) {
                                                     }
                                                     className="peer sr-only"
                                                 />
-                                                <div className="peer h-5 w-9 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white" />
+                                                <div className="peer h-5 w-9 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-slate-300 after:bg-white dark:bg-gray-900 after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white" />
                                             </label>
                                         </div>
                                     </div>
@@ -890,7 +890,7 @@ export default function Index({ settings, schoolYears }) {
                             </div>
 
                             {/* Summary Card */}
-                            <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
+                            <div className="rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-slate-100 overflow-hidden">
                                 <div className="px-6 py-5 border-b border-slate-100">
                                     <h3 className="font-semibold text-slate-900 text-sm">
                                         Configuration Summary
@@ -1067,7 +1067,7 @@ export default function Index({ settings, schoolYears }) {
                             <button
                                 type="button"
                                 onClick={() => setShowNewSYModal(true)}
-                                className="shrink-0 inline-flex items-center gap-2 rounded-xl border-2 border-rose-300 bg-white px-5 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all"
+                                className="shrink-0 inline-flex items-center gap-2 rounded-xl border-2 border-rose-300 bg-white dark:bg-gray-900 px-5 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all"
                             >
                                 <RotateCcw size={15} />
                                 Start New School Year

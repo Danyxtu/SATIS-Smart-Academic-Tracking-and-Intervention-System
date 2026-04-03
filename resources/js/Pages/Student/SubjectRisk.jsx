@@ -32,23 +32,23 @@ import {
 const RiskBadge = ({ level, size = "md" }) => {
     const config = {
         high: {
-            bg: "bg-red-100",
-            text: "text-red-700",
-            border: "border-red-200",
+            bg: "bg-red-100 dark:bg-red-900/30",
+            text: "text-red-700 dark:text-red-300",
+            border: "border-red-200 dark:border-red-700/50",
             icon: XCircle,
             label: "High Risk",
         },
         medium: {
-            bg: "bg-yellow-100",
-            text: "text-yellow-700",
-            border: "border-yellow-200",
+            bg: "bg-yellow-100 dark:bg-yellow-900/30",
+            text: "text-yellow-700 dark:text-yellow-300",
+            border: "border-yellow-200 dark:border-yellow-700/50",
             icon: AlertTriangle,
             label: "Medium Risk",
         },
         low: {
-            bg: "bg-green-100",
-            text: "text-green-700",
-            border: "border-green-200",
+            bg: "bg-green-100 dark:bg-green-900/30",
+            text: "text-green-700 dark:text-green-300",
+            border: "border-green-200 dark:border-green-700/50",
             icon: CheckCircle,
             label: "Low Risk",
         },
@@ -75,25 +75,25 @@ const TrendIndicator = ({ trend }) => {
         improving: {
             icon: TrendingUp,
             color: "text-green-600",
-            bg: "bg-green-50",
+            bg: "bg-green-50 dark:bg-green-900/25",
             label: "Improving",
         },
         declining: {
             icon: TrendingDown,
             color: "text-red-600",
-            bg: "bg-red-50",
+            bg: "bg-red-50 dark:bg-red-900/25",
             label: "Declining",
         },
         stable: {
             icon: Minus,
-            color: "text-gray-600",
-            bg: "bg-gray-50",
+            color: "text-gray-600 dark:text-gray-300",
+            bg: "bg-gray-50 dark:bg-gray-700/50",
             label: "Stable",
         },
         new: {
             icon: Minus,
             color: "text-blue-600",
-            bg: "bg-blue-50",
+            bg: "bg-blue-50 dark:bg-blue-900/25",
             label: "New",
         },
     };
@@ -132,14 +132,16 @@ const ProgressBar = ({
 
     return (
         <div className="flex items-center gap-2">
-            <div className={`flex-1 bg-gray-200 rounded-full ${heightClass}`}>
+            <div
+                className={`flex-1 bg-gray-200 dark:bg-gray-700 rounded-full ${heightClass}`}
+            >
                 <div
                     className={`${colors[color]} ${heightClass} rounded-full transition-all duration-500`}
                     style={{ width: `${percentage}%` }}
                 />
             </div>
             {showLabel && (
-                <span className="text-xs font-medium text-gray-600 w-10 text-right">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300 w-10 text-right">
                     {Math.round(percentage)}%
                 </span>
             )}
@@ -150,20 +152,24 @@ const ProgressBar = ({
 // --- Stat Card for Summary ---
 const StatCard = ({ icon: Icon, label, value, color = "gray" }) => {
     const colors = {
-        red: "bg-red-100 text-red-600",
-        yellow: "bg-yellow-100 text-yellow-600",
-        green: "bg-green-100 text-green-600",
-        gray: "bg-gray-100 text-gray-600",
+        red: "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300",
+        yellow: "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-300",
+        green: "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-300",
+        gray: "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300",
     };
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-3">
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 flex items-center gap-3">
             <div className={`p-2 rounded-lg ${colors[color]}`}>
                 <Icon size={20} />
             </div>
             <div>
-                <p className="text-2xl font-bold text-gray-800">{value}</p>
-                <p className="text-xs text-gray-500">{label}</p>
+                <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                    {value}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {label}
+                </p>
             </div>
         </div>
     );
@@ -176,32 +182,32 @@ const SubjectCard = ({ subject, onClick }) => {
             ? subject.currentGrade < 70
                 ? "red"
                 : subject.currentGrade < 75
-                ? "yellow"
-                : "green"
+                  ? "yellow"
+                  : "green"
             : "gray";
 
     const riskBorderColors = {
-        high: "border-l-red-500 hover:border-red-200",
-        medium: "border-l-yellow-500 hover:border-yellow-200",
-        low: "border-l-green-500 hover:border-green-200",
+        high: "border-l-red-500 hover:border-red-200 dark:hover:border-red-700/60",
+        medium: "border-l-yellow-500 hover:border-yellow-200 dark:hover:border-yellow-700/60",
+        low: "border-l-green-500 hover:border-green-200 dark:hover:border-green-700/60",
     };
 
     return (
         <button
             onClick={onClick}
-            className={`w-full bg-white rounded-xl shadow-sm border border-gray-100 border-l-4 ${
+            className={`w-full bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-l-4 ${
                 riskBorderColors[subject.riskLevel]
             } p-4 text-left hover:shadow-md transition-all duration-200 group`}
         >
             <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-gray-800 truncate">
+                        <h3 className="font-semibold text-gray-800 dark:text-gray-100 truncate">
                             {subject.subjectName}
                         </h3>
                         <TrendIndicator trend={subject.trend} />
                     </div>
-                    <p className="text-xs text-gray-500 flex items-center gap-1 mb-3">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mb-3">
                         <User size={12} />
                         {subject.teacherName}
                         {subject.section && ` • ${subject.section}`}
@@ -209,14 +215,16 @@ const SubjectCard = ({ subject, onClick }) => {
 
                     <div className="grid grid-cols-3 gap-3">
                         <div>
-                            <p className="text-xs text-gray-500 mb-1">Grade</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                Grade
+                            </p>
                             <p
                                 className={`text-lg font-bold ${
                                     gradeColor === "red"
                                         ? "text-red-600"
                                         : gradeColor === "yellow"
-                                        ? "text-yellow-600"
-                                        : "text-green-600"
+                                          ? "text-yellow-600"
+                                          : "text-green-600"
                                 }`}
                             >
                                 {subject.currentGrade !== null
@@ -228,7 +236,7 @@ const SubjectCard = ({ subject, onClick }) => {
                             <p className="text-xs text-gray-500 mb-1">
                                 Attendance
                             </p>
-                            <p className="text-lg font-bold text-gray-800">
+                            <p className="text-lg font-bold text-gray-800 dark:text-gray-100">
                                 {subject.attendanceRate}%
                             </p>
                         </div>
@@ -255,14 +263,14 @@ const SubjectCard = ({ subject, onClick }) => {
                                 .map((reason, idx) => (
                                     <span
                                         key={idx}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600"
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-100 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300"
                                     >
                                         <AlertCircle size={10} />
                                         {reason}
                                     </span>
                                 ))}
                             {subject.riskReasons.length > 2 && (
-                                <span className="text-xs text-gray-400">
+                                <span className="text-xs text-gray-400 dark:text-gray-500">
                                     +{subject.riskReasons.length - 2} more
                                 </span>
                             )}
@@ -274,7 +282,7 @@ const SubjectCard = ({ subject, onClick }) => {
                     <RiskBadge level={subject.riskLevel} size="sm" />
                     <ChevronRight
                         size={20}
-                        className="text-gray-400 group-hover:text-pink-500 transition-colors"
+                        className="text-gray-400 dark:text-gray-500 group-hover:text-pink-500 transition-colors"
                     />
                 </div>
             </div>
@@ -291,8 +299,8 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
             ? subject.currentGrade < 70
                 ? "red"
                 : subject.currentGrade < 75
-                ? "yellow"
-                : "green"
+                  ? "yellow"
+                  : "green"
             : "pink";
 
     return (
@@ -323,7 +331,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                 leaveTo="translate-x-full"
                             >
                                 <Dialog.Panel className="pointer-events-auto w-screen max-w-md">
-                                    <div className="flex h-full flex-col bg-white shadow-xl overflow-y-auto">
+                                    <div className="flex h-full flex-col bg-white dark:bg-gray-900 shadow-xl overflow-y-auto">
                                         {/* Header */}
                                         <div className="bg-gradient-to-r from-pink-500 to-purple-600 px-6 py-5">
                                             <div className="flex items-start justify-between">
@@ -354,8 +362,8 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                         <div className="flex-1 px-6 py-5 space-y-6">
                                             {/* Risk Reasons */}
                                             {subject.riskReasons.length > 0 && (
-                                                <div className="bg-red-50 border border-red-100 rounded-xl p-4">
-                                                    <h4 className="font-semibold text-red-800 flex items-center gap-2 mb-3">
+                                                <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-700/40 rounded-xl p-4">
+                                                    <h4 className="font-semibold text-red-800 dark:text-red-300 flex items-center gap-2 mb-3">
                                                         <AlertCircle
                                                             size={16}
                                                         />
@@ -366,7 +374,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                             (reason, idx) => (
                                                                 <li
                                                                     key={idx}
-                                                                    className="flex items-start gap-2 text-sm text-red-700"
+                                                                    className="flex items-start gap-2 text-sm text-red-700 dark:text-red-300"
                                                                 >
                                                                     <XCircle
                                                                         size={
@@ -376,7 +384,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                                     />
                                                                     {reason}
                                                                 </li>
-                                                            )
+                                                            ),
                                                         )}
                                                     </ul>
                                                 </div>
@@ -384,7 +392,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
 
                                             {/* Grade Overview */}
                                             <div>
-                                                <h4 className="font-semibold text-gray-800 flex items-center gap-2 mb-3">
+                                                <h4 className="font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2 mb-3">
                                                     <Award
                                                         size={16}
                                                         className="text-pink-500"
@@ -392,8 +400,8 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                     Grade Overview
                                                 </h4>
                                                 <div className="grid grid-cols-2 gap-3">
-                                                    <div className="bg-gray-50 rounded-lg p-3 text-center">
-                                                        <p className="text-xs text-gray-500 mb-1">
+                                                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-center">
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                                                             Current Grade
                                                         </p>
                                                         <p
@@ -402,9 +410,9 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                                 "red"
                                                                     ? "text-red-600"
                                                                     : gradeColor ===
-                                                                      "yellow"
-                                                                    ? "text-yellow-600"
-                                                                    : "text-green-600"
+                                                                        "yellow"
+                                                                      ? "text-yellow-600"
+                                                                      : "text-green-600"
                                                             }`}
                                                         >
                                                             {subject.currentGrade !==
@@ -413,11 +421,11 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                                 : "N/A"}
                                                         </p>
                                                     </div>
-                                                    <div className="bg-gray-50 rounded-lg p-3 text-center">
-                                                        <p className="text-xs text-gray-500 mb-1">
+                                                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-center">
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                                                             Expected Grade
                                                         </p>
-                                                        <p className="text-2xl font-bold text-gray-700">
+                                                        <p className="text-2xl font-bold text-gray-700 dark:text-gray-200">
                                                             {subject.expectedGrade !==
                                                             null
                                                                 ? `${subject.expectedGrade}%`
@@ -426,7 +434,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                     </div>
                                                 </div>
                                                 <div className="mt-3 flex items-center justify-between">
-                                                    <span className="text-sm text-gray-600">
+                                                    <span className="text-sm text-gray-600 dark:text-gray-300">
                                                         Trend
                                                     </span>
                                                     <TrendIndicator
@@ -437,10 +445,10 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
 
                                             {/* Grade Breakdown by Category */}
                                             {Object.keys(
-                                                subject.gradesByCategory
+                                                subject.gradesByCategory,
                                             ).length > 0 && (
                                                 <div>
-                                                    <h4 className="font-semibold text-gray-800 flex items-center gap-2 mb-3">
+                                                    <h4 className="font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2 mb-3">
                                                         <BarChart3
                                                             size={16}
                                                             className="text-pink-500"
@@ -449,7 +457,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                     </h4>
                                                     <div className="space-y-3">
                                                         {Object.entries(
-                                                            subject.gradesByCategory
+                                                            subject.gradesByCategory,
                                                         ).map(
                                                             ([
                                                                 category,
@@ -461,12 +469,12 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                                     }
                                                                 >
                                                                     <div className="flex justify-between text-sm mb-1">
-                                                                        <span className="text-gray-600 capitalize">
+                                                                        <span className="text-gray-600 dark:text-gray-300 capitalize">
                                                                             {
                                                                                 category
                                                                             }
                                                                         </span>
-                                                                        <span className="font-medium text-gray-800">
+                                                                        <span className="font-medium text-gray-800 dark:text-gray-100">
                                                                             {data.percentage !==
                                                                             null
                                                                                 ? `${data.percentage}%`
@@ -483,9 +491,9 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                                             70
                                                                                 ? "red"
                                                                                 : data.percentage <
-                                                                                  75
-                                                                                ? "yellow"
-                                                                                : "green"
+                                                                                    75
+                                                                                  ? "yellow"
+                                                                                  : "green"
                                                                         }
                                                                         showLabel={
                                                                             false
@@ -493,7 +501,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                                         size="sm"
                                                                     />
                                                                 </div>
-                                                            )
+                                                            ),
                                                         )}
                                                     </div>
                                                 </div>
@@ -503,7 +511,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                             {subject.recentGrades.length >
                                                 0 && (
                                                 <div>
-                                                    <h4 className="font-semibold text-gray-800 flex items-center gap-2 mb-3">
+                                                    <h4 className="font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2 mb-3">
                                                         <FileText
                                                             size={16}
                                                             className="text-pink-500"
@@ -517,15 +525,15 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                                     key={
                                                                         grade.id
                                                                     }
-                                                                    className="flex items-center justify-between bg-gray-50 rounded-lg p-3"
+                                                                    className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-lg p-3"
                                                                 >
                                                                     <div>
-                                                                        <p className="font-medium text-gray-800 text-sm">
+                                                                        <p className="font-medium text-gray-800 dark:text-gray-100 text-sm">
                                                                             {
                                                                                 grade.name
                                                                             }
                                                                         </p>
-                                                                        <p className="text-xs text-gray-500">
+                                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
                                                                             {
                                                                                 grade.category
                                                                             }{" "}
@@ -542,9 +550,9 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                                                 70
                                                                                     ? "text-red-600"
                                                                                     : grade.percentage <
-                                                                                      75
-                                                                                    ? "text-yellow-600"
-                                                                                    : "text-green-600"
+                                                                                        75
+                                                                                      ? "text-yellow-600"
+                                                                                      : "text-green-600"
                                                                             }`}
                                                                         >
                                                                             {
@@ -563,7 +571,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                                         </p>
                                                                     </div>
                                                                 </div>
-                                                            )
+                                                            ),
                                                         )}
                                                     </div>
                                                 </div>
@@ -571,7 +579,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
 
                                             {/* Attendance */}
                                             <div>
-                                                <h4 className="font-semibold text-gray-800 flex items-center gap-2 mb-3">
+                                                <h4 className="font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2 mb-3">
                                                     <Calendar
                                                         size={16}
                                                         className="text-pink-500"
@@ -579,49 +587,49 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                     Attendance
                                                 </h4>
                                                 <div className="grid grid-cols-4 gap-2 text-center">
-                                                    <div className="bg-blue-50 rounded-lg p-2">
+                                                    <div className="bg-blue-50 dark:bg-blue-900/25 rounded-lg p-2">
                                                         <p className="text-lg font-bold text-blue-600">
                                                             {
                                                                 subject.totalClasses
                                                             }
                                                         </p>
-                                                        <p className="text-xs text-gray-500">
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
                                                             Total
                                                         </p>
                                                     </div>
-                                                    <div className="bg-green-50 rounded-lg p-2">
+                                                    <div className="bg-green-50 dark:bg-green-900/25 rounded-lg p-2">
                                                         <p className="text-lg font-bold text-green-600">
                                                             {
                                                                 subject.presentDays
                                                             }
                                                         </p>
-                                                        <p className="text-xs text-gray-500">
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
                                                             Present
                                                         </p>
                                                     </div>
-                                                    <div className="bg-red-50 rounded-lg p-2">
+                                                    <div className="bg-red-50 dark:bg-red-900/25 rounded-lg p-2">
                                                         <p className="text-lg font-bold text-red-600">
                                                             {subject.absentDays}
                                                         </p>
-                                                        <p className="text-xs text-gray-500">
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
                                                             Absent
                                                         </p>
                                                     </div>
-                                                    <div className="bg-yellow-50 rounded-lg p-2">
+                                                    <div className="bg-yellow-50 dark:bg-yellow-900/25 rounded-lg p-2">
                                                         <p className="text-lg font-bold text-yellow-600">
                                                             {subject.lateDays}
                                                         </p>
-                                                        <p className="text-xs text-gray-500">
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
                                                             Late
                                                         </p>
                                                     </div>
                                                 </div>
                                                 <div className="mt-3">
                                                     <div className="flex justify-between text-sm mb-1">
-                                                        <span className="text-gray-600">
+                                                        <span className="text-gray-600 dark:text-gray-300">
                                                             Attendance Rate
                                                         </span>
-                                                        <span className="font-medium text-gray-800">
+                                                        <span className="font-medium text-gray-800 dark:text-gray-100">
                                                             {
                                                                 subject.attendanceRate
                                                             }
@@ -637,9 +645,9 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                             80
                                                                 ? "red"
                                                                 : subject.attendanceRate <
-                                                                  90
-                                                                ? "yellow"
-                                                                : "green"
+                                                                    90
+                                                                  ? "yellow"
+                                                                  : "green"
                                                         }
                                                         showLabel={false}
                                                     />
@@ -648,12 +656,12 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
 
                                             {/* Intervention */}
                                             {subject.intervention && (
-                                                <div className="bg-orange-50 border border-orange-100 rounded-xl p-4">
-                                                    <h4 className="font-semibold text-orange-800 flex items-center gap-2 mb-2">
+                                                <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-700/40 rounded-xl p-4">
+                                                    <h4 className="font-semibold text-orange-800 dark:text-orange-300 flex items-center gap-2 mb-2">
                                                         <Target size={16} />
                                                         Active Intervention
                                                     </h4>
-                                                    <p className="text-sm text-orange-700 mb-2">
+                                                    <p className="text-sm text-orange-700 dark:text-orange-300 mb-2">
                                                         {
                                                             subject.intervention
                                                                 .typeLabel
@@ -661,7 +669,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                     </p>
                                                     {subject.intervention
                                                         .notes && (
-                                                        <p className="text-sm text-orange-600 bg-orange-100/50 rounded-lg p-2 mb-3">
+                                                        <p className="text-sm text-orange-600 dark:text-orange-300 bg-orange-100/50 dark:bg-orange-900/30 rounded-lg p-2 mb-3">
                                                             {
                                                                 subject
                                                                     .intervention
@@ -672,7 +680,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                     {subject.intervention.tasks
                                                         .length > 0 && (
                                                         <div className="space-y-1">
-                                                            <p className="text-xs font-medium text-orange-700 mb-1">
+                                                            <p className="text-xs font-medium text-orange-700 dark:text-orange-300 mb-1">
                                                                 Tasks:
                                                             </p>
                                                             {subject.intervention.tasks.map(
@@ -681,7 +689,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                                         key={
                                                                             task.id
                                                                         }
-                                                                        className="flex items-center gap-2 text-sm text-orange-700"
+                                                                        className="flex items-center gap-2 text-sm text-orange-700 dark:text-orange-300"
                                                                     >
                                                                         {task.isCompleted ? (
                                                                             <CheckSquare
@@ -709,7 +717,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                                             }
                                                                         </span>
                                                                     </div>
-                                                                )
+                                                                ),
                                                             )}
                                                         </div>
                                                     )}
@@ -739,12 +747,12 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
 
 // --- Empty State ---
 const EmptyState = () => (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-12 text-center">
         <ShieldCheck size={64} className="mx-auto text-green-400 mb-4" />
-        <h3 className="text-xl font-semibold text-gray-800 mb-2">
+        <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-2">
             All Subjects Looking Good!
         </h3>
-        <p className="text-gray-500 max-w-md mx-auto">
+        <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
             You're doing great! None of your subjects are currently at risk.
             Keep up the excellent work!
         </p>
@@ -780,11 +788,11 @@ const SubjectRisk = ({ subjects = [], stats = {} }) => {
             <div className="max-w-5xl mx-auto space-y-6">
                 {/* Header */}
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
                         <ShieldAlert size={32} className="text-pink-600" />
                         Subjects at Risk
                     </h1>
-                    <p className="text-gray-500 mt-1">
+                    <p className="text-gray-500 dark:text-gray-400 mt-1">
                         Monitor your academic performance and identify areas
                         needing attention
                     </p>
@@ -819,7 +827,7 @@ const SubjectRisk = ({ subjects = [], stats = {} }) => {
                 </div>
 
                 {/* Filter Tabs */}
-                <div className="flex items-center gap-2 bg-gray-100 rounded-full p-1 w-fit">
+                <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-full p-1 w-fit">
                     {[
                         { key: "all", label: "All", count: subjects.length },
                         {
@@ -839,8 +847,8 @@ const SubjectRisk = ({ subjects = [], stats = {} }) => {
                             onClick={() => setFilter(tab.key)}
                             className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                                 filter === tab.key
-                                    ? "bg-white text-pink-600 shadow-sm"
-                                    : "text-gray-600 hover:text-gray-800"
+                                    ? "bg-white dark:bg-gray-900 text-pink-600 shadow-sm"
+                                    : "text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
                             }`}
                         >
                             {tab.label}
@@ -848,8 +856,8 @@ const SubjectRisk = ({ subjects = [], stats = {} }) => {
                                 <span
                                     className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs ${
                                         filter === tab.key
-                                            ? "bg-pink-100 text-pink-600"
-                                            : "bg-gray-200 text-gray-600"
+                                            ? "bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-300"
+                                            : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
                                     }`}
                                 >
                                     {tab.count}
@@ -875,17 +883,17 @@ const SubjectRisk = ({ subjects = [], stats = {} }) => {
                 )}
 
                 {/* Info Card */}
-                <div className="bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-100 rounded-xl p-5">
+                <div className="bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 border border-pink-100 dark:border-pink-800/40 rounded-xl p-5">
                     <div className="flex items-start gap-3">
                         <Info
                             size={20}
                             className="text-pink-600 flex-shrink-0 mt-0.5"
                         />
                         <div>
-                            <h4 className="font-semibold text-gray-800 mb-1">
+                            <h4 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">
                                 Understanding Risk Levels
                             </h4>
-                            <div className="text-sm text-gray-600 space-y-1">
+                            <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
                                 <p>
                                     <span className="font-medium text-red-600">
                                         High Risk:

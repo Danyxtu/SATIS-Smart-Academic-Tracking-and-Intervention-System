@@ -17,7 +17,7 @@ const getPriorityClasses = (priority) => {
         case "Low":
             return `${baseClasses} bg-blue-100 text-blue-800`;
         default:
-            return `${baseClasses} bg-gray-100 text-gray-800`;
+            return `${baseClasses} bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200`;
     }
 };
 
@@ -84,7 +84,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
             {selectedIds.length > 0 && (
                 <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-3 rounded-xl shadow-md flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                        <div className="w-8 h-8 bg-white/20 dark:bg-gray-900/20 rounded-lg flex items-center justify-center">
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
                                 className="h-4 w-4"
@@ -112,13 +112,13 @@ function InterventionDashboard({ students, onSelectStudent }) {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={clearSelection}
-                            className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium transition-colors"
+                            className="px-3 py-1.5 bg-white/20 dark:bg-gray-900/20 hover:bg-white/30 dark:hover:bg-gray-900/30 rounded-lg text-xs font-medium transition-colors"
                         >
                             Clear
                         </button>
                         <button
                             onClick={() => setIsBulkModalOpen(true)}
-                            className="px-4 py-1.5 bg-white text-indigo-700 hover:bg-indigo-50 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5"
+                            className="px-4 py-1.5 bg-white dark:bg-gray-900 text-indigo-700 hover:bg-indigo-50 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5"
                         >
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
@@ -140,13 +140,13 @@ function InterventionDashboard({ students, onSelectStudent }) {
 
             {/* Compact Summary Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                <div className="bg-white dark:bg-gray-900 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                                 Total Watchlist
                             </p>
-                            <p className="text-2xl font-bold text-gray-900 mt-1">
+                            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
                                 {totalStudents}
                             </p>
                         </div>
@@ -219,8 +219,8 @@ function InterventionDashboard({ students, onSelectStudent }) {
             </div>
 
             {/* Compact Priority Watchlist */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-sm">
@@ -239,10 +239,10 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="text-sm font-bold text-gray-900">
+                                <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
                                     Priority Watchlist
                                 </h3>
-                                <p className="text-xs text-gray-500">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
                                     Students requiring attention
                                 </p>
                             </div>
@@ -256,7 +256,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
 
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                        <thead className="bg-gray-50 dark:bg-gray-800">
                             <tr>
                                 <th className="w-10 px-3 py-2">
                                     {sortedStudents.length > 0 && (
@@ -268,7 +268,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                                 sortedStudents.length > 0
                                             }
                                             onChange={toggleSelectAll}
-                                            className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                            className="w-3.5 h-3.5 text-indigo-600 border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500 cursor-pointer"
                                         />
                                     )}
                                 </th>
@@ -281,14 +281,14 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                 ].map((head) => (
                                     <th
                                         key={head}
-                                        className="px-4 py-2 text-left text-[10px] font-semibold text-gray-600 uppercase tracking-wider"
+                                        className="px-4 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider"
                                     >
                                         {head}
                                     </th>
                                 ))}
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-100">
+                        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-100">
                             {sortedStudents.length === 0 ? (
                                 <tr>
                                     <td
@@ -311,10 +311,10 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                                     />
                                                 </svg>
                                             </div>
-                                            <p className="text-base font-semibold text-gray-900">
+                                            <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
                                                 All students doing well!
                                             </p>
-                                            <p className="text-xs text-gray-500 mt-1 max-w-sm">
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-sm">
                                                 No students currently need
                                                 intervention.
                                             </p>
@@ -344,7 +344,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                                 onChange={(e) =>
                                                     toggleSelect(s.id, e)
                                                 }
-                                                className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                                className="w-3.5 h-3.5 text-indigo-600 border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500 cursor-pointer"
                                             />
                                         </td>
                                         <td className="px-4 py-3 whitespace-nowrap">
@@ -357,7 +357,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                                         .substring(0, 2)}
                                                 </div>
                                                 <div>
-                                                    <div className="text-xs font-medium text-gray-900">
+                                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100">
                                                         {s.name}
                                                     </div>
                                                     {s.hasPendingCompletionRequest && (
@@ -377,7 +377,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 whitespace-nowrap">
-                                            <span className="text-xs text-gray-600">
+                                            <span className="text-xs text-gray-600 dark:text-gray-400">
                                                 {s.alertReason}
                                             </span>
                                         </td>
@@ -391,12 +391,12 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 whitespace-nowrap">
-                                            <span className="text-xs text-gray-600">
+                                            <span className="text-xs text-gray-600 dark:text-gray-400">
                                                 {s.subject}
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 whitespace-nowrap">
-                                            <span className="text-xs text-gray-500">
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">
                                                 {s.lastInterventionDate}
                                             </span>
                                         </td>
@@ -507,16 +507,16 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
         const colorClasses = {
             amber: isSelected
                 ? "bg-amber-100 border-amber-400 text-amber-700"
-                : "bg-white border-gray-200 text-gray-600 hover:border-amber-200 hover:bg-amber-50",
+                : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-amber-200 hover:bg-amber-50",
             orange: isSelected
                 ? "bg-orange-100 border-orange-400 text-orange-700"
-                : "bg-white border-gray-200 text-gray-600 hover:border-orange-200 hover:bg-orange-50",
+                : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-orange-200 hover:bg-orange-50",
             red: isSelected
                 ? "bg-red-100 border-red-400 text-red-700"
-                : "bg-white border-gray-200 text-gray-600 hover:border-red-200 hover:bg-red-50",
+                : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-red-200 hover:bg-red-50",
             blue: isSelected
                 ? "bg-blue-100 border-blue-400 text-blue-700"
-                : "bg-white border-gray-200 text-gray-600 hover:border-blue-200 hover:bg-blue-50",
+                : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-blue-200 hover:bg-blue-50",
         };
         return colorClasses[color];
     };
@@ -537,12 +537,12 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center">
+                            <div className="w-11 h-11 bg-white/20 dark:bg-gray-900/20 rounded-xl flex items-center justify-center">
                                 <svg
                                     xmlns="http://www.w3.org/2000/svg"
                                     className="h-6 w-6 text-white"
@@ -567,7 +567,7 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
                         </div>
                         <button
                             onClick={onClose}
-                            className="text-white/80 hover:text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
+                            className="text-white/80 hover:text-white hover:bg-white/20 dark:hover:bg-gray-900/20 rounded-lg p-2 transition-colors"
                         >
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
@@ -589,7 +589,7 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
                 <div className="p-6">
                     {/* Feedback Type Selection */}
                     <div className="mb-5">
-                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                             Feedback Type
                         </label>
                         <div className="grid grid-cols-4 gap-2">
@@ -622,11 +622,11 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
 
                     {/* Message Input */}
                     <div className="mb-5">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                             <span className="flex items-center gap-2">
                                 <svg
                                     xmlns="http://www.w3.org/2000/svg"
-                                    className="h-4 w-4 text-gray-400"
+                                    className="h-4 w-4 text-gray-400 dark:text-gray-500"
                                     viewBox="0 0 20 20"
                                     fill="currentColor"
                                 >
@@ -646,10 +646,10 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
                                 selectedType?.placeholder ||
                                 "Write your feedback..."
                             }
-                            className="w-full border border-gray-300 rounded-xl p-4 text-sm resize-none h-32 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-xl p-4 text-sm resize-none h-32 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                         />
                         <div className="flex items-center justify-between mt-2">
-                            <p className="text-xs text-gray-400">
+                            <p className="text-xs text-gray-400 dark:text-gray-500">
                                 This message will be sent to the student's
                                 dashboard
                             </p>
@@ -657,7 +657,7 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
                                 className={`text-xs ${
                                     message.length > 500
                                         ? "text-red-500"
-                                        : "text-gray-400"
+                                        : "text-gray-400 dark:text-gray-500"
                                 }`}
                             >
                                 {message.length}/500
@@ -667,7 +667,7 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
 
                     {/* Quick Templates */}
                     <div className="mb-6">
-                        <label className="block text-xs font-medium text-gray-500 mb-2">
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
                             Quick Templates
                         </label>
                         <div className="flex flex-wrap gap-2">
@@ -678,7 +678,7 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
                                         "Great improvement on your recent work! Keep it up!",
                                     )
                                 }
-                                className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
+                                className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-full hover:bg-gray-200 transition-colors"
                             >
                                 Praise improvement
                             </button>
@@ -689,7 +689,7 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
                                         "Please see me during office hours to discuss your progress.",
                                     )
                                 }
-                                className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
+                                className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-full hover:bg-gray-200 transition-colors"
                             >
                                 Request meeting
                             </button>
@@ -700,7 +700,7 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
                                         "Don't forget to submit your missing assignments by the deadline.",
                                     )
                                 }
-                                className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
+                                className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-full hover:bg-gray-200 transition-colors"
                             >
                                 Remind deadline
                             </button>
@@ -708,10 +708,10 @@ function FeedbackModal({ open, onClose, onSubmit, studentName }) {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
                         <button
                             onClick={onClose}
-                            className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium transition-colors"
+                            className="px-5 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 font-medium transition-colors"
                         >
                             Cancel
                         </button>
@@ -841,12 +841,12 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-5">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                            <div className="w-12 h-12 bg-white/20 dark:bg-gray-900/20 rounded-xl flex items-center justify-center">
                                 <svg
                                     xmlns="http://www.w3.org/2000/svg"
                                     className="h-6 w-6 text-white"
@@ -868,7 +868,7 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
                         </div>
                         <button
                             onClick={onClose}
-                            className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center transition-colors"
+                            className="w-10 h-10 bg-white/20 dark:bg-gray-900/20 hover:bg-white/30 dark:hover:bg-gray-900/30 rounded-lg flex items-center justify-center transition-colors"
                         >
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
@@ -904,10 +904,10 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
                                     />
                                 </svg>
                             </div>
-                            <h3 className="text-xl font-bold text-gray-900 mb-2">
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
                                 Interventions Created!
                             </h3>
-                            <p className="text-gray-600 text-center">
+                            <p className="text-gray-600 dark:text-gray-400 text-center">
                                 Successfully created interventions for{" "}
                                 {selectedStudents.length} students.
                                 <br />
@@ -917,8 +917,8 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
                     ) : (
                         <div className="space-y-6">
                             {/* Selected Students Preview */}
-                            <div className="bg-gray-50 rounded-xl p-4">
-                                <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                            <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4">
+                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                                     Selected Students
                                 </h4>
                                 <div className="flex flex-wrap gap-2">
@@ -927,7 +927,7 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
                                         .map((student) => (
                                             <span
                                                 key={student.id}
-                                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-full text-sm"
+                                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-full text-sm"
                                             >
                                                 <span className="w-6 h-6 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
                                                     {student.name
@@ -936,7 +936,7 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
                                                         .join("")
                                                         .substring(0, 2)}
                                                 </span>
-                                                <span className="text-gray-700">
+                                                <span className="text-gray-700 dark:text-gray-300">
                                                     {student.name.split(" ")[0]}
                                                 </span>
                                             </span>
@@ -951,7 +951,7 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
 
                             {/* Intervention Type Selection */}
                             <div>
-                                <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                                     Select Intervention Type
                                 </h4>
                                 <div className="grid grid-cols-1 gap-3">
@@ -964,14 +964,14 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
                                             className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left ${
                                                 selectedType === type.id
                                                     ? "border-indigo-500 bg-indigo-50"
-                                                    : "border-gray-200 hover:border-gray-300 bg-white"
+                                                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
                                             }`}
                                         >
                                             <div
                                                 className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                                                     selectedType === type.id
                                                         ? "bg-indigo-600"
-                                                        : "bg-gray-100"
+                                                        : "bg-gray-100 dark:bg-gray-700"
                                                 }`}
                                             >
                                                 <svg
@@ -979,7 +979,7 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
                                                     className={`h-5 w-5 ${
                                                         selectedType === type.id
                                                             ? "text-white"
-                                                            : "text-gray-500"
+                                                            : "text-gray-500 dark:text-gray-400"
                                                     }`}
                                                     viewBox="0 0 20 20"
                                                     fill="currentColor"
@@ -1012,7 +1012,7 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
                                             </div>
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-medium text-gray-900">
+                                                    <span className="font-medium text-gray-900 dark:text-gray-100">
                                                         {type.name}
                                                     </span>
                                                     <span
@@ -1021,7 +1021,7 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
                                                         Tier {type.tier}
                                                     </span>
                                                 </div>
-                                                <p className="text-sm text-gray-500 mt-0.5">
+                                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
                                                     {type.description}
                                                 </p>
                                             </div>
@@ -1048,14 +1048,14 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
 
                             {/* Notes */}
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                     Notes for All Students (Optional)
                                 </label>
                                 <textarea
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
                                     rows={3}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                                     placeholder="Add any notes that will be included in the intervention record..."
                                 />
                             </div>
@@ -1065,10 +1065,10 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
 
                 {/* Footer */}
                 {!submitSuccess && (
-                    <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+                    <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
                         <button
                             onClick={onClose}
-                            className="px-5 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 font-medium transition-colors"
+                            className="px-5 py-2.5 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 font-medium transition-colors"
                         >
                             Cancel
                         </button>
@@ -1360,7 +1360,7 @@ function StartInterventionModal({
             red: "bg-red-100 text-red-700 border-red-200",
         };
         return (
-            colorMap[tierColor] || "bg-gray-100 text-gray-700 border-gray-200"
+            colorMap[tierColor] || "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
         );
     };
 
@@ -1371,7 +1371,7 @@ function StartInterventionModal({
             amber: "bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200",
             red: "bg-gradient-to-r from-red-50 to-rose-50 border-red-200",
         };
-        return colorMap[tierColor] || "bg-gray-50 border-gray-200";
+        return colorMap[tierColor] || "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700";
     };
 
     const getIconColorClasses = (tierColor, isSelected) => {
@@ -1382,9 +1382,9 @@ function StartInterventionModal({
             emerald: "text-emerald-600",
             amber: "text-amber-600",
             red: "text-red-600",
-            gray: "text-gray-400",
+            gray: "text-gray-400 dark:text-gray-500",
         };
-        return colorMap[tierColor] || "text-gray-600";
+        return colorMap[tierColor] || "text-gray-600 dark:text-gray-400";
     };
 
     const renderIcon = (iconKey, tierColor, isSelected) => {
@@ -1400,7 +1400,7 @@ function StartInterventionModal({
                           : tierColor === "amber"
                             ? "bg-amber-100"
                             : tierColor === "gray"
-                              ? "bg-gray-100"
+                              ? "bg-gray-100 dark:bg-gray-700"
                               : "bg-red-100"
                 }`}
             >
@@ -1416,12 +1416,12 @@ function StartInterventionModal({
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden transform transition-all flex flex-col">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden transform transition-all flex flex-col">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center">
+                            <div className="w-11 h-11 bg-white/20 dark:bg-gray-900/20 rounded-xl flex items-center justify-center">
                                 <svg
                                     xmlns="http://www.w3.org/2000/svg"
                                     className="h-6 w-6 text-white"
@@ -1449,7 +1449,7 @@ function StartInterventionModal({
                         </div>
                         <button
                             onClick={onClose}
-                            className="text-white/80 hover:text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
+                            className="text-white/80 hover:text-white hover:bg-white/20 dark:hover:bg-gray-900/20 rounded-lg p-2 transition-colors"
                         >
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
@@ -1472,7 +1472,7 @@ function StartInterventionModal({
                     <form onSubmit={handleSubmit} className="p-6">
                         {/* Intervention Strategy Cards */}
                         <div className="mb-5">
-                            <label className="block text-sm font-semibold text-gray-800 mb-3">
+                            <label className="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
                                 Choose Intervention Strategy
                             </label>
 
@@ -1482,7 +1482,7 @@ function StartInterventionModal({
                                 <div
                                     className={`rounded-xl p-4 border ${
                                         isHighRisk
-                                            ? "bg-gray-100 border-gray-200 opacity-60"
+                                            ? "bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-700 opacity-60"
                                             : "bg-emerald-50/50 border-emerald-100"
                                     }`}
                                 >
@@ -1500,7 +1500,7 @@ function StartInterventionModal({
                                             <span
                                                 className={`text-sm font-bold ${
                                                     isHighRisk
-                                                        ? "text-gray-500"
+                                                        ? "text-gray-500 dark:text-gray-400"
                                                         : "text-emerald-700"
                                                 }`}
                                             >
@@ -1509,7 +1509,7 @@ function StartInterventionModal({
                                             <span
                                                 className={`text-xs ml-1 ${
                                                     isHighRisk
-                                                        ? "text-gray-400"
+                                                        ? "text-gray-400 dark:text-gray-500"
                                                         : "text-emerald-600"
                                                 }`}
                                             >
@@ -1519,7 +1519,7 @@ function StartInterventionModal({
                                     </div>
                                     {isHighRisk && (
                                         <div className="mb-3 p-2 bg-gray-200 rounded-lg">
-                                            <p className="text-xs text-gray-500 text-center font-medium">
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 text-center font-medium">
                                                 Not available for high-risk
                                                 students
                                             </p>
@@ -1539,10 +1539,10 @@ function StartInterventionModal({
                                                     }
                                                     className={`relative w-full p-3 rounded-lg border-2 text-left transition-all ${
                                                         isHighRisk
-                                                            ? "border-transparent bg-gray-50 cursor-not-allowed grayscale"
+                                                            ? "border-transparent bg-gray-50 dark:bg-gray-800 cursor-not-allowed grayscale"
                                                             : data.type === key
-                                                              ? "border-indigo-500 bg-white ring-2 ring-indigo-200 shadow-md"
-                                                              : "border-transparent bg-white/80 hover:bg-white hover:border-emerald-200 hover:shadow-md"
+                                                              ? "border-indigo-500 bg-white dark:bg-gray-900 ring-2 ring-indigo-200 shadow-md"
+                                                              : "border-transparent bg-white dark:bg-gray-900/80 hover:bg-white dark:hover:bg-gray-900 hover:border-emerald-200 hover:shadow-md"
                                                     }`}
                                                 >
                                                     <div className="flex items-center gap-3">
@@ -1558,11 +1558,11 @@ function StartInterventionModal({
                                                         <p
                                                             className={`font-medium text-sm flex-1 ${
                                                                 isHighRisk
-                                                                    ? "text-gray-400"
+                                                                    ? "text-gray-400 dark:text-gray-500"
                                                                     : data.type ===
                                                                         key
                                                                       ? "text-indigo-900"
-                                                                      : "text-gray-700"
+                                                                      : "text-gray-700 dark:text-gray-300"
                                                             }`}
                                                         >
                                                             {strategy.label}
@@ -1592,7 +1592,7 @@ function StartInterventionModal({
                                 <div
                                     className={`rounded-xl p-4 border ${
                                         isHighRisk
-                                            ? "bg-gray-100 border-gray-200 opacity-60"
+                                            ? "bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-700 opacity-60"
                                             : "bg-amber-50/50 border-amber-100"
                                     }`}
                                 >
@@ -1610,7 +1610,7 @@ function StartInterventionModal({
                                             <span
                                                 className={`text-sm font-bold ${
                                                     isHighRisk
-                                                        ? "text-gray-500"
+                                                        ? "text-gray-500 dark:text-gray-400"
                                                         : "text-amber-700"
                                                 }`}
                                             >
@@ -1619,7 +1619,7 @@ function StartInterventionModal({
                                             <span
                                                 className={`text-xs ml-1 ${
                                                     isHighRisk
-                                                        ? "text-gray-400"
+                                                        ? "text-gray-400 dark:text-gray-500"
                                                         : "text-amber-600"
                                                 }`}
                                             >
@@ -1629,7 +1629,7 @@ function StartInterventionModal({
                                     </div>
                                     {isHighRisk && (
                                         <div className="mb-3 p-2 bg-gray-200 rounded-lg">
-                                            <p className="text-xs text-gray-500 text-center font-medium">
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 text-center font-medium">
                                                 Not available for high-risk
                                                 students
                                             </p>
@@ -1649,10 +1649,10 @@ function StartInterventionModal({
                                                     }
                                                     className={`relative w-full p-3 rounded-lg border-2 text-left transition-all ${
                                                         isHighRisk
-                                                            ? "border-transparent bg-gray-50 cursor-not-allowed grayscale"
+                                                            ? "border-transparent bg-gray-50 dark:bg-gray-800 cursor-not-allowed grayscale"
                                                             : data.type === key
-                                                              ? "border-indigo-500 bg-white ring-2 ring-indigo-200 shadow-md"
-                                                              : "border-transparent bg-white/80 hover:bg-white hover:border-amber-200 hover:shadow-md"
+                                                              ? "border-indigo-500 bg-white dark:bg-gray-900 ring-2 ring-indigo-200 shadow-md"
+                                                              : "border-transparent bg-white dark:bg-gray-900/80 hover:bg-white dark:hover:bg-gray-900 hover:border-amber-200 hover:shadow-md"
                                                     }`}
                                                 >
                                                     <div className="flex items-center gap-3">
@@ -1668,11 +1668,11 @@ function StartInterventionModal({
                                                         <p
                                                             className={`font-medium text-sm flex-1 ${
                                                                 isHighRisk
-                                                                    ? "text-gray-400"
+                                                                    ? "text-gray-400 dark:text-gray-500"
                                                                     : data.type ===
                                                                         key
                                                                       ? "text-indigo-900"
-                                                                      : "text-gray-700"
+                                                                      : "text-gray-700 dark:text-gray-300"
                                                             }`}
                                                         >
                                                             {strategy.label}
@@ -1744,8 +1744,8 @@ function StartInterventionModal({
                                                     }
                                                     className={`relative w-full p-3 rounded-lg border-2 text-left transition-all hover:shadow-md ${
                                                         data.type === key
-                                                            ? "border-red-400 bg-white ring-2 ring-red-200 shadow-md"
-                                                            : "border-transparent bg-white/80 hover:bg-white hover:border-red-200"
+                                                            ? "border-red-400 bg-white dark:bg-gray-900 ring-2 ring-red-200 shadow-md"
+                                                            : "border-transparent bg-white dark:bg-gray-900/80 hover:bg-white dark:hover:bg-gray-900 hover:border-red-200"
                                                     }`}
                                                 >
                                                     <div className="flex items-center gap-3">
@@ -1760,12 +1760,12 @@ function StartInterventionModal({
                                                                     data.type ===
                                                                     key
                                                                         ? "text-red-900"
-                                                                        : "text-gray-700"
+                                                                        : "text-gray-700 dark:text-gray-300"
                                                                 }`}
                                                             >
                                                                 {strategy.label}
                                                             </p>
-                                                            <p className="text-xs text-gray-500 mt-0.5">
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                                                 Escalates to
                                                                 guidance office
                                                             </p>
@@ -1798,7 +1798,7 @@ function StartInterventionModal({
                             )}`}
                         >
                             <div className="flex items-start gap-3">
-                                <div className="flex-shrink-0 w-11 h-11 bg-white rounded-lg shadow-sm flex items-center justify-center">
+                                <div className="flex-shrink-0 w-11 h-11 bg-white dark:bg-gray-900 rounded-lg shadow-sm flex items-center justify-center">
                                     {(() => {
                                         const IconComponent =
                                             StrategyIcons[
@@ -1816,7 +1816,7 @@ function StartInterventionModal({
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex flex-wrap items-center gap-2 mb-1">
-                                        <h4 className="font-semibold text-gray-900">
+                                        <h4 className="font-semibold text-gray-900 dark:text-gray-100">
                                             {selectedStrategy.label}
                                         </h4>
                                         <span
@@ -1828,7 +1828,7 @@ function StartInterventionModal({
                                             {selectedStrategy.tierLabel}
                                         </span>
                                     </div>
-                                    <p className="text-sm text-gray-600">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
                                         {selectedStrategy.description}
                                     </p>
                                 </div>
@@ -1837,11 +1837,11 @@ function StartInterventionModal({
 
                         {/* Notes / Context */}
                         <div className="mb-5">
-                            <label className="block text-sm font-semibold text-gray-800 mb-2">
+                            <label className="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
                                 <span className="flex items-center gap-2">
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
-                                        className="h-4 w-4 text-gray-500"
+                                        className="h-4 w-4 text-gray-500 dark:text-gray-400"
                                         viewBox="0 0 20 20"
                                         fill="currentColor"
                                     >
@@ -1852,7 +1852,7 @@ function StartInterventionModal({
                                         />
                                     </svg>
                                     Additional Notes
-                                    <span className="text-gray-400 font-normal">
+                                    <span className="text-gray-400 dark:text-gray-500 font-normal">
                                         (Optional)
                                     </span>
                                 </span>
@@ -1862,7 +1862,7 @@ function StartInterventionModal({
                                 onChange={(e) =>
                                     setData("notes", e.target.value)
                                 }
-                                className="w-full border-gray-300 rounded-xl shadow-sm focus:border-indigo-500 focus:ring-indigo-500 h-24 resize-none transition-colors text-sm"
+                                className="w-full border-gray-300 dark:border-gray-600 rounded-xl shadow-sm focus:border-indigo-500 focus:ring-indigo-500 h-24 resize-none transition-colors text-sm"
                                 placeholder="Add context, specific instructions, or follow-up details...&#10;Example: 'Spoke to mother, she will monitor homework tonight' or 'Focus on Quadratic Equations'"
                             />
                         </div>
@@ -1932,14 +1932,14 @@ function StartInterventionModal({
                                         {data.tasks.map((task, index) => (
                                             <div
                                                 key={index}
-                                                className="flex items-center gap-3 bg-white p-3 rounded-lg border border-amber-100 group"
+                                                className="flex items-center gap-3 bg-white dark:bg-gray-900 p-3 rounded-lg border border-amber-100 group"
                                             >
                                                 <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
                                                     <span className="text-xs font-bold text-amber-700">
                                                         {index + 1}
                                                     </span>
                                                 </div>
-                                                <span className="flex-1 text-sm text-gray-700">
+                                                <span className="flex-1 text-sm text-gray-700 dark:text-gray-300">
                                                     {task}
                                                 </span>
                                                 <button
@@ -1994,8 +1994,8 @@ function StartInterventionModal({
                         )}
 
                         {/* Actions */}
-                        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                            <p className="text-xs text-gray-500">
+                        <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-700">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
                                 {data.type === "task_list" &&
                                 data.tasks.length === 0
                                     ? "⚠️ Please add at least one task before starting"
@@ -2005,7 +2005,7 @@ function StartInterventionModal({
                                 <button
                                     type="button"
                                     onClick={onClose}
-                                    className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium transition-colors"
+                                    className="px-5 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 font-medium transition-colors"
                                 >
                                     Cancel
                                 </button>
@@ -2143,7 +2143,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
         }));
     };
 
-    if (!student) return <div className="p-6 text-gray-500">Loading...</div>;
+    if (!student) return <div className="p-6 text-gray-500 dark:text-gray-400">Loading...</div>;
 
     const numericGrade = parseInt(student.currentGrade);
     const showAISuggestion = numericGrade < 75;
@@ -2158,7 +2158,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
     };
 
     return (
-        <div className="p-4 sm:p-6 bg-white rounded-lg shadow-xl border border-gray-200">
+        <div className="p-4 sm:p-6 bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700">
             <div className="flex justify-between items-center mb-6 border-b pb-4">
                 <button
                     onClick={onBack}
@@ -2193,28 +2193,28 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                     {getInitials(student.name)}
                 </div>
                 <div className="flex-1 text-center sm:text-left">
-                    <h2 className="text-2xl font-bold text-gray-900">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                         {student.name}
                     </h2>
                     <div className="mt-3 space-y-1.5">
-                        <p className="text-sm text-gray-600 flex items-center justify-center sm:justify-start gap-2">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center justify-center sm:justify-start gap-2">
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
-                                className="h-4 w-4 text-gray-400"
+                                className="h-4 w-4 text-gray-400 dark:text-gray-500"
                                 viewBox="0 0 20 20"
                                 fill="currentColor"
                             >
                                 <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
                             </svg>
-                            <span className="font-medium text-gray-700">
+                            <span className="font-medium text-gray-700 dark:text-gray-300">
                                 Parent:
                             </span>{" "}
                             {student.parentContact}
                         </p>
-                        <p className="text-sm text-gray-600 flex items-center justify-center sm:justify-start gap-2">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center justify-center sm:justify-start gap-2">
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
-                                className="h-4 w-4 text-gray-400"
+                                className="h-4 w-4 text-gray-400 dark:text-gray-500"
                                 viewBox="0 0 20 20"
                                 fill="currentColor"
                             >
@@ -2224,7 +2224,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                     clipRule="evenodd"
                                 />
                             </svg>
-                            <span className="font-medium text-gray-700">
+                            <span className="font-medium text-gray-700 dark:text-gray-300">
                                 Counselor:
                             </span>{" "}
                             {student.counselor}
@@ -2277,11 +2277,11 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                 3 intervention as complete.
                             </p>
                             {pendingRequest.requestNotes && (
-                                <div className="bg-white/60 rounded-lg p-3 mb-3">
+                                <div className="bg-white/60 dark:bg-gray-900/60 rounded-lg p-3 mb-3">
                                     <p className="text-xs font-medium text-amber-600 mb-1">
                                         Student's Notes:
                                     </p>
-                                    <p className="text-sm text-gray-700">
+                                    <p className="text-sm text-gray-700 dark:text-gray-300">
                                         "{pendingRequest.requestNotes}"
                                     </p>
                                 </div>
@@ -2310,7 +2310,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                 </button>
                                 <button
                                     onClick={() => setShowRejectModal(true)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-white border border-red-300 text-red-600 rounded-lg hover:bg-red-50 font-medium transition-colors"
+                                    className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-900 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 font-medium transition-colors"
                                 >
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
@@ -2334,9 +2334,9 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
 
             {/* Vitals */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mt-6">
-                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-white dark:bg-gray-900 p-5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                        <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                             Academic Status
                         </h3>
                         <div
@@ -2357,7 +2357,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                         {student.currentGrade}
                     </p>
                     {student.gradeTrend && student.gradeTrend.length > 1 && (
-                        <p className="text-sm text-gray-500 mt-3 flex items-center gap-1.5">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-3 flex items-center gap-1.5">
                             {student.gradeTrend[0] >
                             student.gradeTrend[
                                 student.gradeTrend.length - 1
@@ -2404,7 +2404,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                 <>
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
-                                        className="h-4 w-4 text-gray-400"
+                                        className="h-4 w-4 text-gray-400 dark:text-gray-500"
                                         viewBox="0 0 20 20"
                                         fill="currentColor"
                                     >
@@ -2414,7 +2414,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                             clipRule="evenodd"
                                         />
                                     </svg>
-                                    <span className="text-gray-500 font-medium">
+                                    <span className="text-gray-500 dark:text-gray-400 font-medium">
                                         Stable
                                     </span>
                                 </>
@@ -2423,8 +2423,8 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                     )}
                 </div>
 
-                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                    <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                <div className="bg-white dark:bg-gray-900 p-5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
                         Engagement
                     </h3>
                     <div className="flex items-center gap-2 mb-3">
@@ -2440,13 +2440,13 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                 clipRule="evenodd"
                             />
                         </svg>
-                        <span className="text-sm font-medium text-gray-700">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                             {student.attendanceSummary}
                         </span>
                     </div>
                     {student.missingAssignments &&
                         student.missingAssignments.length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-gray-100">
+                            <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
                                 <p className="text-xs font-semibold text-red-600 uppercase tracking-wider mb-2">
                                     Missing ({student.missingAssignments.length}
                                     )
@@ -2456,7 +2456,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                         (assignment) => (
                                             <div
                                                 key={assignment.id}
-                                                className="flex items-center gap-2 text-sm text-gray-600"
+                                                className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400"
                                             >
                                                 <span className="w-1.5 h-1.5 bg-red-400 rounded-full flex-shrink-0"></span>
                                                 <span className="truncate">
@@ -2470,8 +2470,8 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                         )}
                 </div>
 
-                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                    <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                <div className="bg-white dark:bg-gray-900 p-5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
                         Behavioral Notes
                     </h3>
                     {student.behaviorLog && student.behaviorLog.length > 0 ? (
@@ -2479,7 +2479,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                             {student.behaviorLog.map((log, index) => (
                                 <div
                                     key={index}
-                                    className="flex items-start gap-2 text-sm text-gray-600"
+                                    className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
                                 >
                                     <span className="w-1.5 h-1.5 bg-amber-400 rounded-full flex-shrink-0 mt-1.5"></span>
                                     <span>{log}</span>
@@ -2487,7 +2487,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                             ))}
                         </div>
                     ) : (
-                        <div className="flex items-center gap-2 text-gray-400">
+                        <div className="flex items-center gap-2 text-gray-400 dark:text-gray-500">
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
                                 className="h-5 w-5"
@@ -2528,10 +2528,10 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                 </svg>
                             </div>
                             <div className="flex-1">
-                                <h3 className="text-lg font-bold text-gray-900 mb-1">
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-1">
                                     Attention Required
                                 </h3>
-                                <p className="text-sm text-gray-600 mb-4">
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                                     This student's academic performance is below
                                     the passing threshold. Consider taking
                                     action to help improve their grades.
@@ -2541,7 +2541,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                         onClick={() =>
                                             setOpenFeedbackModal(true)
                                         }
-                                        className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all text-sm font-medium"
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-300 dark:border-gray-600 shadow-sm transition-all text-sm font-medium"
                                     >
                                         <svg
                                             xmlns="http://www.w3.org/2000/svg"
@@ -2584,10 +2584,10 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
             {/* Intervention Log */}
             <div className="mt-8">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-gray-900">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                         Intervention History
                     </h3>
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
                         {student.interventionLog.length} record
                         {student.interventionLog.length !== 1 ? "s" : ""}
                     </span>
@@ -2598,7 +2598,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                         {student.interventionLog.map((log) => (
                             <div
                                 key={log.id}
-                                className="bg-gray-50 p-4 rounded-xl border border-gray-100 hover:border-gray-200 transition-colors"
+                                className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:border-gray-700 transition-colors"
                             >
                                 <div className="flex items-start gap-3">
                                     <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -2617,17 +2617,17 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-sm font-semibold text-gray-900">
+                                            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                                                 {log.action}
                                             </span>
-                                            <span className="text-xs text-gray-400">
+                                            <span className="text-xs text-gray-400 dark:text-gray-500">
                                                 •
                                             </span>
-                                            <span className="text-xs text-gray-500">
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">
                                                 {log.date}
                                             </span>
                                         </div>
-                                        <p className="text-sm text-gray-600">
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">
                                             {log.notes}
                                         </p>
                                         {log.followUp && (
@@ -2653,7 +2653,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                         ))}
                     </div>
                 ) : (
-                    <div className="bg-gray-50 rounded-xl border border-dashed border-gray-200 p-8 text-center">
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 p-8 text-center">
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
                             className="h-12 w-12 text-gray-300 mx-auto mb-3"
@@ -2668,10 +2668,10 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                             />
                         </svg>
-                        <p className="text-gray-500 font-medium">
+                        <p className="text-gray-500 dark:text-gray-400 font-medium">
                             No intervention history yet
                         </p>
-                        <p className="text-sm text-gray-400 mt-1">
+                        <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
                             Start an intervention to create the first record
                         </p>
                     </div>
@@ -2697,7 +2697,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
             {/* Approval Modal */}
             {showApprovalModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
                         <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-4">
                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
                                 <svg
@@ -2719,13 +2719,13 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                             </p>
                         </div>
                         <div className="p-6">
-                            <p className="text-gray-600 text-sm mb-4">
+                            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
                                 You are about to approve this student's Tier 3
                                 intervention completion request. This will mark
                                 the intervention as completed.
                             </p>
                             <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     Notes for the student (optional)
                                 </label>
                                 <textarea
@@ -2734,7 +2734,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                         setApprovalNotes(e.target.value)
                                     }
                                     placeholder="Add any congratulatory message or feedback..."
-                                    className="w-full border border-gray-300 rounded-xl p-3 text-sm resize-none h-24 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-xl p-3 text-sm resize-none h-24 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                                     maxLength={1000}
                                 />
                             </div>
@@ -2744,7 +2744,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                         setShowApprovalModal(false);
                                         setApprovalNotes("");
                                     }}
-                                    className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-medium transition-colors"
+                                    className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 font-medium transition-colors"
                                 >
                                     Cancel
                                 </button>
@@ -2803,7 +2803,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
             {/* Rejection Modal */}
             {showRejectModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
                         <div className="bg-gradient-to-r from-red-500 to-rose-600 px-6 py-4">
                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
                                 <svg
@@ -2825,14 +2825,14 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                             </p>
                         </div>
                         <div className="p-6">
-                            <p className="text-gray-600 text-sm mb-4">
+                            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
                                 Please provide a reason for rejecting this
                                 completion request. The student will be able to
                                 submit a new request after addressing your
                                 feedback.
                             </p>
                             <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     Reason for rejection{" "}
                                     <span className="text-red-500">*</span>
                                 </label>
@@ -2842,7 +2842,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                         setRejectionReason(e.target.value)
                                     }
                                     placeholder="Explain what the student needs to complete or improve..."
-                                    className="w-full border border-gray-300 rounded-xl p-3 text-sm resize-none h-24 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-xl p-3 text-sm resize-none h-24 focus:ring-2 focus:ring-red-500 focus:border-transparent"
                                     maxLength={1000}
                                     required
                                 />
@@ -2853,7 +2853,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                         setShowRejectModal(false);
                                         setRejectionReason("");
                                     }}
-                                    className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-medium transition-colors"
+                                    className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 font-medium transition-colors"
                                 >
                                     Cancel
                                 </button>
@@ -2962,10 +2962,10 @@ function InterventionCenter({ watchlist = [], studentDetails = {} }) {
                     </svg>
                 </div>
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                         Intervention Center
                     </h1>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
                         Monitor and support students who need academic
                         intervention
                     </p>
@@ -2990,7 +2990,7 @@ function InterventionCenter({ watchlist = [], studentDetails = {} }) {
 
 const Interventions = ({ watchlist = [], studentDetails = {} }) => {
     return (
-        <div className="bg-gray-100 min-h-screen">
+        <div className="bg-gray-100 dark:bg-gray-700 min-h-screen">
             <Head title="Intervention Center" />
             <InterventionCenter
                 watchlist={watchlist}

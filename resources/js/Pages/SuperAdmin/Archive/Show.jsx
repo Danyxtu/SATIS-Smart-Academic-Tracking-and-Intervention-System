@@ -261,7 +261,7 @@ export default function Show({
                             </div>
                             <Link
                                 href={route("superadmin.archive.index")}
-                                className="inline-flex items-center gap-2 self-start rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/10 transition-colors hover:bg-white/20 lg:self-auto"
+                                className="inline-flex items-center gap-2 self-start rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/10 transition-colors hover:bg-white/20 dark:hover:bg-gray-900/20 lg:self-auto"
                             >
                                 <ArrowLeft size={15} />
                                 Back to Archive
@@ -279,7 +279,7 @@ export default function Show({
                                 type="button"
                                 key={card.label}
                                 onClick={() => setActiveCardKey(card.key)}
-                                className="group rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+                                className="group rounded-2xl border border-slate-100 bg-white dark:bg-gray-900 p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
                             >
                                 <div className="flex items-start justify-between">
                                     <div
@@ -310,7 +310,7 @@ export default function Show({
 
                 {activeCardKey && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-                        <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                        <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white dark:bg-gray-900 shadow-2xl">
                             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-4">
                                 <div>
                                     <h3 className="text-base font-semibold text-slate-900">
@@ -365,7 +365,7 @@ export default function Show({
                                                                     "No email"}
                                                             </p>
                                                         </div>
-                                                        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
+                                                        <span className="rounded-full bg-white dark:bg-gray-900 px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
                                                             {
                                                                 student.enrolled_classes_count
                                                             }{" "}
@@ -447,12 +447,12 @@ export default function Show({
                                                             ).map((role) => (
                                                                 <span
                                                                     key={`${teacher.id}-${role}`}
-                                                                    className="rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200"
+                                                                    className="rounded-md bg-white dark:bg-gray-900 px-2 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200"
                                                                 >
                                                                     {role}
                                                                 </span>
                                                             ))}
-                                                            <span className="rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
+                                                            <span className="rounded-md bg-white dark:bg-gray-900 px-2 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
                                                                 {
                                                                     teacher.classes_count
                                                                 }{" "}
@@ -527,7 +527,7 @@ export default function Show({
                                                             </div>
 
                                                             <div className="flex items-center gap-2">
-                                                                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
+                                                                <span className="rounded-full bg-white dark:bg-gray-900 px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
                                                                     {
                                                                         classItem.students_count
                                                                     }{" "}
@@ -578,7 +578,7 @@ export default function Show({
                                                                             ) => (
                                                                                 <span
                                                                                     key={`${classItem.id}-${student.id}`}
-                                                                                    className="rounded-md bg-white px-2 py-1 text-[11px] text-slate-700 ring-1 ring-slate-200"
+                                                                                    className="rounded-md bg-white dark:bg-gray-900 px-2 py-1 text-[11px] text-slate-700 ring-1 ring-slate-200"
                                                                                 >
                                                                                     {
                                                                                         student.name
@@ -601,7 +601,7 @@ export default function Show({
                     </div>
                 )}
 
-                <div className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+                <div className="rounded-2xl border border-slate-100 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
                     <div className="flex items-center gap-4 border-b border-slate-100 px-6 py-5">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-md shadow-violet-500/20">
                             <Users className="h-5 w-5 text-white" />
@@ -641,11 +641,11 @@ export default function Show({
                                             </p>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
-                                            <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
+                                            <span className="rounded-full bg-white dark:bg-gray-900 px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
                                                 {teacher.classes_count ?? 0}{" "}
                                                 classes
                                             </span>
-                                            <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
+                                            <span className="rounded-full bg-white dark:bg-gray-900 px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
                                                 {teacher.students_count ?? 0}{" "}
                                                 students
                                             </span>
@@ -663,7 +663,7 @@ export default function Show({
                                                 (classItem) => (
                                                     <div
                                                         key={classItem.id}
-                                                        className="rounded-lg border border-slate-200 bg-white p-3"
+                                                        className="rounded-lg border border-slate-200 bg-white dark:bg-gray-900 p-3"
                                                     >
                                                         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                                                             <div>
@@ -748,7 +748,7 @@ export default function Show({
 
                 <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
                     <div className="space-y-6 xl:col-span-2">
-                        <div className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+                        <div className="rounded-2xl border border-slate-100 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
                             <div className="flex items-center gap-4 border-b border-slate-100 px-6 py-5">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 shadow-md shadow-slate-500/20">
                                     <TrendingUp className="h-5 w-5 text-white" />
@@ -792,7 +792,7 @@ export default function Show({
                             </div>
                         </div>
 
-                        <div className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+                        <div className="rounded-2xl border border-slate-100 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
                             <div className="flex items-center gap-4 border-b border-slate-100 px-6 py-5">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md shadow-blue-500/20">
                                     <Calendar className="h-5 w-5 text-white" />
@@ -851,7 +851,7 @@ export default function Show({
                         </div>
 
                         {safeStats.total_graded > 0 && (
-                            <div className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+                            <div className="rounded-2xl border border-slate-100 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
                                 <div className="flex items-center gap-4 border-b border-slate-100 px-6 py-5">
                                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-md shadow-emerald-500/20">
                                         <TrendingUp className="h-5 w-5 text-white" />
@@ -931,7 +931,7 @@ export default function Show({
                         )}
 
                         {totalInterventions > 0 && (
-                            <div className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+                            <div className="rounded-2xl border border-slate-100 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
                                 <div className="flex items-center gap-4 border-b border-slate-100 px-6 py-5">
                                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-md shadow-amber-500/20">
                                         <AlertTriangle className="h-5 w-5 text-white" />
@@ -986,7 +986,7 @@ export default function Show({
                         )}
                     </div>
 
-                    <div className="self-start overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm xl:sticky xl:top-6">
+                    <div className="self-start overflow-hidden rounded-2xl border border-slate-100 bg-white dark:bg-gray-900 shadow-sm xl:sticky xl:top-6">
                         <div className="flex items-center gap-4 border-b border-slate-100 px-6 py-5">
                             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-600 to-slate-700 shadow-md shadow-slate-500/20">
                                 <Building2 className="h-5 w-5 text-white" />

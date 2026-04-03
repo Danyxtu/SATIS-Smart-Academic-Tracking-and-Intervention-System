@@ -59,18 +59,18 @@ const buildStudentKey = (student, index) => {
 const getGradeRowColors = (grade) => {
     const numericGrade = parseFloat(grade);
     let colors = {
-        row: "bg-white",
-        hoverRow: "hover:bg-gray-50/50",
-        leftCell: "bg-white",
-        rightCell: "bg-white",
+        row: "bg-white dark:bg-gray-900",
+        hoverRow: "hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800/50",
+        leftCell: "bg-white dark:bg-gray-900",
+        rightCell: "bg-white dark:bg-gray-900",
     };
 
     if (grade === "N/A" || isNaN(numericGrade)) {
         colors = {
-            row: "bg-gray-50",
-            hoverRow: "hover:bg-gray-100/50",
-            leftCell: "bg-gray-50",
-            rightCell: "bg-gray-50",
+            row: "bg-gray-50 dark:bg-gray-800",
+            hoverRow: "hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-700/50",
+            leftCell: "bg-gray-50 dark:bg-gray-800",
+            rightCell: "bg-gray-50 dark:bg-gray-800",
         };
     } else if (numericGrade >= 90) {
         colors = {
@@ -1045,7 +1045,7 @@ const MyClass = (props) => {
             />
 
             {/* My Class Container - More Compact */}
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
                 {/* Upload Status Messages - Compact */}
                 {(uploadError || uploadSuccess) && (
                     <div className="mb-3">
@@ -1078,11 +1078,11 @@ const MyClass = (props) => {
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 gap-3">
                     <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                            <h2 className="text-lg font-bold text-gray-900">
+                            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                                 {classTitleLabel}
                                 {selectedSubjectLabel && (
                                     <>
-                                        <span className="text-gray-500">
+                                        <span className="text-gray-500 dark:text-gray-400">
                                             :{" "}
                                         </span>
                                         <span className="text-indigo-600 dark:text-indigo-400">
@@ -1102,15 +1102,15 @@ const MyClass = (props) => {
                                 </span>
                             )}
                             {/* View Mode Toggle - Compact */}
-                            <div className="flex items-center p-0.5 bg-gray-100 rounded-md">
+                            <div className="flex items-center p-0.5 bg-gray-100 dark:bg-gray-700 rounded-md">
                                 <button
                                     onClick={() =>
                                         setStudentViewMode("classList")
                                     }
                                     className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
                                         studentViewMode === "classList"
-                                            ? "bg-white text-indigo-700 shadow-sm"
-                                            : "text-gray-600 hover:bg-gray-200"
+                                            ? "bg-white dark:bg-gray-900 text-indigo-700 shadow-sm"
+                                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-200"
                                     }`}
                                 >
                                     List
@@ -1121,8 +1121,8 @@ const MyClass = (props) => {
                                     }
                                     className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
                                         studentViewMode === "gradeOverview"
-                                            ? "bg-white text-indigo-700 shadow-sm"
-                                            : "text-gray-600 hover:bg-gray-200"
+                                            ? "bg-white dark:bg-gray-900 text-indigo-700 shadow-sm"
+                                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-200"
                                     }`}
                                 >
                                     Grades
@@ -1158,7 +1158,7 @@ const MyClass = (props) => {
                                     : handleDownloadClasslistTemplate
                             }
                             disabled={!selectedClass}
-                            className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="flex items-center gap-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             <FileDown size={14} />
                             Template
@@ -1173,7 +1173,7 @@ const MyClass = (props) => {
                                         isImportingGrades ||
                                         isArchiveReadOnly
                                     }
-                                    className="flex items-center gap-1 bg-gray-100 text-gray-700 font-medium py-1.5 px-2.5 rounded-md hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60 text-xs"
+                                    className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium py-1.5 px-2.5 rounded-md hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60 text-xs"
                                     title={
                                         isArchiveReadOnly
                                             ? "Archive classes are view-only"
@@ -1232,13 +1232,13 @@ const MyClass = (props) => {
                     <input
                         type="text"
                         placeholder="Search student by name or LRN..."
-                        className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full pl-8 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                     <Search
                         size={16}
-                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
                     />
                 </div>
 
@@ -1271,10 +1271,10 @@ const MyClass = (props) => {
                         {/* Grade View Controls - More Compact */}
                         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                             <div className="flex items-center gap-2">
-                                <span className="text-xs font-medium text-gray-700">
+                                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
                                     View:
                                 </span>
-                                <div className="flex items-center p-0.5 bg-gray-100 rounded-md ring-1 ring-gray-200">
+                                <div className="flex items-center p-0.5 bg-gray-100 dark:bg-gray-700 rounded-md ring-1 ring-gray-200">
                                     <button
                                         onClick={() => {
                                             setSelectedTab("q1");
@@ -1285,7 +1285,7 @@ const MyClass = (props) => {
                                         className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 ${
                                             selectedTab === "q1"
                                                 ? "bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-600"
-                                                : "text-gray-700 hover:bg-white hover:text-indigo-700"
+                                                : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-900 hover:text-indigo-700"
                                         }`}
                                     >
                                         Q1
@@ -1304,8 +1304,8 @@ const MyClass = (props) => {
                                             selectedTab === "q2"
                                                 ? "bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-600"
                                                 : !isQ2Unlocked
-                                                  ? "text-gray-400 cursor-not-allowed opacity-75"
-                                                  : "text-gray-700 hover:bg-white hover:text-indigo-700"
+                                                  ? "text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-75"
+                                                  : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-900 hover:text-indigo-700"
                                         }`}
                                         title={
                                             !isQ2Unlocked
@@ -1327,8 +1327,8 @@ const MyClass = (props) => {
                                             selectedTab === "final"
                                                 ? "bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-600"
                                                 : !isFinalUnlocked
-                                                  ? "text-gray-400 cursor-not-allowed opacity-75"
-                                                  : "text-gray-700 hover:bg-white hover:text-indigo-700"
+                                                  ? "text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-75"
+                                                  : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-900 hover:text-indigo-700"
                                         }`}
                                         title={
                                             !isFinalUnlocked
@@ -1358,9 +1358,9 @@ const MyClass = (props) => {
                                             <div
                                                 id="final-unlock-conditions"
                                                 role="status"
-                                                className="absolute left-full top-1/2 z-30 ml-2 w-72 -translate-y-1/2 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs text-indigo-900 shadow-lg"
+                                                className="absolute left-full top-1/2 z-30 ml-2 w-72 -translate-y-1/2 rounded-lg border border-indigo-200 bg-white dark:bg-gray-900 px-3 py-2 text-xs text-indigo-900 shadow-lg"
                                             >
-                                                <div className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rotate-45 border-b border-l border-indigo-200 bg-white" />
+                                                <div className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rotate-45 border-b border-l border-indigo-200 bg-white dark:bg-gray-900" />
                                                 <p className="font-semibold">
                                                     Final opens when:
                                                 </p>
@@ -1419,7 +1419,7 @@ const MyClass = (props) => {
                                             setIsEditCategoriesModalOpen(true);
                                         }}
                                         disabled={isArchiveReadOnly}
-                                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition disabled:cursor-not-allowed disabled:opacity-60"
+                                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 transition disabled:cursor-not-allowed disabled:opacity-60"
                                         title={
                                             isArchiveReadOnly
                                                 ? "Archive classes are view-only"
@@ -1433,7 +1433,7 @@ const MyClass = (props) => {
                                         onClick={() =>
                                             setGradesExpanded(!gradesExpanded)
                                         }
-                                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition"
+                                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 transition"
                                     >
                                         {gradesExpanded ? (
                                             <ChevronUp size={12} />
@@ -1448,16 +1448,16 @@ const MyClass = (props) => {
 
                         {/* Grade Tables with reduced padding and text sizes */}
                         {selectedTab !== "final" ? (
-                            <div className="relative border border-gray-200 rounded-md overflow-hidden">
+                            <div className="relative border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full border-collapse text-xs">
-                                        <thead className="bg-gray-50">
+                                        <thead className="bg-gray-50 dark:bg-gray-800">
                                             {/* Compact header with smaller text */}
                                             <tr>
-                                                <th className="sticky left-0 z-20 bg-gray-50 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 min-w-[160px]">
+                                                <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[160px]">
                                                     Student Name
                                                 </th>
-                                                <th className="sticky left-[160px] z-20 bg-gray-50 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 min-w-[100px]">
+                                                <th className="sticky left-[160px] z-20 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[100px]">
                                                     LRN
                                                 </th>
 
@@ -1501,7 +1501,7 @@ const MyClass = (props) => {
                                                                 colSpan={
                                                                     colSpan
                                                                 }
-                                                                className="bg-gray-50 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200"
+                                                                className="bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700"
                                                             >
                                                                 <div className="flex items-center gap-1.5">
                                                                     {!isQE &&
@@ -1514,7 +1514,7 @@ const MyClass = (props) => {
                                                                                         category.id,
                                                                                     )
                                                                                 }
-                                                                                className="p-0.5 text-gray-500 hover:text-gray-700 transition"
+                                                                                className="p-0.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 dark:text-gray-300 transition"
                                                                                 title={
                                                                                     isCollapsed
                                                                                         ? "Expand"
@@ -1548,7 +1548,7 @@ const MyClass = (props) => {
                                                                         {isCollapsed &&
                                                                             tasks.length >
                                                                                 1 && (
-                                                                                <span className="ml-1 text-[9px] text-gray-400">
+                                                                                <span className="ml-1 text-[9px] text-gray-400 dark:text-gray-500">
                                                                                     (
                                                                                     {
                                                                                         tasks.length
@@ -1622,9 +1622,9 @@ const MyClass = (props) => {
                                             </tr>
 
                                             {/* Sub-header for task labels - Compact */}
-                                            <tr className="bg-gray-50/50">
-                                                <th className="sticky left-0 z-20 bg-gray-50/50 border-r border-gray-200"></th>
-                                                <th className="sticky left-[160px] z-20 bg-gray-50/50 border-r border-gray-200"></th>
+                                            <tr className="bg-gray-50 dark:bg-gray-800/50">
+                                                <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-800/50 border-r border-gray-200 dark:border-gray-700"></th>
+                                                <th className="sticky left-[160px] z-20 bg-gray-50 dark:bg-gray-800/50 border-r border-gray-200 dark:border-gray-700"></th>
 
                                                 {gradeCategories.map(
                                                     (category) => {
@@ -1644,7 +1644,7 @@ const MyClass = (props) => {
                                                             return (
                                                                 <th
                                                                     key={`${category.id}-empty`}
-                                                                    className="px-3 py-1.5 text-left text-[10px] font-medium text-gray-400 border-r border-gray-200"
+                                                                    className="px-3 py-1.5 text-left text-[10px] font-medium text-gray-400 dark:text-gray-500 border-r border-gray-200 dark:border-gray-700"
                                                                 >
                                                                     No tasks
                                                                 </th>
@@ -1658,7 +1658,7 @@ const MyClass = (props) => {
                                                             return (
                                                                 <th
                                                                     key={`${category.id}-collapsed`}
-                                                                    className="px-3 py-1.5 text-left text-[10px] font-medium text-gray-500 border-r border-gray-200"
+                                                                    className="px-3 py-1.5 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700"
                                                                 >
                                                                     <div className="flex items-start justify-between gap-1">
                                                                         <span className="block truncate max-w-[96px]">
@@ -1678,7 +1678,7 @@ const MyClass = (props) => {
                                                                                 disabled={
                                                                                     isSavingCategoryTask
                                                                                 }
-                                                                                className="rounded p-0.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                                                                className="rounded p-0.5 text-gray-400 dark:text-gray-500 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
                                                                                 title="Delete activity"
                                                                                 aria-label={`Delete ${latestTask.label}`}
                                                                             >
@@ -1690,7 +1690,7 @@ const MyClass = (props) => {
                                                                             </button>
                                                                         )}
                                                                     </div>
-                                                                    <span className="text-[9px] font-normal text-gray-400">
+                                                                    <span className="text-[9px] font-normal text-gray-400 dark:text-gray-500">
                                                                         /{" "}
                                                                         {
                                                                             latestTask.total
@@ -1710,11 +1710,11 @@ const MyClass = (props) => {
                                                                     key={
                                                                         task.id
                                                                     }
-                                                                    className={`px-3 py-1.5 text-left text-[10px] font-medium text-gray-500 ${
+                                                                    className={`px-3 py-1.5 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 ${
                                                                         taskIndex ===
                                                                         tasks.length -
                                                                             1
-                                                                            ? "border-r border-gray-200"
+                                                                            ? "border-r border-gray-200 dark:border-gray-700"
                                                                             : ""
                                                                     }`}
                                                                 >
@@ -1736,7 +1736,7 @@ const MyClass = (props) => {
                                                                                 disabled={
                                                                                     isSavingCategoryTask
                                                                                 }
-                                                                                className="rounded p-0.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                                                                className="rounded p-0.5 text-gray-400 dark:text-gray-500 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
                                                                                 title="Delete activity"
                                                                                 aria-label={`Delete ${task.label}`}
                                                                             >
@@ -1748,7 +1748,7 @@ const MyClass = (props) => {
                                                                             </button>
                                                                         )}
                                                                     </div>
-                                                                    <span className="text-[9px] font-normal text-gray-400">
+                                                                    <span className="text-[9px] font-normal text-gray-400 dark:text-gray-500">
                                                                         /{" "}
                                                                         {
                                                                             task.total
@@ -1772,7 +1772,7 @@ const MyClass = (props) => {
                                                 )}
                                             </tr>
                                         </thead>
-                                        <tbody className="bg-white divide-y divide-gray-200">
+                                        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200">
                                             {sortedStudents.map(
                                                 (student, index) => {
                                                     const draftValues = {
@@ -1841,9 +1841,9 @@ const MyClass = (props) => {
                                                         >
                                                             {/* Student Name - Compact */}
                                                             <td
-                                                                className={`sticky left-0 z-10 ${gradeColors.leftCell} px-3 py-2 border-r border-gray-200 min-w-[160px]`}
+                                                                className={`sticky left-0 z-10 ${gradeColors.leftCell} px-3 py-2 border-r border-gray-200 dark:border-gray-700 min-w-[160px]`}
                                                             >
-                                                                <div className="text-xs font-medium text-gray-900 truncate">
+                                                                <div className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">
                                                                     {
                                                                         student.name
                                                                     }
@@ -1851,7 +1851,7 @@ const MyClass = (props) => {
                                                                 {formatAcademicMeta(
                                                                     student,
                                                                 ) && (
-                                                                    <div className="text-[10px] text-gray-500 truncate">
+                                                                    <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
                                                                         {formatAcademicMeta(
                                                                             student,
                                                                         )}
@@ -1860,7 +1860,7 @@ const MyClass = (props) => {
                                                             </td>
                                                             {/* LRN - Compact */}
                                                             <td
-                                                                className={`sticky left-[160px] z-10 ${gradeColors.leftCell} px-3 py-2 whitespace-nowrap text-xs text-gray-500 border-r border-gray-200 min-w-[100px]`}
+                                                                className={`sticky left-[160px] z-10 ${gradeColors.leftCell} px-3 py-2 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 min-w-[100px]`}
                                                             >
                                                                 {student.lrn}
                                                             </td>
@@ -1886,7 +1886,7 @@ const MyClass = (props) => {
                                                                         return (
                                                                             <td
                                                                                 key={`${studentKey}-${category.id}-placeholder`}
-                                                                                className="px-3 py-2 text-center text-xs text-gray-400 border-r border-gray-200"
+                                                                                className="px-3 py-2 text-center text-xs text-gray-400 dark:text-gray-500 border-r border-gray-200 dark:border-gray-700"
                                                                             >
                                                                                 —
                                                                             </td>
@@ -1927,7 +1927,7 @@ const MyClass = (props) => {
                                                                         return (
                                                                             <td
                                                                                 key={`${studentKey}-${category.id}-collapsed`}
-                                                                                className="px-3 py-2 text-xs text-gray-700 border-r border-gray-200"
+                                                                                className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700"
                                                                             >
                                                                                 <input
                                                                                     type="text"
@@ -1952,7 +1952,7 @@ const MyClass = (props) => {
                                                                                         )
                                                                                     }
                                                                                     autoComplete="off"
-                                                                                    className="w-16 rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+                                                                                    className="w-16 rounded border border-gray-300 dark:border-gray-600 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:bg-gray-100 dark:bg-gray-700 disabled:text-gray-500 dark:text-gray-400"
                                                                                 />
                                                                             </td>
                                                                         );
@@ -1993,11 +1993,11 @@ const MyClass = (props) => {
                                                                             return (
                                                                                 <td
                                                                                     key={`${studentKey}-${task.id}`}
-                                                                                    className={`px-3 py-2 text-xs text-gray-700 ${
+                                                                                    className={`px-3 py-2 text-xs text-gray-700 dark:text-gray-300 ${
                                                                                         taskIndex ===
                                                                                         tasks.length -
                                                                                             1
-                                                                                            ? "border-r border-gray-200"
+                                                                                            ? "border-r border-gray-200 dark:border-gray-700"
                                                                                             : ""
                                                                                     }`}
                                                                                 >
@@ -2024,7 +2024,7 @@ const MyClass = (props) => {
                                                                                             )
                                                                                         }
                                                                                         autoComplete="off"
-                                                                                        className="w-16 rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+                                                                                        className="w-16 rounded border border-gray-300 dark:border-gray-600 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:bg-gray-100 dark:bg-gray-700 disabled:text-gray-500 dark:text-gray-400"
                                                                                     />
                                                                                 </td>
                                                                             );
@@ -2037,7 +2037,7 @@ const MyClass = (props) => {
                                                             {gradesExpanded ? (
                                                                 <>
                                                                     <td
-                                                                        className={`sticky right-[160px] z-10 ${gradeColors.rightCell} px-3 py-2 whitespace-nowrap text-xs font-semibold text-gray-900 border-l border-gray-300 min-w-[80px]`}
+                                                                        className={`sticky right-[160px] z-10 ${gradeColors.rightCell} px-3 py-2 whitespace-nowrap text-xs font-semibold text-gray-900 dark:text-gray-100 border-l border-gray-300 dark:border-gray-600 min-w-[80px]`}
                                                                     >
                                                                         {initialGrade !=
                                                                         null
@@ -2045,7 +2045,7 @@ const MyClass = (props) => {
                                                                             : "—"}
                                                                     </td>
                                                                     <td
-                                                                        className={`sticky right-[80px] z-10 ${gradeColors.rightCell} px-3 py-2 whitespace-nowrap text-xs font-semibold text-indigo-600 border-l border-gray-200 min-w-[80px]`}
+                                                                        className={`sticky right-[80px] z-10 ${gradeColors.rightCell} px-3 py-2 whitespace-nowrap text-xs font-semibold text-indigo-600 border-l border-gray-200 dark:border-gray-700 min-w-[80px]`}
                                                                     >
                                                                         {expectedGrade !=
                                                                         null
@@ -2053,7 +2053,7 @@ const MyClass = (props) => {
                                                                             : "—"}
                                                                     </td>
                                                                     <td
-                                                                        className={`sticky right-0 z-10 ${gradeColors.rightCell} px-3 py-2 whitespace-nowrap text-xs font-bold text-gray-900 border-l border-gray-200 min-w-[80px]`}
+                                                                        className={`sticky right-0 z-10 ${gradeColors.rightCell} px-3 py-2 whitespace-nowrap text-xs font-bold text-gray-900 dark:text-gray-100 border-l border-gray-200 dark:border-gray-700 min-w-[80px]`}
                                                                     >
                                                                         {quarterGrade !=
                                                                         null
@@ -2063,7 +2063,7 @@ const MyClass = (props) => {
                                                                 </>
                                                             ) : (
                                                                 <td
-                                                                    className={`sticky right-0 z-10 ${gradeColors.rightCell} px-3 py-2 whitespace-nowrap text-xs font-bold text-gray-900 border-l border-gray-300 min-w-[80px]`}
+                                                                    className={`sticky right-0 z-10 ${gradeColors.rightCell} px-3 py-2 whitespace-nowrap text-xs font-bold text-gray-900 dark:text-gray-100 border-l border-gray-300 dark:border-gray-600 min-w-[80px]`}
                                                                 >
                                                                     {quarterGrade !=
                                                                     null
@@ -2091,21 +2091,21 @@ const MyClass = (props) => {
                             </div>
                         ) : (
                             /* Final Grade Table - Compact */
-                            <div className="relative border border-gray-200 rounded-md overflow-hidden">
+                            <div className="relative border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full border-collapse text-xs">
-                                        <thead className="bg-gray-50">
+                                        <thead className="bg-gray-50 dark:bg-gray-800">
                                             <tr>
-                                                <th className="sticky left-0 z-20 bg-gray-50 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 min-w-[160px]">
+                                                <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[160px]">
                                                     Student Name
                                                 </th>
-                                                <th className="bg-gray-50 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 min-w-[100px]">
+                                                <th className="bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[100px]">
                                                     LRN
                                                 </th>
-                                                <th className="bg-indigo-50 px-3 py-2 text-center text-[10px] font-semibold text-indigo-700 uppercase tracking-wider border-r border-gray-200 min-w-[80px]">
+                                                <th className="bg-indigo-50 px-3 py-2 text-center text-[10px] font-semibold text-indigo-700 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[80px]">
                                                     Q1
                                                 </th>
-                                                <th className="bg-indigo-50 px-3 py-2 text-center text-[10px] font-semibold text-indigo-700 uppercase tracking-wider border-r border-gray-200 min-w-[80px]">
+                                                <th className="bg-indigo-50 px-3 py-2 text-center text-[10px] font-semibold text-indigo-700 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[80px]">
                                                     Q2
                                                 </th>
                                                 <th className="bg-emerald-50 px-3 py-2 text-center text-[10px] font-semibold text-emerald-700 uppercase tracking-wider min-w-[100px]">
@@ -2113,7 +2113,7 @@ const MyClass = (props) => {
                                                 </th>
                                             </tr>
                                         </thead>
-                                        <tbody className="bg-white divide-y divide-gray-200">
+                                        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200">
                                             {sortedStudents.map(
                                                 (student, index) => {
                                                     const summary =
@@ -2142,9 +2142,9 @@ const MyClass = (props) => {
                                                             className={`${gradeColors.row} ${gradeColors.hoverRow} transition-colors`}
                                                         >
                                                             <td
-                                                                className={`sticky left-0 z-10 ${gradeColors.leftCell} px-3 py-2 border-r border-gray-200 min-w-[160px]`}
+                                                                className={`sticky left-0 z-10 ${gradeColors.leftCell} px-3 py-2 border-r border-gray-200 dark:border-gray-700 min-w-[160px]`}
                                                             >
-                                                                <div className="text-xs font-medium text-gray-900 truncate">
+                                                                <div className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">
                                                                     {
                                                                         student.name
                                                                     }
@@ -2152,32 +2152,32 @@ const MyClass = (props) => {
                                                                 {formatAcademicMeta(
                                                                     student,
                                                                 ) && (
-                                                                    <div className="text-[10px] text-gray-500 truncate">
+                                                                    <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
                                                                         {formatAcademicMeta(
                                                                             student,
                                                                         )}
                                                                     </div>
                                                                 )}
                                                             </td>
-                                                            <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500 border-r border-gray-200 min-w-[100px]">
+                                                            <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 min-w-[100px]">
                                                                 {student.lrn}
                                                             </td>
-                                                            <td className="px-3 py-2 whitespace-nowrap text-xs font-semibold text-center text-gray-900 border-r border-gray-200 min-w-[80px]">
+                                                            <td className="px-3 py-2 whitespace-nowrap text-xs font-semibold text-center text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-700 min-w-[80px]">
                                                                 {q1 != null
                                                                     ? q1
                                                                     : "—"}
                                                             </td>
-                                                            <td className="px-3 py-2 whitespace-nowrap text-xs font-semibold text-center text-gray-900 border-r border-gray-200 min-w-[80px]">
+                                                            <td className="px-3 py-2 whitespace-nowrap text-xs font-semibold text-center text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-700 min-w-[80px]">
                                                                 {q2 != null
                                                                     ? q2
                                                                     : "—"}
                                                             </td>
-                                                            <td className="px-3 py-2 whitespace-nowrap text-xs font-bold text-center text-gray-900 min-w-[100px]">
+                                                            <td className="px-3 py-2 whitespace-nowrap text-xs font-bold text-center text-gray-900 dark:text-gray-100 min-w-[100px]">
                                                                 <span
                                                                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                                                         final_grade ==
                                                                         null
-                                                                            ? "bg-gray-100 text-gray-500"
+                                                                            ? "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
                                                                             : final_grade >=
                                                                                 75
                                                                               ? "bg-green-100 text-green-800"
@@ -2210,7 +2210,7 @@ const MyClass = (props) => {
                             </div>
                         )}
                         {selectedTab !== "final" && !hasAssignments && (
-                            <p className="text-center text-gray-500 py-4 text-xs">
+                            <p className="text-center text-gray-500 dark:text-gray-400 py-4 text-xs">
                                 {isArchiveReadOnly
                                     ? "No activity records are available for this archive quarter."
                                     : "Add your first activity under Written Works, Performance Task, or Quarterly Exam to begin encoding scores."}

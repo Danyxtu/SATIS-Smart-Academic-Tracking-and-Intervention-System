@@ -8,12 +8,13 @@ const StatusButton = ({
 }) => (
     <button
         onClick={onClick}
-        className={`flex items-center gap-1.5 py-2 px-3 rounded-full font-medium text-sm transition-all
+        type="button"
+        className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
             ${isActive ? activeClassName : className}
         `}
     >
         {icon}
-        <span className="hidden md:inline">{label}</span>
+        <span>{label}</span>
     </button>
 );
 

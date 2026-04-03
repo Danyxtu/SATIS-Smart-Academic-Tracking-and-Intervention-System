@@ -22,9 +22,11 @@ const getGreeting = () => {
 // --- Status Badge Component ---
 const StatusBadge = ({ status }) => {
     const styles = {
-        good: "bg-emerald-100 text-emerald-700 border-emerald-200",
-        warning: "bg-amber-100 text-amber-700 border-amber-200",
-        critical: "bg-red-100 text-red-700 border-red-200",
+        good: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700/50",
+        warning:
+            "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700/50",
+        critical:
+            "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700/50",
     };
 
     const labels = {
@@ -44,15 +46,19 @@ const StatusBadge = ({ status }) => {
 
 // --- Stat Card Component ---
 const StatCard = ({ title, value, subtitle, icon, gradient, trend }) => (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-300">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 hover:shadow-md transition-all duration-300">
         <div className="flex items-start justify-between">
             <div className="flex-1">
-                <p className="text-sm font-medium text-gray-500 mb-1">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
                     {title}
                 </p>
-                <p className="text-3xl font-bold text-gray-900">{value}</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                    {value}
+                </p>
                 {subtitle && (
-                    <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        {subtitle}
+                    </p>
                 )}
                 {trend !== undefined && (
                     <div
@@ -120,11 +126,11 @@ const SubjectCard = ({ subject }) => {
     };
 
     return (
-        <div className="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-md transition-all duration-300 group">
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700 p-5 hover:shadow-md transition-all duration-300 group">
             <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                        <h4 className="font-semibold text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 transition-colors">
                             {subject.name}
                         </h4>
                         {subject.hasIntervention && (
@@ -134,7 +140,9 @@ const SubjectCard = ({ subject }) => {
                             ></span>
                         )}
                     </div>
-                    <p className="text-sm text-gray-500">{subject.section}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {subject.section}
+                    </p>
                 </div>
                 <StatusBadge status={subject.status} />
             </div>
@@ -143,7 +151,9 @@ const SubjectCard = ({ subject }) => {
                 {/* Grade Progress */}
                 <div>
                     <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-sm text-gray-600">Grade</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-300">
+                            Grade
+                        </span>
                         <span
                             className={`text-sm font-bold ${getGradeColor(
                                 subject.grade,
@@ -152,7 +162,7 @@ const SubjectCard = ({ subject }) => {
                             {subject.gradeDisplay}
                         </span>
                     </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                         <div
                             className={`h-full rounded-full transition-all duration-500 ${getProgressColor(
                                 subject.grade,
@@ -164,8 +174,10 @@ const SubjectCard = ({ subject }) => {
 
                 {/* Attendance */}
                 <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Attendance</span>
-                    <span className="font-medium text-gray-900">
+                    <span className="text-gray-600 dark:text-gray-300">
+                        Attendance
+                    </span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
                         {subject.attendance}%
                     </span>
                 </div>
@@ -175,7 +187,7 @@ const SubjectCard = ({ subject }) => {
                 href={route("analytics.show", {
                     enrollment: subject.id,
                 })}
-                className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 hover:bg-indigo-50 text-gray-700 hover:text-indigo-700 rounded-lg text-sm font-medium transition-colors"
+                className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-gray-700 dark:text-gray-200 hover:text-indigo-700 dark:hover:text-indigo-300 rounded-lg text-sm font-medium transition-colors"
             >
                 View Details
                 <svg
@@ -212,34 +224,34 @@ const NotificationItem = ({ notification, onMarkRead, isHighlighted }) => {
 
     const typeStyles = {
         nudge: {
-            bg: "bg-blue-50",
-            icon: "text-blue-600",
-            iconBg: "bg-blue-100",
+            bg: "bg-blue-50 dark:bg-blue-900/20",
+            icon: "text-blue-600 dark:text-blue-300",
+            iconBg: "bg-blue-100 dark:bg-blue-900/35",
         },
         task: {
-            bg: "bg-purple-50",
-            icon: "text-purple-600",
-            iconBg: "bg-purple-100",
+            bg: "bg-purple-50 dark:bg-purple-900/20",
+            icon: "text-purple-600 dark:text-purple-300",
+            iconBg: "bg-purple-100 dark:bg-purple-900/35",
         },
         feedback: {
-            bg: "bg-green-50",
-            icon: "text-green-600",
-            iconBg: "bg-green-100",
+            bg: "bg-green-50 dark:bg-green-900/20",
+            icon: "text-green-600 dark:text-green-300",
+            iconBg: "bg-green-100 dark:bg-green-900/35",
         },
         extension: {
-            bg: "bg-amber-50",
-            icon: "text-amber-600",
-            iconBg: "bg-amber-100",
+            bg: "bg-amber-50 dark:bg-amber-900/20",
+            icon: "text-amber-600 dark:text-amber-300",
+            iconBg: "bg-amber-100 dark:bg-amber-900/35",
         },
         alert: {
-            bg: "bg-red-50",
-            icon: "text-red-600",
-            iconBg: "bg-red-100",
+            bg: "bg-red-50 dark:bg-red-900/20",
+            icon: "text-red-600 dark:text-red-300",
+            iconBg: "bg-red-100 dark:bg-red-900/35",
         },
         intervention: {
-            bg: "bg-orange-50",
-            icon: "text-orange-600",
-            iconBg: "bg-orange-100",
+            bg: "bg-orange-50 dark:bg-orange-900/20",
+            icon: "text-orange-600 dark:text-orange-300",
+            iconBg: "bg-orange-100 dark:bg-orange-900/35",
         },
     };
 
@@ -368,7 +380,7 @@ const NotificationItem = ({ notification, onMarkRead, isHighlighted }) => {
                 isHighlighted
                     ? "animate-highlight-blink ring-2 ring-pink-500"
                     : ""
-            }`}
+            } border border-transparent dark:border-gray-700`}
         >
             <div className="flex gap-4">
                 <div
@@ -380,23 +392,23 @@ const NotificationItem = ({ notification, onMarkRead, isHighlighted }) => {
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-semibold text-gray-900 text-sm truncate">
+                        <h4 className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">
                             {notification.title}
                         </h4>
                         <div className="flex items-center gap-2 flex-shrink-0">
                             {!notification.isRead && (
                                 <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
                             )}
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
                                 {notification.createdAt}
                             </span>
                         </div>
                     </div>
-                    <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
                         {notification.message}
                     </p>
                     <div className="flex items-center justify-between mt-2">
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
                             From: {notification.sender}
                         </span>
                         {!notification.isRead && (
@@ -419,11 +431,15 @@ const NotificationItem = ({ notification, onMarkRead, isHighlighted }) => {
 
 // --- Task Item Component ---
 const TaskItem = ({ task }) => (
-    <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
-        <div className="w-5 h-5 mt-0.5 rounded border-2 border-gray-300 flex-shrink-0" />
+    <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+        <div className="w-5 h-5 mt-0.5 rounded border-2 border-gray-300 dark:border-gray-600 flex-shrink-0" />
         <div className="flex-1 min-w-0">
-            <p className="text-sm text-gray-800">{task.description}</p>
-            <p className="text-xs text-gray-500 mt-1">{task.subject}</p>
+            <p className="text-sm text-gray-800 dark:text-gray-200">
+                {task.description}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {task.subject}
+            </p>
         </div>
     </div>
 );
@@ -466,7 +482,7 @@ const MiniChart = ({ data }) => {
 
     if (!items || items.length === 0) {
         return (
-            <div className="h-40 flex items-center justify-center text-sm text-gray-400">
+            <div className="h-40 flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">
                 No data available
             </div>
         );
@@ -479,7 +495,7 @@ const MiniChart = ({ data }) => {
 
     if (validItems.length === 0) {
         return (
-            <div className="h-40 flex items-center justify-center text-sm text-gray-400">
+            <div className="h-40 flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">
                 No scores recorded yet
             </div>
         );
@@ -528,8 +544,8 @@ const MiniChart = ({ data }) => {
     const CustomTooltip = ({ active, payload, label }) => {
         if (!active || !payload || payload.length === 0) return null;
         return (
-            <div className="bg-white rounded-lg shadow-lg border border-gray-100 p-2.5 text-xs">
-                <p className="font-semibold text-gray-700 mb-1">
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-100 dark:border-gray-700 p-2.5 text-xs">
+                <p className="font-semibold text-gray-700 dark:text-gray-200 mb-1">
                     Item #{label}
                 </p>
                 {payload.map((entry) => {
@@ -548,11 +564,11 @@ const MiniChart = ({ data }) => {
                                 className="inline-block w-2 h-2 rounded-full"
                                 style={{ backgroundColor: entry.color }}
                             />
-                            <span className="text-gray-600 truncate max-w-[120px]">
+                            <span className="text-gray-600 dark:text-gray-300 truncate max-w-[120px]">
                                 {catInfo.label}
                                 {itemLabel ? ` – ${itemLabel}` : ""}:
                             </span>
-                            <span className="font-bold text-gray-800">
+                            <span className="font-bold text-gray-800 dark:text-gray-100">
                                 {entry.value}%
                             </span>
                         </div>
@@ -574,7 +590,7 @@ const MiniChart = ({ data }) => {
                     return (
                         <div
                             key={cat}
-                            className="flex items-center gap-1.5 text-xs text-gray-500"
+                            className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400"
                         >
                             <span
                                 className="inline-block w-3 h-0.5 rounded"
@@ -638,17 +654,19 @@ const MiniChart = ({ data }) => {
 const QuickActionCard = ({ title, description, icon, href, gradient }) => (
     <Link
         href={href}
-        className="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-lg transition-all duration-300 group"
+        className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700 p-5 hover:shadow-lg transition-all duration-300 group"
     >
         <div
             className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${gradient} group-hover:scale-110 transition-transform`}
         >
             {icon}
         </div>
-        <h3 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
+        <h3 className="font-semibold text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 transition-colors">
             {title}
         </h3>
-        <p className="text-sm text-gray-500 mt-1">{description}</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            {description}
+        </p>
     </Link>
 );
 
@@ -728,7 +746,7 @@ export default function Dashboard({
                 }
             `}</style>
 
-            <div className="min-h-screen bg-gray-50/50">
+            <div className="min-h-screen bg-gray-50/50 dark:bg-gray-950">
                 {/* Welcome Header */}
                 <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-2xl mx-4 mt-4 p-8 text-white relative overflow-hidden">
                     {/* Background Pattern */}
@@ -907,7 +925,7 @@ export default function Dashboard({
                             {/* Semester Toggle */}
                             {(semesters?.semester1Count > 0 ||
                                 semesters?.semester2Count > 0) && (
-                                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                                <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
                                     <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center gap-2">
                                             <svg
@@ -923,14 +941,14 @@ export default function Dashboard({
                                                     d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                                                 />
                                             </svg>
-                                            <span className="font-semibold text-gray-700">
+                                            <span className="font-semibold text-gray-700 dark:text-gray-200">
                                                 Academic Year{" "}
                                                 {semesters?.schoolYear || ""}
                                             </span>
                                         </div>
                                         {semesters?.selected !==
                                             semesters?.current && (
-                                            <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                                            <span className="text-xs text-amber-600 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/25 px-2 py-1 rounded-full">
                                                 Viewing past semester
                                             </span>
                                         )}
@@ -973,10 +991,10 @@ export default function Dashboard({
                                                     disabled={isFutureSemester}
                                                     className={`flex-1 relative flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-medium transition-all ${
                                                         isFutureSemester
-                                                            ? "bg-gray-50 text-gray-400 cursor-not-allowed opacity-60"
+                                                            ? "bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60"
                                                             : isActive
                                                               ? "bg-pink-600 text-white shadow-md"
-                                                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                                              : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
                                                     }`}
                                                 >
                                                     <svg
@@ -1002,7 +1020,7 @@ export default function Dashboard({
                                                         className={`ml-1 px-2 py-0.5 rounded-full text-xs font-bold ${
                                                             isActive
                                                                 ? "bg-white/20 text-white"
-                                                                : "bg-gray-200 text-gray-600"
+                                                                : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
                                                         }`}
                                                     >
                                                         {sem.count}
@@ -1025,13 +1043,13 @@ export default function Dashboard({
                             )}
 
                             {/* Subject Performance Section */}
-                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
                                 <div className="flex items-center justify-between mb-6">
                                     <div>
-                                        <h2 className="text-xl font-bold text-gray-900">
+                                        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
                                             Subject Performance
                                         </h2>
-                                        <p className="text-sm text-gray-500 mt-1">
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                             Your grades across all enrolled
                                             subjects
                                         </p>
@@ -1070,9 +1088,9 @@ export default function Dashboard({
                                     </div>
                                 ) : (
                                     <div className="text-center py-12">
-                                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
                                             <svg
-                                                className="w-8 h-8 text-gray-400"
+                                                className="w-8 h-8 text-gray-400 dark:text-gray-500"
                                                 fill="none"
                                                 viewBox="0 0 24 24"
                                                 stroke="currentColor"
@@ -1085,7 +1103,7 @@ export default function Dashboard({
                                                 />
                                             </svg>
                                         </div>
-                                        <p className="text-gray-500">
+                                        <p className="text-gray-500 dark:text-gray-400">
                                             No subjects enrolled yet
                                         </p>
                                     </div>
@@ -1095,19 +1113,19 @@ export default function Dashboard({
                             {/* Grade Trend & Quick Actions */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Grade Trend Card */}
-                                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                                    <h3 className="font-semibold text-gray-900 mb-1">
+                                <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
                                         Grade Trend
                                     </h3>
                                     {gradeTrend?.subjectName ? (
-                                        <p className="text-sm text-gray-500 mb-3">
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
                                             <span className="font-medium text-indigo-600">
                                                 {gradeTrend.subjectName}
                                             </span>{" "}
                                             — last updated
                                         </p>
                                     ) : (
-                                        <p className="text-sm text-gray-500 mb-3">
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
                                             Score breakdown by category
                                         </p>
                                     )}
@@ -1115,12 +1133,12 @@ export default function Dashboard({
                                 </div>
 
                                 {/* Upcoming Tasks */}
-                                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                                <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
                                     <div className="flex items-center justify-between mb-4">
-                                        <h3 className="font-semibold text-gray-900">
+                                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                                             Pending Tasks
                                         </h3>
-                                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-medium">
+                                        <span className="text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded-full font-medium">
                                             {upcomingTasks.length} pending
                                         </span>
                                     </div>
@@ -1135,7 +1153,7 @@ export default function Dashboard({
                                         </div>
                                     ) : (
                                         <div className="text-center py-6">
-                                            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
                                                 <svg
                                                     className="w-6 h-6 text-green-600"
                                                     fill="none"
@@ -1150,7 +1168,7 @@ export default function Dashboard({
                                                     />
                                                 </svg>
                                             </div>
-                                            <p className="text-sm text-gray-500">
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">
                                                 All tasks completed!
                                             </p>
                                         </div>
@@ -1162,10 +1180,10 @@ export default function Dashboard({
                         {/* Right Column - Notifications */}
                         <div className="space-y-6">
                             {/* Notifications Section */}
-                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-3">
-                                        <h2 className="text-lg font-bold text-gray-900">
+                                        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                                             Notifications
                                         </h2>
                                         {unreadNotificationCount > 0 && (
@@ -1187,7 +1205,7 @@ export default function Dashboard({
                                         )}
                                         <Link
                                             href={route("interventions-feed")}
-                                            className="text-sm text-gray-500 hover:text-gray-700"
+                                            className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                                         >
                                             View all →
                                         </Link>
@@ -1217,7 +1235,7 @@ export default function Dashboard({
                                                         !showAllNotifications,
                                                     )
                                                 }
-                                                className="w-full py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors"
+                                                className="w-full py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
                                             >
                                                 {showAllNotifications
                                                     ? "Show Less"
@@ -1230,9 +1248,9 @@ export default function Dashboard({
                                     </div>
                                 ) : (
                                     <div className="text-center py-8">
-                                        <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <div className="w-14 h-14 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3">
                                             <svg
-                                                className="w-7 h-7 text-gray-400"
+                                                className="w-7 h-7 text-gray-400 dark:text-gray-500"
                                                 fill="none"
                                                 viewBox="0 0 24 24"
                                                 stroke="currentColor"
@@ -1245,7 +1263,7 @@ export default function Dashboard({
                                                 />
                                             </svg>
                                         </div>
-                                        <p className="text-gray-500 text-sm">
+                                        <p className="text-gray-500 dark:text-gray-400 text-sm">
                                             No notifications yet
                                         </p>
                                     </div>
@@ -1253,8 +1271,8 @@ export default function Dashboard({
                             </div>
 
                             {/* Quick Actions */}
-                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                                <h3 className="font-semibold text-gray-900 mb-4">
+                            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                                <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">
                                     Quick Actions
                                 </h3>
                                 <div className="space-y-3">

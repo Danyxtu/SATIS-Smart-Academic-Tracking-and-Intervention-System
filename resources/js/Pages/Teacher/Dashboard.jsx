@@ -22,6 +22,7 @@ import {
     UploadGradesModal,
     StartInterventionModal,
 } from "@/Components/Teacher/Dashboard";
+import UnifiedDashboardSwitcher from "@/Components/UnifiedDashboardSwitcher";
 
 const Dashboard = ({
     auth,
@@ -158,6 +159,8 @@ const Dashboard = ({
             <Head title="Teacher Dashboard" />
 
             <div className="space-y-5">
+                <UnifiedDashboardSwitcher />
+
                 {/* 1. Compact Header */}
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                     <div>

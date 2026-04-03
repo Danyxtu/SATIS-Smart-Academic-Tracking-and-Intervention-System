@@ -1,5 +1,6 @@
 import React from "react";
 import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import UnifiedDashboardSwitcher from "@/Components/UnifiedDashboardSwitcher";
 import { Head, Link } from "@inertiajs/react";
 import {
     Users,
@@ -188,6 +189,8 @@ export default function Dashboard({ auth, stats, userTrends, department }) {
                     </div>
                 </div>
             )}
+
+            <UnifiedDashboardSwitcher className="mb-6" />
 
             {/* Header */}
             <div className="mb-8">
