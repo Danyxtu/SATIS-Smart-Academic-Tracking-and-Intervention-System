@@ -4,7 +4,9 @@ namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Department;
+use App\Models\Enrollment;
 use App\Models\Subject;
+use App\Models\SubjectTeacher;
 use App\Models\SystemSetting;
 use App\Models\User;
 use Inertia\Inertia;
@@ -17,6 +19,9 @@ class DashboardController extends Controller
      */
     public function index(): Response
     {
+        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
+        $currentSemester = SystemSetting::getCurrentSemester();
+
         $stats = [
             'total_departments' => Department::count(),
             'active_departments' => Department::active()->count(),
@@ -31,6 +36,79 @@ class DashboardController extends Controller
             })->count(),
             'total_subjects' => Subject::count(),
             'active_subjects' => Subject::count(), // All subjects are considered active
+        ];
+
+        $classesByDepartment = SubjectTeacher::query()
+            ->selectRaw('users.department_id, COUNT(*) as classes_count')
+            ->join('users', 'users.id', '=', 'subject_teachers.teacher_id')
+            ->where('subject_teachers.school_year', $currentSchoolYear)
+            ->whereNotNull('users.department_id')
+            ->groupBy('users.department_id')
+            ->pluck('classes_count', 'users.department_id');
+
+        $enrolledStudentsByDepartment = Enrollment::query()
+            ->selectRaw('users.department_id, COUNT(DISTINCT enrollments.user_id) as students_count')
+            ->join('subject_teachers', 'subject_teachers.id', '=', 'enrollments.subject_teachers_id')
+            ->join('users', 'users.id', '=', 'subject_teachers.teacher_id')
+            ->where('subject_teachers.school_year', $currentSchoolYear)
+            ->whereNotNull('users.department_id')
+            ->groupBy('users.department_id')
+            ->pluck('students_count', 'users.department_id');
+
+        $departmentAssignments = Department::query()
+            ->with([
+                'admins:id,first_name,middle_name,last_name,personal_email,department_id',
+            ])
+            ->orderBy('department_name')
+            ->get()
+            ->map(function (Department $department) use ($classesByDepartment, $enrolledStudentsByDepartment) {
+                $admins = $department->admins
+                    ->map(fn(User $admin) => [
+                        'id' => $admin->id,
+                        'name' => $admin->name,
+                        'email' => $admin->email,
+                    ])
+                    ->values();
+
+                return [
+                    'id' => $department->id,
+                    'name' => $department->department_name,
+                    'code' => $department->department_code,
+                    'is_active' => (bool) $department->is_active,
+                    'admins' => $admins,
+                    'admin_count' => $admins->count(),
+                    'classes_count' => (int) ($classesByDepartment[$department->id] ?? 0),
+                    'students_enrolled_count' => (int) ($enrolledStudentsByDepartment[$department->id] ?? 0),
+                ];
+            })
+            ->values();
+
+        $departmentsWithAdminCount = $departmentAssignments
+            ->where('admin_count', '>', 0)
+            ->count();
+
+        $currentYearStatus = [
+            'school_year' => $currentSchoolYear,
+            'semester' => $currentSemester,
+            'students_enrolled' => Enrollment::query()
+                ->whereHas('subjectTeacher', function ($query) use ($currentSchoolYear) {
+                    $query->where('school_year', $currentSchoolYear);
+                })
+                ->distinct('user_id')
+                ->count('user_id'),
+            'teachers_handling_classes' => SubjectTeacher::query()
+                ->where('school_year', $currentSchoolYear)
+                ->distinct('teacher_id')
+                ->count('teacher_id'),
+            'classes_created' => SubjectTeacher::query()
+                ->where('school_year', $currentSchoolYear)
+                ->count(),
+            'departments_total' => (int) $stats['total_departments'],
+            'departments_with_admin' => $departmentsWithAdminCount,
+            'departments_without_admin' => (int) $stats['total_departments'] - $departmentsWithAdminCount,
+            'overall_admins' => (int) $stats['total_admins'],
+            'overall_teachers' => (int) $stats['total_teachers'],
+            'department_assignments' => $departmentAssignments,
         ];
 
         $recentAdmins = User::query()
@@ -81,8 +159,8 @@ class DashboardController extends Controller
             ]);
 
         $currentSettings = [
-            'school_year' => SystemSetting::getCurrentSchoolYear(),
-            'semester' => SystemSetting::getCurrentSemester(),
+            'school_year' => $currentSchoolYear,
+            'semester' => $currentSemester,
         ];
 
         return Inertia::render('SuperAdmin/Dashboard', [
@@ -90,6 +168,7 @@ class DashboardController extends Controller
             'recentAdmins' => $recentAdmins,
             'departments' => $departments,
             'currentSettings' => $currentSettings,
+            'currentYearStatus' => $currentYearStatus,
         ]);
     }
 }
