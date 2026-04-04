@@ -11,7 +11,7 @@ class Enrollment extends Model
 
     protected $fillable = [
         'user_id',
-        'subject_teachers_id',
+        'class_id',
         'risk_status',
         'current_grade',
         'current_attendance_rate',
@@ -44,20 +44,26 @@ class Enrollment extends Model
         return $this->hasOneThrough(Student::class, User::class, 'id', 'user_id', 'user_id', 'id');
     }
 
+    public function schoolClass()
+    {
+        return $this->belongsTo(SchoolClass::class, 'class_id');
+    }
+
     public function subjectTeacher()
     {
-        return $this->belongsTo(SubjectTeacher::class, 'subject_teachers_id');
+        // Compatibility alias for older code paths still calling subjectTeacher().
+        return $this->belongsTo(SubjectTeacher::class, 'class_id');
     }
 
     public function subject()
     {
         return $this->hasOneThrough(
             Subject::class,
-            SubjectTeacher::class,
-            'id',              // Foreign key on SubjectTeacher table
-            'id',              // Foreign key on Subject table
-            'subject_teachers_id', // Local key on Enrollment table
-            'subject_id'       // Local key on SubjectTeacher table
+            SchoolClass::class,
+            'id',        // Foreign key on SchoolClass table
+            'id',        // Foreign key on Subject table
+            'class_id',  // Local key on Enrollment table
+            'subject_id' // Local key on SchoolClass table
         );
     }
 

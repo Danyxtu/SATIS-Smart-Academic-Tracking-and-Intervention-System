@@ -2,24 +2,25 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class SubjectTeacher extends Model
+class SchoolClass extends Model
 {
+    use HasFactory;
+
     protected $table = 'classes';
 
     protected $fillable = [
         'subject_id',
         'section_id',
         'teacher_id',
+        'school_year',
         'grade_level',
         'section',
-        'color',
         'strand',
         'track',
-        'school_year',
+        'color',
         'current_quarter',
         'grade_categories',
         'semester',
@@ -27,28 +28,26 @@ class SubjectTeacher extends Model
 
     protected $casts = [
         'grade_categories' => 'array',
+        'current_quarter' => 'integer',
     ];
 
-    public function subject(): BelongsTo
+    public function subject()
     {
         return $this->belongsTo(Subject::class);
     }
 
-    public function teacher(): BelongsTo
+    public function teacher()
     {
         return $this->belongsTo(User::class, 'teacher_id');
     }
 
-    public function enrollments(): HasMany
+    public function sectionRecord()
     {
-        return $this->hasMany(Enrollment::class, 'class_id');
+        return $this->belongsTo(Section::class, 'section_id');
     }
 
-    /**
-     * Get the subject name through the subject relationship.
-     */
-    public function getNameAttribute(): ?string
+    public function enrollments()
     {
-        return $this->subject?->subject_name;
+        return $this->hasMany(Enrollment::class, 'class_id');
     }
 }

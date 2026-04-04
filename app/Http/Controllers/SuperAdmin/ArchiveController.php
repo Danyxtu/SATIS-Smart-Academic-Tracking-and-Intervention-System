@@ -5,7 +5,7 @@ namespace App\Http\Controllers\SuperAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\Intervention;
-use App\Models\SubjectTeacher;
+use App\Models\SchoolClass;
 use App\Models\SystemSetting;
 use App\Services\SchoolYearArchiveDetailsService;
 use Inertia\Inertia;
@@ -17,17 +17,17 @@ class ArchiveController extends Controller
     {
         $currentSY = SystemSetting::getCurrentSchoolYear();
 
-        $allYears = SubjectTeacher::select('school_year')
+        $allYears = SchoolClass::select('school_year')
             ->distinct()
             ->orderByDesc('school_year')
             ->pluck('school_year');
 
         $years = $allYears->map(function ($sy) use ($currentSY) {
-            $classIds = SubjectTeacher::where('school_year', $sy)->pluck('id');
-            $students = Enrollment::whereIn('subject_teachers_id', $classIds)
+            $classIds = SchoolClass::where('school_year', $sy)->pluck('id');
+            $students = Enrollment::whereIn('class_id', $classIds)
                 ->distinct('user_id')->count('user_id');
-            $classes  = SubjectTeacher::where('school_year', $sy)->count();
-            $teachers = SubjectTeacher::where('school_year', $sy)
+            $classes  = SchoolClass::where('school_year', $sy)->count();
+            $teachers = SchoolClass::where('school_year', $sy)
                 ->distinct('teacher_id')->count('teacher_id');
 
             return [
@@ -85,21 +85,21 @@ class ArchiveController extends Controller
         $currentSY = SystemSetting::getCurrentSchoolYear();
         $details = app(SchoolYearArchiveDetailsService::class)->build($schoolYear);
 
-        $classIds = SubjectTeacher::where('school_year', $schoolYear)->pluck('id');
+        $classIds = SchoolClass::where('school_year', $schoolYear)->pluck('id');
 
-        $students = Enrollment::whereIn('subject_teachers_id', $classIds)
+        $students = Enrollment::whereIn('class_id', $classIds)
             ->distinct('user_id')->count('user_id');
 
-        $teachers = SubjectTeacher::where('school_year', $schoolYear)
+        $teachers = SchoolClass::where('school_year', $schoolYear)
             ->distinct('teacher_id')->count('teacher_id');
 
-        $classesBySemester = SubjectTeacher::where('school_year', $schoolYear)
+        $classesBySemester = SchoolClass::where('school_year', $schoolYear)
             ->selectRaw('semester, count(*) as total')
             ->groupBy('semester')
             ->pluck('total', 'semester');
 
         // Grade distribution for the school year
-        $gradeStats = Enrollment::whereIn('subject_teachers_id', $classIds)
+        $gradeStats = Enrollment::whereIn('class_id', $classIds)
             ->whereNotNull('final_grade')
             ->selectRaw('
                 COUNT(*) as total,
@@ -112,7 +112,7 @@ class ArchiveController extends Controller
         $interventionCounts = Intervention::whereHas(
             'enrollment',
             fn($q) =>
-            $q->whereIn('subject_teachers_id', $classIds)
+            $q->whereIn('class_id', $classIds)
         )->selectRaw("type, COUNT(*) as total")->groupBy('type')->pluck('total', 'type');
 
         return Inertia::render('SuperAdmin/Archive/Show', [

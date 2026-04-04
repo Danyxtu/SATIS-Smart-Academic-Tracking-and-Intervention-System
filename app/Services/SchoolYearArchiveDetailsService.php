@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\Department;
 use App\Models\Enrollment;
-use App\Models\SubjectTeacher;
+use App\Models\SchoolClass;
 use App\Models\User;
 
 class SchoolYearArchiveDetailsService
@@ -16,13 +16,13 @@ class SchoolYearArchiveDetailsService
      */
     public function build(string $schoolYear): array
     {
-        $classes = SubjectTeacher::query()
+        $classes = SchoolClass::query()
             ->where('school_year', $schoolYear)
             ->with([
                 'subject:id,subject_name,subject_code',
                 'teacher:id,first_name,middle_name,last_name,personal_email,department_id',
                 'teacher.department:id,department_name,department_code,is_active',
-                'enrollments:id,user_id,subject_teachers_id',
+                'enrollments:id,user_id,class_id',
                 'enrollments.user:id,first_name,middle_name,last_name,personal_email,department_id',
                 'enrollments.user.department:id,department_name,department_code,is_active',
             ])

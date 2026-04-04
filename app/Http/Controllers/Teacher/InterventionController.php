@@ -8,7 +8,6 @@ use App\Models\Enrollment;
 use App\Models\Intervention;
 use App\Models\InterventionTask;
 use App\Models\StudentNotification;
-use App\Models\Subject;
 use App\Services\PredictionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -37,13 +36,20 @@ class InterventionController extends Controller
         // Include their grades, attendance, and any existing interventions
         $enrollments = Enrollment::with([
             'user.student',
+            'schoolClass.subject',
             'subjectTeacher.subject',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
         ])
-            ->whereHas('subjectTeacher', function ($query) use ($teacher) {
-                $query->where('teacher_id', $teacher->id);
+            ->where(function ($query) use ($teacher) {
+                $query
+                    ->whereHas('schoolClass', function ($classQuery) use ($teacher) {
+                        $classQuery->where('teacher_id', $teacher->id);
+                    })
+                    ->orWhereHas('subjectTeacher', function ($legacyQuery) use ($teacher) {
+                        $legacyQuery->where('teacher_id', $teacher->id);
+                    });
             })
             ->get();
 
@@ -51,7 +57,10 @@ class InterventionController extends Controller
         $watchlist = $enrollments->map(function ($enrollment) {
             $user = $enrollment->user;
             $student = $user?->student;
-            $subject = $enrollment->subjectTeacher?->subject;
+            $classAssignment = $enrollment->schoolClass ?? $enrollment->subjectTeacher;
+            $subject = $classAssignment?->subject;
+            $subjectName = $subject?->subject_name ?? 'N/A';
+            $classSection = $classAssignment?->section;
 
             // Calculate current grade percentage
             $grades = $enrollment->grades;
@@ -107,10 +116,10 @@ class InterventionController extends Controller
                 'lrn' => $student?->lrn,
                 'email' => $user?->email,
                 'avatar' => $student?->avatar,
-                'subject' => $subject?->name . ' - ' . $subject?->section,
-                'subject_id' => $enrollment->subjectTeacher?->subject_id,
-                'grade_level' => $student?->grade_level ?? $subject?->grade_level,
-                'section' => $student?->section ?? $subject?->section,
+                'subject' => trim($subjectName . ' - ' . ($classSection ?? 'N/A')),
+                'subject_id' => $classAssignment?->subject_id,
+                'grade_level' => $student?->grade_level ?? $classAssignment?->grade_level,
+                'section' => $student?->section ?? $classSection,
                 'currentGrade' => $gradePercentage !== null ? "{$gradePercentage}%" : 'N/A',
                 'gradeNumeric' => $gradePercentage,
                 'attendanceRate' => $attendanceRate,
@@ -295,9 +304,9 @@ class InterventionController extends Controller
             'send_email' => 'nullable|boolean',
         ]);
 
-        $enrollment = Enrollment::with(['subjectTeacher', 'user'])->findOrFail($validated['enrollment_id']);
+        $enrollment = Enrollment::with(['schoolClass.subject', 'subjectTeacher.subject', 'user'])->findOrFail($validated['enrollment_id']);
 
-        if (optional($enrollment->subjectTeacher)->teacher_id !== $request->user()->id) {
+        if (! $this->enrollmentOwnedByTeacher($enrollment, (int) $request->user()->id)) {
             abort(403, 'You are not authorized to start an intervention for this student.');
         }
 
@@ -357,10 +366,10 @@ class InterventionController extends Controller
         $failedCount = 0;
 
         foreach ($validated['enrollment_ids'] as $enrollmentId) {
-            $enrollment = Enrollment::with(['subjectTeacher', 'user'])->find($enrollmentId);
+            $enrollment = Enrollment::with(['schoolClass.subject', 'subjectTeacher.subject', 'user'])->find($enrollmentId);
 
             // Skip if enrollment not found or teacher doesn't own the subject
-            if (!$enrollment || optional($enrollment->subjectTeacher)->teacher_id !== $teacher->id) {
+            if (!$enrollment || ! $this->enrollmentOwnedByTeacher($enrollment, (int) $teacher->id)) {
                 $failedCount++;
                 continue;
             }
@@ -430,7 +439,9 @@ class InterventionController extends Controller
     private function createNotification(Enrollment $enrollment, Intervention $intervention, $teacher, string $notificationType)
     {
         $studentName = $enrollment->user?->name ?? 'Student';
-        $subjectName = $enrollment->subjectTeacher?->subject?->subject_name ?? 'your class';
+        $subjectName = $enrollment->schoolClass?->subject?->subject_name
+            ?? $enrollment->subjectTeacher?->subject?->subject_name
+            ?? 'your class';
         $teacherName = $teacher->name ?? 'Your Teacher';
 
         $titles = [
@@ -439,7 +450,7 @@ class InterventionController extends Controller
             'extension' => '⏰ Deadline Extension Granted',
             'agreement' => '📄 Academic Agreement Recorded',
             'meeting' => '💬 Intervention Meeting Logged',
-            'general' => '� Notice from ' . $teacherName,
+            'general' => 'Notice from ' . $teacherName,
         ];
 
         $messages = [
@@ -494,7 +505,9 @@ class InterventionController extends Controller
     private function sendEmailNotification(Enrollment $enrollment, Intervention $intervention, $teacher, string $notificationType)
     {
         try {
-            $subjectName = $enrollment->subjectTeacher?->subject?->subject_name ?? 'your class';
+            $subjectName = $enrollment->schoolClass?->subject?->subject_name
+                ?? $enrollment->subjectTeacher?->subject?->subject_name
+                ?? 'your class';
 
             Mail::to($enrollment->user->email)->queue(
                 new InterventionNotification(
@@ -539,7 +552,7 @@ class InterventionController extends Controller
         $enrollment = $intervention->enrollment;
 
         // Verify the intervention belongs to this teacher's subject
-        if ($enrollment->subjectTeacher?->teacher_id !== $teacher->id) {
+        if (! $this->enrollmentOwnedByTeacher($enrollment, (int) $teacher->id)) {
             abort(403, 'Unauthorized');
         }
 
@@ -582,7 +595,7 @@ class InterventionController extends Controller
         $enrollment = $intervention->enrollment;
 
         // Verify the intervention belongs to this teacher's subject
-        if ($enrollment->subjectTeacher?->teacher_id !== $teacher->id) {
+        if (! $this->enrollmentOwnedByTeacher($enrollment, (int) $teacher->id)) {
             abort(403, 'Unauthorized');
         }
 
@@ -614,5 +627,13 @@ class InterventionController extends Controller
         ]);
 
         return back()->with('success', 'Completion request rejected. Student has been notified.');
+    }
+
+    private function enrollmentOwnedByTeacher(Enrollment $enrollment, int $teacherId): bool
+    {
+        $classTeacherId = $enrollment->schoolClass?->teacher_id
+            ?? $enrollment->subjectTeacher?->teacher_id;
+
+        return (int) $classTeacherId === $teacherId;
     }
 }

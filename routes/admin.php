@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\TeacherRegistrationController as AdminTeacherRegistrationController;
+use App\Http\Controllers\Admin\SectionController as AdminSectionController;
+use App\Http\Controllers\Admin\ClassController as AdminClassController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -44,6 +46,22 @@ Route::middleware(['auth', 'verified', 'admin'])
         // Bulk Actions
         Route::post('/users/bulk-destroy', [AdminUserController::class, 'bulkDestroy'])
             ->name('users.bulk-destroy');
+
+        // Section Management
+        Route::get('/sections', [AdminSectionController::class, 'index'])
+            ->name('sections.index');
+        Route::post('/sections', [AdminSectionController::class, 'store'])
+            ->name('sections.store');
+
+        // Class Management
+        Route::get('/classes', [AdminClassController::class, 'index'])
+            ->name('classes.index');
+        Route::post('/classes', [AdminClassController::class, 'store'])
+            ->name('classes.store');
+        Route::put('/classes/{schoolClass}', [AdminClassController::class, 'update'])
+            ->name('classes.update');
+        Route::delete('/classes/{schoolClass}', [AdminClassController::class, 'destroy'])
+            ->name('classes.destroy');
 
         // Password Reset Requests Management
         Route::get('/password-reset-requests', [AdminUserController::class, 'passwordResetRequests'])

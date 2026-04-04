@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import SATISHeader from "@/Components/SATISHeader";
 import ConfirmationDialog from "@/Components/ConfirmationDialog";
 import { Link, usePage, router } from "@inertiajs/react";
@@ -382,6 +382,11 @@ export default function SuperAdminLayout({ children }) {
         useState(false);
     const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
     const [flashVisible, setFlashVisible] = useState(true);
+    const [isRouteLoading, setIsRouteLoading] = useState(false);
+    const [routeProgress, setRouteProgress] = useState(0);
+
+    const progressIntervalRef = useRef(null);
+    const progressHideTimeoutRef = useRef(null);
 
     const handleLogoutClick = () => setShowLogoutConfirmation(true);
     const handleConfirmLogout = () => router.post(route("logout"));
@@ -392,8 +397,96 @@ export default function SuperAdminLayout({ children }) {
         `${auth.user.first_name} ${auth.user.last_name}`.trim() || "Superadmin";
     const initials = getInitials(auth.user.first_name, auth.user.last_name);
 
+    useEffect(() => {
+        const clearProgressTimers = () => {
+            if (progressIntervalRef.current) {
+                clearInterval(progressIntervalRef.current);
+                progressIntervalRef.current = null;
+            }
+
+            if (progressHideTimeoutRef.current) {
+                clearTimeout(progressHideTimeoutRef.current);
+                progressHideTimeoutRef.current = null;
+            }
+        };
+
+        const startProgress = () => {
+            clearProgressTimers();
+            setIsRouteLoading(true);
+            setRouteProgress(14);
+
+            progressIntervalRef.current = setInterval(() => {
+                setRouteProgress((prev) => {
+                    const next = prev + Math.random() * 10;
+                    return next >= 88 ? 88 : next;
+                });
+            }, 160);
+        };
+
+        const finishProgress = () => {
+            clearProgressTimers();
+            setRouteProgress(100);
+
+            progressHideTimeoutRef.current = setTimeout(() => {
+                setIsRouteLoading(false);
+                setRouteProgress(0);
+            }, 260);
+        };
+
+        const removeStart = router.on("start", startProgress);
+        const removeProgress = router.on("progress", (event) => {
+            const pct = event?.detail?.progress?.percentage;
+
+            if (typeof pct === "number") {
+                setRouteProgress((prev) => {
+                    const normalized = Math.max(20, Math.min(pct, 95));
+                    return normalized > prev ? normalized : prev;
+                });
+            }
+        });
+        const removeFinish = router.on("finish", finishProgress);
+        const removeCancel = router.on("cancel", finishProgress);
+        const removeError = router.on("error", finishProgress);
+        const removeInvalid = router.on("invalid", finishProgress);
+        const removeException = router.on("exception", finishProgress);
+
+        return () => {
+            removeStart();
+            removeProgress();
+            removeFinish();
+            removeCancel();
+            removeError();
+            removeInvalid();
+            removeException();
+            clearProgressTimers();
+        };
+    }, []);
+
     return (
         <div className="flex h-screen overflow-hidden bg-slate-100 dark:bg-slate-900 text-[13px]">
+            {isRouteLoading && (
+                <>
+                    <div className="pointer-events-none fixed inset-0 z-[70] bg-slate-900/15 backdrop-blur-[1px]" />
+
+                    <div className="pointer-events-none fixed left-0 top-0 z-[80] h-1 w-full">
+                        <div
+                            className="h-full rounded-r-full bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600 shadow-[0_0_14px_rgba(37,99,235,0.65)] transition-all duration-200 ease-out"
+                            style={{ width: `${routeProgress}%` }}
+                        />
+                    </div>
+
+                    <div className="pointer-events-none fixed right-5 top-4 z-[85] flex items-center gap-2 rounded-full border border-white/40 bg-white/90 px-3 py-1.5 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/90">
+                        <span className="relative flex h-2 w-2">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
+                        </span>
+                        <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+                            Loading page...
+                        </span>
+                    </div>
+                </>
+            )}
+
             {/* ── Desktop Sidebar ── */}
             <aside
                 className={`relative hidden shrink-0 overflow-hidden bg-slate-900 transition-all duration-300 ease-in-out lg:flex lg:flex-col ${

@@ -3,7 +3,6 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -12,36 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        /**
-         * This pivot table represents the many-to-many relationship between subjects and teachers.
-         * A subject can be taught by multiple teachers, and a teacher can teach multiple subjects.
-         * 
-         */
-        $defaultCategories = [
-            [
-                'id' => 'written_works',
-                'label' => 'Written Works',
-                'weight' => 0.30,
-                'tasks' => [],
-            ],
-            [
-                'id' => 'performance_task',
-                'label' => 'Performance Task',
-                'weight' => 0.40,
-                'tasks' => [],
-            ],
-            [
-                'id' => 'quarterly_exam',
-                'label' => 'Quarterly Exam',
-                'weight' => 0.30,
-                'tasks' => [],
-            ],
-        ];
-        Schema::create('subject_teachers', function (Blueprint $table) {
+        Schema::create('classes', function (Blueprint $table) {
             $table->id();
             $table->foreignId('subject_id')->constrained()->onDelete('cascade');
             $table->foreignId('teacher_id')->constrained('users')->onDelete('cascade');
             $table->string('grade_level')->default('Grade 12');
+            $table->string('section')->nullable();
+            $table->unsignedBigInteger('section_id')->nullable();
             $table->string('color')->default('indigo');
             $table->string('strand')->nullable();
             $table->string('track')->nullable();
@@ -52,10 +28,6 @@ return new class extends Migration
 
             $table->timestamps();
         });
-
-        DB::table('subject_teachers')
-            ->whereNull('grade_categories')
-            ->update(['grade_categories' => json_encode($defaultCategories)]);
     }
 
     /**
@@ -63,6 +35,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('subject_teachers');
+        Schema::dropIfExists('classes');
     }
 };

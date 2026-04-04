@@ -6,7 +6,7 @@ use App\Services\Teacher\AttendanceServices;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceRecord;
-use App\Models\SubjectTeacher;
+use App\Models\SchoolClass;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -43,7 +43,7 @@ class AttendanceController extends Controller
     /**
      * Get detailed attendance data for a specific section.
      */
-    public function attendanceLogOfSpecificSection(Request $request, SubjectTeacher $subjectTeacher): Response
+    public function attendanceLogOfSpecificSection(Request $request, SchoolClass $subjectTeacher): Response
     {
         $teacher = $request->user();
 
@@ -67,7 +67,7 @@ class AttendanceController extends Controller
     /**
      * Export attendance data as CSV.
      */
-    public function exportCSV(Request $request, SubjectTeacher $subjectTeacher)
+    public function exportCSV(Request $request, SchoolClass $subjectTeacher)
     {
         $teacher = $request->user();
 
@@ -82,7 +82,7 @@ class AttendanceController extends Controller
     /**
      * Export attendance data as a PDF using dompdf.
      */
-    public function exportPdf(Request $request, SubjectTeacher $subjectTeacher)
+    public function exportPdf(Request $request, SchoolClass $subjectTeacher)
     {
         $teacher = $request->user();
 
@@ -99,15 +99,15 @@ class AttendanceController extends Controller
     public function checkExists(Request $request)
     {
         $data = $request->validate([
-            'classId' => ['required', 'integer', 'exists:subject_teachers,id'],
+            'classId' => ['required', 'integer', 'exists:classes,id'],
             'date' => ['required', 'date'],
         ]);
 
-        $subjectTeacher = SubjectTeacher::findOrFail($data['classId']);
+        $subjectTeacher = SchoolClass::findOrFail($data['classId']);
 
         $exists = AttendanceRecord::where('date', $data['date'])
             ->whereHas('enrollment', function ($query) use ($subjectTeacher) {
-                $query->where('subject_teachers_id', $subjectTeacher->id);
+                $query->where('class_id', $subjectTeacher->id);
             })->exists();
 
         return response()->json(['exists' => $exists]);
@@ -123,7 +123,7 @@ class AttendanceController extends Controller
         $teacher = $request->user();
 
         $data = $request->validate([
-            'classId' => ['required', 'integer', 'exists:subject_teachers,id'],
+            'classId' => ['required', 'integer', 'exists:classes,id'],
             'date' => ['required', 'date'],
             'students' => ['required', 'array'],
             'students.*.id' => ['required', 'integer', 'exists:enrollments,id'],

@@ -72,6 +72,14 @@ class Department extends Model
     }
 
     /**
+     * Get all sections created under this department.
+     */
+    public function sections(): HasMany
+    {
+        return $this->hasMany(Section::class);
+    }
+
+    /**
      * Scope to get only active departments.
      */
     public function scopeActive($query)

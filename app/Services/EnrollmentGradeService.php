@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\Enrollment;
-use App\Models\SubjectTeacher;
+use App\Models\SchoolClass;
 use App\Services\TransmutationGradeServices;
 
 /**
@@ -28,7 +28,7 @@ class EnrollmentGradeService
     /**
      * Recalculate and persist all grade columns for every enrollment in a class.
      */
-    public function recalculateClassGrades(SubjectTeacher $subjectTeacher): void
+    public function recalculateClassGrades(SchoolClass $subjectTeacher): void
     {
         $subjectTeacher->load(['enrollments.grades']);
         $storedCategories = $subjectTeacher->grade_categories ?? [];

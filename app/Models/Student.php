@@ -20,6 +20,7 @@ class Student extends Model
         'user_id',
         'grade_level',
         'section',
+        'section_id',
         'strand',
         'track',
     ];
@@ -27,5 +28,10 @@ class Student extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function sectionRecord()
+    {
+        return $this->belongsTo(Section::class, 'section_id');
     }
 }

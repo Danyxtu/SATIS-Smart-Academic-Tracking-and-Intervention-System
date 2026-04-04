@@ -1,4 +1,4 @@
-import { House, Users, UserPlus, Key } from "lucide-react";
+import { House, Users, UserPlus, Key, Layers3, BookOpen } from "lucide-react";
 
 export const adminRoutes = [
     {
@@ -10,6 +10,16 @@ export const adminRoutes = [
         name: "User Management",
         path: "admin.users.index",
         icon: Users,
+    },
+    {
+        name: "Section Management",
+        path: "admin.sections.index",
+        icon: Layers3,
+    },
+    {
+        name: "Class Management",
+        path: "admin.classes.index",
+        icon: BookOpen,
     },
     {
         name: "Teacher Registration",

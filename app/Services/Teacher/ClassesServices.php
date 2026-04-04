@@ -5,7 +5,7 @@ namespace App\Services\Teacher;
 use App\Support\Concerns\HasDefaultAssignments;
 use Illuminate\Support\Str;
 use App\Models\SystemSetting;
-use App\Models\SubjectTeacher;
+use App\Models\SchoolClass;
 
 class ClassesServices
 {
@@ -32,8 +32,9 @@ class ClassesServices
         }
 
         // Only show active classes for the configured school year.
-        $allSubjectTeachers = SubjectTeacher::with([
+        $allClasses = SchoolClass::with([
             'subject',
+            'sectionRecord',
             'enrollments.user.student',
             'enrollments.grades',
         ])->where('teacher_id', $teacher->id)
@@ -41,34 +42,35 @@ class ClassesServices
             ->orderBy('grade_level')
             ->get();
 
-        // Filter subject-teachers by selected semester for display
-        $subjectTeachers = $allSubjectTeachers->filter(function ($st) use ($selectedSemester) {
-            return $st->semester == $selectedSemester;
+        // Filter classes by selected semester for display.
+        $classesForSemester = $allClasses->filter(function ($schoolClass) use ($selectedSemester) {
+            return (string) $schoolClass->semester === $selectedSemester;
         });
 
-        // Count classes per semester for the toggle UI
-        $semester1Count = $allSubjectTeachers->filter(fn($s) => $s->semester == '1')->count();
-        $semester2Count = $allSubjectTeachers->filter(fn($s) => $s->semester == '2')->count();
+        // Count classes per semester for the toggle UI.
+        $semester1Count = $allClasses->filter(fn($schoolClass) => (string) $schoolClass->semester === '1')->count();
+        $semester2Count = $allClasses->filter(fn($schoolClass) => (string) $schoolClass->semester === '2')->count();
 
-
-        $classes = $subjectTeachers->map(fn($st) => [
-            'id' => $st->id,
-            'name' => $st->grade_level,
-            'section' => $st->section,
-            'subject' => $st->subject?->subject_name ?? 'N/A',
-            'subject_name' => $st->subject?->subject_name ?? 'N/A',
-            'color' => $st->color,
-            'strand' => $st->strand,
-            'track' => $st->track,
-            'school_year' => $st->school_year,
-            'student_count' => $st->enrollments->count(),
-            'current_quarter' => $st->current_quarter ?? 1,
-            'semester' => $st->semester,
+        $classes = $classesForSemester->map(fn($schoolClass) => [
+            'id' => $schoolClass->id,
+            'subject_id' => (int) $schoolClass->subject_id,
+            'section_id' => (int) $schoolClass->section_id,
+            'name' => $schoolClass->grade_level,
+            'section' => $schoolClass->section,
+            'subject' => $schoolClass->subject?->subject_name ?? 'N/A',
+            'subject_name' => $schoolClass->subject?->subject_name ?? 'N/A',
+            'color' => $schoolClass->color,
+            'strand' => $schoolClass->strand,
+            'track' => $schoolClass->track,
+            'school_year' => $schoolClass->school_year,
+            'student_count' => $schoolClass->enrollments->count(),
+            'current_quarter' => $schoolClass->current_quarter ?? 1,
+            'semester' => (int) ($schoolClass->semester ?? 1),
         ])->values();
 
-        $roster = $subjectTeachers->mapWithKeys(function ($st) {
+        $roster = $classesForSemester->mapWithKeys(function ($schoolClass) {
             return [
-                $st->id => $st->enrollments
+                $schoolClass->id => $schoolClass->enrollments
                     ->map(function ($enrollment) {
                         return [
                             'id' => $enrollment->user_id,
@@ -93,7 +95,7 @@ class ClassesServices
 
     public function createClass() {}
 
-    public function ensureStructureCoversExistingGrades(SubjectTeacher $subjectTeacher, array $structure, ?int $quarter = null): array
+    public function ensureStructureCoversExistingGrades(SchoolClass $subjectTeacher, array $structure, ?int $quarter = null): array
     {
         $assignments = collect($structure['assignments']);
 

@@ -1,4 +1,11 @@
-import { House, Building2, Users, Settings, Archive } from "lucide-react";
+import {
+    House,
+    Building2,
+    Users,
+    Settings,
+    Archive,
+    BookOpen,
+} from "lucide-react";
 
 export const superAdminRoutes = [
     {
@@ -10,6 +17,11 @@ export const superAdminRoutes = [
         label: "Departments",
         path: "superadmin.departments.index",
         icon: Building2,
+    },
+    {
+        label: "Subject Management",
+        path: "superadmin.subjects.index",
+        icon: BookOpen,
     },
     {
         label: "User Management",

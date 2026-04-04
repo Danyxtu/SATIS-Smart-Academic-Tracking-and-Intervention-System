@@ -7,6 +7,7 @@ use App\Http\Controllers\SuperAdmin\AdminController as SuperAdminAdminController
 use App\Http\Controllers\SuperAdmin\ArchiveController;
 use App\Http\Controllers\SuperAdmin\NewSchoolYearController;
 use App\Http\Controllers\SuperAdmin\SettingsController;
+use App\Http\Controllers\SuperAdmin\SubjectController;
 use App\Http\Controllers\SuperAdmin\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
@@ -48,6 +49,10 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
             ->name('departments.destroy');
         Route::post('/departments/{department}/toggle-status', [DepartmentController::class, 'toggleStatus'])
             ->name('departments.toggle-status');
+
+        // Subject Management
+        Route::resource('subjects', SubjectController::class)
+            ->only(['index', 'store', 'update', 'destroy']);
 
         // User Management
         Route::resource('users', UserManagementController::class)

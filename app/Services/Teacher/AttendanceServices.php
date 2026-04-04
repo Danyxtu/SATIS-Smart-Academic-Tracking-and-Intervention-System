@@ -2,8 +2,8 @@
 
 namespace App\Services\Teacher;
 
-use App\Models\SubjectTeacher;
 use App\Models\AttendanceRecord;
+use App\Models\SchoolClass;
 
 class AttendanceServices
 {
@@ -17,7 +17,7 @@ class AttendanceServices
 
     public function index($teacher): array
     {
-        $subjectTeachers = SubjectTeacher::with([
+        $classes = SchoolClass::with([
             'subject',
             'enrollments.user.student',
             'enrollments.attendanceRecords',
@@ -29,8 +29,8 @@ class AttendanceServices
         $today = now()->toDateString();
 
 
-        $rosters = $subjectTeachers->mapWithKeys(fn($st) => [
-            $st->id => $st->enrollments
+        $rosters = $classes->mapWithKeys(fn($class) => [
+            $class->id => $class->enrollments
                 ->map(function ($enrollment) {
                     $user = $enrollment->user;
                     $studentProfile = $user?->student;
@@ -48,8 +48,8 @@ class AttendanceServices
                 ->values(),
         ])->all();
 
-        $classes = $subjectTeachers->map(function ($st) use ($today) {
-            $allRecords = $st->enrollments
+        $classes = $classes->map(function ($class) use ($today) {
+            $allRecords = $class->enrollments
                 ->flatMap(fn($enrollment) => $enrollment->attendanceRecords);
 
             $todayRecords = $allRecords->filter(
@@ -70,18 +70,18 @@ class AttendanceServices
                 ->count();
 
             return [
-                'id' => $st->id,
+                'id' => $class->id,
                 'label' => sprintf(
                     '%s - %s (%s)',
-                    $st->grade_level,
-                    $st->section,
-                    $st->subject?->subject_name ?? $st->name
+                    $class->grade_level,
+                    $class->section,
+                    $class->subject?->subject_name ?? 'N/A'
                 ),
-                'grade_level' => $st->grade_level,
-                'section' => $st->section,
-                'subject' => $st->subject?->subject_name ?? $st->name,
-                'color' => $st->color ?? 'indigo',
-                'student_count' => $st->enrollments->count(),
+                'grade_level' => $class->grade_level,
+                'section' => $class->section,
+                'subject' => $class->subject?->subject_name ?? 'N/A',
+                'color' => $class->color ?? 'indigo',
+                'student_count' => $class->enrollments->count(),
                 'attendance_summary' => [
                     'days_recorded' => $daysRecorded,
                     'total_records' => $allRecords->count(),
@@ -107,7 +107,7 @@ class AttendanceServices
 
     public function attendanceLogsOfSpecificSection($teacher, $subjectTeacher)
     {
-        // Ensure teacher owns this subject-teacher assignment
+        // Ensure teacher owns this class assignment
         if ($subjectTeacher->teacher_id !== $teacher->id) {
             abort(403, 'You are not authorized to view this attendance.');
         }
@@ -166,9 +166,11 @@ class AttendanceServices
             ->toArray();
 
         $subjectName = $subjectTeacher->subject?->subject_name ?? 'N/A';
+
         return [
             'section' => [
                 'id' => $subjectTeacher->id,
+                'name' => $subjectName,
                 'subject_name' => $subjectName,
                 'grade_level' => $subjectTeacher->grade_level,
                 'section' => $subjectTeacher->section,
@@ -187,9 +189,9 @@ class AttendanceServices
      */
     public function createAttendance(array $data, $teacher): array
     {
-        $subjectTeacher = SubjectTeacher::with('enrollments')->findOrFail($data['classId']);
+        $subjectTeacher = SchoolClass::with('enrollments')->findOrFail($data['classId']);
 
-        // Ensure the teacher owns this subject-teacher assignment
+        // Ensure the teacher owns this class assignment
         if ($subjectTeacher->teacher_id !== $teacher->id) {
             return [
                 'status' => 403,
@@ -212,7 +214,7 @@ class AttendanceServices
         // Check if attendance already exists for this class on this date
         $existingAttendance = AttendanceRecord::where('date', $date)
             ->whereHas('enrollment', function ($query) use ($subjectTeacher) {
-                $query->where('subject_teachers_id', $subjectTeacher->id);
+                $query->where('class_id', $subjectTeacher->id);
             })->exists();
 
         if ($existingAttendance) {
@@ -226,7 +228,7 @@ class AttendanceServices
         foreach ($data['students'] as $s) {
             $enrollment = $subjectTeacher->enrollments->firstWhere('id', $s['id']);
 
-            // If the enrollment does not belong to this subject-teacher, skip it
+            // If the enrollment does not belong to this class, skip it
             if (!$enrollment) {
                 continue;
             }

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
-use App\Models\SubjectTeacher;
+use App\Models\SchoolClass;
 use App\Services\GradeCalculationService;
 use App\Support\Concerns\HasDefaultAssignments;
 use Illuminate\Http\JsonResponse;
@@ -23,7 +23,7 @@ class GradeCalculationController extends Controller
     /**
      * Build per-quarter grade structure from the stored categories.
      */
-    private function perQuarterGradeStructure(SubjectTeacher $subjectTeacher): array
+    private function perQuarterGradeStructure(SchoolClass $subjectTeacher): array
     {
         $stored = $subjectTeacher->grade_categories ?? [];
         return [
@@ -35,12 +35,13 @@ class GradeCalculationController extends Controller
     /**
      * Calculate grades for a specific class
      */
-    public function calculateClassGrades(Request $request, SubjectTeacher $subjectTeacher): JsonResponse
+    public function calculateClassGrades(Request $request, SchoolClass $subjectTeacher): JsonResponse
     {
-        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
+        $this->ensureTeacherOwnsClass($request->user()->id, $subjectTeacher);
 
         // Load necessary relationships
         $subjectTeacher->load([
+            'subject',
             'enrollments.user.student',
             'enrollments.grades',
         ]);
@@ -70,9 +71,9 @@ class GradeCalculationController extends Controller
     /**
      * Calculate grades for a specific student
      */
-    public function calculateStudentGrades(Request $request, SubjectTeacher $subjectTeacher, int $enrollmentId): JsonResponse
+    public function calculateStudentGrades(Request $request, SchoolClass $subjectTeacher, int $enrollmentId): JsonResponse
     {
-        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
+        $this->ensureTeacherOwnsClass($request->user()->id, $subjectTeacher);
 
         // Find the specific enrollment
         $enrollment = $subjectTeacher->enrollments()
@@ -99,9 +100,9 @@ class GradeCalculationController extends Controller
     /**
      * Recalculate grades after bulk update
      */
-    public function recalculateAfterUpdate(Request $request, SubjectTeacher $subjectTeacher): JsonResponse
+    public function recalculateAfterUpdate(Request $request, SchoolClass $subjectTeacher): JsonResponse
     {
-        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
+        $this->ensureTeacherOwnsClass($request->user()->id, $subjectTeacher);
 
         $data = $request->validate([
             'enrollment_ids' => 'sometimes|array',
@@ -132,5 +133,12 @@ class GradeCalculationController extends Controller
                 'updated_at' => now()->toISOString(),
             ]
         ]);
+    }
+
+    private function ensureTeacherOwnsClass(int $teacherId, SchoolClass $schoolClass): void
+    {
+        if ((int) $schoolClass->teacher_id !== (int) $teacherId) {
+            abort(403, 'You are not allowed to modify this class.');
+        }
     }
 }

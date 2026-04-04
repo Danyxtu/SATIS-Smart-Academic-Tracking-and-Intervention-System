@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('subject_teachers', function (Blueprint $table) {
-            $table->string('section')->nullable()->after('grade_level');
-        });
+        if (Schema::hasTable('classes') && !Schema::hasColumn('classes', 'section')) {
+            Schema::table('classes', function (Blueprint $table) {
+                $table->string('section')->nullable()->after('grade_level');
+            });
+        }
     }
 
     /**
@@ -21,8 +23,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('subject_teachers', function (Blueprint $table) {
-            $table->dropColumn('section');
-        });
+        if (Schema::hasTable('classes') && Schema::hasColumn('classes', 'section')) {
+            Schema::table('classes', function (Blueprint $table) {
+                $table->dropColumn('section');
+            });
+        }
     }
 };

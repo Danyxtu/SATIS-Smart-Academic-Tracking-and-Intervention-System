@@ -21,7 +21,7 @@ class Subject extends Model
      */
     public function subjectTeachers(): HasMany
     {
-        return $this->hasMany(SubjectTeacher::class);
+        return $this->hasMany(SchoolClass::class, 'subject_id');
     }
 
     /**
@@ -31,11 +31,11 @@ class Subject extends Model
     {
         return $this->hasManyThrough(
             Enrollment::class,
-            SubjectTeacher::class,
-            'subject_id',         // Foreign key on SubjectTeacher table
-            'subject_teachers_id', // Foreign key on Enrollment table
-            'id',                 // Local key on Subject table
-            'id'                  // Local key on SubjectTeacher table
+            SchoolClass::class,
+            'subject_id', // Foreign key on classes table
+            'class_id',   // Foreign key on enrollments table
+            'id',
+            'id'
         );
     }
 
@@ -47,10 +47,10 @@ class Subject extends Model
         return $this->hasManyThrough(
             User::class,
             Enrollment::class,
-            'subject_teachers_id', // Foreign key on Enrollment table - but this won't work directly
-            'id',                  // Foreign key on User table
-            'id',                  // Local key on Subject table
-            'user_id'              // Local key on Enrollment table
+            'class_id', // Foreign key on Enrollment table
+            'id',
+            'id',
+            'user_id'
         );
     }
 }

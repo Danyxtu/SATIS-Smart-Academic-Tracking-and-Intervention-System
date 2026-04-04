@@ -2,9 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
 use App\Models\Subject;
+use Illuminate\Database\Seeder;
 
 class SubjectSeeder extends Seeder
 {
@@ -13,67 +12,66 @@ class SubjectSeeder extends Seeder
      */
     public function run(): void
     {
-        // Default grade categories structure matching HasDefaultAssignments trait
-        $defaultGradeCategories = [
-            [
-                'id' => 'written_works',
-                'label' => 'Written Works',
-                'weight' => 0.30,
-                'tasks' => [],
-            ],
-            [
-                'id' => 'performance_task',
-                'label' => 'Performance Task',
-                'weight' => 0.50,
-                'tasks' => [],
-            ],
-            [
-                'id' => 'quarterly_exam',
-                'label' => 'Quarterly Exam',
-                'weight' => 0.20,
-                'tasks' => [],
-            ],
-        ];
-
-        // 3 subjects/classlists matching the 3 sections we created students for
         $subjects = [
             [
-                'name' => 'Physics',
-                'grade_level' => 'Grade 12',
-                'section' => 'STEM-A',
-                'strand' => 'STEM',
-                'track' => 'Academic',
-                'color' => 'indigo',
-                'user_id' => 1,
-                'school_year' => '2025-2026',
-                'grade_categories' => $defaultGradeCategories,
+                'subject_name' => 'Oral Communication',
+                'subject_code' => 'ORAL-COMM',
             ],
             [
-                'name' => 'Business Mathematics',
-                'grade_level' => 'Grade 11',
-                'section' => 'ABM-B',
-                'strand' => 'ABM',
-                'track' => 'Academic',
-                'color' => 'blue',
-                'user_id' => 1,
-                'school_year' => '2025-2026',
-                'grade_categories' => $defaultGradeCategories,
+                'subject_name' => 'Reading and Writing',
+                'subject_code' => 'READ-WRITE',
             ],
             [
-                'name' => 'Creative Writing',
-                'grade_level' => 'Grade 11',
-                'section' => 'HUMSS-A',
-                'strand' => 'HUMSS',
-                'track' => 'Academic',
-                'color' => 'amber',
-                'user_id' => 1,
-                'school_year' => '2025-2026',
-                'grade_categories' => $defaultGradeCategories,
+                'subject_name' => 'Komunikasyon at Pananaliksik sa Wika at Kulturang Pilipino',
+                'subject_code' => 'KOM-PAN',
+            ],
+            [
+                'subject_name' => 'General Mathematics',
+                'subject_code' => 'GEN-MATH',
+            ],
+            [
+                'subject_name' => 'Statistics and Probability',
+                'subject_code' => 'STAT-PROB',
+            ],
+            [
+                'subject_name' => 'Earth and Life Science',
+                'subject_code' => 'EARTH-LIFE',
+            ],
+            [
+                'subject_name' => 'Physical Science',
+                'subject_code' => 'PHYS-SCI',
+            ],
+            [
+                'subject_name' => 'Personal Development',
+                'subject_code' => 'PERDEV',
+            ],
+            [
+                'subject_name' => 'Understanding Culture, Society and Politics',
+                'subject_code' => 'UCSP',
+            ],
+            [
+                'subject_name' => '21st Century Literature from the Philippines and the World',
+                'subject_code' => '21CLPW',
+            ],
+            [
+                'subject_name' => 'Contemporary Philippine Arts from the Regions',
+                'subject_code' => 'CPAR',
+            ],
+            [
+                'subject_name' => 'Media and Information Literacy',
+                'subject_code' => 'MIL',
+            ],
+            [
+                'subject_name' => 'Earth Science',
+                'subject_code' => 'EARTH-SCI',
             ],
         ];
 
         foreach ($subjects as $subject) {
-            Subject::create($subject);
+            Subject::updateOrCreate(
+                ['subject_code' => $subject['subject_code']],
+                ['subject_name' => $subject['subject_name']]
+            );
         }
     }
 }

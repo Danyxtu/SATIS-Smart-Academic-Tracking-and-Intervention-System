@@ -7,10 +7,11 @@ use App\Models\Enrollment;
 use App\Models\Department;
 use App\Models\Grade;
 use App\Models\Role;
+use App\Models\SchoolClass;
+use App\Models\Section;
 use App\Models\Student;
 use App\Models\StudentNotification;
 use App\Models\Subject;
-use App\Models\SubjectTeacher;
 use App\Models\SystemSetting;
 use App\Models\User;
 use App\Services\EnrollmentGradeService;
@@ -133,7 +134,7 @@ class ClassController extends Controller
         $teacherId = $request->user()->id;
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
 
-        $archivedClasses = SubjectTeacher::query()
+        $archivedClasses = SchoolClass::query()
             ->withCount('enrollments')
             ->where('teacher_id', $teacherId)
             ->where('school_year', '!=', $currentSchoolYear)
@@ -179,7 +180,7 @@ class ClassController extends Controller
 
         $teacherId = $request->user()->id;
 
-        $archivedClasses = SubjectTeacher::query()
+        $archivedClasses = SchoolClass::query()
             ->with([
                 'subject',
                 'enrollments.user.student',
@@ -285,7 +286,7 @@ class ClassController extends Controller
             ], 422);
         }
 
-        $archivedClasses = SubjectTeacher::query()
+        $archivedClasses = SchoolClass::query()
             ->with('subject:id,subject_name')
             ->where('teacher_id', $teacherId)
             ->where('school_year', $sourceSchoolYear)
@@ -294,6 +295,7 @@ class ClassController extends Controller
             ->get([
                 'id',
                 'subject_id',
+                'section_id',
                 'grade_level',
                 'section',
                 'color',
@@ -318,7 +320,7 @@ class ClassController extends Controller
             ->values()
             ->all();
 
-        $existingSignatures = SubjectTeacher::query()
+        $existingSignatures = SchoolClass::query()
             ->where('teacher_id', $teacherId)
             ->where('school_year', $currentSchoolYear)
             ->where('semester', $targetSemester)
@@ -363,8 +365,20 @@ class ClassController extends Controller
                     continue;
                 }
 
-                $newClass = SubjectTeacher::create([
+                $resolvedSectionId = $archivedClass->section_id
+                    ? (int) $archivedClass->section_id
+                    : $this->resolveSectionRecordId(
+                        $teacherId,
+                        $currentSchoolYear,
+                        (string) $archivedClass->section,
+                        (string) $archivedClass->grade_level,
+                        $archivedClass->strand,
+                        $archivedClass->track,
+                    );
+
+                $newClass = SchoolClass::create([
                     'subject_id' => $archivedClass->subject_id,
+                    'section_id' => $resolvedSectionId,
                     'teacher_id' => $teacherId,
                     'grade_level' => $archivedClass->grade_level,
                     'section' => $archivedClass->section,
@@ -414,11 +428,27 @@ class ClassController extends Controller
     {
         $teacher = $request->user();
 
-        $result = $this->ClassesServices->createClass($request);
-
         // Get current semester from system settings
         $currentSemester = SystemSetting::getCurrentSemester();
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
+
+        $sanitizedManualStudents = collect($request->input('manual_students', []))
+            ->filter(fn($student) => is_array($student))
+            ->map(function (array $student) {
+                return [
+                    'student_name' => preg_replace('/\s+/', ' ', trim((string) ($student['student_name'] ?? ''))),
+                    'lrn' => $this->sanitizeLrn($student['lrn'] ?? null),
+                    'personal_email' => isset($student['personal_email']) && trim((string) $student['personal_email']) !== ''
+                        ? Str::lower(trim((string) $student['personal_email']))
+                        : null,
+                ];
+            })
+            ->values()
+            ->all();
+
+        $request->merge([
+            'manual_students' => $sanitizedManualStudents,
+        ]);
 
         $data = $request->validate([
             'grade_level' => 'required|string|max:255',
@@ -429,12 +459,24 @@ class ClassController extends Controller
             'strand' => ['required', 'string', Rule::exists('departments', 'department_code')],
             'track' => 'nullable|string|max:255',
             'classlist' => 'nullable|file|mimes:csv,txt,xls,xlsx|max:4096',
+            'manual_students' => 'nullable|array',
+            'manual_students.*' => 'array',
         ]);
 
         $sectionSuffix = strtoupper(trim($data['section']));
-        $sectionCombined = strtoupper(trim($data['strand'])) . '-' . $sectionSuffix;
+        $normalizedStrand = strtoupper(trim($data['strand']));
+        $sectionCombined = $normalizedStrand . '-' . $sectionSuffix;
 
-        $duplicateSectionCount = SubjectTeacher::query()
+        $sectionId = $this->resolveSectionRecordId(
+            (int) $teacher->id,
+            $currentSchoolYear,
+            $sectionCombined,
+            (string) $data['grade_level'],
+            $normalizedStrand,
+            $data['track'] ?? null,
+        );
+
+        $duplicateSectionCount = SchoolClass::query()
             ->where('teacher_id', $teacher->id)
             ->where('grade_level', $data['grade_level'])
             ->where('section', $sectionCombined)
@@ -448,12 +490,13 @@ class ClassController extends Controller
         );
 
         // Create the SubjectTeacher (teacher's class assignment)
-        $subjectTeacher = SubjectTeacher::create([
+        $subjectTeacher = SchoolClass::create([
             'subject_id' => $subject->id,
+            'section_id' => $sectionId,
             'teacher_id' => $teacher->id,
             'grade_level' => $data['grade_level'],
             'section' => $sectionCombined,
-            'strand' => strtoupper(trim($data['strand'])),
+            'strand' => $normalizedStrand,
             'track' => $data['track'] ?? null,
             'color' => $data['color'],
             'school_year' => $currentSchoolYear,
@@ -473,6 +516,11 @@ class ClassController extends Controller
                     ->withErrors(['classlist' => $exception->getMessage()])
                     ->withInput();
             }
+        }
+
+        if (! empty($data['manual_students'])) {
+            $manualSummary = $this->importManualStudents($subjectTeacher, $data['manual_students']);
+            $summary = $this->mergeImportSummaries($summary, $manualSummary);
         }
 
         return redirect()
@@ -496,7 +544,7 @@ class ClassController extends Controller
             ->with('import_summary', $summary);
     }
 
-    public function updateClass(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
+    public function updateClass(Request $request, SchoolClass $subjectTeacher): RedirectResponse
     {
         $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
@@ -513,7 +561,17 @@ class ClassController extends Controller
         ]);
 
         $sectionSuffix = strtoupper(trim($data['section']));
-        $sectionCombined = strtoupper(trim($data['strand'])) . '-' . $sectionSuffix;
+        $normalizedStrand = strtoupper(trim($data['strand']));
+        $sectionCombined = $normalizedStrand . '-' . $sectionSuffix;
+
+        $sectionId = $this->resolveSectionRecordId(
+            (int) $request->user()->id,
+            $currentSchoolYear,
+            $sectionCombined,
+            (string) $data['grade_level'],
+            $normalizedStrand,
+            $data['track'] ?? null,
+        );
 
         $subjectCode = Str::slug($data['subject_name'], '_') . '_' . Str::random(6);
         $subject = Subject::firstOrCreate(
@@ -523,9 +581,10 @@ class ClassController extends Controller
 
         $subjectTeacher->update([
             'subject_id' => $subject->id,
+            'section_id' => $sectionId,
             'grade_level' => $data['grade_level'],
             'section' => $sectionCombined,
-            'strand' => strtoupper(trim($data['strand'])),
+            'strand' => $normalizedStrand,
             'track' => $data['track'] ?? null,
             'color' => $data['color'],
             'school_year' => $currentSchoolYear,
@@ -536,7 +595,7 @@ class ClassController extends Controller
             ->with('success', 'Class updated successfully.');
     }
 
-    public function destroyClass(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
+    public function destroyClass(Request $request, SchoolClass $subjectTeacher): RedirectResponse
     {
         $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
@@ -557,7 +616,7 @@ class ClassController extends Controller
             ->with('success', 'Class deleted successfully.');
     }
 
-    public function enrollStudent(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
+    public function enrollStudent(Request $request, SchoolClass $subjectTeacher): RedirectResponse
     {
         $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
@@ -620,7 +679,7 @@ class ClassController extends Controller
         return $redirect;
     }
 
-    public function uploadClasslist(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
+    public function uploadClasslist(Request $request, SchoolClass $subjectTeacher): RedirectResponse
     {
         $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
@@ -640,7 +699,7 @@ class ClassController extends Controller
             ->with('import_summary', $summary);
     }
 
-    public function updateGradeStructure(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
+    public function updateGradeStructure(Request $request, SchoolClass $subjectTeacher): RedirectResponse
     {
         $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
@@ -700,7 +759,7 @@ class ClassController extends Controller
         return back()->with('success', 'Grade structure updated.');
     }
 
-    private function importClasslist(SubjectTeacher $subjectTeacher, UploadedFile $file): array
+    private function importClasslist(SchoolClass $subjectTeacher, UploadedFile $file): array
     {
         $rows = $this->readSpreadsheetRows($file);
 
@@ -796,7 +855,138 @@ class ClassController extends Controller
         return $summary;
     }
 
-    private function persistStudentRecord(SubjectTeacher $subjectTeacher, array $payload): array
+    private function importManualStudents(SchoolClass $subjectTeacher, array $manualStudents): array
+    {
+        $summary = [
+            'newly_created' => 0,
+            'assigned_existing' => 0,
+            'already_enrolled' => 0,
+            'skipped' => 0,
+            'errors' => [],
+            'newly_created_students' => [],
+            'assigned_existing_students' => [],
+            'already_enrolled_students' => [],
+        ];
+
+        $seenLrns = [];
+
+        foreach ($manualStudents as $index => $manualStudent) {
+            $rowNumber = $index + 1;
+
+            $payload = [
+                'student_name' => preg_replace('/\s+/', ' ', trim((string) ($manualStudent['student_name'] ?? ''))),
+                'lrn' => $this->sanitizeLrn($manualStudent['lrn'] ?? null),
+                'personal_email' => $manualStudent['personal_email'] ?? null,
+                'grade_level' => $subjectTeacher->grade_level,
+                'section' => $subjectTeacher->section,
+                'strand' => $subjectTeacher->strand,
+                'track' => $subjectTeacher->track,
+            ];
+
+            if (empty($payload['student_name']) || empty($payload['lrn'])) {
+                $summary['skipped']++;
+                $summary['errors'][] = "Student #{$rowNumber}: Missing required student name or LRN.";
+                continue;
+            }
+
+            if (isset($seenLrns[$payload['lrn']])) {
+                $summary['skipped']++;
+                $summary['errors'][] = "Student #{$rowNumber}: Duplicate LRN {$payload['lrn']} detected in this queue.";
+                continue;
+            }
+
+            $seenLrns[$payload['lrn']] = true;
+
+            try {
+                $result = $this->persistStudentRecord($subjectTeacher, $payload);
+
+                if ($result['status'] === 'created') {
+                    $summary['newly_created']++;
+                    $summary['newly_created_students'][] = [
+                        'name' => $payload['student_name'] ?? null,
+                        'lrn' => $payload['lrn'] ?? null,
+                        'username' => $result['username'] ?? null,
+                        'personal_email' => $result['personal_email'] ?? null,
+                        'password' => $result['password'],
+                    ];
+                } elseif ($result['status'] === 'assigned_existing') {
+                    $summary['assigned_existing']++;
+                    $summary['assigned_existing_students'][] = [
+                        'name' => $payload['student_name'] ?? null,
+                        'lrn' => $payload['lrn'] ?? null,
+                        'username' => $result['username'] ?? null,
+                        'personal_email' => $result['personal_email'] ?? null,
+                    ];
+                } elseif ($result['status'] === 'already_assigned') {
+                    $summary['already_enrolled']++;
+                    $summary['already_enrolled_students'][] = [
+                        'name' => $payload['student_name'] ?? null,
+                        'lrn' => $payload['lrn'] ?? null,
+                        'username' => $result['username'] ?? null,
+                        'personal_email' => $result['personal_email'] ?? null,
+                    ];
+                }
+            } catch (ValidationException $exception) {
+                $summary['skipped']++;
+                $summary['errors'][] = "Student #{$rowNumber}: " . $this->flattenValidationErrors($exception);
+            } catch (RuntimeException $exception) {
+                $summary['skipped']++;
+                $summary['errors'][] = "Student #{$rowNumber}: {$exception->getMessage()}";
+            }
+        }
+
+        $summary['imported'] = $summary['newly_created'];
+        $summary['updated'] = $summary['assigned_existing'] + $summary['already_enrolled'];
+        $summary['created_students'] = $summary['newly_created_students'];
+
+        return $summary;
+    }
+
+    private function mergeImportSummaries(?array $baseSummary, ?array $incomingSummary): ?array
+    {
+        if ($baseSummary === null) {
+            return $incomingSummary;
+        }
+
+        if ($incomingSummary === null) {
+            return $baseSummary;
+        }
+
+        $merged = [
+            'newly_created' => (int) ($baseSummary['newly_created'] ?? $baseSummary['imported'] ?? 0)
+                + (int) ($incomingSummary['newly_created'] ?? $incomingSummary['imported'] ?? 0),
+            'assigned_existing' => (int) ($baseSummary['assigned_existing'] ?? 0)
+                + (int) ($incomingSummary['assigned_existing'] ?? 0),
+            'already_enrolled' => (int) ($baseSummary['already_enrolled'] ?? 0)
+                + (int) ($incomingSummary['already_enrolled'] ?? 0),
+            'skipped' => (int) ($baseSummary['skipped'] ?? 0)
+                + (int) ($incomingSummary['skipped'] ?? 0),
+            'errors' => array_values(array_merge(
+                $baseSummary['errors'] ?? [],
+                $incomingSummary['errors'] ?? [],
+            )),
+            'newly_created_students' => array_values(array_merge(
+                $baseSummary['newly_created_students'] ?? $baseSummary['created_students'] ?? [],
+                $incomingSummary['newly_created_students'] ?? $incomingSummary['created_students'] ?? [],
+            )),
+            'assigned_existing_students' => array_values(array_merge(
+                $baseSummary['assigned_existing_students'] ?? [],
+                $incomingSummary['assigned_existing_students'] ?? [],
+            )),
+            'already_enrolled_students' => array_values(array_merge(
+                $baseSummary['already_enrolled_students'] ?? [],
+                $incomingSummary['already_enrolled_students'] ?? [],
+            )),
+        ];
+
+        $merged['imported'] = $merged['newly_created'];
+        $merged['updated'] = $merged['assigned_existing'] + $merged['already_enrolled'];
+        $merged['created_students'] = $merged['newly_created_students'];
+
+        return $merged;
+    }
+
+    private function persistStudentRecord(SchoolClass $subjectTeacher, array $payload): array
     {
         if (! array_key_exists('personal_email', $payload) && array_key_exists('email', $payload)) {
             $payload['personal_email'] = $payload['email'];
@@ -889,22 +1079,28 @@ class ClassController extends Controller
 
         // Update student record - use student_name (single field)
         $student->student_name = $studentName;
-        $student->subject = $subjectTeacher->subject?->subject_name ?? 'N/A';
+        if (! filled($student->subject)) {
+            $student->subject = $subjectTeacher->subject?->subject_name ?? 'N/A';
+        }
         $student->grade = $student->grade ?? 75;
         $student->trend = $student->trend ?? 'Stable';
         $student->avatar = $student->avatar ?? $this->avatarFor($studentName);
         $student->lrn = $lrn;
-        $student->grade_level = $payload['grade_level'] ?? $subjectTeacher->grade_level;
-        $student->section = $payload['section'] ?? $subjectTeacher->section;
-        $student->strand = $payload['strand'] ?? $subjectTeacher->strand ?? 'N/A';
-        $student->track = $payload['track'] ?? $subjectTeacher->track ?? 'N/A';
+        $student->grade_level = $student->grade_level ?: ($payload['grade_level'] ?? $subjectTeacher->grade_level);
+        $student->section = $student->section ?: ($payload['section'] ?? $subjectTeacher->section);
+        $student->strand = $student->strand ?: ($payload['strand'] ?? $subjectTeacher->strand ?? 'N/A');
+        $student->track = $student->track ?: ($payload['track'] ?? $subjectTeacher->track ?? 'N/A');
+
+        if (empty($student->section_id) && ! empty($subjectTeacher->section_id)) {
+            $student->section_id = $subjectTeacher->section_id;
+        }
 
         $student->save();
 
         $enrollment = Enrollment::firstOrCreate(
             [
                 'user_id' => $student->user_id,
-                'subject_teachers_id' => $subjectTeacher->id,
+                'class_id' => $subjectTeacher->id,
             ],
             [
                 'risk_status' => 'low',
@@ -1110,7 +1306,7 @@ class ClassController extends Controller
         return true;
     }
 
-    private function ensureTeacherOwnsSubjectTeacher(int $teacherId, SubjectTeacher $subjectTeacher): void
+    private function ensureTeacherOwnsSubjectTeacher(int $teacherId, SchoolClass $subjectTeacher): void
     {
         if ($subjectTeacher->teacher_id !== $teacherId) {
             abort(403, 'You are not allowed to modify this class.');
@@ -1126,12 +1322,91 @@ class ClassController extends Controller
         ]);
     }
 
+    private function resolveSectionRecordId(
+        int $teacherId,
+        string $schoolYear,
+        string $sectionCombined,
+        string $gradeLevel,
+        ?string $strand,
+        ?string $track,
+    ): int {
+        $normalizedSection = strtoupper(trim($sectionCombined));
+        $normalizedStrand = strtoupper(trim((string) $strand));
+
+        if ($normalizedStrand === '' && str_contains($normalizedSection, '-')) {
+            $normalizedStrand = strtoupper((string) Str::before($normalizedSection, '-'));
+        }
+
+        $departmentQuery = Department::query();
+
+        if ($normalizedStrand !== '') {
+            $departmentQuery->where('department_code', $normalizedStrand);
+        } else {
+            $teacherDepartmentId = User::query()
+                ->whereKey($teacherId)
+                ->value('department_id');
+
+            if ($teacherDepartmentId) {
+                $departmentQuery->whereKey($teacherDepartmentId);
+            }
+        }
+
+        $department = $departmentQuery->first();
+
+        if (! $department) {
+            throw ValidationException::withMessages([
+                'strand' => 'Selected strand is not linked to a department.',
+            ]);
+        }
+
+        $cohort = $this->cohortFromSchoolYear($schoolYear);
+
+        $sectionRecord = Section::query()
+            ->where('department_id', $department->id)
+            ->where('cohort', $cohort)
+            ->where(function ($query) use ($normalizedSection) {
+                $query
+                    ->whereRaw('UPPER(section_name) = ?', [$normalizedSection])
+                    ->orWhereRaw('UPPER(section_code) = ?', [$normalizedSection]);
+            })
+            ->first();
+
+        if ($sectionRecord) {
+            return (int) $sectionRecord->id;
+        }
+
+        $sectionRecord = Section::create([
+            'department_id' => $department->id,
+            'created_by' => $teacherId,
+            'section_name' => $normalizedSection,
+            'section_code' => $normalizedSection,
+            'cohort' => $cohort,
+            'grade_level' => $gradeLevel,
+            'strand' => $normalizedStrand !== '' ? $normalizedStrand : $department->department_code,
+            'track' => $track,
+            'school_year' => $schoolYear,
+            'description' => 'Auto-created from teacher class workflow.',
+            'is_active' => true,
+        ]);
+
+        return (int) $sectionRecord->id;
+    }
+
+    private function cohortFromSchoolYear(string $schoolYear): string
+    {
+        if (preg_match('/^(\d{4})-\d{4}$/', $schoolYear, $matches) === 1) {
+            return $matches[1];
+        }
+
+        return $schoolYear;
+    }
+
 
 
     /**
      * Send a nudge notification to all students in a class.
      */
-    public function sendNudge(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
+    public function sendNudge(Request $request, SchoolClass $subjectTeacher): RedirectResponse
     {
         $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
@@ -1178,7 +1453,7 @@ class ClassController extends Controller
      * If the current quarter has no quarterly-exam scores the teacher must
      * confirm by providing their password.
      */
-    public function startQuarter(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
+    public function startQuarter(Request $request, SchoolClass $subjectTeacher): RedirectResponse
     {
         $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
 
@@ -1253,7 +1528,7 @@ class ClassController extends Controller
      * Check if at least one enrollment in the class has a quarterly-exam score
      * for the given quarter.
      */
-    private function classHasQuarterlyExamScores(SubjectTeacher $subjectTeacher, int $quarter): bool
+    private function classHasQuarterlyExamScores(SchoolClass $subjectTeacher, int $quarter): bool
     {
         $categories = $this->resolveQuarterCategories($subjectTeacher->grade_categories, $quarter);
 
@@ -1286,7 +1561,7 @@ class ClassController extends Controller
         return false;
     }
 
-    public function myClass(Request $request, SubjectTeacher $subjectTeacher)
+    public function myClass(Request $request, SchoolClass $subjectTeacher)
     {
         try {
             // Add error logging

@@ -5,8 +5,7 @@ namespace App\Http\Controllers\Teacher;
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\Grade;
-use App\Models\Subject;
-use App\Models\SubjectTeacher;
+use App\Models\SchoolClass;
 use App\Support\Concerns\HasDefaultAssignments;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,9 +22,9 @@ class GradeController extends Controller
         'lrn' => ['lrn', 'student_lrn', 'student lrn', 'learner_reference_number', 'learner reference number'],
     ];
 
-    public function bulkStore(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse
+    public function bulkStore(Request $request, SchoolClass $subjectTeacher): RedirectResponse
     {
-        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
+        $this->ensureTeacherOwnsClass($request->user()->id, $subjectTeacher);
 
         $stored = $subjectTeacher->grade_categories ?? [];
         $q1Structure = $this->buildGradeStructure($this->resolveQuarterCategories($stored, 1));
@@ -68,7 +67,7 @@ class GradeController extends Controller
 
         $enrollmentIds = collect($data['grades'])->pluck('enrollment_id')->unique()->values();
 
-        $enrollments = Enrollment::where('subject_teachers_id', $subjectTeacher->id)
+        $enrollments = Enrollment::where('class_id', $subjectTeacher->id)
             ->whereIn('id', $enrollmentIds)
             ->get()
             ->keyBy('id');
@@ -138,9 +137,9 @@ class GradeController extends Controller
             ->with('grade_update_summary', $summary);
     }
 
-    public function import(Request $request, SubjectTeacher $subjectTeacher): RedirectResponse|\Illuminate\Http\JsonResponse
+    public function import(Request $request, SchoolClass $subjectTeacher): RedirectResponse|\Illuminate\Http\JsonResponse
     {
-        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
+        $this->ensureTeacherOwnsClass($request->user()->id, $subjectTeacher);
 
         $request->validate([
             'grades_file' => 'required|file|mimes:csv,txt|max:4096',
@@ -190,7 +189,7 @@ class GradeController extends Controller
             ->with('grade_import_summary', $summary);
     }
 
-    private function importGradesFromCsv(SubjectTeacher $subjectTeacher, UploadedFile $file, array $structure, int $quarter = 1): array
+    private function importGradesFromCsv(SchoolClass $subjectTeacher, UploadedFile $file, array $structure, int $quarter = 1): array
     {
         $rows = $this->readSpreadsheetRows($file);
 
@@ -341,10 +340,10 @@ class GradeController extends Controller
         return $map;
     }
 
-    private function locateEnrollment(SubjectTeacher $subjectTeacher, ?string $lrn, ?string $name): ?Enrollment
+    private function locateEnrollment(SchoolClass $subjectTeacher, ?string $lrn, ?string $name): ?Enrollment
     {
         $query = Enrollment::with(['user.student'])
-            ->where('subject_teachers_id', $subjectTeacher->id);
+            ->where('class_id', $subjectTeacher->id);
 
         if ($lrn) {
             return (clone $query)
@@ -427,7 +426,7 @@ class GradeController extends Controller
         return true;
     }
 
-    private function ensureTeacherOwnsSubjectTeacher(int $teacherId, SubjectTeacher $subjectTeacher): void
+    private function ensureTeacherOwnsClass(int $teacherId, SchoolClass $subjectTeacher): void
     {
         if ($subjectTeacher->teacher_id !== $teacherId) {
             abort(403, 'You are not allowed to modify this class.');

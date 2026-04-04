@@ -42,6 +42,20 @@ class AppServiceProvider extends ServiceProvider
             return $user->hasRole('super_admin');
         });
 
+        // Subject management gates (super_admin only)
+        Gate::define('manage-subjects', function (User $user) {
+            return $user->hasRole('super_admin');
+        });
+        Gate::define('create-subject', function (User $user) {
+            return $user->hasRole('super_admin');
+        });
+        Gate::define('update-subject', function (User $user) {
+            return $user->hasRole('super_admin');
+        });
+        Gate::define('delete-subject', function (User $user) {
+            return $user->hasRole('super_admin');
+        });
+
         Gate::define('access-teacher-portal', function (User $user) {
             return $user->hasRole('teacher');
         });

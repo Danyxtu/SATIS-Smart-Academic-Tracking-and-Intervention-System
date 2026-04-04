@@ -9,8 +9,8 @@ use App\Models\Enrollment;
 use App\Models\Grade;
 use App\Models\Intervention;
 use App\Models\InterventionTask;
+use App\Models\SchoolClass;
 use App\Models\StudentNotification;
-use App\Models\SubjectTeacher;
 use App\Models\SystemSetting;
 use App\Models\User;
 use App\Services\SchoolYearArchiveDetailsService;
@@ -44,7 +44,7 @@ class SettingsController extends Controller
         $syStats    = $this->buildSyStats($currentSY, $currentSem);
 
         // Archive: all distinct school years that have classes, excluding current
-        $archiveYears = SubjectTeacher::select('school_year')
+        $archiveYears = SchoolClass::select('school_year')
             ->distinct()
             ->where('school_year', '!=', $currentSY)
             ->orderByDesc('school_year')
@@ -296,8 +296,8 @@ class SettingsController extends Controller
 
     private function createArchiveSnapshot(string $oldSY, string $newSY, ?int $userId): string
     {
-        $classIds = SubjectTeacher::where('school_year', $oldSY)->pluck('id');
-        $enrollmentIds = Enrollment::whereIn('subject_teachers_id', $classIds)->pluck('id');
+        $classIds = SchoolClass::where('school_year', $oldSY)->pluck('id');
+        $enrollmentIds = Enrollment::whereIn('class_id', $classIds)->pluck('id');
         $interventionIds = Intervention::whereIn('enrollment_id', $enrollmentIds)->pluck('id');
         $details = app(SchoolYearArchiveDetailsService::class)->build($oldSY);
 
@@ -347,14 +347,14 @@ class SettingsController extends Controller
 
     private function buildSyStats(string $schoolYear, ?int $semester = null): array
     {
-        $classQuery = SubjectTeacher::where('school_year', $schoolYear);
+        $classQuery = SchoolClass::where('school_year', $schoolYear);
         $semQuery   = $semester ? (clone $classQuery)->where('semester', $semester) : clone $classQuery;
         $classIds   = $semQuery->pluck('id');
 
-        $students = Enrollment::whereIn('subject_teachers_id', $classIds)
+        $students = Enrollment::whereIn('class_id', $classIds)
             ->distinct('user_id')->count('user_id');
 
-        $teachers = SubjectTeacher::where('school_year', $schoolYear)
+        $teachers = SchoolClass::where('school_year', $schoolYear)
             ->distinct('teacher_id')->count('teacher_id');
 
         $departments = Department::withCount([

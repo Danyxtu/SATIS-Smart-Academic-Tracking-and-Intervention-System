@@ -18,6 +18,7 @@ import {
     Key,
     Building2,
     UserPlus,
+    Layers3,
 } from "lucide-react";
 
 export default function AdminLayout({ children }) {
@@ -48,6 +49,12 @@ export default function AdminLayout({ children }) {
             label: "User Management",
             destination: "admin.users.index",
             activeCheck: "admin.users.*",
+        },
+        {
+            icon: <Layers3 size={18} />,
+            label: "Section Management",
+            destination: "admin.sections.index",
+            activeCheck: "admin.sections.*",
         },
         {
             icon: <UserPlus size={18} />,

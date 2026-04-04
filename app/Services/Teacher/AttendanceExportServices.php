@@ -2,7 +2,7 @@
 
 namespace App\Services\Teacher;
 
-use App\Models\SubjectTeacher;
+use App\Models\SchoolClass;
 
 class AttendanceExportServices
 {
@@ -14,7 +14,7 @@ class AttendanceExportServices
         //
     }
 
-    public function exportCSV(SubjectTeacher $subjectTeacher)
+    public function exportCSV(SchoolClass $subjectTeacher)
     {
         // Load relationships
         $subjectTeacher->load([
@@ -38,7 +38,7 @@ class AttendanceExportServices
         return $this->streamCsv($headers, $rows, $filename);
     }
 
-    public function exportPDF(SubjectTeacher $subjectTeacher)
+    public function exportPDF(SchoolClass $subjectTeacher)
     {
         // Try to use Dompdf via barryvdh/laravel-dompdf (use string to avoid static analysis error when package is not installed)
         if (! class_exists('Barryvdh\\DomPDF\\Facade\\Pdf')) {
@@ -119,7 +119,7 @@ class AttendanceExportServices
     /**
      * Private functions
      */
-    private function getAllDates(SubjectTeacher $subjectTeacher): array
+    private function getAllDates(SchoolClass $subjectTeacher): array
     {
         return $subjectTeacher->enrollments
             ->flatMap(fn($e) => $e->attendanceRecords->pluck('date'))
@@ -130,7 +130,7 @@ class AttendanceExportServices
             ->toArray();
     }
 
-    private function buildRows(SubjectTeacher $subjectTeacher, array $allDates): array
+    private function buildRows(SchoolClass $subjectTeacher, array $allDates): array
     {
         return $subjectTeacher->enrollments
             ->map(function ($enrollment) use ($allDates) {
@@ -181,7 +181,7 @@ class AttendanceExportServices
             ->toArray();
     }
 
-    private function generateFilename(SubjectTeacher $subjectTeacher): string
+    private function generateFilename(SchoolClass $subjectTeacher): string
     {
         return sprintf(
             'attendance_%s_%s_%s.csv',
