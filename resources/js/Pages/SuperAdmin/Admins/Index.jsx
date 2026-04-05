@@ -1,5 +1,5 @@
 import { Head, Link, router } from "@inertiajs/react";
-import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import {
     UserCog,
     Plus,
@@ -500,4 +500,4 @@ export default function Index({ admins, departments, filters }) {
     );
 }
 
-Index.layout = (page) => <SuperAdminLayout children={page} />;
+Index.layout = (page) => <SchoolStaffLayout children={page} />;

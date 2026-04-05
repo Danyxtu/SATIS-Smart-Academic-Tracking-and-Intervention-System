@@ -1,5 +1,5 @@
 import React from "react";
-import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import UnifiedDashboardSwitcher from "@/Components/UnifiedDashboardSwitcher";
 import { Head, Link } from "@inertiajs/react";
 import {
@@ -165,7 +165,7 @@ export default function Dashboard({ auth, stats, userTrends, department }) {
     ];
 
     return (
-        <SuperAdminLayout>
+        <>
             <Head title="Admin Dashboard" />
 
             {/* Department Header Banner */}
@@ -320,6 +320,8 @@ export default function Dashboard({ auth, stats, userTrends, department }) {
                     </Link>
                 </div>
             </div>
-        </SuperAdminLayout>
+        </>
     );
 }
+
+Dashboard.layout = (page) => <SchoolStaffLayout children={page} />;

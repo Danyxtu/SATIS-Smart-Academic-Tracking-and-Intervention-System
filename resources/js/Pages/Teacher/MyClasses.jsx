@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
-import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import { useLoading } from "@/Context/LoadingContext";
 import {
@@ -1799,6 +1799,6 @@ const MyClasses = ({
     );
 };
 
-MyClasses.layout = (page) => <SuperAdminLayout children={page} />;
+MyClasses.layout = (page) => <SchoolStaffLayout children={page} />;
 
 export default MyClasses;

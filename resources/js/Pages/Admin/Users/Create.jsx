@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import AdminLayout from "@/Layouts/AdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import { Head, Link, useForm, usePage } from "@inertiajs/react";
 import {
     UserPlus,
@@ -119,7 +119,7 @@ export default function Create({ department }) {
     ];
 
     return (
-        <AdminLayout>
+        <>
             <Head title="Create User" />
 
             {/* Department Info Banner */}
@@ -515,6 +515,8 @@ export default function Create({ department }) {
                     </div>
                 </form>
             </div>
-        </AdminLayout>
+        </>
     );
 }
+
+Create.layout = (page) => <SchoolStaffLayout children={page} />;

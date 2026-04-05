@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Head, Link } from "@inertiajs/react";
-import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import {
     Archive,
     ArrowLeft,
@@ -1108,4 +1108,4 @@ export default function Show({
     );
 }
 
-Show.layout = (page) => <SuperAdminLayout children={page} />;
+Show.layout = (page) => <SchoolStaffLayout children={page} />;

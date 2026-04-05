@@ -1,5 +1,5 @@
 import React from "react";
-import AdminLayout from "@/Layouts/AdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import { Head, Link, useForm } from "@inertiajs/react";
 import {
     Edit as EditIcon,
@@ -106,7 +106,7 @@ export default function Edit({ user, department }) {
     ];
 
     return (
-        <AdminLayout>
+        <>
             <Head title={`Edit User - ${user.name}`} />
 
             {/* Department Info Banner */}
@@ -377,6 +377,8 @@ export default function Edit({ user, department }) {
                     </div>
                 </form>
             </div>
-        </AdminLayout>
+        </>
     );
 }
+
+Edit.layout = (page) => <SchoolStaffLayout children={page} />;

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import { Head, Link } from "@inertiajs/react";
 import {
     ArrowLeft,
@@ -96,8 +96,7 @@ const StatChip = ({ label, value, tone = "slate" }) => {
             "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
         rose: "bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
         amber: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
-        indigo:
-            "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
+        indigo: "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
     };
 
     return (
@@ -131,7 +130,10 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
             return;
         }
 
-        const currentMonthKey = toMonthKey(selectedMonth.year, selectedMonth.month);
+        const currentMonthKey = toMonthKey(
+            selectedMonth.year,
+            selectedMonth.month,
+        );
         const hasCurrentMonth = dates.some((dateString) => {
             const date = new Date(dateString);
             return (
@@ -164,7 +166,8 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
     const activeMonthIndex = availableMonthKeys.indexOf(activeMonthKey);
     const canGoPrev = activeMonthIndex > 0;
     const canGoNext =
-        activeMonthIndex !== -1 && activeMonthIndex < availableMonthKeys.length - 1;
+        activeMonthIndex !== -1 &&
+        activeMonthIndex < availableMonthKeys.length - 1;
 
     const filteredDates = useMemo(() => {
         return dates.filter((dateStr) => {
@@ -233,14 +236,18 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
         if (!canGoPrev) {
             return;
         }
-        setSelectedMonth(parseMonthKey(availableMonthKeys[activeMonthIndex - 1]));
+        setSelectedMonth(
+            parseMonthKey(availableMonthKeys[activeMonthIndex - 1]),
+        );
     };
 
     const goToNextMonth = () => {
         if (!canGoNext) {
             return;
         }
-        setSelectedMonth(parseMonthKey(availableMonthKeys[activeMonthIndex + 1]));
+        setSelectedMonth(
+            parseMonthKey(availableMonthKeys[activeMonthIndex + 1]),
+        );
     };
 
     const handleExportCSV = () => {
@@ -255,11 +262,14 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
         });
     };
 
-    const isTableEmpty = filteredStudents.length === 0 || filteredDates.length === 0;
+    const isTableEmpty =
+        filteredStudents.length === 0 || filteredDates.length === 0;
 
     return (
         <>
-            <Head title={`${section.grade_level} - ${section.section} Attendance Log`} />
+            <Head
+                title={`${section.grade_level} - ${section.section} Attendance Log`}
+            />
 
             <div className="space-y-4">
                 <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5">
@@ -323,7 +333,13 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
                         <StatChip
                             label="Overall Rate"
                             value={`${monthRate}%`}
-                            tone={monthRate >= 90 ? "emerald" : monthRate >= 75 ? "amber" : "rose"}
+                            tone={
+                                monthRate >= 90
+                                    ? "emerald"
+                                    : monthRate >= 75
+                                      ? "amber"
+                                      : "rose"
+                            }
                         />
                     </div>
                 </section>
@@ -339,8 +355,14 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
                                 <ChevronLeft size={16} />
                             </button>
                             <div className="flex min-w-[190px] items-center justify-center gap-1.5 px-3 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                                <Calendar size={14} className="text-indigo-500" />
-                                {getMonthName(selectedMonth.year, selectedMonth.month)}
+                                <Calendar
+                                    size={14}
+                                    className="text-indigo-500"
+                                />
+                                {getMonthName(
+                                    selectedMonth.year,
+                                    selectedMonth.month,
+                                )}
                             </div>
                             <button
                                 onClick={goToNextMonth}
@@ -432,7 +454,7 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
                                                 colSpan={7}
                                                 className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
                                             >
-                                                No attendance records for {" "}
+                                                No attendance records for{" "}
                                                 {getMonthName(
                                                     selectedMonth.year,
                                                     selectedMonth.month,
@@ -441,55 +463,80 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredStudents.map((student, index) => {
-                                            const rowClass =
-                                                index % 2 === 0
-                                                    ? "bg-white dark:bg-slate-800"
-                                                    : "bg-slate-50/60 dark:bg-slate-800/70";
+                                        filteredStudents.map(
+                                            (student, index) => {
+                                                const rowClass =
+                                                    index % 2 === 0
+                                                        ? "bg-white dark:bg-slate-800"
+                                                        : "bg-slate-50/60 dark:bg-slate-800/70";
 
-                                            return (
-                                                <tr
-                                                    key={student.id}
-                                                    className={`${rowClass} hover:bg-indigo-50/40 dark:hover:bg-slate-700/40`}
-                                                >
-                                                    <td className="px-3 py-2.5 text-sm font-medium text-slate-900 dark:text-slate-100">
-                                                        {student.name}
-                                                    </td>
-                                                    <td className="px-3 py-2.5 text-sm text-slate-500 dark:text-slate-400">
-                                                        {student.lrn || "-"}
-                                                    </td>
-                                                    <td className="px-3 py-2.5 text-center text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                                                        {student.monthStats.present}
-                                                    </td>
-                                                    <td className="px-3 py-2.5 text-center text-sm font-semibold text-rose-700 dark:text-rose-300">
-                                                        {student.monthStats.absent}
-                                                    </td>
-                                                    <td className="px-3 py-2.5 text-center text-sm font-semibold text-amber-700 dark:text-amber-300">
-                                                        {student.monthStats.late}
-                                                    </td>
-                                                    <td className="px-3 py-2.5 text-center text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                                        {student.monthStats.total}
-                                                    </td>
-                                                    <td className="px-3 py-2.5 text-center">
-                                                        <span
-                                                            className={`text-sm font-bold ${
-                                                                student.monthStats
-                                                                    .rate >= 90
-                                                                    ? "text-emerald-600 dark:text-emerald-300"
-                                                                    : student
-                                                                            .monthStats
-                                                                            .rate >=
-                                                                        75
-                                                                      ? "text-amber-600 dark:text-amber-300"
-                                                                      : "text-rose-600 dark:text-rose-300"
-                                                            }`}
-                                                        >
-                                                            {student.monthStats.rate}%
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
+                                                return (
+                                                    <tr
+                                                        key={student.id}
+                                                        className={`${rowClass} hover:bg-indigo-50/40 dark:hover:bg-slate-700/40`}
+                                                    >
+                                                        <td className="px-3 py-2.5 text-sm font-medium text-slate-900 dark:text-slate-100">
+                                                            {student.name}
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-sm text-slate-500 dark:text-slate-400">
+                                                            {student.lrn || "-"}
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-center text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                                                            {
+                                                                student
+                                                                    .monthStats
+                                                                    .present
+                                                            }
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-center text-sm font-semibold text-rose-700 dark:text-rose-300">
+                                                            {
+                                                                student
+                                                                    .monthStats
+                                                                    .absent
+                                                            }
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-center text-sm font-semibold text-amber-700 dark:text-amber-300">
+                                                            {
+                                                                student
+                                                                    .monthStats
+                                                                    .late
+                                                            }
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-center text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                                            {
+                                                                student
+                                                                    .monthStats
+                                                                    .total
+                                                            }
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-center">
+                                                            <span
+                                                                className={`text-sm font-bold ${
+                                                                    student
+                                                                        .monthStats
+                                                                        .rate >=
+                                                                    90
+                                                                        ? "text-emerald-600 dark:text-emerald-300"
+                                                                        : student
+                                                                                .monthStats
+                                                                                .rate >=
+                                                                            75
+                                                                          ? "text-amber-600 dark:text-amber-300"
+                                                                          : "text-rose-600 dark:text-rose-300"
+                                                                }`}
+                                                            >
+                                                                {
+                                                                    student
+                                                                        .monthStats
+                                                                        .rate
+                                                                }
+                                                                %
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            },
+                                        )
                                     )}
                                 </tbody>
                             </table>
@@ -535,10 +582,12 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
                                     {isTableEmpty ? (
                                         <tr>
                                             <td
-                                                colSpan={filteredDates.length + 5}
+                                                colSpan={
+                                                    filteredDates.length + 5
+                                                }
                                                 className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
                                             >
-                                                No attendance records for {" "}
+                                                No attendance records for{" "}
                                                 {getMonthName(
                                                     selectedMonth.year,
                                                     selectedMonth.month,
@@ -547,63 +596,87 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredStudents.map((student, index) => {
-                                            const rowClass =
-                                                index % 2 === 0
-                                                    ? "bg-white dark:bg-slate-800"
-                                                    : "bg-slate-50/60 dark:bg-slate-800/70";
+                                        filteredStudents.map(
+                                            (student, index) => {
+                                                const rowClass =
+                                                    index % 2 === 0
+                                                        ? "bg-white dark:bg-slate-800"
+                                                        : "bg-slate-50/60 dark:bg-slate-800/70";
 
-                                            return (
-                                                <tr
-                                                    key={student.id}
-                                                    className={`${rowClass} hover:bg-indigo-50/40 dark:hover:bg-slate-700/40`}
-                                                >
-                                                    <td
-                                                        className={`sticky left-0 z-10 border-r border-slate-200 px-3 py-2.5 dark:border-slate-700 ${rowClass}`}
+                                                return (
+                                                    <tr
+                                                        key={student.id}
+                                                        className={`${rowClass} hover:bg-indigo-50/40 dark:hover:bg-slate-700/40`}
                                                     >
-                                                        <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                                                            {student.name}
-                                                        </div>
-                                                        {student.lrn && (
-                                                            <div className="text-xs text-slate-400 dark:text-slate-500">
-                                                                LRN: {student.lrn}
-                                                            </div>
-                                                        )}
-                                                    </td>
-
-                                                    {filteredDates.map((date) => (
                                                         <td
-                                                            key={date}
-                                                            className="px-1.5 py-2"
+                                                            className={`sticky left-0 z-10 border-r border-slate-200 px-3 py-2.5 dark:border-slate-700 ${rowClass}`}
                                                         >
-                                                            <div className="flex justify-center">
-                                                                <StatusCell
-                                                                    status={
-                                                                        student
-                                                                            .monthAttendance[
-                                                                            date
-                                                                        ]
-                                                                    }
-                                                                />
+                                                            <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                                                                {student.name}
                                                             </div>
+                                                            {student.lrn && (
+                                                                <div className="text-xs text-slate-400 dark:text-slate-500">
+                                                                    LRN:{" "}
+                                                                    {
+                                                                        student.lrn
+                                                                    }
+                                                                </div>
+                                                            )}
                                                         </td>
-                                                    ))}
 
-                                                    <td className="border-l border-slate-200 px-2 py-2.5 text-center text-sm font-semibold text-emerald-700 dark:border-slate-700 dark:text-emerald-300">
-                                                        {student.monthStats.present}
-                                                    </td>
-                                                    <td className="px-2 py-2.5 text-center text-sm font-semibold text-rose-700 dark:text-rose-300">
-                                                        {student.monthStats.absent}
-                                                    </td>
-                                                    <td className="px-2 py-2.5 text-center text-sm font-semibold text-amber-700 dark:text-amber-300">
-                                                        {student.monthStats.late}
-                                                    </td>
-                                                    <td className="px-2 py-2.5 text-center text-sm font-semibold text-indigo-700 dark:text-indigo-300">
-                                                        {student.monthStats.rate}%
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
+                                                        {filteredDates.map(
+                                                            (date) => (
+                                                                <td
+                                                                    key={date}
+                                                                    className="px-1.5 py-2"
+                                                                >
+                                                                    <div className="flex justify-center">
+                                                                        <StatusCell
+                                                                            status={
+                                                                                student
+                                                                                    .monthAttendance[
+                                                                                    date
+                                                                                ]
+                                                                            }
+                                                                        />
+                                                                    </div>
+                                                                </td>
+                                                            ),
+                                                        )}
+
+                                                        <td className="border-l border-slate-200 px-2 py-2.5 text-center text-sm font-semibold text-emerald-700 dark:border-slate-700 dark:text-emerald-300">
+                                                            {
+                                                                student
+                                                                    .monthStats
+                                                                    .present
+                                                            }
+                                                        </td>
+                                                        <td className="px-2 py-2.5 text-center text-sm font-semibold text-rose-700 dark:text-rose-300">
+                                                            {
+                                                                student
+                                                                    .monthStats
+                                                                    .absent
+                                                            }
+                                                        </td>
+                                                        <td className="px-2 py-2.5 text-center text-sm font-semibold text-amber-700 dark:text-amber-300">
+                                                            {
+                                                                student
+                                                                    .monthStats
+                                                                    .late
+                                                            }
+                                                        </td>
+                                                        <td className="px-2 py-2.5 text-center text-sm font-semibold text-indigo-700 dark:text-indigo-300">
+                                                            {
+                                                                student
+                                                                    .monthStats
+                                                                    .rate
+                                                            }
+                                                            %
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            },
+                                        )
                                     )}
                                 </tbody>
                             </table>
@@ -615,8 +688,6 @@ const AttendanceLogDetail = ({ section, dates = [], students = [] }) => {
     );
 };
 
-AttendanceLogDetail.layout = (page) => (
-    <SuperAdminLayout>{page}</SuperAdminLayout>
-);
+AttendanceLogDetail.layout = (page) => <SchoolStaffLayout children={page} />;
 
 export default AttendanceLogDetail;

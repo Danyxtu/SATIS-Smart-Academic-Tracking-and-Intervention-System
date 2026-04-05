@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Head, useForm, usePage, router } from "@inertiajs/react";
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import TeacherLayout from "@/Layouts/TeacherLayout";
-import AdminLayout from "@/Layouts/AdminLayout";
+import StudentLayout from "@/Layouts/StudentLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import {
     User,
     Mail,
@@ -305,15 +304,8 @@ export default function Edit({ status, student, pendingPasswordReset }) {
     const fullName =
         isStudent && student ? student.student_name || "" : userFullName;
 
-    // Determine the correct layout based on user role
-    const Layout = isTeacher
-        ? TeacherLayout
-        : isAdmin
-          ? AdminLayout
-          : AuthenticatedLayout;
-
     return (
-        <Layout>
+        <>
             <Head title="My Profile" />
 
             <div className="min-h-screen bg-gray-50/50 py-8">
@@ -665,6 +657,15 @@ export default function Edit({ status, student, pendingPasswordReset }) {
                 show={showPasswordModal}
                 onClose={() => setShowPasswordModal(false)}
             />
-        </Layout>
+        </>
     );
 }
+
+Edit.layout = (page) => {
+    const role = page?.props?.auth?.user?.role;
+    const Layout =
+        role === "teacher" || role === "admin"
+            ? SchoolStaffLayout
+            : StudentLayout;
+    return <Layout children={page} />;
+};

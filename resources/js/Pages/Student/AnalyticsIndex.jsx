@@ -1,5 +1,5 @@
 import React from "react";
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import StudentLayout from "@/Layouts/StudentLayout";
 import { Head, Link } from "@inertiajs/react"; // Import Link
 import { BarChart3 } from "lucide-react";
 
@@ -60,7 +60,7 @@ const SubjectGradeCard = ({ subject, teacher, grade }) => {
 const AnalyticsIndex = () => {
     // Renamed component
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Performance Analytics" />
 
             <div className="max-w-7xl mx-auto space-y-8">
@@ -89,8 +89,10 @@ const AnalyticsIndex = () => {
                     ))}
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 };
+
+AnalyticsIndex.layout = (page) => <StudentLayout children={page} />;
 
 export default AnalyticsIndex;

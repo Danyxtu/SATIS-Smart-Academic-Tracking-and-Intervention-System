@@ -1,5 +1,5 @@
 import React, { useState, Fragment } from "react";
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import StudentLayout from "@/Layouts/StudentLayout";
 import { Head, Link } from "@inertiajs/react";
 import { Dialog, Transition } from "@headlessui/react";
 import {
@@ -782,7 +782,7 @@ const SubjectRisk = ({ subjects = [], stats = {} }) => {
     });
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Subjects at Risk" />
 
             <div className="max-w-5xl mx-auto space-y-6">
@@ -925,8 +925,10 @@ const SubjectRisk = ({ subjects = [], stats = {} }) => {
                 isOpen={isPanelOpen}
                 onClose={handleClosePanel}
             />
-        </AuthenticatedLayout>
+        </>
     );
 };
+
+SubjectRisk.layout = (page) => <StudentLayout children={page} />;
 
 export default SubjectRisk;

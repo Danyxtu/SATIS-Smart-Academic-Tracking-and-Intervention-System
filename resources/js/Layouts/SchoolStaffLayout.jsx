@@ -375,7 +375,7 @@ function SidebarContent({ initials, fullName, onLinkClick, onLogout }) {
 }
 
 // ── Layout ────────────────────────────────────────────────────────
-export default function SuperAdminLayout({ children }) {
+export default function SchoolStaffLayout({ children }) {
     const { auth, flash } = usePage().props;
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] =

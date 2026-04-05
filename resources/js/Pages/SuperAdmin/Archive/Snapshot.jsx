@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Head, Link } from "@inertiajs/react";
-import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import {
     Archive,
     ArrowLeft,
@@ -964,4 +964,4 @@ export default function Snapshot({
     );
 }
 
-Snapshot.layout = (page) => <SuperAdminLayout children={page} />;
+Snapshot.layout = (page) => <SchoolStaffLayout children={page} />;

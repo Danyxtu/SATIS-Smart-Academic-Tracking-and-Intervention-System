@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import StudentLayout from "@/Layouts/StudentLayout";
 import { Head, usePage } from "@inertiajs/react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
@@ -439,7 +439,7 @@ const Attendance = ({
     const hasSubjects = subjectAttendance && subjectAttendance.length > 0;
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Attendance" />
 
             {/* Global CSS for Calendar */}
@@ -696,8 +696,10 @@ const Attendance = ({
                     </>
                 )}
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 };
+
+Attendance.layout = (page) => <StudentLayout children={page} />;
 
 export default Attendance;

@@ -1,5 +1,5 @@
 import { Head, Link, router } from "@inertiajs/react";
-import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import {
     UserCog,
     ArrowLeft,
@@ -33,7 +33,7 @@ export default function Show({ admin, departmentStats }) {
                     setTimeout(() => setResendSuccess(false), 3000);
                 },
                 onFinish: () => setResending(false),
-            }
+            },
         );
     };
 
@@ -287,4 +287,4 @@ export default function Show({ admin, departmentStats }) {
     );
 }
 
-Show.layout = (page) => <SuperAdminLayout children={page} />;
+Show.layout = (page) => <SchoolStaffLayout children={page} />;

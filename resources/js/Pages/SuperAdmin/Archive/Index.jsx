@@ -1,5 +1,5 @@
 import { Head, Link } from "@inertiajs/react";
-import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import {
     Archive,
     Calendar,
@@ -301,4 +301,4 @@ export default function Index({ years, currentSY, snapshots = [] }) {
     );
 }
 
-Index.layout = (page) => <SuperAdminLayout children={page} />;
+Index.layout = (page) => <SchoolStaffLayout children={page} />;

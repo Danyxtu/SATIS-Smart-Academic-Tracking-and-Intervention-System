@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import AdminLayout from "@/Layouts/AdminLayout";
 import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
 import { Fragment } from "react";
 import { Dialog, Transition } from "@headlessui/react";
@@ -31,7 +30,7 @@ import {
     Building2,
     Lock,
 } from "lucide-react";
-import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 
 // Role Badge Component
 const RoleBadge = ({ role }) => {
@@ -1384,4 +1383,4 @@ export default function Index({
     );
 }
 
-Index.layout = (page) => <SuperAdminLayout children={page} />;
+Index.layout = (page) => <SchoolStaffLayout children={page} />;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import { Head, Link } from "@inertiajs/react";
 import { useLoading } from "@/Context/LoadingContext";
 import {
@@ -756,6 +756,6 @@ const Attendance = ({ classes, rosters }) => {
     );
 };
 
-Attendance.layout = (page) => <SuperAdminLayout children={page} />;
+Attendance.layout = (page) => <SchoolStaffLayout children={page} />;
 
 export default Attendance;

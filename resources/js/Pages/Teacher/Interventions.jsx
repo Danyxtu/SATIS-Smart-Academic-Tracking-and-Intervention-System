@@ -1,9 +1,8 @@
-import TeacherLayout from "@/Layouts/TeacherLayout";
 import React, { useState, useEffect, useMemo } from "react";
 import { Head, useForm, usePage, router } from "@inertiajs/react";
 import { useLoading } from "@/Context/LoadingContext";
 import { ArrowLeft } from "lucide-react";
-import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 
 // --- Helper Function ---
 const getPriorityClasses = (priority) => {
@@ -1360,7 +1359,8 @@ function StartInterventionModal({
             red: "bg-red-100 text-red-700 border-red-200",
         };
         return (
-            colorMap[tierColor] || "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+            colorMap[tierColor] ||
+            "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
         );
     };
 
@@ -1371,7 +1371,10 @@ function StartInterventionModal({
             amber: "bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200",
             red: "bg-gradient-to-r from-red-50 to-rose-50 border-red-200",
         };
-        return colorMap[tierColor] || "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700";
+        return (
+            colorMap[tierColor] ||
+            "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+        );
     };
 
     const getIconColorClasses = (tierColor, isSelected) => {
@@ -2143,7 +2146,12 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
         }));
     };
 
-    if (!student) return <div className="p-6 text-gray-500 dark:text-gray-400">Loading...</div>;
+    if (!student)
+        return (
+            <div className="p-6 text-gray-500 dark:text-gray-400">
+                Loading...
+            </div>
+        );
 
     const numericGrade = parseInt(student.currentGrade);
     const showAISuggestion = numericGrade < 75;
@@ -3000,6 +3008,6 @@ const Interventions = ({ watchlist = [], studentDetails = {} }) => {
     );
 };
 
-Interventions.layout = (page) => <SuperAdminLayout children={page} />;
+Interventions.layout = (page) => <SchoolStaffLayout children={page} />;
 
 export default Interventions;

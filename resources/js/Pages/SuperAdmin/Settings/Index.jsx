@@ -1,6 +1,6 @@
 import { Head, useForm, router } from "@inertiajs/react";
 import axios from "axios";
-import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import { useState } from "react";
 import {
     Settings,
@@ -1087,4 +1087,4 @@ export default function Index({ settings, schoolYears }) {
     );
 }
 
-Index.layout = (page) => <SuperAdminLayout children={page} />;
+Index.layout = (page) => <SchoolStaffLayout children={page} />;

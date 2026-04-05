@@ -21,7 +21,7 @@ import {
     BarChart3,
 } from "lucide-react";
 
-export default function AuthenticatedLayout({ children }) {
+export default function StudentLayout({ children }) {
     const { auth, notifications } = usePage().props;
     const [showingNavigationDropdown, setShowingNavigationDropdown] =
         useState(false);

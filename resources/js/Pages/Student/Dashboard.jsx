@@ -1,4 +1,4 @@
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import StudentLayout from "@/Layouts/StudentLayout";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import { useState, useRef, useEffect } from "react";
 import {
@@ -722,7 +722,7 @@ export default function Dashboard({
         : notifications.slice(0, 3);
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Dashboard" />
 
             {/* Custom CSS for blink animation */}
@@ -1345,6 +1345,8 @@ export default function Dashboard({
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }
+
+Dashboard.layout = (page) => <StudentLayout children={page} />;

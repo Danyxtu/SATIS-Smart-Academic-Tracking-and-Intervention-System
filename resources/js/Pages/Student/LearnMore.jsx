@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import StudentLayout from "@/Layouts/StudentLayout";
 import { Head, Link } from "@inertiajs/react";
 import TutorialCard from "@/Components/TutorialCard";
 import TutorialModal from "@/Components/TutorialModal";
@@ -425,7 +425,7 @@ const LearnMore = () => {
     ];
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Learn More" />
 
             <div className="min-h-screen bg-gray-50/50 dark:bg-gray-950">
@@ -891,8 +891,10 @@ const LearnMore = () => {
                     accentColor={activeTutorial.color}
                 />
             )}
-        </AuthenticatedLayout>
+        </>
     );
 };
+
+LearnMore.layout = (page) => <StudentLayout children={page} />;
 
 export default LearnMore;

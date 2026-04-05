@@ -1,5 +1,5 @@
 import { Head, Link, useForm } from "@inertiajs/react";
-import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import {
     UserCog,
     ArrowLeft,
@@ -463,4 +463,4 @@ export default function Edit({ admin, departments }) {
     );
 }
 
-Edit.layout = (page) => <SuperAdminLayout children={page} />;
+Edit.layout = (page) => <SchoolStaffLayout children={page} />;

@@ -1,5 +1,5 @@
 import React from "react";
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import StudentLayout from "@/Layouts/StudentLayout";
 import { Head, Link } from "@inertiajs/react";
 import {
     BarChart3,
@@ -161,7 +161,7 @@ const AnalyticsIndex = ({ subjects = [], stats = {}, semesters = {} }) => {
     };
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Performance Analytics" />
 
             <div className="max-w-7xl mx-auto space-y-6">
@@ -233,8 +233,8 @@ const AnalyticsIndex = ({ subjects = [], stats = {}, semesters = {} }) => {
                             stats.overallGrade >= 85
                                 ? "bg-gradient-to-r from-green-50 to-emerald-50 border-green-200"
                                 : stats.overallGrade >= 75
-                                ? "bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200"
-                                : "bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200"
+                                  ? "bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200"
+                                  : "bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200"
                         }`}
                     >
                         <div className="flex items-center gap-4">
@@ -243,8 +243,8 @@ const AnalyticsIndex = ({ subjects = [], stats = {}, semesters = {} }) => {
                                     stats.overallGrade >= 85
                                         ? "bg-green-100"
                                         : stats.overallGrade >= 75
-                                        ? "bg-blue-100"
-                                        : "bg-yellow-100"
+                                          ? "bg-blue-100"
+                                          : "bg-yellow-100"
                                 }`}
                             >
                                 {stats.overallGrade >= 85 ? (
@@ -269,19 +269,19 @@ const AnalyticsIndex = ({ subjects = [], stats = {}, semesters = {} }) => {
                                     {stats.overallGrade >= 90
                                         ? "Outstanding Performance! 🌟"
                                         : stats.overallGrade >= 85
-                                        ? "Great Job! Keep it up!"
-                                        : stats.overallGrade >= 80
-                                        ? "Good Progress!"
-                                        : stats.overallGrade >= 75
-                                        ? "You're on the right track"
-                                        : "Let's work on improving together"}
+                                          ? "Great Job! Keep it up!"
+                                          : stats.overallGrade >= 80
+                                            ? "Good Progress!"
+                                            : stats.overallGrade >= 75
+                                              ? "You're on the right track"
+                                              : "Let's work on improving together"}
                                 </h3>
                                 <p className="text-gray-600 text-sm">
                                     {stats.overallGrade >= 85
                                         ? "Your academic performance is excellent. Continue your great study habits!"
                                         : stats.overallGrade >= 75
-                                        ? "You're doing well. Focus on the subjects that need attention to boost your overall grade."
-                                        : "Click on subjects below to see detailed analytics and suggestions for improvement."}
+                                          ? "You're doing well. Focus on the subjects that need attention to boost your overall grade."
+                                          : "Click on subjects below to see detailed analytics and suggestions for improvement."}
                                 </p>
                             </div>
                         </div>
@@ -325,8 +325,10 @@ const AnalyticsIndex = ({ subjects = [], stats = {}, semesters = {} }) => {
                     </p>
                 )}
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 };
+
+AnalyticsIndex.layout = (page) => <StudentLayout children={page} />;
 
 export default AnalyticsIndex;

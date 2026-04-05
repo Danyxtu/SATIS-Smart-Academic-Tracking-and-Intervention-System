@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import { Fragment } from "react";
 import { Dialog, Transition } from "@headlessui/react";
@@ -559,4 +559,4 @@ export default function Index({ registrations = [], pendingCount = 0, error }) {
         </>
     );
 }
-Index.layout = (page) => <SuperAdminLayout children={page} />;
+Index.layout = (page) => <SchoolStaffLayout children={page} />;

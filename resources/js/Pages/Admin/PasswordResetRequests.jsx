@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
 import { Fragment } from "react";
 import { Dialog, Transition } from "@headlessui/react";
@@ -501,7 +501,7 @@ export default function PasswordResetRequests({
     };
 
     return (
-        <SuperAdminLayout>
+        <>
             <Head title="Password Reset Requests" />
 
             {/* Header */}
@@ -742,6 +742,8 @@ export default function PasswordResetRequests({
                 password={passwordModal.password}
                 userName={passwordModal.userName}
             />
-        </SuperAdminLayout>
+        </>
     );
 }
+
+PasswordResetRequests.layout = (page) => <SchoolStaffLayout children={page} />;

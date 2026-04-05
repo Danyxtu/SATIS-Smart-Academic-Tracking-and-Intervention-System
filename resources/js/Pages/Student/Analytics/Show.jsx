@@ -1,5 +1,5 @@
 import React, { useMemo, useState, Fragment } from "react";
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import StudentLayout from "@/Layouts/StudentLayout";
 import { Head, Link } from "@inertiajs/react";
 import { Dialog, Transition } from "@headlessui/react";
 import {
@@ -2403,7 +2403,7 @@ const AnalyticsShow = ({
     };
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title={subject.name || "Subject Analytics"} />
 
             <div className="max-w-7xl mx-auto space-y-6">
@@ -2489,8 +2489,10 @@ const AnalyticsShow = ({
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 };
+
+AnalyticsShow.layout = (page) => <StudentLayout children={page} />;
 
 export default AnalyticsShow;

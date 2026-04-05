@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import StudentLayout from "@/Layouts/StudentLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import {
     AlertTriangle,
@@ -774,7 +774,7 @@ const InterventionFeedback = ({
     };
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Interventions & Feedback" />
 
             {/* Custom CSS for blink animation */}
@@ -902,8 +902,10 @@ const InterventionFeedback = ({
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 };
+
+InterventionFeedback.layout = (page) => <StudentLayout children={page} />;
 
 export default InterventionFeedback;

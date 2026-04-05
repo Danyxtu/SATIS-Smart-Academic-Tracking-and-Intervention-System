@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import { Head, Link } from "@inertiajs/react";
 import {
     AlertTriangle,
@@ -155,7 +155,7 @@ const Dashboard = ({
     ];
 
     return (
-        <SuperAdminLayout>
+        <>
             <Head title="Teacher Dashboard" />
 
             <div className="space-y-5">
@@ -538,8 +538,10 @@ const Dashboard = ({
                 onClose={() => setShowInterventionModal(false)}
                 attentionStudents={attentionStudents}
             />
-        </SuperAdminLayout>
+        </>
     );
 };
+
+Dashboard.layout = (page) => <SchoolStaffLayout children={page} />;
 
 export default Dashboard;

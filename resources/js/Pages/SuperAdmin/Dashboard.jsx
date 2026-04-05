@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Head, Link } from "@inertiajs/react";
-import SuperAdminLayout from "@/Layouts/SuperAdminLayout";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import UnifiedDashboardSwitcher from "@/Components/UnifiedDashboardSwitcher";
 import {
     Building2,
@@ -785,4 +785,4 @@ export default function Dashboard({
     );
 }
 
-Dashboard.layout = (page) => <SuperAdminLayout children={page} />;
+Dashboard.layout = (page) => <SchoolStaffLayout children={page} />;
