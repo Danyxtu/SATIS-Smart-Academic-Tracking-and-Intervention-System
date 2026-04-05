@@ -65,7 +65,7 @@ const TemporaryPasswordModal = ({ studentInfo, onClose }) => {
                         </div>
                         <button
                             onClick={onClose}
-                            className="text-white/80 hover:text-white p-1 rounded-md hover:bg-white/10 transition-colors"
+                            className="z-10 text-white/80 hover:text-white p-1 rounded-md hover:bg-white/10 transition-colors"
                         >
                             <X size={18} />
                         </button>

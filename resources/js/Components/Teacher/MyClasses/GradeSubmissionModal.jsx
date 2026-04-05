@@ -59,7 +59,7 @@ const GradeSubmissionModal = ({ isOpen, onClose, status, message }) => {
                     {/* Close Button */}
                     <button
                         onClick={onClose}
-                        className="absolute top-4 right-4 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                        className="absolute top-4 right-4 z-10 p-1 text-gray-400 hover:text-gray-600 transition-colors"
                     >
                         <X size={20} />
                     </button>

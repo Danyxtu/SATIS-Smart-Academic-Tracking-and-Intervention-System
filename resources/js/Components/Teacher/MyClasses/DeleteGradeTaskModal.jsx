@@ -56,7 +56,7 @@ const DeleteGradeTaskModal = ({
                         type="button"
                         onClick={onClose}
                         disabled={isSubmitting}
-                        className="rounded-full p-1.5 text-red-500 transition hover:bg-red-100 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="z-10 rounded-full p-1.5 text-red-500 transition hover:bg-red-100 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                         aria-label="Close delete activity modal"
                     >
                         <X size={18} />

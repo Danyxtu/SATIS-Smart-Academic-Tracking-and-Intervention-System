@@ -258,7 +258,7 @@ const ResetPasswordModal = ({ isOpen, onClose, user }) => {
                                         </Dialog.Title>
                                         <button
                                             onClick={onClose}
-                                            className="text-gray-400 hover:text-gray-500"
+                                            className="z-10 text-gray-400 hover:text-gray-500"
                                         >
                                             <X size={20} />
                                         </button>
@@ -642,7 +642,7 @@ const TempPasswordModal = ({ isOpen, onClose, user, tempPassword }) => {
                                         </Dialog.Title>
                                         <button
                                             onClick={onClose}
-                                            className="text-white/80 hover:text-white"
+                                            className="z-10 text-white/80 hover:text-white"
                                         >
                                             <X size={20} />
                                         </button>

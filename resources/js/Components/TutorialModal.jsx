@@ -108,7 +108,7 @@ const TutorialModal = ({
                     </div>
                     <button
                         onClick={handleClose}
-                        className="p-2 -mr-2 -mt-1 rounded-lg hover:bg-gray-100 transition-colors"
+                        className="z-10 p-2 -mr-2 -mt-1 rounded-lg hover:bg-gray-100 transition-colors"
                     >
                         <X size={22} className="text-gray-400" />
                     </button>
@@ -227,8 +227,8 @@ const TutorialModal = ({
                                 index === currentStep
                                     ? "w-6"
                                     : index < currentStep
-                                    ? "w-2 opacity-50"
-                                    : "w-2"
+                                      ? "w-2 opacity-50"
+                                      : "w-2"
                             }`}
                             style={{
                                 backgroundColor:

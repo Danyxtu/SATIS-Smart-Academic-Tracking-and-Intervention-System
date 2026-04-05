@@ -172,7 +172,7 @@ export default function CreateDepartmentModal({ isOpen, onClose, onSuccess }) {
                             type="button"
                             onClick={handleClose}
                             disabled={processing}
-                            className="absolute top-3 right-3 rounded-xl p-2 text-white/80 hover:bg-white/20 hover:text-white transition-colors disabled:opacity-50"
+                            className="absolute top-3 right-3 z-10 rounded-xl p-2 text-white/80 hover:bg-white/20 hover:text-white transition-colors disabled:opacity-50"
                         >
                             <X size={18} />
                         </button>
@@ -221,7 +221,9 @@ export default function CreateDepartmentModal({ isOpen, onClose, onSuccess }) {
                                         placeholder="e.g., Information and Communications Technology"
                                         className={`w-full rounded-xl border bg-slate-50 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors ${errors.department_name ? "border-rose-300 bg-rose-50" : "border-slate-200"}`}
                                     />
-                                    <FieldError error={errors.department_name} />
+                                    <FieldError
+                                        error={errors.department_name}
+                                    />
                                 </div>
 
                                 <div>
@@ -245,7 +247,9 @@ export default function CreateDepartmentModal({ isOpen, onClose, onSuccess }) {
                                         placeholder="e.g., ICT"
                                         className={`w-full rounded-xl border bg-slate-50 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors ${errors.department_code ? "border-rose-300 bg-rose-50" : "border-slate-200"}`}
                                     />
-                                    <FieldError error={errors.department_code} />
+                                    <FieldError
+                                        error={errors.department_code}
+                                    />
                                     <p className="mt-1 text-xs text-slate-400">
                                         Short unique identifier (e.g., ICT,
                                         STEM, ABM)
@@ -410,7 +414,10 @@ export default function CreateDepartmentModal({ isOpen, onClose, onSuccess }) {
                                                                 className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                                                             />
                                                             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-bold">
-                                                                {t.first_name[0]}
+                                                                {
+                                                                    t
+                                                                        .first_name[0]
+                                                                }
                                                                 {t.last_name[0]}
                                                             </div>
                                                             <div className="min-w-0 flex-1">
@@ -422,7 +429,9 @@ export default function CreateDepartmentModal({ isOpen, onClose, onSuccess }) {
                                                                         ? t.middle_name +
                                                                           " "
                                                                         : ""}
-                                                                    {t.last_name}
+                                                                    {
+                                                                        t.last_name
+                                                                    }
                                                                 </p>
                                                                 <p className="text-xs text-slate-400 truncate">
                                                                     {t.email}
@@ -591,7 +600,8 @@ export default function CreateDepartmentModal({ isOpen, onClose, onSuccess }) {
                                                 {adminTeacher.first_name}{" "}
                                                 {adminTeacher.last_name}
                                             </span>{" "}
-                                            will be assigned as department admin.
+                                            will be assigned as department
+                                            admin.
                                         </p>
                                     </div>
                                 )}
@@ -603,7 +613,11 @@ export default function CreateDepartmentModal({ isOpen, onClose, onSuccess }) {
                     <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4 mt-4 bg-slate-50/50 rounded-b-2xl">
                         <button
                             type="button"
-                            onClick={step === 0 ? handleClose : () => setStep((s) => s - 1)}
+                            onClick={
+                                step === 0
+                                    ? handleClose
+                                    : () => setStep((s) => s - 1)
+                            }
                             disabled={processing}
                             className="rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50 flex items-center gap-1.5"
                         >

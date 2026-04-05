@@ -754,7 +754,7 @@ export default function Index({
                                 <button
                                     type="button"
                                     onClick={closeWizard}
-                                    className="absolute right-3 top-3 rounded-xl p-2 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
+                                    className="absolute right-3 top-3 z-10 rounded-xl p-2 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
                                 >
                                     <X size={18} />
                                 </button>

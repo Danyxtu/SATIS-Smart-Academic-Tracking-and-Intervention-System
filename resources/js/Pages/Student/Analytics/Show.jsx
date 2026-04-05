@@ -1991,7 +1991,7 @@ const ForYourCaseCard = ({
                                                 onClick={() =>
                                                     setShowApproachModal(false)
                                                 }
-                                                className="text-white/80 hover:text-white"
+                                                className="z-10 text-white/80 hover:text-white"
                                             >
                                                 <X size={24} />
                                             </button>

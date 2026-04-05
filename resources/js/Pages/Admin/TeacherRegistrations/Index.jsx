@@ -206,7 +206,7 @@ const ConfirmModal = ({
                                 </Dialog.Title>
                                 <button
                                     onClick={onClose}
-                                    className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                    className="z-10 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                                 >
                                     <X size={18} className="text-gray-500" />
                                 </button>
@@ -295,7 +295,7 @@ const RejectModal = ({
                                     </Dialog.Title>
                                     <button
                                         onClick={onClose}
-                                        className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                        className="z-10 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                                     >
                                         <X
                                             size={18}

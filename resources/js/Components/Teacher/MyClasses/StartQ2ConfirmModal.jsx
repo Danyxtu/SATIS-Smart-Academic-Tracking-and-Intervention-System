@@ -81,7 +81,7 @@ const StartQ2ConfirmModal = ({
                 {/* Close button */}
                 <button
                     onClick={handleClose}
-                    className="absolute top-4 right-4 p-1 text-gray-400 hover:text-gray-600 transition"
+                    className="absolute top-4 right-4 z-10 p-1 text-gray-400 hover:text-gray-600 transition"
                 >
                     <X size={18} />
                 </button>

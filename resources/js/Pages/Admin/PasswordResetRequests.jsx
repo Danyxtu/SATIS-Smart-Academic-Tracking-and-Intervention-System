@@ -127,7 +127,7 @@ const ApproveModal = ({ isOpen, onClose, request }) => {
                                         </Dialog.Title>
                                         <button
                                             onClick={onClose}
-                                            className="text-gray-400 hover:text-gray-500"
+                                            className="z-10 text-gray-400 hover:text-gray-500"
                                         >
                                             <X size={20} />
                                         </button>

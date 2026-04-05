@@ -117,7 +117,7 @@ const AddStudentModal = ({
                         <button
                             type="button"
                             onClick={handleClose}
-                            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-slate-400 hover:bg-white hover:text-slate-600 transition"
+                            className="z-10 h-8 w-8 inline-flex items-center justify-center rounded-md text-slate-400 hover:bg-white hover:text-slate-600 transition"
                         >
                             <X size={20} />
                         </button>

@@ -39,7 +39,7 @@ const AddGradeTaskModal = ({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                        className="z-10 rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
                     >
                         <X size={20} />
                     </button>

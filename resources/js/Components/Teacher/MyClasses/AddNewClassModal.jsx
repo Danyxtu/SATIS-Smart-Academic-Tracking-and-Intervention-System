@@ -418,7 +418,7 @@ const AddNewClassModal = ({
                         <button
                             type="button"
                             onClick={handleClose}
-                            className="text-gray-400 hover:text-gray-600"
+                            className="z-10 text-gray-400 hover:text-gray-600"
                         >
                             <X size={24} />
                         </button>

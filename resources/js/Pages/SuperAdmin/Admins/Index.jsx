@@ -392,7 +392,7 @@ export default function Index({ admins, departments, filters }) {
                                 <div className="absolute top-0 right-0 -mt-8 -mr-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
                                 <button
                                     onClick={closeDeleteModal}
-                                    className="absolute top-3 right-3 rounded-xl p-3 text-white/80 hover:bg-white/20 hover:text-white transition-colors"
+                                    className="absolute top-3 right-3 z-10 rounded-xl p-3 text-white/80 hover:bg-white/20 hover:text-white transition-colors"
                                 >
                                     <X size={18} />
                                 </button>

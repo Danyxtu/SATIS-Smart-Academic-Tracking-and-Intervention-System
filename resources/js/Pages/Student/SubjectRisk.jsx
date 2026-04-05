@@ -346,7 +346,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                                 </div>
                                                 <button
                                                     onClick={onClose}
-                                                    className="text-white/80 hover:text-white transition-colors"
+                                                    className="z-10 text-white/80 hover:text-white transition-colors"
                                                 >
                                                     <X size={24} />
                                                 </button>

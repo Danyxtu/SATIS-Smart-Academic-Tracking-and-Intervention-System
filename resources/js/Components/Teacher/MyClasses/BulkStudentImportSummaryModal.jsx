@@ -119,7 +119,7 @@ const BulkStudentImportSummaryModal = ({ summary, onClose }) => {
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                        className="z-10 rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
                     >
                         <X size={20} />
                     </button>

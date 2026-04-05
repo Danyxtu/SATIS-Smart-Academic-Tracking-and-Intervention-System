@@ -196,7 +196,7 @@ function NewSchoolYearModal({ currentSY, onClose }) {
                         <button
                             onClick={onClose}
                             disabled={submitting}
-                            className="rounded-lg p-1.5 text-white/70 hover:bg-white/20 dark:hover:bg-gray-900/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="z-10 rounded-lg p-1.5 text-white/70 hover:bg-white/20 dark:hover:bg-gray-900/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                             <X size={18} />
                         </button>

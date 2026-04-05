@@ -69,7 +69,7 @@ const DeleteClassModal = ({ isOpen, classData, onClose, onDeleted }) => {
                     <button
                         type="button"
                         onClick={handleClose}
-                        className="rounded-md p-1 text-red-400 hover:bg-red-100 hover:text-red-600"
+                        className="z-10 rounded-md p-1 text-red-400 hover:bg-red-100 hover:text-red-600"
                     >
                         <X size={16} />
                     </button>

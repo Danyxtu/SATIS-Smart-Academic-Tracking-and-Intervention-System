@@ -40,7 +40,7 @@ const ReuseArchivedClassesSummaryModal = ({ isOpen, summary, onClose }) => {
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-md p-1 text-emerald-500 hover:bg-emerald-100 hover:text-emerald-700"
+                        className="z-10 rounded-md p-1 text-emerald-500 hover:bg-emerald-100 hover:text-emerald-700"
                     >
                         <X size={16} />
                     </button>

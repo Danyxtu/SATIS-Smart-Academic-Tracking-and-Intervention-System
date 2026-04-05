@@ -257,7 +257,7 @@ const EditGradeCategoriesModal = ({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="text-white/80 hover:text-white transition"
+                        className="z-10 text-white/80 hover:text-white transition"
                     >
                         <X size={20} />
                     </button>

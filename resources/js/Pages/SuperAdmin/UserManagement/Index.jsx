@@ -396,7 +396,12 @@ export default function Index({
                                     return (
                                         <div
                                             key={user.id}
-                                            onClick={() => setViewModal({ open: true, user })}
+                                            onClick={() =>
+                                                setViewModal({
+                                                    open: true,
+                                                    user,
+                                                })
+                                            }
                                             className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-50/60 transition-colors group cursor-pointer"
                                         >
                                             {/* User */}
@@ -419,7 +424,11 @@ export default function Index({
 
                                             {/* Role */}
                                             <div className="col-span-2 flex flex-wrap gap-1">
-                                                {(user.roles_list ?? [user.role]).map((r) => {
+                                                {(
+                                                    user.roles_list ?? [
+                                                        user.role,
+                                                    ]
+                                                ).map((r) => {
                                                     const rc = getRoleConfig(r);
                                                     const RIcon = rc.icon;
                                                     return (
@@ -466,7 +475,9 @@ export default function Index({
                                             {/* Actions */}
                                             <div
                                                 className="col-span-1 flex items-center justify-end gap-1"
-                                                onClick={(e) => e.stopPropagation()}
+                                                onClick={(e) =>
+                                                    e.stopPropagation()
+                                                }
                                             >
                                                 <button
                                                     onClick={() =>
@@ -602,7 +613,7 @@ export default function Index({
                                 <div className="absolute top-0 right-0 -mt-8 -mr-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
                                 <button
                                     onClick={closeDeleteModal}
-                                    className="absolute top-3 right-3 rounded-xl p-3 text-white/80 hover:bg-white/20 hover:text-white transition-colors"
+                                    className="absolute top-3 right-3 z-10 rounded-xl p-3 text-white/80 hover:bg-white/20 hover:text-white transition-colors"
                                 >
                                     <X size={18} />
                                 </button>
@@ -638,7 +649,9 @@ export default function Index({
                                 </div>
 
                                 {(() => {
-                                    const cfg = getRoleConfig(deleteModal.user?.role);
+                                    const cfg = getRoleConfig(
+                                        deleteModal.user?.role,
+                                    );
                                     return (
                                         <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
                                             <div
@@ -649,18 +662,28 @@ export default function Index({
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <p className="font-semibold text-slate-800 text-sm">
-                                                    {getFullName(deleteModal.user)}
+                                                    {getFullName(
+                                                        deleteModal.user,
+                                                    )}
                                                 </p>
                                                 <p className="text-xs text-slate-500 truncate">
                                                     {deleteModal.user?.email}
                                                 </p>
                                             </div>
                                             <div className="flex flex-wrap gap-1 justify-end">
-                                                {(deleteModal.user?.roles_list ?? [deleteModal.user?.role]).map((r) => {
+                                                {(
+                                                    deleteModal.user
+                                                        ?.roles_list ?? [
+                                                        deleteModal.user?.role,
+                                                    ]
+                                                ).map((r) => {
                                                     const rc = getRoleConfig(r);
                                                     const RIcon = rc.icon;
                                                     return (
-                                                        <span key={r} className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-semibold ${rc.badgeClass}`}>
+                                                        <span
+                                                            key={r}
+                                                            className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-semibold ${rc.badgeClass}`}
+                                                        >
                                                             <RIcon size={10} />
                                                             {rc.label}
                                                         </span>

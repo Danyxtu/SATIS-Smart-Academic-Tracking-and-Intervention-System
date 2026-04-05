@@ -190,7 +190,7 @@ const ChangePasswordModal = ({ show, onClose }) => {
                     <button
                         type="button"
                         onClick={handleClose}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                        className="z-10 p-2 hover:bg-gray-100 rounded-lg transition-colors"
                     >
                         <X size={20} className="text-gray-500" />
                     </button>

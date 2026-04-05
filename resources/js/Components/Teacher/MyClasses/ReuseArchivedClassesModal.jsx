@@ -57,7 +57,7 @@ const ReuseArchivedClassesModal = ({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-md p-1 text-indigo-500 hover:bg-indigo-100 hover:text-indigo-700"
+                        className="z-10 rounded-md p-1 text-indigo-500 hover:bg-indigo-100 hover:text-indigo-700"
                     >
                         <X size={16} />
                     </button>

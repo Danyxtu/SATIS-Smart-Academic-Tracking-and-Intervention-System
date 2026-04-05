@@ -55,11 +55,11 @@ const SendNudgeModal = ({ isOpen, onClose, subject }) => {
                 onError: (errors) => {
                     showToast.error(
                         errors.message ||
-                            "Failed to send nudge. Please try again."
+                            "Failed to send nudge. Please try again.",
                     );
                     setIsSending(false);
                 },
-            }
+            },
         );
     };
 
@@ -98,7 +98,7 @@ const SendNudgeModal = ({ isOpen, onClose, subject }) => {
                         </div>
                         <button
                             onClick={handleClose}
-                            className="text-white/80 hover:text-white transition-colors p-1"
+                            className="z-10 text-white/80 hover:text-white transition-colors p-1"
                         >
                             <X className="w-5 h-5" />
                         </button>

@@ -233,7 +233,7 @@ export default function UploadGradesModal({ show, onClose, allSubjects = [] }) {
                         </div>
                         <button
                             onClick={handleClose}
-                            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+                            className="z-10 p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
                         >
                             <X className="w-5 h-5 text-white" />
                         </button>

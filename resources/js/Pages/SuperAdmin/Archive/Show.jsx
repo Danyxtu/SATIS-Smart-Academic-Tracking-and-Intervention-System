@@ -334,7 +334,7 @@ export default function Show({
                                 <button
                                     type="button"
                                     onClick={closeCardModal}
-                                    className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                                    className="z-10 rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
                                     aria-label="Close details"
                                 >
                                     <X size={16} />
