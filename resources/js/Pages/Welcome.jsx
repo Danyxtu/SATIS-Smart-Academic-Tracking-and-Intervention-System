@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Head, router } from "@inertiajs/react";
 import ApplicationLogo from "@/Components/ApplicationLogo";
+import AppDownloadCTA from "@/Components/AppDownloadCTA";
 import Background from "../../assets/background.png";
 import { ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
 import { WelcomeScreens as screens } from "@/Data/welcomeScreens";
@@ -116,6 +117,9 @@ export default function Welcome() {
                             </div>
                         </div>
                     </div>
+
+                    {/* Floating Download App CTA */}
+                    <AppDownloadCTA />
 
                     {/* Footer */}
                     <div className="mt-4 sm:mt-5 text-center">

@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
         <title inertia>SATIS-FACTION</title>
-        <link rel="icon" type="image/png" href="{{ Vite::asset('resources/assets/system-logo.png') }}">
+        <link rel="icon" type="image/png" href="{{ Vite::asset('resources/assets/satis-logo.png') }}">
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">

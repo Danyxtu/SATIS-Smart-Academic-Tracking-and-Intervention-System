@@ -1,4 +1,4 @@
-import Logo from "../../assets/system-logo.png";
+import Logo from "../../assets/satis-logo.png";
 
 export default function ApplicationLogo({ className = "", ...props }) {
     return (

@@ -12,7 +12,7 @@ import {
     PanelLeftOpen,
     Settings,
 } from "lucide-react";
-import systemLogo from "../../assets/system-logo.png";
+import systemLogo from "../../assets/satis-logo.png";
 
 const ROLE_LABELS = {
     super_admin: "Super Admin",
