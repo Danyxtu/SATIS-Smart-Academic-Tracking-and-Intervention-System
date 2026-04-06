@@ -6,6 +6,7 @@ import {
     Users,
     Search,
     Plus,
+    Hash,
     Edit,
     Trash2,
     Key,
@@ -198,6 +199,508 @@ const SortHeader = ({
                 />
             </span>
         </button>
+    );
+};
+
+// Create User Modal
+const CreateUserModal = ({ isOpen, onClose, department, initialRole }) => {
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+    const { data, setData, post, processing, errors, reset, clearErrors } =
+        useForm({
+            first_name: "",
+            last_name: "",
+            middle_name: "",
+            lrn: "",
+            email: "",
+            password: "",
+            password_confirmation: "",
+            role: initialRole,
+        });
+
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        setData("role", initialRole === "teacher" ? "teacher" : "student");
+    }, [isOpen, initialRole]);
+
+    const closeAndReset = () => {
+        onClose();
+        reset();
+        clearErrors();
+        setShowPassword(false);
+        setShowConfirmPassword(false);
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+
+        post(route("admin.users.store"), {
+            preserveScroll: true,
+            onSuccess: () => {
+                closeAndReset();
+            },
+        });
+    };
+
+    return (
+        <Transition.Root show={isOpen} as={Fragment}>
+            <Dialog as="div" className="relative z-50" onClose={closeAndReset}>
+                <Transition.Child
+                    as={Fragment}
+                    enter="ease-out duration-300"
+                    enterFrom="opacity-0"
+                    enterTo="opacity-100"
+                    leave="ease-in duration-200"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                >
+                    <div className="fixed inset-0 bg-black/50 transition-opacity" />
+                </Transition.Child>
+
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex min-h-full items-center justify-center p-4">
+                        <Transition.Child
+                            as={Fragment}
+                            enter="ease-out duration-300"
+                            enterFrom="opacity-0 scale-95"
+                            enterTo="opacity-100 scale-100"
+                            leave="ease-in duration-200"
+                            leaveFrom="opacity-100 scale-100"
+                            leaveTo="opacity-0 scale-95"
+                        >
+                            <Dialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-xl transition-all">
+                                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                    <div className="flex items-center justify-between">
+                                        <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                            <Plus
+                                                size={20}
+                                                className="text-purple-500"
+                                            />
+                                            Create New User
+                                        </Dialog.Title>
+                                        <button
+                                            type="button"
+                                            onClick={closeAndReset}
+                                            className="z-10 text-gray-400 hover:text-gray-500"
+                                        >
+                                            <X size={20} />
+                                        </button>
+                                    </div>
+                                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                        Add a student or teacher without leaving
+                                        this page.
+                                    </p>
+                                </div>
+
+                                <form
+                                    onSubmit={handleSubmit}
+                                    className="p-6 space-y-5 max-h-[80vh] overflow-y-auto"
+                                >
+                                    {/* Role Selection */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Select Role *
+                                        </label>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setData("role", "student")
+                                                }
+                                                className={`p-3 rounded-xl border-2 text-left transition-all ${
+                                                    data.role === "student"
+                                                        ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+                                                        : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <GraduationCap
+                                                        size={18}
+                                                        className="text-purple-600 dark:text-purple-400"
+                                                    />
+                                                    <span className="font-medium text-gray-900 dark:text-white">
+                                                        Student
+                                                    </span>
+                                                </div>
+                                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                                    Auto-generates a temporary
+                                                    password.
+                                                </p>
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setData("role", "teacher")
+                                                }
+                                                className={`p-3 rounded-xl border-2 text-left transition-all ${
+                                                    data.role === "teacher"
+                                                        ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+                                                        : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <UserCog
+                                                        size={18}
+                                                        className="text-purple-600 dark:text-purple-400"
+                                                    />
+                                                    <span className="font-medium text-gray-900 dark:text-white">
+                                                        Teacher
+                                                    </span>
+                                                </div>
+                                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                                    Requires a manual password.
+                                                </p>
+                                            </button>
+                                        </div>
+                                        {errors.role && (
+                                            <p className="mt-2 text-sm text-red-600">
+                                                {errors.role}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {department && data.role === "teacher" && (
+                                        <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                            <Building2
+                                                size={18}
+                                                className="text-blue-500 mt-0.5"
+                                            />
+                                            <p className="text-sm text-blue-700 dark:text-blue-300">
+                                                This teacher will be assigned to{" "}
+                                                <strong>
+                                                    {department.name}
+                                                </strong>
+                                                .
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label
+                                                htmlFor="modal_first_name"
+                                                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                                            >
+                                                First Name *
+                                            </label>
+                                            <div className="relative">
+                                                <User
+                                                    size={18}
+                                                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                                                />
+                                                <input
+                                                    id="modal_first_name"
+                                                    type="text"
+                                                    value={data.first_name}
+                                                    onChange={(e) =>
+                                                        setData(
+                                                            "first_name",
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                                    placeholder="Enter first name"
+                                                />
+                                            </div>
+                                            {errors.first_name && (
+                                                <p className="mt-1 text-sm text-red-600">
+                                                    {errors.first_name}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <label
+                                                htmlFor="modal_last_name"
+                                                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                                            >
+                                                Last Name *
+                                            </label>
+                                            <div className="relative">
+                                                <User
+                                                    size={18}
+                                                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                                                />
+                                                <input
+                                                    id="modal_last_name"
+                                                    type="text"
+                                                    value={data.last_name}
+                                                    onChange={(e) =>
+                                                        setData(
+                                                            "last_name",
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                                    placeholder="Enter last name"
+                                                />
+                                            </div>
+                                            {errors.last_name && (
+                                                <p className="mt-1 text-sm text-red-600">
+                                                    {errors.last_name}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label
+                                            htmlFor="modal_middle_name"
+                                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                                        >
+                                            Middle Name{" "}
+                                            <span className="text-gray-400 text-xs">
+                                                (Optional)
+                                            </span>
+                                        </label>
+                                        <div className="relative">
+                                            <User
+                                                size={18}
+                                                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                                            />
+                                            <input
+                                                id="modal_middle_name"
+                                                type="text"
+                                                value={data.middle_name}
+                                                onChange={(e) =>
+                                                    setData(
+                                                        "middle_name",
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                                placeholder="Enter middle name"
+                                            />
+                                        </div>
+                                        {errors.middle_name && (
+                                            <p className="mt-1 text-sm text-red-600">
+                                                {errors.middle_name}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label
+                                            htmlFor="modal_email"
+                                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                                        >
+                                            Email Address
+                                            {data.role === "teacher"
+                                                ? " *"
+                                                : ""}
+                                        </label>
+                                        <div className="relative">
+                                            <Mail
+                                                size={18}
+                                                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                                            />
+                                            <input
+                                                id="modal_email"
+                                                type="email"
+                                                value={data.email}
+                                                onChange={(e) =>
+                                                    setData(
+                                                        "email",
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                                placeholder="Enter email address"
+                                            />
+                                        </div>
+                                        {errors.email && (
+                                            <p className="mt-1 text-sm text-red-600">
+                                                {errors.email}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {data.role === "student" && (
+                                        <>
+                                            <div>
+                                                <label
+                                                    htmlFor="modal_lrn"
+                                                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                                                >
+                                                    Learner Reference Number
+                                                    (LRN) *
+                                                </label>
+                                                <div className="relative">
+                                                    <Hash
+                                                        size={18}
+                                                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                                                    />
+                                                    <input
+                                                        id="modal_lrn"
+                                                        type="text"
+                                                        value={data.lrn}
+                                                        onChange={(e) =>
+                                                            setData(
+                                                                "lrn",
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                                        placeholder="Enter 12-digit LRN"
+                                                        maxLength={20}
+                                                    />
+                                                </div>
+                                                {errors.lrn && (
+                                                    <p className="mt-1 text-sm text-red-600">
+                                                        {errors.lrn}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                                <Key
+                                                    size={18}
+                                                    className="text-blue-500 mt-0.5"
+                                                />
+                                                <p className="text-sm text-blue-700 dark:text-blue-300">
+                                                    A secure temporary password
+                                                    will be generated
+                                                    automatically for students.
+                                                </p>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {data.role === "teacher" && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label
+                                                    htmlFor="modal_password"
+                                                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                                                >
+                                                    Password *
+                                                </label>
+                                                <div className="relative">
+                                                    <Lock
+                                                        size={18}
+                                                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                                                    />
+                                                    <input
+                                                        id="modal_password"
+                                                        type={
+                                                            showPassword
+                                                                ? "text"
+                                                                : "password"
+                                                        }
+                                                        value={data.password}
+                                                        onChange={(e) =>
+                                                            setData(
+                                                                "password",
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        className="w-full pl-10 pr-10 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                                        placeholder="Enter password"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setShowPassword(
+                                                                !showPassword,
+                                                            )
+                                                        }
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                    >
+                                                        {showPassword ? (
+                                                            <EyeOff size={18} />
+                                                        ) : (
+                                                            <Eye size={18} />
+                                                        )}
+                                                    </button>
+                                                </div>
+                                                {errors.password && (
+                                                    <p className="mt-1 text-sm text-red-600">
+                                                        {errors.password}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <div>
+                                                <label
+                                                    htmlFor="modal_password_confirmation"
+                                                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                                                >
+                                                    Confirm Password *
+                                                </label>
+                                                <div className="relative">
+                                                    <Lock
+                                                        size={18}
+                                                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                                                    />
+                                                    <input
+                                                        id="modal_password_confirmation"
+                                                        type={
+                                                            showConfirmPassword
+                                                                ? "text"
+                                                                : "password"
+                                                        }
+                                                        value={
+                                                            data.password_confirmation
+                                                        }
+                                                        onChange={(e) =>
+                                                            setData(
+                                                                "password_confirmation",
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        className="w-full pl-10 pr-10 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                                        placeholder="Confirm password"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setShowConfirmPassword(
+                                                                !showConfirmPassword,
+                                                            )
+                                                        }
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                    >
+                                                        {showConfirmPassword ? (
+                                                            <EyeOff size={18} />
+                                                        ) : (
+                                                            <Eye size={18} />
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-end gap-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                                        <button
+                                            type="button"
+                                            onClick={closeAndReset}
+                                            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={processing}
+                                            className="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors disabled:opacity-50"
+                                        >
+                                            {processing
+                                                ? "Creating..."
+                                                : "Create User"}
+                                        </button>
+                                    </div>
+                                </form>
+                            </Dialog.Panel>
+                        </Transition.Child>
+                    </div>
+                </div>
+            </Dialog>
+        </Transition.Root>
     );
 };
 
@@ -839,8 +1342,14 @@ export default function Index({
     sections = [],
     department,
 }) {
-    const { flash } = usePage().props;
+    const page = usePage();
+    const { flash } = page.props;
     const [search, setSearch] = useState(filters.search);
+    const [createUserModal, setCreateUserModal] = useState({
+        isOpen: false,
+        initialRole: "student",
+    });
+    const [hasHandledCreateQuery, setHasHandledCreateQuery] = useState(false);
     const [selectedUsers, setSelectedUsers] = useState([]);
     const [resetPasswordModal, setResetPasswordModal] = useState({
         isOpen: false,
@@ -871,6 +1380,31 @@ export default function Index({
             });
         }
     }, [flash]);
+
+    useEffect(() => {
+        if (hasHandledCreateQuery) {
+            return;
+        }
+
+        const queryString = page.url?.split("?")[1] ?? "";
+        if (!queryString) {
+            return;
+        }
+
+        const queryParams = new URLSearchParams(queryString);
+        const shouldOpenCreateModal = queryParams.get("openCreate");
+
+        if (shouldOpenCreateModal === "1" || shouldOpenCreateModal === "true") {
+            setCreateUserModal({
+                isOpen: true,
+                initialRole:
+                    queryParams.get("createRole") === "teacher"
+                        ? "teacher"
+                        : "student",
+            });
+            setHasHandledCreateQuery(true);
+        }
+    }, [page.url, hasHandledCreateQuery]);
 
     const handleSearch = (e) => {
         e.preventDefault();
@@ -1001,13 +1535,19 @@ export default function Index({
                             : "Manage all students, teachers, and administrators"}
                     </p>
                 </div>
-                <Link
-                    href={route("admin.users.create")}
+                <button
+                    type="button"
+                    onClick={() =>
+                        setCreateUserModal({
+                            isOpen: true,
+                            initialRole: "student",
+                        })
+                    }
                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors shadow-sm"
                 >
                     <Plus size={18} />
                     Add User
-                </Link>
+                </button>
             </div>
 
             {/* Filters and Search */}
@@ -1344,6 +1884,17 @@ export default function Index({
             </div>
 
             {/* Modals */}
+            <CreateUserModal
+                isOpen={createUserModal.isOpen}
+                onClose={() =>
+                    setCreateUserModal((prev) => ({
+                        ...prev,
+                        isOpen: false,
+                    }))
+                }
+                department={department}
+                initialRole={createUserModal.initialRole}
+            />
             <ResetPasswordModal
                 isOpen={resetPasswordModal.isOpen}
                 onClose={() =>

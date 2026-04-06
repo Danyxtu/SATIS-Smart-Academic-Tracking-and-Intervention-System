@@ -204,7 +204,9 @@ export default function Dashboard({ auth, stats, userTrends, department }) {
                         </p>
                     </div>
                     <Link
-                        href={route("admin.users.create")}
+                        href={route("admin.users.index", {
+                            openCreate: 1,
+                        })}
                         className="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors shadow-sm"
                     >
                         <UserPlus size={18} />
@@ -298,14 +300,20 @@ export default function Dashboard({ auth, stats, userTrends, department }) {
                 </p>
                 <div className="flex flex-wrap gap-3">
                     <Link
-                        href={route("admin.users.create")}
+                        href={route("admin.users.index", {
+                            openCreate: 1,
+                            createRole: "student",
+                        })}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg font-medium transition-colors"
                     >
                         <UserPlus size={18} />
                         Create Student
                     </Link>
                     <Link
-                        href={route("admin.users.create")}
+                        href={route("admin.users.index", {
+                            openCreate: 1,
+                            createRole: "teacher",
+                        })}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg font-medium transition-colors"
                     >
                         <UserCog size={18} />

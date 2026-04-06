@@ -963,7 +963,7 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
                                             className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left ${
                                                 selectedType === type.id
                                                     ? "border-indigo-500 bg-indigo-50"
-                                                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
+                                                    : "border-gray-200 dark:border-gray-600 hover:border-gray-300 bg-white dark:bg-gray-900"
                                             }`}
                                         >
                                             <div
@@ -2549,7 +2549,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                         onClick={() =>
                                             setOpenFeedbackModal(true)
                                         }
-                                        className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-300 dark:border-gray-600 shadow-sm transition-all text-sm font-medium"
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-300 shadow-sm transition-all text-sm font-medium"
                                     >
                                         <svg
                                             xmlns="http://www.w3.org/2000/svg"
@@ -2606,7 +2606,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                         {student.interventionLog.map((log) => (
                             <div
                                 key={log.id}
-                                className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:border-gray-700 transition-colors"
+                                className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 hover:border-gray-200 transition-colors"
                             >
                                 <div className="flex items-start gap-3">
                                     <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">

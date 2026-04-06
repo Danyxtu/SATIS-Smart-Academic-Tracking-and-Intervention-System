@@ -227,23 +227,6 @@ class UserController extends Controller
     }
 
     /**
-     * Show the form for creating a new user.
-     */
-    public function create()
-    {
-        $admin = Auth::user();
-        $department = $admin->department;
-
-        return Inertia::render('Admin/Users/Create', [
-            'department' => $department ? [
-                'id' => $department->id,
-                'name' => $department->department_name,
-                'code' => $department->department_code,
-            ] : null,
-        ]);
-    }
-
-    /**
      * Store a newly created user in storage.
      */
     public function store(Request $request)
