@@ -45,6 +45,14 @@
             color: #6b7280;
         }
         
+        .logo-image {
+            width: 60px;
+            height: 60px;
+            object-fit: contain;
+            display: block;
+            margin: 0 auto 10px;
+        }
+
         .logo-text {
             font-size: 24px;
             font-weight: 800;
@@ -355,10 +363,21 @@
     </style>
 </head>
 <body>
+    @php
+        $logoPath = resource_path('assets/satis-logo.png');
+        $logoData = file_exists($logoPath)
+            ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath))
+            : null;
+    @endphp
+
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <div class="logo-text">SATIS</div>
+            @if($logoData)
+                <img src="{{ $logoData }}" alt="SATIS Logo" class="logo-image">
+            @else
+                <div class="logo-text">SATIS</div>
+            @endif
             <h1>Student Analytics Report</h1>
             <p class="subtitle">Smart Academic Tracking and Intervention System</p>
         </div>

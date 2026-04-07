@@ -94,8 +94,7 @@ class AdminController extends Controller
             'last_name' => $validated['last_name'],
             'middle_name' => $validated['middle_name'] ?? null,
             'personal_email' => $validated['email'],
-            'password' => $plainPassword, // Will be hashed on first login
-            'temp_password' => $plainPassword,
+            'password' => Hash::make($plainPassword),
             'must_change_password' => true,
             'department_id' => $validated['department_id'],
             'created_by' => Auth::id(),
@@ -115,14 +114,7 @@ class AdminController extends Controller
 
         return redirect()
             ->route('superadmin.admins.index')
-            ->with('success', 'Admin created successfully.')
-            ->with('new_admin_password', [
-                'first_name' => $admin->first_name,
-                'last_name' => $admin->last_name,
-                'middle_name' => $admin->middle_name,
-                'email' => $admin->email,
-                'password' => $plainPassword,
-            ]);
+            ->with('success', 'Admin created successfully. Credentials have been sent via email.');
     }
 
     /**
@@ -157,7 +149,6 @@ class AdminController extends Controller
                     'name' => $admin->department->department_name,
                     'code' => $admin->department->department_code,
                 ] : null,
-                'temp_password' => $admin->temp_password,
                 'must_change_password' => $admin->must_change_password,
                 'created_at' => $admin->created_at->format('M d, Y'),
                 'password_changed_at' => $admin->password_changed_at?->format('M d, Y'),
@@ -223,8 +214,7 @@ class AdminController extends Controller
 
         // If password was provided, update it and require change on next login
         if (!empty($validated['password'])) {
-            $updateData['password'] = $validated['password'];
-            $updateData['temp_password'] = $validated['password'];
+            $updateData['password'] = Hash::make($validated['password']);
             $updateData['must_change_password'] = true;
             $updateData['password_changed_at'] = null;
         }
@@ -274,21 +264,21 @@ class AdminController extends Controller
         $plainPassword = Str::random(12);
 
         $admin->update([
-            'password' => $plainPassword,
-            'temp_password' => $plainPassword,
+            'password' => Hash::make($plainPassword),
             'must_change_password' => true,
             'password_changed_at' => null,
         ]);
 
+        $admin->load('department');
+
+        Mail::to($admin->email)->send(new AdminCredentials(
+            admin: $admin,
+            plainPassword: $plainPassword,
+            createdBy: Auth::user(),
+        ));
+
         return back()
-            ->with('success', 'Password reset successfully.')
-            ->with('new_admin_password', [
-                'first_name' => $admin->first_name,
-                'last_name' => $admin->last_name,
-                'middle_name' => $admin->middle_name,
-                'email' => $admin->email,
-                'password' => $plainPassword,
-            ]);
+            ->with('success', 'Password reset successfully. A new temporary password was emailed to the admin.');
     }
 
     /**
@@ -300,18 +290,12 @@ class AdminController extends Controller
             abort(404);
         }
 
-        // If no temp_password exists, generate a new one
-        $plainPassword = $admin->temp_password;
-
-        if (!$plainPassword) {
-            $plainPassword = Str::random(12);
-            $admin->update([
-                'password' => $plainPassword,
-                'temp_password' => $plainPassword,
-                'must_change_password' => true,
-                'password_changed_at' => null,
-            ]);
-        }
+        $plainPassword = Str::random(12);
+        $admin->update([
+            'password' => Hash::make($plainPassword),
+            'must_change_password' => true,
+            'password_changed_at' => null,
+        ]);
 
         // Load the department relationship for the email
         $admin->load('department');

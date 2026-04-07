@@ -68,7 +68,8 @@ const getGradeRowColors = (grade) => {
     if (grade === "N/A" || isNaN(numericGrade)) {
         colors = {
             row: "bg-gray-50 dark:bg-gray-800",
-            hoverRow: "hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-700/50",
+            hoverRow:
+                "hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-700/50",
             leftCell: "bg-gray-50 dark:bg-gray-800",
             rightCell: "bg-gray-50 dark:bg-gray-800",
         };
@@ -224,6 +225,8 @@ const MyClass = (props) => {
         gradeSummaries = {},
         onRefreshClassData,
         isReadOnly = false,
+        readOnlyModeLabel = "Archive View Only",
+        readOnlyActionMessage = "This class is view-only.",
     } = props;
 
     // State Management
@@ -235,6 +238,10 @@ const MyClass = (props) => {
     const [isStartQ2ModalOpen, setIsStartQ2ModalOpen] = useState(false);
     const currentQuarter = selectedClass?.current_quarter ?? 1;
     const isArchiveReadOnly = Boolean(isReadOnly);
+    const readOnlyBadgeLabel = String(readOnlyModeLabel || "View Only");
+    const readOnlyHint = String(
+        readOnlyActionMessage || "This class is view-only.",
+    );
     const isQ2Unlocked = isArchiveReadOnly || currentQuarter >= 2;
     const [searchTerm, setSearchTerm] = useState("");
     const [gradesExpanded, setGradesExpanded] = useState(false);
@@ -1098,7 +1105,7 @@ const MyClass = (props) => {
                             )}
                             {isArchiveReadOnly && (
                                 <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 font-medium">
-                                    Archive View Only
+                                    {readOnlyBadgeLabel}
                                 </span>
                             )}
                             {/* View Mode Toggle - Compact */}
@@ -1143,7 +1150,7 @@ const MyClass = (props) => {
                             className="flex items-center gap-1 rounded-md border border-indigo-300 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
                             title={
                                 isArchiveReadOnly
-                                    ? "Archive classes are view-only"
+                                    ? readOnlyHint
                                     : "Upload students from CSV"
                             }
                         >
@@ -1176,7 +1183,7 @@ const MyClass = (props) => {
                                     className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium py-1.5 px-2.5 rounded-md hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60 text-xs"
                                     title={
                                         isArchiveReadOnly
-                                            ? "Archive classes are view-only"
+                                            ? readOnlyHint
                                             : "Upload grades from CSV"
                                     }
                                 >
@@ -1195,7 +1202,7 @@ const MyClass = (props) => {
                                     className="flex items-center gap-1 bg-emerald-600 text-white font-medium py-1.5 px-2.5 rounded-md hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 text-xs"
                                     title={
                                         isArchiveReadOnly
-                                            ? "Archive classes are view-only"
+                                            ? readOnlyHint
                                             : "Save updated grades"
                                     }
                                 >
@@ -1216,9 +1223,7 @@ const MyClass = (props) => {
                             className="flex items-center gap-1 bg-indigo-600 text-white font-medium py-1.5 px-2.5 rounded-md hover:bg-indigo-700 disabled:opacity-50 text-xs"
                             disabled={!selectedClass || isArchiveReadOnly}
                             title={
-                                isArchiveReadOnly
-                                    ? "Archive classes are view-only"
-                                    : "Add student"
+                                isArchiveReadOnly ? readOnlyHint : "Add student"
                             }
                         >
                             <Plus size={14} />
@@ -1422,7 +1427,7 @@ const MyClass = (props) => {
                                         className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 transition disabled:cursor-not-allowed disabled:opacity-60"
                                         title={
                                             isArchiveReadOnly
-                                                ? "Archive classes are view-only"
+                                                ? readOnlyHint
                                                 : "Edit grade category percentages"
                                         }
                                     >
@@ -2212,7 +2217,7 @@ const MyClass = (props) => {
                         {selectedTab !== "final" && !hasAssignments && (
                             <p className="text-center text-gray-500 dark:text-gray-400 py-4 text-xs">
                                 {isArchiveReadOnly
-                                    ? "No activity records are available for this archive quarter."
+                                    ? "No activity records are available for this quarter."
                                     : "Add your first activity under Written Works, Performance Task, or Quarterly Exam to begin encoding scores."}
                             </p>
                         )}

@@ -24,8 +24,6 @@ import {
     EyeOff,
     BookOpen,
     School,
-    Copy,
-    CheckCircle,
     User,
     Mail,
     Building2,
@@ -327,8 +325,8 @@ const CreateUserModal = ({ isOpen, onClose, department, initialRole }) => {
                                                     </span>
                                                 </div>
                                                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                                    Auto-generates a temporary
-                                                    password.
+                                                    Sends temporary credentials
+                                                    via email.
                                                 </p>
                                             </button>
 
@@ -489,10 +487,7 @@ const CreateUserModal = ({ isOpen, onClose, department, initialRole }) => {
                                             htmlFor="modal_email"
                                             className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                                         >
-                                            Email Address
-                                            {data.role === "teacher"
-                                                ? " *"
-                                                : ""}
+                                            Email Address *
                                         </label>
                                         <div className="relative">
                                             <Mail
@@ -564,8 +559,8 @@ const CreateUserModal = ({ isOpen, onClose, department, initialRole }) => {
                                                 />
                                                 <p className="text-sm text-blue-700 dark:text-blue-300">
                                                     A secure temporary password
-                                                    will be generated
-                                                    automatically for students.
+                                                    will be generated and sent
+                                                    to the student's email.
                                                 </p>
                                             </div>
                                         </>
@@ -1092,194 +1087,6 @@ const BulkDeleteModal = ({
     );
 };
 
-// Temporary Password Modal - Shows generated password after creating a student
-const TempPasswordModal = ({ isOpen, onClose, user, tempPassword }) => {
-    const [copied, setCopied] = useState(false);
-
-    const copyToClipboard = (text) => {
-        navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    const copyAllCredentials = () => {
-        const credentials = `Email: ${user?.email}\nPassword: ${tempPassword}`;
-        navigator.clipboard.writeText(credentials);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    return (
-        <Transition.Root show={isOpen} as={Fragment}>
-            <Dialog as="div" className="relative z-50" onClose={onClose}>
-                <Transition.Child
-                    as={Fragment}
-                    enter="ease-out duration-300"
-                    enterFrom="opacity-0"
-                    enterTo="opacity-100"
-                    leave="ease-in duration-200"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                >
-                    <div className="fixed inset-0 bg-black/50 transition-opacity" />
-                </Transition.Child>
-
-                <div className="fixed inset-0 z-50 overflow-y-auto">
-                    <div className="flex min-h-full items-center justify-center p-4">
-                        <Transition.Child
-                            as={Fragment}
-                            enter="ease-out duration-300"
-                            enterFrom="opacity-0 scale-95"
-                            enterTo="opacity-100 scale-100"
-                            leave="ease-in duration-200"
-                            leaveFrom="opacity-100 scale-100"
-                            leaveTo="opacity-0 scale-95"
-                        >
-                            <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-xl transition-all">
-                                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-green-500 to-emerald-500">
-                                    <div className="flex items-center justify-between">
-                                        <Dialog.Title className="text-lg font-semibold text-white flex items-center gap-2">
-                                            <CheckCircle size={20} />
-                                            Student Created Successfully!
-                                        </Dialog.Title>
-                                        <button
-                                            onClick={onClose}
-                                            className="z-10 text-white/80 hover:text-white"
-                                        >
-                                            <X size={20} />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="p-6 space-y-4">
-                                    <div className="text-center mb-4">
-                                        <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
-                                            <GraduationCap
-                                                size={32}
-                                                className="text-green-600 dark:text-green-400"
-                                            />
-                                        </div>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                                            Please save these credentials. The
-                                            password will only be shown once.
-                                        </p>
-                                    </div>
-
-                                    {/* User Info */}
-                                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-3">
-                                        <div className="flex items-center gap-3">
-                                            <User
-                                                size={18}
-                                                className="text-gray-400"
-                                            />
-                                            <div>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                    Name
-                                                </p>
-                                                <p className="font-medium text-gray-900 dark:text-white">
-                                                    {user?.name}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <Mail
-                                                size={18}
-                                                className="text-gray-400"
-                                            />
-                                            <div className="flex-1">
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                    Email
-                                                </p>
-                                                <p className="font-medium text-gray-900 dark:text-white">
-                                                    {user?.email}
-                                                </p>
-                                            </div>
-                                            <button
-                                                onClick={() =>
-                                                    copyToClipboard(user?.email)
-                                                }
-                                                className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
-                                                title="Copy email"
-                                            >
-                                                <Copy size={16} />
-                                            </button>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <Key
-                                                size={18}
-                                                className="text-gray-400"
-                                            />
-                                            <div className="flex-1">
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                    Temporary Password
-                                                </p>
-                                                <p className="font-mono font-bold text-purple-600 dark:text-purple-400 text-lg">
-                                                    {tempPassword}
-                                                </p>
-                                            </div>
-                                            <button
-                                                onClick={() =>
-                                                    copyToClipboard(
-                                                        tempPassword,
-                                                    )
-                                                }
-                                                className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
-                                                title="Copy password"
-                                            >
-                                                <Copy size={16} />
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Warning */}
-                                    <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                                        <AlertTriangle
-                                            size={18}
-                                            className="text-amber-500 flex-shrink-0 mt-0.5"
-                                        />
-                                        <p className="text-xs text-amber-700 dark:text-amber-300">
-                                            This password will not be shown
-                                            again. Please make sure to save it
-                                            or share it with the student
-                                            securely.
-                                        </p>
-                                    </div>
-
-                                    {/* Actions */}
-                                    <div className="flex gap-3 pt-2">
-                                        <button
-                                            onClick={copyAllCredentials}
-                                            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors"
-                                        >
-                                            {copied ? (
-                                                <>
-                                                    <CheckCircle size={18} />
-                                                    Copied!
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Copy size={18} />
-                                                    Copy All Credentials
-                                                </>
-                                            )}
-                                        </button>
-                                        <button
-                                            onClick={onClose}
-                                            className="px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                                        >
-                                            Done
-                                        </button>
-                                    </div>
-                                </div>
-                            </Dialog.Panel>
-                        </Transition.Child>
-                    </div>
-                </div>
-            </Dialog>
-        </Transition.Root>
-    );
-};
-
 // User Actions Dropdown
 const UserActions = ({ user, onResetPassword, onDelete }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -1343,7 +1150,6 @@ export default function Index({
     department,
 }) {
     const page = usePage();
-    const { flash } = page.props;
     const [search, setSearch] = useState(filters.search);
     const [createUserModal, setCreateUserModal] = useState({
         isOpen: false,
@@ -1364,22 +1170,6 @@ export default function Index({
         loading: false,
     });
     const [isDeleting, setIsDeleting] = useState(false);
-    const [tempPasswordModal, setTempPasswordModal] = useState({
-        isOpen: false,
-        user: null,
-        tempPassword: null,
-    });
-
-    // Check for flash data when component mounts or flash changes
-    useEffect(() => {
-        if (flash?.tempPassword && flash?.createdUser) {
-            setTempPasswordModal({
-                isOpen: true,
-                user: flash.createdUser,
-                tempPassword: flash.tempPassword,
-            });
-        }
-    }, [flash]);
 
     useEffect(() => {
         if (hasHandledCreateQuery) {
@@ -1917,18 +1707,6 @@ export default function Index({
                 selectedCount={selectedUsers.length}
                 onConfirm={handleConfirmBulkDelete}
                 processing={bulkDeleteModal.loading}
-            />
-            <TempPasswordModal
-                isOpen={tempPasswordModal.isOpen}
-                onClose={() =>
-                    setTempPasswordModal({
-                        isOpen: false,
-                        user: null,
-                        tempPassword: null,
-                    })
-                }
-                user={tempPasswordModal.user}
-                tempPassword={tempPasswordModal.tempPassword}
             />
         </>
     );

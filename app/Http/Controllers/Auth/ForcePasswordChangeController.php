@@ -34,10 +34,9 @@ class ForcePasswordChangeController extends Controller
 
         $user = Auth::user();
 
-        // Update password with hash and clear the temporary password
+        // Update password and clear first-login requirement.
         $user->update([
             'password' => Hash::make($request->password),
-            'temp_password' => null,
             'must_change_password' => false,
             'password_changed_at' => now(),
         ]);

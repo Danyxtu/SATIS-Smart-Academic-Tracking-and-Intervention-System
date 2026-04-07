@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
-import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
+import { Head, Link, router, useForm } from "@inertiajs/react";
 import { Fragment } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import {
@@ -11,15 +11,11 @@ import {
     User,
     Mail,
     Calendar,
-    Eye,
-    EyeOff,
     AlertTriangle,
     X,
     ChevronLeft,
     ChevronRight,
     Shield,
-    Copy,
-    Check,
 } from "lucide-react";
 
 // Status Badge Component
@@ -150,15 +146,15 @@ const ApproveModal = ({ isOpen, onClose, request }) => {
                                             />
                                             <div className="text-sm text-amber-700 dark:text-amber-400">
                                                 <p className="font-medium">
-                                                    Face-to-Face Reset
+                                                    Secure Email Reset
                                                 </p>
                                                 <p className="mt-1 text-xs">
                                                     A temporary 8-character
                                                     password will be generated
-                                                    automatically. Share it with
-                                                    the user in person. They
-                                                    will be required to create a
-                                                    new password on their next
+                                                    and sent to the user's email
+                                                    address. They will be
+                                                    required to create a new
+                                                    password on their next
                                                     login.
                                                 </p>
                                             </div>
@@ -198,143 +194,10 @@ const ApproveModal = ({ isOpen, onClose, request }) => {
                                         >
                                             {processing
                                                 ? "Approving..."
-                                                : "Approve & Generate Password"}
+                                                : "Approve & Send Email"}
                                         </button>
                                     </div>
                                 </form>
-                            </Dialog.Panel>
-                        </Transition.Child>
-                    </div>
-                </div>
-            </Dialog>
-        </Transition.Root>
-    );
-};
-
-// Generated Password Modal - Shows the generated password for F2F sharing
-const GeneratedPasswordModal = ({ isOpen, onClose, password, userName }) => {
-    const [copied, setCopied] = useState(false);
-    const [showPassword, setShowPassword] = useState(true);
-
-    const copyToClipboard = () => {
-        navigator.clipboard.writeText(password);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    return (
-        <Transition.Root show={isOpen} as={Fragment}>
-            <Dialog as="div" className="relative z-50" onClose={() => {}}>
-                <Transition.Child
-                    as={Fragment}
-                    enter="ease-out duration-300"
-                    enterFrom="opacity-0"
-                    enterTo="opacity-100"
-                    leave="ease-in duration-200"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                >
-                    <div className="fixed inset-0 bg-black/50 transition-opacity" />
-                </Transition.Child>
-
-                <div className="fixed inset-0 z-50 overflow-y-auto">
-                    <div className="flex min-h-full items-center justify-center p-4">
-                        <Transition.Child
-                            as={Fragment}
-                            enter="ease-out duration-300"
-                            enterFrom="opacity-0 scale-95"
-                            enterTo="opacity-100 scale-100"
-                            leave="ease-in duration-200"
-                            leaveFrom="opacity-100 scale-100"
-                            leaveTo="opacity-0 scale-95"
-                        >
-                            <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-xl transition-all">
-                                <div className="p-6 text-center">
-                                    <div className="flex items-center justify-center w-16 h-16 mx-auto bg-green-100 dark:bg-green-900/30 rounded-full mb-4">
-                                        <Key
-                                            size={32}
-                                            className="text-green-600 dark:text-green-400"
-                                        />
-                                    </div>
-                                    <Dialog.Title className="text-xl font-bold text-gray-900 dark:text-white">
-                                        Temporary Password Generated
-                                    </Dialog.Title>
-                                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                                        Share this password with{" "}
-                                        <strong>{userName}</strong>{" "}
-                                        face-to-face. They will be required to
-                                        create a new password on next login.
-                                    </p>
-
-                                    {/* Password Display */}
-                                    <div className="mt-6 bg-gray-50 dark:bg-gray-700 rounded-xl p-4 border-2 border-dashed border-gray-300 dark:border-gray-600">
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider font-medium">
-                                            Temporary Password
-                                        </p>
-                                        <div className="flex items-center justify-center gap-3">
-                                            <code className="text-2xl font-mono font-bold text-gray-900 dark:text-white tracking-widest select-all">
-                                                {showPassword
-                                                    ? password
-                                                    : "••••••••"}
-                                            </code>
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setShowPassword(
-                                                        !showPassword,
-                                                    )
-                                                }
-                                                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                                            >
-                                                {showPassword ? (
-                                                    <EyeOff size={18} />
-                                                ) : (
-                                                    <Eye size={18} />
-                                                )}
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Copy Button */}
-                                    <button
-                                        type="button"
-                                        onClick={copyToClipboard}
-                                        className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
-                                    >
-                                        {copied ? (
-                                            <>
-                                                <Check
-                                                    size={16}
-                                                    className="text-green-500"
-                                                />
-                                                Copied!
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Copy size={16} />
-                                                Copy to Clipboard
-                                            </>
-                                        )}
-                                    </button>
-
-                                    {/* Warning */}
-                                    <div className="mt-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-                                        <p className="text-xs text-red-600 dark:text-red-400 font-medium">
-                                            ⚠️ This password will only be shown
-                                            once. Make sure the user copies it
-                                            before closing.
-                                        </p>
-                                    </div>
-
-                                    {/* Close Button */}
-                                    <button
-                                        type="button"
-                                        onClick={onClose}
-                                        className="mt-6 w-full px-4 py-2.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-                                    >
-                                        Done - Password Shared
-                                    </button>
-                                </div>
                             </Dialog.Panel>
                         </Transition.Child>
                     </div>
@@ -462,7 +325,6 @@ export default function PasswordResetRequests({
     counts,
     currentStatus,
 }) {
-    const { flash } = usePage().props;
     const [approveModal, setApproveModal] = useState({
         isOpen: false,
         request: null,
@@ -471,26 +333,6 @@ export default function PasswordResetRequests({
         isOpen: false,
         request: null,
     });
-    const [passwordModal, setPasswordModal] = useState({
-        isOpen: false,
-        password: "",
-        userName: "",
-    });
-
-    // Watch for generated password from flash data after approval
-    useEffect(() => {
-        if (flash?.generated_password) {
-            // Find the request that was just approved to get the user name
-            const approvedRequest = requests.data.find(
-                (r) => r.id === flash.reset_request_id,
-            );
-            setPasswordModal({
-                isOpen: true,
-                password: flash.generated_password,
-                userName: approvedRequest?.user?.name || "User",
-            });
-        }
-    }, [flash?.generated_password]);
 
     const handleStatusFilter = (status) => {
         router.get(
@@ -729,18 +571,6 @@ export default function PasswordResetRequests({
                 isOpen={rejectModal.isOpen}
                 onClose={() => setRejectModal({ isOpen: false, request: null })}
                 request={rejectModal.request}
-            />
-            <GeneratedPasswordModal
-                isOpen={passwordModal.isOpen}
-                onClose={() =>
-                    setPasswordModal({
-                        isOpen: false,
-                        password: "",
-                        userName: "",
-                    })
-                }
-                password={passwordModal.password}
-                userName={passwordModal.userName}
             />
         </>
     );

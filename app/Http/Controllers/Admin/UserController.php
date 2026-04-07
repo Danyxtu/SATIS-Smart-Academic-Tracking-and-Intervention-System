@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\TemporaryCredentials;
 use App\Models\User;
 use App\Models\Student;
 use App\Models\Subject;
@@ -11,6 +12,7 @@ use App\Models\PasswordResetRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\Rule;
@@ -151,14 +153,27 @@ class UserController extends Controller
             $query->orderBy($sortField, $sortDirection === 'asc' ? 'asc' : 'desc');
         }
 
-        // Eager load student data with enrollments and subjects
-        $query->with(['student.user', 'student']);
+        // Eager load student profile data for list rendering.
+        $query->with('student');
 
         // Paginate results
         $users = $query->paginate(15)->withQueryString();
 
+        $studentUserIds = $users->getCollection()
+            ->filter(fn($user) => $user->hasRole('student') && $user->student)
+            ->pluck('id')
+            ->values();
+
+        $enrollmentsByUserId = $studentUserIds->isNotEmpty()
+            ? Enrollment::query()
+            ->whereIn('user_id', $studentUserIds)
+            ->with(['subjectTeacher.subject', 'subjectTeacher.teacher'])
+            ->get()
+            ->groupBy('user_id')
+            : collect();
+
         // Transform users to include section and teacher info
-        $users->getCollection()->transform(function ($user) {
+        $users->getCollection()->transform(function ($user) use ($enrollmentsByUserId) {
             $payload = $user->toArray();
             $payload['role'] = $user->roles->pluck('name')->first();
 
@@ -167,14 +182,11 @@ class UserController extends Controller
                 $payload['grade_level'] = $user->student->grade_level;
                 $payload['strand'] = $user->student->strand;
 
-                // Get teachers for this student's subjects
-                $enrollments = Enrollment::where('user_id', $user->id)
-                    ->with(['subjectTeacher.subject', 'subjectTeacher.teacher'])
-                    ->get();
+                $enrollments = $enrollmentsByUserId->get($user->id, collect());
 
                 $payload['subjects'] = $enrollments->map(function ($enrollment) {
                     return [
-                        'name' => $enrollment->subjectTeacher?->subject?->name ?? 'N/A',
+                        'name' => $enrollment->subjectTeacher?->subject?->subject_name ?? 'N/A',
                         'teacher' => $enrollment->subjectTeacher?->teacher?->name ?? 'N/A',
                     ];
                 });
@@ -244,7 +256,7 @@ class UserController extends Controller
         ];
 
         if ($request->role === 'student') {
-            $rules['email'] = 'nullable|string|email|max:255|unique:users,personal_email';
+            $rules['email'] = 'required|string|email|max:255|unique:users,personal_email';
         } else {
             $rules['email'] = 'required|string|email|max:255|unique:users,personal_email';
         }
@@ -284,6 +296,7 @@ class UserController extends Controller
         if ($validated['role'] === 'student') {
             $seed = trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? ''));
             $userData['username'] = User::generateUniqueUsername($seed);
+            $userData['must_change_password'] = true;
         }
 
         // Assign department for teachers
@@ -305,14 +318,15 @@ class UserController extends Controller
                 'lrn' => $validated['lrn'],
             ]);
 
-            // Return with temporary password for student
+            Mail::to($user->email)->send(new TemporaryCredentials(
+                user: $user,
+                plainPassword: (string) $tempPassword,
+                issuedBy: $admin,
+                context: 'new student account',
+            ));
+
             return redirect()->route('admin.users.index')
-                ->with('success', 'Student created successfully.')
-                ->with('tempPassword', $tempPassword)
-                ->with('createdUser', [
-                    'name' => $user->first_name . ' ' . $user->last_name,
-                    'email' => $user->email,
-                ]);
+                ->with('success', 'Student created successfully. Temporary credentials were sent via email.');
         }
 
         return redirect()->route('admin.users.index')
@@ -461,15 +475,52 @@ class UserController extends Controller
 
         // Filter out the current admin user
         $currentUserId = Auth::id();
-        $idsToDelete = array_filter($validated['ids'], fn($id) => $id !== $currentUserId);
+        $idsToDelete = collect($validated['ids'])
+            ->map(fn($id) => (int) $id)
+            ->filter(fn($id) => $id !== $currentUserId)
+            ->unique()
+            ->values();
+
+        if ($idsToDelete->isEmpty()) {
+            return back()->withErrors(['ids' => 'No eligible users selected for deletion.']);
+        }
+
+        // Restrict bulk delete scope to students and teachers within admin permissions.
+        $scopedIds = User::query()
+            ->whereIn('id', $idsToDelete)
+            ->where(function ($query) use ($currentUser) {
+                $query->whereHas('roles', function ($roleQuery) {
+                    $roleQuery->where('name', 'student');
+                });
+
+                if ($currentUser->department_id) {
+                    $query->orWhere(function ($departmentQuery) use ($currentUser) {
+                        $departmentQuery->where('department_id', $currentUser->department_id)
+                            ->whereHas('roles', function ($roleQuery) {
+                                $roleQuery->where('name', 'teacher');
+                            });
+                    });
+                } else {
+                    $query->orWhereHas('roles', function ($roleQuery) {
+                        $roleQuery->where('name', 'teacher');
+                    });
+                }
+            })
+            ->pluck('id');
+
+        if ($scopedIds->count() !== $idsToDelete->count()) {
+            return back()->withErrors([
+                'ids' => 'One or more selected users are outside your allowed scope.',
+            ]);
+        }
 
         // Delete associated student records
-        Student::whereIn('user_id', $idsToDelete)->delete();
+        Student::whereIn('user_id', $scopedIds)->delete();
 
         // Delete users
-        User::whereIn('id', $idsToDelete)->delete();
+        User::whereIn('id', $scopedIds)->delete();
 
-        return back()->with('success', count($idsToDelete) . ' user(s) deleted successfully.');
+        return back()->with('success', $scopedIds->count() . ' user(s) deleted successfully.');
     }
 
     /**
@@ -540,6 +591,12 @@ class UserController extends Controller
             'admin_notes' => ['nullable', 'string', 'max:500'],
         ]);
 
+        if (blank($passwordResetRequest->user->email)) {
+            return back()->withErrors([
+                'email' => 'Cannot approve this reset request because the user has no email on file.',
+            ]);
+        }
+
         // Generate a random 8-character password
         $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
         $tempPassword = '';
@@ -550,8 +607,8 @@ class UserController extends Controller
         // Update user's password and flag for forced change
         $passwordResetRequest->user->update([
             'password' => Hash::make($tempPassword),
-            'temp_password' => $tempPassword,
             'must_change_password' => true,
+            'password_changed_at' => null,
         ]);
 
         // Update request status
@@ -562,11 +619,14 @@ class UserController extends Controller
             'processed_at' => now(),
         ]);
 
-        return back()->with([
-            'success' => 'Password reset approved. Share the temporary password with the user face-to-face.',
-            'generated_password' => $tempPassword,
-            'reset_request_id' => $passwordResetRequest->id,
-        ]);
+        Mail::to($passwordResetRequest->user->email)->send(new TemporaryCredentials(
+            user: $passwordResetRequest->user,
+            plainPassword: $tempPassword,
+            issuedBy: Auth::user(),
+            context: 'password reset',
+        ));
+
+        return back()->with('success', 'Password reset approved. Temporary credentials were sent via email.');
     }
 
     /**

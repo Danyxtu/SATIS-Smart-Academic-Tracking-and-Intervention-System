@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Models\Student;
+use App\Models\SchoolClass;
 use App\Models\Subject;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
@@ -13,12 +14,16 @@ test('teacher can add a student and receives the generated password in session',
     $teacher = User::factory()->create();
     $teacher->syncRolesByName(['teacher']);
 
-    $subject = Subject::factory()->create(["user_id" => $teacher->id]);
+    $subject = Subject::factory()->create();
+    $class = SchoolClass::factory()->create([
+        'teacher_id' => $teacher->id,
+        'subject_id' => $subject->id,
+    ]);
 
     actingAs($teacher);
 
-    $response = post(route('teacher.classes.students.store', $subject->id), [
-        'name' => 'Test Student',
+    $response = post(route('teacher.classes.students.store', $class->id), [
+        'student_name' => 'Test Student',
         'lrn' => '111222333444',
     ]);
 
@@ -39,14 +44,18 @@ test('teacher can upload a classlist and import summary contains generated passw
     $teacher = User::factory()->create();
     $teacher->syncRolesByName(['teacher']);
 
-    $subject = Subject::factory()->create(["user_id" => $teacher->id]);
+    $subject = Subject::factory()->create();
+    $class = SchoolClass::factory()->create([
+        'teacher_id' => $teacher->id,
+        'subject_id' => $subject->id,
+    ]);
 
     $csv = "Student Name,LRN\nNew Student,123456789012\nAnother Student,987654321098\n";
     $file = UploadedFile::fake()->createWithContent('classlist.csv', $csv);
 
     actingAs($teacher);
 
-    $response = post(route('teacher.classes.classlist.store', $subject->id), [
+    $response = post(route('teacher.classes.classlist.store', $class->id), [
         'classlist' => $file,
     ]);
 
@@ -67,14 +76,19 @@ test('teacher can start quarter 2 for a class', function () {
     /** @var User $teacher */
     $teacher = User::factory()->create();
     $teacher->syncRolesByName(['teacher']);
-    $subject = Subject::factory()->create(['user_id' => $teacher->id, 'current_quarter' => 1]);
+    $subject = Subject::factory()->create();
+    $class = SchoolClass::factory()->create([
+        'teacher_id' => $teacher->id,
+        'subject_id' => $subject->id,
+        'current_quarter' => 1,
+    ]);
 
     actingAs($teacher);
 
-    $response = post(route('teacher.classes.quarter.start', $subject->id), [
+    $response = post(route('teacher.classes.quarter.start', $class->id), [
         'quarter' => 2,
     ]);
 
     $response->assertSessionHas('success');
-    $this->assertEquals(2, $subject->fresh()->current_quarter);
+    $this->assertEquals(2, $class->fresh()->current_quarter);
 });

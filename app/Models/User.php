@@ -34,7 +34,6 @@ class User extends Authenticatable
         'status',
         'department_id',
         'created_by',
-        'temp_password',
         'must_change_password',
         'password_changed_at',
     ];
@@ -56,7 +55,6 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
-        'temp_password',
     ];
 
     /**

@@ -183,24 +183,6 @@ export default function Show({ admin, departmentStats }) {
                                     </div>
                                 </div>
                             </div>
-
-                            {/* Temporary Password (if exists) */}
-                            {admin.temp_password &&
-                                admin.must_change_password && (
-                                    <div className="flex items-start gap-4">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
-                                            <Key size={18} />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                                                Temporary Password
-                                            </p>
-                                            <p className="text-slate-900 font-mono mt-1 bg-slate-100 px-3 py-1.5 rounded-lg inline-block">
-                                                {admin.temp_password}
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
                         </div>
                     </div>
 
