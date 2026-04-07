@@ -21,7 +21,6 @@ class SuperAdminSeeder extends Seeder
                 'last_name' => 'Admin',
                 'username' => 'superadmin',
                 'password' => Hash::make('superadmin123'),
-                'temp_password' => 'superadmin123',
                 'must_change_password' => true,
                 'email_verified_at' => now(),
             ]

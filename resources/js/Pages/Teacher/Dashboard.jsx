@@ -40,14 +40,6 @@ const Dashboard = ({
     const [showUploadGradesModal, setShowUploadGradesModal] = useState(false);
     const [showInterventionModal, setShowInterventionModal] = useState(false);
 
-    console.log("Academic Period:", academicPeriod);
-    console.log("Department:", department);
-    console.log("Priority Students:", priorityStudents);
-    console.log("Stats:", stats);
-    console.log("Recent Activity:", recentActivity);
-    console.log("Auth User:", auth.user);
-    console.log("All Subjects:", allSubjects);
-
     const currentDate = new Date().toLocaleDateString("en-US", {
         weekday: "long",
         month: "long",

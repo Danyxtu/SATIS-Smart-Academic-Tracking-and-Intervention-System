@@ -4,20 +4,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 
-use function Pest\Laravel\json;
-
 Route::get('/test', function () {
     return response()->json([
         'message' => 'Hello from Laravel!',
         'status' => 'success'
     ]);
 });
-
-
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
-
 
 Route::get('/health', function () {
     return response()->json([
@@ -26,7 +18,7 @@ Route::get('/health', function () {
     ]);
 });
 
-Route::post('login', [AuthController::class, 'login']);
+Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
 // Force password change for new accounts
 Route::middleware('auth:sanctum')->post('force-change-password', [AuthController::class, 'forceChangePassword']);
@@ -51,6 +43,6 @@ Route::middleware('auth:sanctum')->put('student/password', [\App\Http\Controller
 // Export PDF endpoint for mobile app
 Route::middleware('auth:sanctum')->get('student/performance/{enrollment}/export/pdf', [\App\Http\Controllers\Api\StudentPerformanceController::class, 'exportPdf']);
 
-Route::middleware('auth:sanctum')->get('user', function (Request $req) {
-    return $req->user();
+Route::middleware('auth:sanctum')->get('user', function (Request $request) {
+    return $request->user();
 });

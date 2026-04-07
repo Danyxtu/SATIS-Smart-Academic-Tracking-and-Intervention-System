@@ -18,8 +18,11 @@ return [
 
     'allowed_methods' => ['*'],
 
-    // Allow Expo + ngrok to access Laravel API
-    'allowed_origins' => ['*'],
+    // Comma-separated list from env, e.g. https://app.example.com,https://expo.dev
+    'allowed_origins' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', env('CORS_ALLOWED_ORIGINS', 'http://localhost,http://127.0.0.1')),
+    ))),
 
     'allowed_origins_patterns' => [],
 

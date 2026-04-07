@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Eye, EyeOff, Copy, Check } from "lucide-react";
+import { X, Check } from "lucide-react";
 
 const StudentStatusModal = ({
     student,
@@ -12,8 +12,6 @@ const StudentStatusModal = ({
     hasQuarterlyExamScores,
     onClose,
 }) => {
-    const [showPassword, setShowPassword] = useState(false);
-    const [copied, setCopied] = useState(false);
     const [selectedQuarter, setSelectedQuarter] = useState(1);
 
     if (!student) return null;
@@ -33,9 +31,6 @@ const StudentStatusModal = ({
     const currentCategories = resolveCategories(selectedQuarter);
     const q1Categories = resolveCategories(1);
 
-    // Get the temporary password from the student's user record
-    const temporaryPassword =
-        student.user?.temp_password || student.temp_password || null;
     const hasChangedPassword =
         student.user?.must_change_password === false ||
         student.must_change_password === false;
@@ -91,12 +86,6 @@ const StudentStatusModal = ({
             .join("")
             .toUpperCase()
             .slice(0, 2);
-    };
-
-    const handleCopyPassword = () => {
-        navigator.clipboard.writeText(temporaryPassword);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
     };
 
     return (
@@ -181,103 +170,57 @@ const StudentStatusModal = ({
 
                 {/* Scrollable Content */}
                 <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                    {/* Temporary Password Section */}
-                    {hasChangedPassword ? (
-                        // Student has already changed their password
-                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-2.5">
-                            <div className="flex items-center gap-2">
-                                <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                                    <Check
-                                        size={16}
-                                        className="text-green-600"
-                                    />
-                                </div>
-                                <div>
-                                    <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">
-                                        Password Changed
-                                    </p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                        This student has set their own password
-                                    </p>
-                                </div>
+                    {/* Account Status Section */}
+                    <div
+                        className={`rounded-lg border p-2.5 ${
+                            hasChangedPassword
+                                ? "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
+                                : "border-amber-200 bg-amber-50"
+                        }`}
+                    >
+                        <div className="flex items-center gap-2">
+                            <div
+                                className={`h-8 w-8 rounded-full flex items-center justify-center ${
+                                    hasChangedPassword
+                                        ? "bg-green-100"
+                                        : "bg-amber-100"
+                                }`}
+                            >
+                                <Check
+                                    size={16}
+                                    className={
+                                        hasChangedPassword
+                                            ? "text-green-600"
+                                            : "text-amber-600"
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <p
+                                    className={`text-xs font-semibold ${
+                                        hasChangedPassword
+                                            ? "text-gray-800 dark:text-gray-200"
+                                            : "text-amber-800"
+                                    }`}
+                                >
+                                    {hasChangedPassword
+                                        ? "Password Changed"
+                                        : "Password Change Required"}
+                                </p>
+                                <p
+                                    className={`text-xs ${
+                                        hasChangedPassword
+                                            ? "text-gray-500 dark:text-gray-400"
+                                            : "text-amber-600"
+                                    }`}
+                                >
+                                    {hasChangedPassword
+                                        ? "This student has already set their own password."
+                                        : "This student must update their password after login."}
+                                </p>
                             </div>
                         </div>
-                    ) : temporaryPassword ? (
-                        // Student has a temporary password
-                        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2.5">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                                <div>
-                                    <p className="text-xs font-semibold text-emerald-800">
-                                        Temporary Password
-                                    </p>
-                                    <p className="text-xs text-emerald-600">
-                                        Share this password with the student for
-                                        initial login
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <div className="flex items-center gap-1 rounded-lg bg-white dark:bg-gray-900 border border-emerald-300 px-2.5 py-1">
-                                        <span className="font-mono text-sm font-semibold text-gray-900 dark:text-gray-100 tracking-wide">
-                                            {showPassword
-                                                ? temporaryPassword
-                                                : "••••••••••••"}
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setShowPassword(!showPassword)
-                                            }
-                                            className="p-0.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 dark:text-gray-300 transition"
-                                            aria-label={
-                                                showPassword
-                                                    ? "Hide password"
-                                                    : "Show password"
-                                            }
-                                        >
-                                            {showPassword ? (
-                                                <EyeOff size={15} />
-                                            ) : (
-                                                <Eye size={15} />
-                                            )}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={handleCopyPassword}
-                                            className="p-0.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 dark:text-gray-300 transition"
-                                            aria-label="Copy password"
-                                        >
-                                            {copied ? (
-                                                <Check
-                                                    size={15}
-                                                    className="text-green-600"
-                                                />
-                                            ) : (
-                                                <Copy size={15} />
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        // No temporary password available
-                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-2.5">
-                            <div className="flex items-center gap-2">
-                                <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center">
-                                    <Eye size={16} className="text-amber-600" />
-                                </div>
-                                <div>
-                                    <p className="text-xs font-semibold text-amber-800">
-                                        No Temporary Password
-                                    </p>
-                                    <p className="text-xs text-amber-600">
-                                        This student account was created without
-                                        a temporary password
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    </div>
 
                     {/* Meta Information Grid */}
                     <div className="grid gap-2 grid-cols-2 md:grid-cols-3">

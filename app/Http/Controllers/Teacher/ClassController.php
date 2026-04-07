@@ -108,6 +108,15 @@ class ClassController extends Controller
             ->where('is_active', true)
             ->orderBy('department_code')
             ->get(['department_name', 'department_code']);
+        $availableSubjects = Subject::query()
+            ->orderBy('subject_name')
+            ->get(['id', 'subject_name', 'subject_code'])
+            ->map(fn(Subject $subject) => [
+                'id' => (int) $subject->id,
+                'subject_name' => $subject->subject_name,
+                'subject_code' => $subject->subject_code,
+            ])
+            ->values();
 
         $classes = $classesData['classes'];
         $defaultSchoolYear = $classesData['defaultSchoolYear'];
@@ -126,6 +135,7 @@ class ClassController extends Controller
             'semester2Count',
             'roster',
             'departments',
+            'availableSubjects',
         ));
     }
 
@@ -1256,8 +1266,7 @@ class ClassController extends Controller
             'middle_name' => $middleName,
             'username' => $username,
             'personal_email' => $preferredPersonalEmail,
-            'password' => $plainPassword, // Store plain text initially - will be hashed on first login change
-            'temp_password' => $plainPassword, // Store for teacher to view
+            'password' => Hash::make($plainPassword),
             'must_change_password' => true,
         ]);
 
@@ -1654,7 +1663,6 @@ class ClassController extends Controller
                         'section' => $studentProfile?->section ?? $subjectTeacher->section,
                         'strand' => $studentProfile?->strand ?? $subjectTeacher->strand,
                         'track' => $studentProfile?->track ?? $subjectTeacher->track,
-                        'temp_password' => $user?->temp_password,
                         'must_change_password' => $user?->must_change_password ?? true,
                         'grades' => $enrollment->grades->groupBy('quarter')->map(function ($quarterGrades) {
                             return $quarterGrades->mapWithKeys(fn($grade) => [

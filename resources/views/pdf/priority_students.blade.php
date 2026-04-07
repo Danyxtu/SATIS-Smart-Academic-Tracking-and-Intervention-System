@@ -18,6 +18,16 @@
                 border-bottom: 2px solid #333;
                 padding-bottom: 15px;
             }
+            .logo-mark {
+                margin-bottom: 8px;
+            }
+            .logo-image {
+                width: 56px;
+                height: 56px;
+                object-fit: contain;
+                display: block;
+                margin: 0 auto;
+            }
             .logo-title {
                 font-size: 22px; 
                 font-weight: bold; 
@@ -230,8 +240,21 @@
         </style>
     </head>
     <body>
+        @php
+            $logoPath = resource_path('assets/satis-logo.png');
+            $logoData = file_exists($logoPath)
+                ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath))
+                : null;
+        @endphp
+
         <div class="header">
-            <div class="logo-title">SATIS</div>
+            <div class="logo-mark">
+                @if($logoData)
+                    <img src="{{ $logoData }}" alt="SATIS Logo" class="logo-image">
+                @else
+                    <div class="logo-title">SATIS</div>
+                @endif
+            </div>
             <div class="subtitle">Smart Academic Tracking and Intervention System</div>
             <div class="report-type">Priority Students Report</div>
             <div class="date-info">Generated on {{ \Carbon\Carbon::now()->format('F d, Y \a\t h:i A') }}</div>

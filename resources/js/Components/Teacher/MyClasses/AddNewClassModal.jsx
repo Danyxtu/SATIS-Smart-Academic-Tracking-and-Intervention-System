@@ -58,6 +58,7 @@ const COLOR_OPTIONS = [
 ];
 
 const GRADE_LEVEL_OPTIONS = ["Grade 11", "Grade 12"];
+const SECTION_LETTER_OPTIONS = ["A", "B", "C", "D", "E", "F"];
 
 const WIZARD_STEPS = [
     { id: 1, title: "Class Info" },
@@ -81,6 +82,10 @@ const parseSectionSuffix = (sectionValue, strandValue) => {
 };
 
 const sanitizeLrn = (value) => String(value ?? "").replace(/[^0-9]/g, "");
+const normalizeSearchValue = (value) =>
+    String(value ?? "")
+        .toLowerCase()
+        .trim();
 
 const StepBadge = ({ step, currentStep }) => {
     const isActive = currentStep === step.id;
@@ -118,9 +123,11 @@ const AddNewClassModal = ({
     mode = "create",
     classData = null,
     departments = [],
+    availableSubjects = [],
 }) => {
     const isEditMode = mode === "edit";
     const [step, setStep] = useState(1);
+    const [isSubjectMenuOpen, setIsSubjectMenuOpen] = useState(false);
     const [manualStudents, setManualStudents] = useState([]);
     const [studentDraft, setStudentDraft] = useState({
         student_name: "",
@@ -164,8 +171,76 @@ const AddNewClassModal = ({
         return COLOR_OPTIONS.find((item) => item.name === data.color);
     }, [data.color]);
 
+    const subjectOptions = useMemo(() => {
+        const seenNames = new Set();
+
+        return availableSubjects
+            .map((subject, index) => {
+                if (typeof subject === "string") {
+                    const subjectName = subject.trim();
+
+                    if (!subjectName) {
+                        return null;
+                    }
+
+                    return {
+                        id: `subject-${index}`,
+                        subject_name: subjectName,
+                        subject_code: "",
+                    };
+                }
+
+                const subjectName = String(
+                    subject?.subject_name ?? subject?.name ?? "",
+                ).trim();
+
+                if (!subjectName) {
+                    return null;
+                }
+
+                return {
+                    id: subject?.id ?? `subject-${index}`,
+                    subject_name: subjectName,
+                    subject_code: String(
+                        subject?.subject_code ?? subject?.code ?? "",
+                    ).trim(),
+                };
+            })
+            .filter((subject) => subject !== null)
+            .filter((subject) => {
+                const key = normalizeSearchValue(subject.subject_name);
+
+                if (!key || seenNames.has(key)) {
+                    return false;
+                }
+
+                seenNames.add(key);
+                return true;
+            });
+    }, [availableSubjects]);
+
+    const filteredSubjects = useMemo(() => {
+        const query = normalizeSearchValue(data.subject_name);
+
+        if (!query) {
+            return subjectOptions.slice(0, 50);
+        }
+
+        return subjectOptions
+            .filter((subject) => {
+                const subjectName = normalizeSearchValue(subject.subject_name);
+                const subjectCode = normalizeSearchValue(subject.subject_code);
+
+                return (
+                    subjectName.includes(query) || subjectCode.includes(query)
+                );
+            })
+            .slice(0, 50);
+    }, [subjectOptions, data.subject_name]);
+
     const resetWizardState = () => {
         setStep(1);
+        setIsSubjectMenuOpen(false);
         setManualStudents([]);
         setStudentDraft({
             student_name: "",
@@ -251,7 +326,19 @@ const AddNewClassModal = ({
             setData("section", value.toUpperCase().replace(/[^A-Z]/g, ""));
             return;
         }
+
+        if (name === "subject_name") {
+            setData("subject_name", value);
+            setIsSubjectMenuOpen(true);
+            return;
+        }
+
         setData(name, value);
+    };
+
+    const handleSubjectSelect = (subjectName) => {
+        setData("subject_name", subjectName);
+        setIsSubjectMenuOpen(false);
     };
 
     const handleFileChange = (file) => {
@@ -478,16 +565,27 @@ const AddNewClassModal = ({
                                         <label className="block text-sm font-medium text-gray-700">
                                             Section Letter
                                         </label>
-                                        <input
-                                            type="text"
+                                        <select
                                             name="section"
                                             required
                                             className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
                                             value={data.section}
                                             onChange={handleChange}
-                                            placeholder="e.g., A"
-                                            maxLength={5}
-                                        />
+                                        >
+                                            <option value="" disabled>
+                                                Select Section Letter
+                                            </option>
+                                            {SECTION_LETTER_OPTIONS.map(
+                                                (letter) => (
+                                                    <option
+                                                        key={letter}
+                                                        value={letter}
+                                                    >
+                                                        {letter}
+                                                    </option>
+                                                ),
+                                            )}
+                                        </select>
                                         {errors.section && (
                                             <p className="text-sm text-red-600 mt-1">
                                                 {errors.section}
@@ -501,15 +599,81 @@ const AddNewClassModal = ({
                                         <label className="block text-sm font-medium text-gray-700">
                                             Subject
                                         </label>
-                                        <input
-                                            type="text"
-                                            name="subject_name"
-                                            required
-                                            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-                                            value={data.subject_name}
-                                            onChange={handleChange}
-                                            placeholder="e.g., General Mathematics"
-                                        />
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                name="subject_name"
+                                                required
+                                                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                                                value={data.subject_name}
+                                                onChange={handleChange}
+                                                onFocus={() =>
+                                                    setIsSubjectMenuOpen(true)
+                                                }
+                                                onBlur={() => {
+                                                    setTimeout(() => {
+                                                        setIsSubjectMenuOpen(
+                                                            false,
+                                                        );
+                                                    }, 120);
+                                                }}
+                                                placeholder="Type to search subjects"
+                                                autoComplete="off"
+                                            />
+
+                                            {isSubjectMenuOpen &&
+                                                subjectOptions.length > 0 && (
+                                                    <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                                                        {filteredSubjects.length ===
+                                                        0 ? (
+                                                            <p className="px-3 py-2 text-sm text-gray-500">
+                                                                No matching
+                                                                subjects.
+                                                            </p>
+                                                        ) : (
+                                                            filteredSubjects.map(
+                                                                (subject) => (
+                                                                    <button
+                                                                        key={`${subject.id}-${subject.subject_name}`}
+                                                                        type="button"
+                                                                        onMouseDown={(
+                                                                            event,
+                                                                        ) => {
+                                                                            event.preventDefault();
+                                                                            handleSubjectSelect(
+                                                                                subject.subject_name,
+                                                                            );
+                                                                        }}
+                                                                        className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-indigo-50"
+                                                                    >
+                                                                        <span className="font-medium text-gray-700">
+                                                                            {
+                                                                                subject.subject_name
+                                                                            }
+                                                                        </span>
+                                                                        <span className="ml-2 text-xs text-gray-500">
+                                                                            {subject.subject_code ||
+                                                                                "No code"}
+                                                                        </span>
+                                                                    </button>
+                                                                ),
+                                                            )
+                                                        )}
+                                                    </div>
+                                                )}
+                                        </div>
+
+                                        {subjectOptions.length > 0 ? (
+                                            <p className="mt-1 text-xs text-gray-500">
+                                                {`Available subjects: ${subjectOptions.length}. Type to filter.`}
+                                            </p>
+                                        ) : (
+                                            <p className="mt-1 text-xs text-gray-500">
+                                                No subjects found in the system
+                                                yet. You may enter one manually.
+                                            </p>
+                                        )}
+
                                         {errors.subject_name && (
                                             <p className="text-sm text-red-600 mt-1">
                                                 {errors.subject_name}

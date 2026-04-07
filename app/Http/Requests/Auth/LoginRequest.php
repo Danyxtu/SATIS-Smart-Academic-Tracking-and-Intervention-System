@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Auth;
 
-use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -44,25 +43,6 @@ class LoginRequest extends FormRequest
 
         $identifier = trim((string) $this->input('email'));
         $normalizedIdentifier = Str::lower($identifier);
-
-        $userQuery = User::query()
-            ->where('username', $normalizedIdentifier);
-
-        if (filter_var($normalizedIdentifier, FILTER_VALIDATE_EMAIL)) {
-            $userQuery->orWhere('personal_email', $normalizedIdentifier);
-        }
-
-        // First, check if user exists and needs to change password (plain text auth)
-        $user = $userQuery->first();
-
-        if ($user && $user->must_change_password) {
-            // Check plain text password match for first-time login
-            if ($this->password === $user->password) {
-                Auth::login($user, $this->boolean('remember'));
-                RateLimiter::clear($this->throttleKey());
-                return;
-            }
-        }
 
         // Normal hashed password authentication
         $authenticated = false;

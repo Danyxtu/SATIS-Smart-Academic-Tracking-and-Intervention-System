@@ -31,15 +31,14 @@ class StudentActionsController extends Controller
 
     public function completeInterventionTask(Request $request, $taskId)
     {
-        $task = InterventionTask::findOrFail($taskId);
+        $task = InterventionTask::query()
+            ->whereHas('intervention.enrollment', function ($query) use ($request) {
+                $query->where('user_id', $request->user()->id);
+            })
+            ->with('intervention.tasks')
+            ->findOrFail($taskId);
 
-        // Ensure the task belongs to an intervention for this student
         $intervention = $task->intervention;
-        $enrollment = $intervention->enrollment;
-
-        if ($enrollment->user_id !== $request->user()->id) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
-        }
 
         $task->update(['is_completed' => true]);
 

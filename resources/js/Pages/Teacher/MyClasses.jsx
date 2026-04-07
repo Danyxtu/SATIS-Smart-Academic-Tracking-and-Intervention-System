@@ -85,6 +85,7 @@ const buildClassKey = (cls, index) => {
 const MyClasses = ({
     classes = [],
     departments = [],
+    availableSubjects = [],
     rosters = {},
     gradeStructures = {},
     defaultSchoolYear,
@@ -93,19 +94,6 @@ const MyClasses = ({
     semester1Count = 0,
     semester2Count = 0,
 }) => {
-    /**
-     * Debugging purposes: Log the received props to verify data structure and values.
-     * This will be removed or commented out in production.
-     */
-    console.log("Rendering MyClasses with props:", classes);
-    console.log("Rosters:", rosters);
-    console.log("Grade Structures:", gradeStructures);
-    console.log("Default School Year:", defaultSchoolYear);
-    console.log("Current Semester:", currentSemester);
-    console.log("Selected Semester:", selectedSemester);
-    console.log("Semester 1 Count:", semester1Count);
-    console.log("Semester 2 Count:", semester2Count);
-
     const page = usePage();
     const flash = page?.props?.flash ?? {};
     const importSummary =
@@ -429,6 +417,22 @@ const MyClasses = ({
         archiveSelectedSemester === 2 && Number(currentSemester) < 2
             ? "Second semester should start to proceed with this operation."
             : "";
+    const isSemesterViewOnly =
+        !isArchiveMode && Number(selectedSemester) < Number(currentSemester);
+    const isReadOnlyMode = isArchiveMode || isSemesterViewOnly;
+    const readOnlySemesterMessage =
+        "Past semesters are view-only while the current semester is active.";
+
+    useEffect(() => {
+        if (!isSemesterViewOnly) {
+            return;
+        }
+
+        setIsAddClassModalOpen(false);
+        setDroppedFile(null);
+        setEditClassModal({ open: false, classData: null });
+        setDeleteClassModal({ open: false, classData: null });
+    }, [isSemesterViewOnly]);
 
     const clearClassQueryParam = ({ replace = true } = {}) => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -809,6 +813,12 @@ const MyClasses = ({
 
     const handleDragOver = (e) => {
         e.preventDefault();
+
+        if (isSemesterViewOnly) {
+            setIsDragging(false);
+            return;
+        }
+
         setIsDragging(true);
     };
 
@@ -820,6 +830,11 @@ const MyClasses = ({
     const handleDrop = (e) => {
         e.preventDefault();
         setIsDragging(false);
+
+        if (isSemesterViewOnly) {
+            return;
+        }
+
         const file = e.dataTransfer.files[0];
 
         if (!file) return;
@@ -862,10 +877,18 @@ const MyClasses = ({
     };
 
     const handleEditClass = (cls) => {
+        if (isReadOnlyMode) {
+            return;
+        }
+
         setEditClassModal({ open: true, classData: cls });
     };
 
     const handleDeleteClass = (cls) => {
+        if (isReadOnlyMode) {
+            return;
+        }
+
         setDeleteClassModal({ open: true, classData: cls });
     };
 
@@ -961,12 +984,30 @@ const MyClasses = ({
                             {!isArchiveMode && (
                                 <button
                                     type="button"
-                                    onClick={() => setIsAddClassModalOpen(true)}
-                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-all ${
-                                        highlightAddClass ? "animate-pulse" : ""
+                                    onClick={() => {
+                                        if (isSemesterViewOnly) {
+                                            return;
+                                        }
+
+                                        setIsAddClassModalOpen(true);
+                                    }}
+                                    disabled={isSemesterViewOnly}
+                                    title={
+                                        isSemesterViewOnly
+                                            ? readOnlySemesterMessage
+                                            : "Add class"
+                                    }
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                                        isSemesterViewOnly
+                                            ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                                            : "bg-indigo-600 text-white hover:bg-indigo-700"
+                                    } ${
+                                        highlightAddClass && !isSemesterViewOnly
+                                            ? "animate-pulse"
+                                            : ""
                                     }`}
                                     style={
-                                        highlightAddClass
+                                        highlightAddClass && !isSemesterViewOnly
                                             ? {
                                                   boxShadow:
                                                       "0 0 20px rgba(99, 102, 241, 0.5)",
@@ -1645,14 +1686,31 @@ const MyClasses = ({
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
                                         {selectedSemester === currentSemester
                                             ? "Add your first class to get started."
-                                            : "No classes were created this semester."}
+                                            : isSemesterViewOnly
+                                              ? "This semester is currently in view mode."
+                                              : "No classes were created this semester."}
                                     </p>
-                                    {selectedSemester === currentSemester && (
+                                    {(selectedSemester === currentSemester ||
+                                        isSemesterViewOnly) && (
                                         <button
-                                            onClick={() =>
-                                                setIsAddClassModalOpen(true)
+                                            onClick={() => {
+                                                if (isSemesterViewOnly) {
+                                                    return;
+                                                }
+
+                                                setIsAddClassModalOpen(true);
+                                            }}
+                                            disabled={isSemesterViewOnly}
+                                            title={
+                                                isSemesterViewOnly
+                                                    ? readOnlySemesterMessage
+                                                    : "Add class"
                                             }
-                                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                                isSemesterViewOnly
+                                                    ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                                                    : "bg-indigo-600 text-white hover:bg-indigo-700"
+                                            }`}
                                         >
                                             <Plus size={16} />
                                             Add Class
@@ -1685,6 +1743,7 @@ const MyClasses = ({
                                                     handleDeleteClass
                                                 }
                                                 isLoading={isLoading}
+                                                showActions={!isReadOnlyMode}
                                             />
                                         );
                                     })}
@@ -1700,7 +1759,17 @@ const MyClasses = ({
                         gradeStructure={gradeStructure}
                         gradeSummaries={gradeSummaries}
                         onRefreshClassData={refreshClassData}
-                        isReadOnly={isArchiveMode}
+                        isReadOnly={isReadOnlyMode}
+                        readOnlyModeLabel={
+                            isArchiveMode
+                                ? "Archive View Only"
+                                : "Semester View Only"
+                        }
+                        readOnlyActionMessage={
+                            isArchiveMode
+                                ? "Archive classes are view-only"
+                                : readOnlySemesterMessage
+                        }
                     />
                 )}
             </div>
@@ -1716,6 +1785,7 @@ const MyClasses = ({
                     currentSemester={currentSemester}
                     initialFile={droppedFile}
                     departments={departments}
+                    availableSubjects={availableSubjects}
                 />
             )}
 
@@ -1729,6 +1799,7 @@ const MyClasses = ({
                     defaultSchoolYear={defaultSchoolYear}
                     currentSemester={currentSemester}
                     departments={departments}
+                    availableSubjects={availableSubjects}
                 />
             )}
 

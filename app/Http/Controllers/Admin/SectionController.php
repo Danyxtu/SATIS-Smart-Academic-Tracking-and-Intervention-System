@@ -277,7 +277,6 @@ class SectionController extends Controller
                     'username' => User::generateUniqueUsername($newStudent['first_name'] . ' ' . $newStudent['last_name']),
                     'personal_email' => $newStudent['personal_email'],
                     'password' => Hash::make($tempPassword),
-                    'temp_password' => $tempPassword,
                     'must_change_password' => true,
                     'department_id' => $departmentId,
                     'created_by' => $admin->id,

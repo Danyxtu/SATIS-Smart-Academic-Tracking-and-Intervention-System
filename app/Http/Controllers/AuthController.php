@@ -31,9 +31,7 @@ class AuthController extends Controller
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        $validPassword = $user->must_change_password
-            ? $request->password === $user->password
-            : Hash::check($request->password, $user->password);
+        $validPassword = Hash::check($request->password, $user->password);
 
         if (! $validPassword) {
             return response()->json(['message' => 'Invalid credentials'], 401);
@@ -66,7 +64,6 @@ class AuthController extends Controller
 
         $user->update([
             'password' => Hash::make($request->password),
-            'temp_password' => null,
             'must_change_password' => false,
             'password_changed_at' => now(),
         ]);

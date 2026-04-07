@@ -21,7 +21,6 @@ class TeacherSuperAdminSeeder extends Seeder
                 'last_name' => 'SA',
                 'username' => 'teachsa',
                 'password' => Hash::make('teachsa123'),
-                'temp_password' => 'teachsa123',
                 'must_change_password' => true,
                 'email_verified_at' => now(),
             ]

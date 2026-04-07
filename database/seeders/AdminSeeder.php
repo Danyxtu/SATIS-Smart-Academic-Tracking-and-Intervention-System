@@ -31,7 +31,6 @@ class AdminSeeder extends Seeder
                 'last_name' => 'User',
                 'username' => 'admin',
                 'password' => bcrypt('admin123'),
-                'temp_password' => 'admin123',
                 'must_change_password' => true,
                 'department_id' => $department->id,
                 'email_verified_at' => now(),
