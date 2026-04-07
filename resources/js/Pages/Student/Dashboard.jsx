@@ -45,24 +45,24 @@ const StatusBadge = ({ status }) => {
 };
 
 // --- Stat Card Component ---
-const StatCard = ({ title, value, subtitle, icon, gradient, trend }) => (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 hover:shadow-md transition-all duration-300">
+const StatCard = ({ title, value, subtitle, icon, trend }) => (
+    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 hover:shadow-md transition-all duration-300">
         <div className="flex items-start justify-between">
             <div className="flex-1">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                     {title}
                 </p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
                     {value}
                 </p>
                 {subtitle && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {subtitle}
                     </p>
                 )}
                 {trend !== undefined && (
                     <div
-                        className={`flex items-center gap-1 mt-2 text-sm font-medium ${
+                        className={`flex items-center gap-1 mt-2 text-xs font-medium ${
                             trend >= 0 ? "text-emerald-600" : "text-red-600"
                         }`}
                     >
@@ -99,9 +99,7 @@ const StatCard = ({ title, value, subtitle, icon, gradient, trend }) => (
                     </div>
                 )}
             </div>
-            <div
-                className={`w-14 h-14 rounded-2xl flex items-center justify-center ${gradient}`}
-            >
+            <div className="w-9 h-9 flex items-center justify-center">
                 {icon}
             </div>
         </div>
@@ -126,11 +124,11 @@ const SubjectCard = ({ subject }) => {
     };
 
     return (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700 p-5 hover:shadow-md transition-all duration-300 group">
-            <div className="flex items-start justify-between mb-4">
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700 p-4 hover:shadow-md transition-all duration-300 group">
+            <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 transition-colors">
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 transition-colors">
                             {subject.name}
                         </h4>
                         {subject.hasIntervention && (
@@ -140,7 +138,7 @@ const SubjectCard = ({ subject }) => {
                             ></span>
                         )}
                     </div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
                         {subject.section}
                     </p>
                 </div>
@@ -151,11 +149,11 @@ const SubjectCard = ({ subject }) => {
                 {/* Grade Progress */}
                 <div>
                     <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-sm text-gray-600 dark:text-gray-300">
+                        <span className="text-xs text-gray-600 dark:text-gray-300">
                             Grade
                         </span>
                         <span
-                            className={`text-sm font-bold ${getGradeColor(
+                            className={`text-xs font-bold ${getGradeColor(
                                 subject.grade,
                             )}`}
                         >
@@ -173,7 +171,7 @@ const SubjectCard = ({ subject }) => {
                 </div>
 
                 {/* Attendance */}
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-600 dark:text-gray-300">
                         Attendance
                     </span>
@@ -187,11 +185,11 @@ const SubjectCard = ({ subject }) => {
                 href={route("analytics.show", {
                     enrollment: subject.id,
                 })}
-                className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-gray-700 dark:text-gray-200 hover:text-indigo-700 dark:hover:text-indigo-300 rounded-lg text-sm font-medium transition-colors"
+                className="mt-3 w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-gray-700 dark:text-gray-200 hover:text-indigo-700 dark:hover:text-indigo-300 rounded-lg text-xs font-medium transition-colors"
             >
                 View Details
                 <svg
-                    className="w-4 h-4"
+                    className="w-3.5 h-3.5"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -372,7 +370,7 @@ const NotificationItem = ({ notification, onMarkRead, isHighlighted }) => {
         <div
             ref={itemRef}
             onClick={handleClick}
-            className={`p-4 rounded-xl cursor-pointer transition-all hover:shadow-md ${
+            className={`p-3 rounded-xl cursor-pointer transition-all hover:shadow-md ${
                 style.bg
             } ${
                 !notification.isRead ? "ring-2 ring-inset ring-indigo-200" : ""
@@ -382,9 +380,9 @@ const NotificationItem = ({ notification, onMarkRead, isHighlighted }) => {
                     : ""
             } border border-transparent dark:border-gray-700`}
         >
-            <div className="flex gap-4">
+            <div className="flex gap-3">
                 <div
-                    className={`w-10 h-10 rounded-xl ${style.iconBg} flex items-center justify-center flex-shrink-0`}
+                    className={`w-8 h-8 rounded-lg ${style.iconBg} flex items-center justify-center flex-shrink-0`}
                 >
                     <span className={style.icon}>
                         {icons[notification.type] || icons.nudge}
@@ -404,7 +402,7 @@ const NotificationItem = ({ notification, onMarkRead, isHighlighted }) => {
                             </span>
                         </div>
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
+                    <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
                         {notification.message}
                     </p>
                     <div className="flex items-center justify-between mt-2">
@@ -431,10 +429,10 @@ const NotificationItem = ({ notification, onMarkRead, isHighlighted }) => {
 
 // --- Task Item Component ---
 const TaskItem = ({ task }) => (
-    <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-        <div className="w-5 h-5 mt-0.5 rounded border-2 border-gray-300 dark:border-gray-600 flex-shrink-0" />
+    <div className="flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+        <div className="w-4 h-4 mt-0.5 rounded border-2 border-gray-300 dark:border-gray-600 flex-shrink-0" />
         <div className="flex-1 min-w-0">
-            <p className="text-sm text-gray-800 dark:text-gray-200">
+            <p className="text-xs text-gray-800 dark:text-gray-200">
                 {task.description}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -651,20 +649,18 @@ const MiniChart = ({ data }) => {
 };
 
 // --- Quick Action Card ---
-const QuickActionCard = ({ title, description, icon, href, gradient }) => (
+const QuickActionCard = ({ title, description, icon, href }) => (
     <Link
         href={href}
-        className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700 p-5 hover:shadow-lg transition-all duration-300 group"
+        className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700 p-4 hover:shadow-md transition-all duration-300 group"
     >
-        <div
-            className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${gradient} group-hover:scale-110 transition-transform`}
-        >
+        <div className="w-8 h-8 flex items-center justify-center mb-2">
             {icon}
         </div>
-        <h3 className="font-semibold text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 transition-colors">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 transition-colors">
             {title}
         </h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">
             {description}
         </p>
     </Link>
@@ -748,7 +744,7 @@ export default function Dashboard({
 
             <div className="min-h-screen bg-gray-50/50 dark:bg-gray-950">
                 {/* Welcome Header */}
-                <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-2xl mx-4 mt-4 p-8 text-white relative overflow-hidden">
+                <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-2xl mx-4 mt-4 p-6 text-white relative overflow-hidden">
                     {/* Background Pattern */}
                     <div className="absolute inset-0 opacity-10">
                         <svg
@@ -776,43 +772,42 @@ export default function Dashboard({
                     </div>
 
                     <div className="relative z-10">
-                        <div className="flex items-center gap-3 mb-2">
-                            <span className="text-2xl">👋</span>
-                            <h1 className="text-3xl font-bold">
+                        <div className="flex items-center gap-2.5 mb-1.5">
+                            <span className="text-xl">👋</span>
+                            <h1 className="text-2xl font-bold">
                                 {getGreeting()},{" "}
                                 {student.firstName || "Student"}!
                             </h1>
                         </div>
-                        <p className="text-indigo-100 text-lg">
-                            Here's an overview of your academic progress. Keep
-                            up the great work!
+                        <p className="text-indigo-100 text-sm sm:text-base">
+                            Your progress at a glance.
                         </p>
 
                         {/* Quick Stats in Header */}
-                        <div className="mt-6 flex flex-wrap gap-6">
-                            <div className="bg-white/20 backdrop-blur-sm rounded-xl px-5 py-3">
-                                <p className="text-sm text-indigo-100">
+                        <div className="mt-5 flex flex-wrap gap-3">
+                            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2.5">
+                                <p className="text-xs text-indigo-100">
                                     Overall Grade
                                 </p>
-                                <p className="text-2xl font-bold">
+                                <p className="text-xl font-bold leading-tight">
                                     {stats.overallGrade !== null
                                         ? `${stats.overallGrade}%`
                                         : "N/A"}
                                 </p>
                             </div>
-                            <div className="bg-white/20 backdrop-blur-sm rounded-xl px-5 py-3">
-                                <p className="text-sm text-indigo-100">
+                            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2.5">
+                                <p className="text-xs text-indigo-100">
                                     Attendance
                                 </p>
-                                <p className="text-2xl font-bold">
+                                <p className="text-xl font-bold leading-tight">
                                     {stats.overallAttendance}%
                                 </p>
                             </div>
-                            <div className="bg-white/20 backdrop-blur-sm rounded-xl px-5 py-3">
-                                <p className="text-sm text-indigo-100">
+                            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2.5">
+                                <p className="text-xs text-indigo-100">
                                     Tasks Completed
                                 </p>
-                                <p className="text-2xl font-bold">
+                                <p className="text-xl font-bold leading-tight">
                                     {stats.completedTasks}/{stats.totalTasks}
                                 </p>
                             </div>
@@ -825,9 +820,9 @@ export default function Dashboard({
                 </div>
 
                 {/* Main Content */}
-                <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+                <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
                     {/* Stats Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <StatCard
                             title="Overall Grade"
                             value={
@@ -836,10 +831,9 @@ export default function Dashboard({
                                     : "N/A"
                             }
                             subtitle="Across all subjects"
-                            gradient="bg-gradient-to-br from-emerald-400 to-emerald-600"
                             icon={
                                 <svg
-                                    className="w-7 h-7 text-white"
+                                    className="w-5 h-5 text-pink-600"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -857,10 +851,9 @@ export default function Dashboard({
                             title="Subjects at Risk"
                             value={stats.subjectsAtRisk}
                             subtitle={`of ${stats.totalSubjects} subjects`}
-                            gradient="bg-gradient-to-br from-red-400 to-red-600"
                             icon={
                                 <svg
-                                    className="w-7 h-7 text-white"
+                                    className="w-5 h-5 text-amber-500"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -878,10 +871,9 @@ export default function Dashboard({
                             title="Attendance Rate"
                             value={`${stats.overallAttendance}%`}
                             subtitle="This semester"
-                            gradient="bg-gradient-to-br from-blue-400 to-blue-600"
                             icon={
                                 <svg
-                                    className="w-7 h-7 text-white"
+                                    className="w-5 h-5 text-emerald-600"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -899,10 +891,9 @@ export default function Dashboard({
                             title="Tasks Completed"
                             value={`${stats.completedTasks}/${stats.totalTasks}`}
                             subtitle="Intervention goals"
-                            gradient="bg-gradient-to-br from-amber-400 to-amber-600"
                             icon={
                                 <svg
-                                    className="w-7 h-7 text-white"
+                                    className="w-5 h-5 text-indigo-600"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -919,17 +910,17 @@ export default function Dashboard({
                     </div>
 
                     {/* Main Grid - Two Columns */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                         {/* Left Column - Subject Performance */}
-                        <div className="lg:col-span-2 space-y-6">
+                        <div className="lg:col-span-2 space-y-5">
                             {/* Semester Toggle */}
                             {(semesters?.semester1Count > 0 ||
                                 semesters?.semester2Count > 0) && (
-                                <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
-                                    <div className="flex items-center justify-between mb-3">
+                                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-3.5">
+                                    <div className="flex items-center justify-between mb-2.5">
                                         <div className="flex items-center gap-2">
                                             <svg
-                                                className="w-5 h-5 text-pink-600"
+                                                className="w-4 h-4 text-pink-600"
                                                 fill="none"
                                                 viewBox="0 0 24 24"
                                                 stroke="currentColor"
@@ -941,15 +932,15 @@ export default function Dashboard({
                                                     d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                                                 />
                                             </svg>
-                                            <span className="font-semibold text-gray-700 dark:text-gray-200">
+                                            <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
                                                 Academic Year{" "}
                                                 {semesters?.schoolYear || ""}
                                             </span>
                                         </div>
                                         {semesters?.selected !==
                                             semesters?.current && (
-                                            <span className="text-xs text-amber-600 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/25 px-2 py-1 rounded-full">
-                                                Viewing past semester
+                                            <span className="text-[11px] text-amber-600 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/25 px-2 py-0.5 rounded-full">
+                                                Past semester
                                             </span>
                                         )}
                                     </div>
@@ -989,7 +980,7 @@ export default function Dashboard({
                                                         );
                                                     }}
                                                     disabled={isFutureSemester}
-                                                    className={`flex-1 relative flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-medium transition-all ${
+                                                    className={`flex-1 relative flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
                                                         isFutureSemester
                                                             ? "bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60"
                                                             : isActive
@@ -998,7 +989,7 @@ export default function Dashboard({
                                                     }`}
                                                 >
                                                     <svg
-                                                        className="w-4 h-4"
+                                                        className="w-3.5 h-3.5"
                                                         fill="none"
                                                         viewBox="0 0 24 24"
                                                         stroke="currentColor"
@@ -1017,7 +1008,7 @@ export default function Dashboard({
                                                         Sem {sem.id}
                                                     </span>
                                                     <span
-                                                        className={`ml-1 px-2 py-0.5 rounded-full text-xs font-bold ${
+                                                        className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
                                                             isActive
                                                                 ? "bg-white/20 text-white"
                                                                 : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
@@ -1043,24 +1034,23 @@ export default function Dashboard({
                             )}
 
                             {/* Subject Performance Section */}
-                            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                                <div className="flex items-center justify-between mb-6">
+                            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
+                                <div className="flex items-center justify-between mb-5">
                                     <div>
-                                        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                                        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                                             Subject Performance
                                         </h2>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                            Your grades across all enrolled
-                                            subjects
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                            Grades across subjects
                                         </p>
                                     </div>
                                     <Link
                                         href={route("analytics.index")}
-                                        className="text-sm font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                                        className="text-xs font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
                                     >
                                         View All
                                         <svg
-                                            className="w-4 h-4"
+                                            className="w-3.5 h-3.5"
                                             fill="none"
                                             viewBox="0 0 24 24"
                                             stroke="currentColor"
@@ -1076,7 +1066,7 @@ export default function Dashboard({
                                 </div>
 
                                 {subjectPerformance.length > 0 ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                                         {subjectPerformance
                                             .slice(0, 4)
                                             .map((subject) => (
@@ -1111,34 +1101,34 @@ export default function Dashboard({
                             </div>
 
                             {/* Grade Trend & Quick Actions */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 {/* Grade Trend Card */}
-                                <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
                                     <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
                                         Grade Trend
                                     </h3>
                                     {gradeTrend?.subjectName ? (
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2.5">
                                             <span className="font-medium text-indigo-600">
                                                 {gradeTrend.subjectName}
                                             </span>{" "}
-                                            — last updated
+                                            trend
                                         </p>
                                     ) : (
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                                            Score breakdown by category
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2.5">
+                                            Score by category
                                         </p>
                                     )}
                                     <MiniChart data={gradeTrend} />
                                 </div>
 
                                 {/* Upcoming Tasks */}
-                                <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                                    <div className="flex items-center justify-between mb-4">
+                                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
+                                    <div className="flex items-center justify-between mb-3">
                                         <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                                             Pending Tasks
                                         </h3>
-                                        <span className="text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded-full font-medium">
+                                        <span className="text-[11px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full font-medium">
                                             {upcomingTasks.length} pending
                                         </span>
                                     </div>
@@ -1178,12 +1168,12 @@ export default function Dashboard({
                         </div>
 
                         {/* Right Column - Notifications */}
-                        <div className="space-y-6">
+                        <div className="space-y-5">
                             {/* Notifications Section */}
-                            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                                <div className="flex items-center justify-between mb-4">
+                            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
+                                <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-3">
-                                        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                                        <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">
                                             Notifications
                                         </h2>
                                         {unreadNotificationCount > 0 && (
@@ -1198,14 +1188,14 @@ export default function Dashboard({
                                         {unreadNotificationCount > 0 && (
                                             <button
                                                 onClick={handleMarkAllRead}
-                                                className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                                                className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
                                             >
                                                 Mark all read
                                             </button>
                                         )}
                                         <Link
                                             href={route("interventions-feed")}
-                                            className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                                            className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                                         >
                                             View all →
                                         </Link>
@@ -1235,7 +1225,7 @@ export default function Dashboard({
                                                         !showAllNotifications,
                                                     )
                                                 }
-                                                className="w-full py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                                                className="w-full py-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
                                             >
                                                 {showAllNotifications
                                                     ? "Show Less"
@@ -1271,19 +1261,18 @@ export default function Dashboard({
                             </div>
 
                             {/* Quick Actions */}
-                            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                                <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
+                                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
                                     Quick Actions
                                 </h3>
-                                <div className="space-y-3">
+                                <div className="space-y-2.5">
                                     <QuickActionCard
                                         title="View Analytics"
-                                        description="Detailed performance breakdown"
+                                        description="Performance details"
                                         href={route("analytics.index")}
-                                        gradient="bg-gradient-to-br from-indigo-400 to-indigo-600"
                                         icon={
                                             <svg
-                                                className="w-6 h-6 text-white"
+                                                className="w-5 h-5 text-indigo-600"
                                                 fill="none"
                                                 viewBox="0 0 24 24"
                                                 stroke="currentColor"
@@ -1299,12 +1288,11 @@ export default function Dashboard({
                                     />
                                     <QuickActionCard
                                         title="Interventions & Feed"
-                                        description="Check teacher feedback"
+                                        description="Feedback and updates"
                                         href={route("interventions-feed")}
-                                        gradient="bg-gradient-to-br from-purple-400 to-purple-600"
                                         icon={
                                             <svg
-                                                className="w-6 h-6 text-white"
+                                                className="w-5 h-5 text-pink-600"
                                                 fill="none"
                                                 viewBox="0 0 24 24"
                                                 stroke="currentColor"
@@ -1320,12 +1308,11 @@ export default function Dashboard({
                                     />
                                     <QuickActionCard
                                         title="Subjects at Risk"
-                                        description="View struggling areas"
+                                        description="At-risk subjects"
                                         href={route("subject-at-risk")}
-                                        gradient="bg-gradient-to-br from-red-400 to-red-600"
                                         icon={
                                             <svg
-                                                className="w-6 h-6 text-white"
+                                                className="w-5 h-5 text-amber-500"
                                                 fill="none"
                                                 viewBox="0 0 24 24"
                                                 stroke="currentColor"
