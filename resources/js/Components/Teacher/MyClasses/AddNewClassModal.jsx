@@ -58,11 +58,10 @@ const COLOR_OPTIONS = [
 ];
 
 const GRADE_LEVEL_OPTIONS = ["Grade 11", "Grade 12"];
-const SECTION_LETTER_OPTIONS = ["A", "B", "C", "D", "E", "F"];
 
 const WIZARD_STEPS = [
-    { id: 1, title: "Class Info" },
-    { id: 2, title: "Students" },
+    { id: 1, title: "Subject" },
+    { id: 2, title: "Section and Students" },
     { id: 3, title: "Color and Save" },
 ];
 
@@ -82,6 +81,18 @@ const parseSectionSuffix = (sectionValue, strandValue) => {
 };
 
 const sanitizeLrn = (value) => String(value ?? "").replace(/[^0-9]/g, "");
+const normalizeDepartmentCode = (value) =>
+    String(value ?? "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .trim();
+
+const sanitizeSectionName = (value) =>
+    String(value ?? "")
+        .toUpperCase()
+        .replace(/[^A-Z]/g, "")
+        .trim();
+
 const normalizeSearchValue = (value) =>
     String(value ?? "")
         .toLowerCase()
@@ -124,10 +135,17 @@ const AddNewClassModal = ({
     classData = null,
     departments = [],
     availableSubjects = [],
+    availableSections = [],
 }) => {
     const isEditMode = mode === "edit";
     const [step, setStep] = useState(1);
     const [isSubjectMenuOpen, setIsSubjectMenuOpen] = useState(false);
+    const [isDepartmentMenuOpen, setIsDepartmentMenuOpen] = useState(false);
+    const [sectionMode, setSectionMode] = useState("existing");
+    const [selectedExistingSectionId, setSelectedExistingSectionId] =
+        useState(null);
+    const [existingSectionQuery, setExistingSectionQuery] = useState("");
+    const [isStepThreeSubmitReady, setIsStepThreeSubmitReady] = useState(false);
     const [manualStudents, setManualStudents] = useState([]);
     const [studentDraft, setStudentDraft] = useState({
         student_name: "",
@@ -151,20 +169,146 @@ const AddNewClassModal = ({
             manual_students: [],
         });
 
+    const departmentOptions = useMemo(() => {
+        return departments
+            .map((department) => ({
+                department_code: normalizeDepartmentCode(
+                    department?.department_code,
+                ),
+                department_name: String(
+                    department?.department_name ?? "",
+                ).trim(),
+            }))
+            .filter((department) => department.department_code);
+    }, [departments]);
+
+    const validDepartmentCodeSet = useMemo(
+        () => new Set(departmentOptions.map((item) => item.department_code)),
+        [departmentOptions],
+    );
+
+    const normalizedStrand = normalizeDepartmentCode(data.strand);
+    const hasValidStrand = validDepartmentCodeSet.has(normalizedStrand);
+
+    const sectionOptions = useMemo(() => {
+        return availableSections
+            .map((section, index) => {
+                const strand = normalizeDepartmentCode(
+                    section?.strand ?? section?.department_code,
+                );
+                const sectionSource =
+                    section?.section_code ?? section?.section_name ?? "";
+                const sectionName = sanitizeSectionName(
+                    parseSectionSuffix(sectionSource, strand),
+                );
+
+                return {
+                    id: section?.id ?? `section-${index}`,
+                    key: `${section?.id ?? `section-${index}`}::${strand}::${sectionName}`,
+                    strand,
+                    section: sectionName,
+                    grade_level: String(section?.grade_level ?? "").trim(),
+                    track: String(section?.track ?? "").trim(),
+                    section_label: String(
+                        section?.section_name ?? section?.section_code ?? "",
+                    ).trim(),
+                };
+            })
+            .filter(
+                (section) =>
+                    section.strand && section.section && section.grade_level,
+            );
+    }, [availableSections]);
+
+    const selectedExistingSection = useMemo(
+        () =>
+            sectionOptions.find(
+                (section) => section.id === selectedExistingSectionId,
+            ) ?? null,
+        [sectionOptions, selectedExistingSectionId],
+    );
+
+    const filteredDepartments = useMemo(() => {
+        const query = normalizeSearchValue(data.strand);
+
+        if (!query) {
+            return departmentOptions.slice(0, 20);
+        }
+
+        return departmentOptions
+            .filter((department) => {
+                const code = normalizeSearchValue(department.department_code);
+                const name = normalizeSearchValue(department.department_name);
+
+                return code.includes(query) || name.includes(query);
+            })
+            .slice(0, 20);
+    }, [data.strand, departmentOptions]);
+
+    const selectedDepartment = useMemo(
+        () =>
+            departmentOptions.find(
+                (department) => department.department_code === normalizedStrand,
+            ) ?? null,
+        [departmentOptions, normalizedStrand],
+    );
+
+    const filteredExistingSections = useMemo(() => {
+        const query = normalizeSearchValue(existingSectionQuery);
+
+        const sectionsByStrand = hasValidStrand
+            ? sectionOptions.filter(
+                  (section) => section.strand === normalizedStrand,
+              )
+            : [];
+
+        if (!query) {
+            return sectionsByStrand.slice(0, 20);
+        }
+
+        return sectionsByStrand
+            .filter((section) => {
+                const sectionLabel = normalizeSearchValue(
+                    section.section_label,
+                );
+                const gradeLevel = normalizeSearchValue(section.grade_level);
+                const sectionName = normalizeSearchValue(section.section);
+                const track = normalizeSearchValue(section.track);
+
+                return (
+                    sectionLabel.includes(query) ||
+                    gradeLevel.includes(query) ||
+                    sectionName.includes(query) ||
+                    track.includes(query)
+                );
+            })
+            .slice(0, 20);
+    }, [
+        existingSectionQuery,
+        hasValidStrand,
+        normalizedStrand,
+        sectionOptions,
+    ]);
+
     const canContinueStepOne = useMemo(() => {
-        return Boolean(
-            data.grade_level &&
-            data.section &&
-            data.subject_name &&
-            data.school_year &&
-            data.strand,
-        );
+        return Boolean(data.subject_name && data.school_year);
+    }, [data.subject_name, data.school_year]);
+
+    const canContinueStepTwo = useMemo(() => {
+        const hasBasicSectionDetails =
+            data.grade_level && data.section && hasValidStrand;
+
+        if (sectionMode === "existing") {
+            return Boolean(selectedExistingSectionId && hasBasicSectionDetails);
+        }
+
+        return Boolean(hasBasicSectionDetails);
     }, [
         data.grade_level,
         data.section,
-        data.subject_name,
-        data.school_year,
-        data.strand,
+        hasValidStrand,
+        sectionMode,
+        selectedExistingSectionId,
     ]);
 
     const selectedColor = useMemo(() => {
@@ -241,6 +385,11 @@ const AddNewClassModal = ({
     const resetWizardState = () => {
         setStep(1);
         setIsSubjectMenuOpen(false);
+        setIsDepartmentMenuOpen(false);
+        setSectionMode("existing");
+        setSelectedExistingSectionId(null);
+        setExistingSectionQuery("");
+        setIsStepThreeSubmitReady(false);
         setManualStudents([]);
         setStudentDraft({
             student_name: "",
@@ -257,19 +406,20 @@ const AddNewClassModal = ({
             resetWizardState();
             setData({
                 grade_level: classData?.name ?? "",
-                section: parseSectionSuffix(
-                    classData?.section,
-                    classData?.strand,
+                section: sanitizeSectionName(
+                    parseSectionSuffix(classData?.section, classData?.strand),
                 ),
                 subject_name:
                     classData?.subject_name ?? classData?.subject ?? "",
                 color: classData?.color ?? "indigo",
                 school_year: classData?.school_year ?? defaultSchoolYear,
-                strand: classData?.strand ?? "",
+                strand: normalizeDepartmentCode(classData?.strand),
                 track: classData?.track ?? "",
                 classlist: null,
                 manual_students: [],
             });
+
+            setSectionMode("manual");
             return;
         }
 
@@ -291,9 +441,50 @@ const AddNewClassModal = ({
     useEffect(() => {
         if (!isEditMode && initialFile) {
             setData("classlist", initialFile);
-            setStep(2);
         }
     }, [initialFile, isEditMode]);
+
+    useEffect(() => {
+        if (isEditMode) {
+            setIsStepThreeSubmitReady(true);
+            return;
+        }
+
+        if (step !== 3) {
+            setIsStepThreeSubmitReady(false);
+            return;
+        }
+
+        const animationFrameId = window.requestAnimationFrame(() => {
+            setIsStepThreeSubmitReady(true);
+        });
+
+        return () => {
+            window.cancelAnimationFrame(animationFrameId);
+        };
+    }, [isEditMode, step]);
+
+    useEffect(() => {
+        if (sectionMode !== "existing" || !selectedExistingSectionId) {
+            return;
+        }
+
+        const currentSelection = sectionOptions.find(
+            (section) => section.id === selectedExistingSectionId,
+        );
+
+        if (!currentSelection || currentSelection.strand !== normalizedStrand) {
+            setSelectedExistingSectionId(null);
+            setData("grade_level", "");
+            setData("section", "");
+        }
+    }, [
+        normalizedStrand,
+        sectionMode,
+        sectionOptions,
+        selectedExistingSectionId,
+        setData,
+    ]);
 
     useEffect(() => {
         setData("manual_students", manualStudents);
@@ -322,8 +513,9 @@ const AddNewClassModal = ({
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+
         if (name === "section") {
-            setData("section", value.toUpperCase().replace(/[^A-Z]/g, ""));
+            setData("section", sanitizeSectionName(value));
             return;
         }
 
@@ -333,12 +525,57 @@ const AddNewClassModal = ({
             return;
         }
 
+        if (name === "strand") {
+            setData("strand", normalizeDepartmentCode(value));
+            setIsDepartmentMenuOpen(true);
+            return;
+        }
+
         setData(name, value);
     };
 
     const handleSubjectSelect = (subjectName) => {
         setData("subject_name", subjectName);
         setIsSubjectMenuOpen(false);
+    };
+
+    const handleDepartmentSelect = (departmentCode) => {
+        const normalizedCode = normalizeDepartmentCode(departmentCode);
+
+        setData("strand", normalizedCode);
+        setIsDepartmentMenuOpen(false);
+
+        if (sectionMode === "existing") {
+            setSelectedExistingSectionId(null);
+            setData("grade_level", "");
+            setData("section", "");
+        }
+    };
+
+    const handleSectionModeChange = (mode) => {
+        setSectionMode(mode);
+
+        if (mode === "manual") {
+            setSelectedExistingSectionId(null);
+            setData("grade_level", "");
+            setData("section", "");
+            return;
+        }
+
+        setData("grade_level", "");
+        setData("section", "");
+    };
+
+    const handleExistingSectionSelect = (section) => {
+        setSectionMode("existing");
+        setSelectedExistingSectionId(section.id);
+        setData("strand", section.strand);
+        setData("grade_level", section.grade_level);
+        setData("section", section.section);
+
+        if (!data.track && section.track) {
+            setData("track", section.track);
+        }
     };
 
     const handleFileChange = (file) => {
@@ -459,6 +696,10 @@ const AddNewClassModal = ({
     const handleSubmit = (e) => {
         e.preventDefault();
 
+        if (!isEditMode && (!isStepThreeSubmitReady || step !== 3)) {
+            return;
+        }
+
         if (isEditMode && classData?.id) {
             put(route("teacher.classes.update", classData.id), {
                 preserveState: true,
@@ -528,71 +769,18 @@ const AddNewClassModal = ({
                     {/* Modal Body (Form) */}
                     <div className="p-6 space-y-6 overflow-y-auto flex-1">
                         {(isEditMode || step === 1) && (
-                            <>
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">
-                                            Grade Level
-                                        </label>
-                                        <select
-                                            name="grade_level"
-                                            required
-                                            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-                                            value={data.grade_level}
-                                            onChange={handleChange}
-                                        >
-                                            <option value="" disabled>
-                                                Select Grade Level
-                                            </option>
-                                            {GRADE_LEVEL_OPTIONS.map(
-                                                (option) => (
-                                                    <option
-                                                        key={option}
-                                                        value={option}
-                                                    >
-                                                        {option}
-                                                    </option>
-                                                ),
-                                            )}
-                                        </select>
-                                        {errors.grade_level && (
-                                            <p className="text-sm text-red-600 mt-1">
-                                                {errors.grade_level}
-                                            </p>
-                                        )}
+                            <div className="space-y-4">
+                                {!isEditMode && (
+                                    <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+                                        <p className="text-sm font-semibold text-indigo-800">
+                                            Step 1: Subject Selection
+                                        </p>
+                                        <p className="mt-1 text-xs text-indigo-700">
+                                            Pick or type the subject first, then
+                                            continue to section setup.
+                                        </p>
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">
-                                            Section Letter
-                                        </label>
-                                        <select
-                                            name="section"
-                                            required
-                                            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-                                            value={data.section}
-                                            onChange={handleChange}
-                                        >
-                                            <option value="" disabled>
-                                                Select Section Letter
-                                            </option>
-                                            {SECTION_LETTER_OPTIONS.map(
-                                                (letter) => (
-                                                    <option
-                                                        key={letter}
-                                                        value={letter}
-                                                    >
-                                                        {letter}
-                                                    </option>
-                                                ),
-                                            )}
-                                        </select>
-                                        {errors.section && (
-                                            <p className="text-sm text-red-600 mt-1">
-                                                {errors.section}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
+                                )}
 
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <div>
@@ -680,6 +868,7 @@ const AddNewClassModal = ({
                                             </p>
                                         )}
                                     </div>
+
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700">
                                             School Year
@@ -704,41 +893,334 @@ const AddNewClassModal = ({
                                         )}
                                     </div>
                                 </div>
+                            </div>
+                        )}
 
-                                <div className="grid gap-4 sm:grid-cols-2">
+                        {(isEditMode || step === 2) && (
+                            <div className="space-y-5">
+                                {!isEditMode && (
+                                    <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+                                        <p className="text-sm font-semibold text-indigo-800">
+                                            Step 2: Section Setup and Student
+                                            Queue
+                                        </p>
+                                        <p className="mt-1 text-xs text-indigo-700">
+                                            First select an existing section. If
+                                            none fits, switch to manual section
+                                            details and continue below.
+                                        </p>
+                                    </div>
+                                )}
+
+                                <div className="rounded-xl border border-gray-200 p-4 space-y-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700">
                                             Strand (Department Code)
                                         </label>
-                                        <select
-                                            name="strand"
-                                            required
-                                            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-                                            value={data.strand}
-                                            onChange={handleChange}
-                                        >
-                                            <option value="" disabled>
-                                                Select Department Code
-                                            </option>
-                                            {departments.map((dept) => (
-                                                <option
-                                                    key={dept.department_code}
-                                                    value={dept.department_code}
-                                                >
-                                                    {dept.department_code} -{" "}
-                                                    {dept.department_name}
-                                                </option>
-                                            ))}
-                                        </select>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                name="strand"
+                                                required
+                                                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                                                value={data.strand}
+                                                onChange={handleChange}
+                                                onFocus={() =>
+                                                    setIsDepartmentMenuOpen(
+                                                        true,
+                                                    )
+                                                }
+                                                onBlur={() => {
+                                                    setTimeout(() => {
+                                                        setIsDepartmentMenuOpen(
+                                                            false,
+                                                        );
+                                                    }, 120);
+                                                }}
+                                                placeholder="Type department code (e.g., STEM, ABM, TVL)"
+                                                autoComplete="off"
+                                            />
+
+                                            {isDepartmentMenuOpen &&
+                                                departmentOptions.length >
+                                                    0 && (
+                                                    <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                                                        {filteredDepartments.length ===
+                                                        0 ? (
+                                                            <p className="px-3 py-2 text-sm text-gray-500">
+                                                                No matching
+                                                                department
+                                                                codes.
+                                                            </p>
+                                                        ) : (
+                                                            filteredDepartments.map(
+                                                                (
+                                                                    department,
+                                                                ) => (
+                                                                    <button
+                                                                        key={
+                                                                            department.department_code
+                                                                        }
+                                                                        type="button"
+                                                                        onMouseDown={(
+                                                                            event,
+                                                                        ) => {
+                                                                            event.preventDefault();
+                                                                            handleDepartmentSelect(
+                                                                                department.department_code,
+                                                                            );
+                                                                        }}
+                                                                        className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-indigo-50"
+                                                                    >
+                                                                        <span className="font-semibold text-gray-700">
+                                                                            {
+                                                                                department.department_code
+                                                                            }
+                                                                        </span>
+                                                                        <span className="ml-2 text-xs text-gray-500">
+                                                                            {
+                                                                                department.department_name
+                                                                            }
+                                                                        </span>
+                                                                    </button>
+                                                                ),
+                                                            )
+                                                        )}
+                                                    </div>
+                                                )}
+                                        </div>
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            Strand is the department code. New
+                                            sections created here are linked to
+                                            that department.
+                                        </p>
+                                        {selectedDepartment && (
+                                            <p className="mt-1 text-xs text-emerald-700">
+                                                Linked department:{" "}
+                                                {
+                                                    selectedDepartment.department_code
+                                                }
+                                                {" - "}
+                                                {
+                                                    selectedDepartment.department_name
+                                                }
+                                            </p>
+                                        )}
                                         {errors.strand && (
                                             <p className="text-sm text-red-600 mt-1">
                                                 {errors.strand}
                                             </p>
                                         )}
                                     </div>
+
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                handleSectionModeChange(
+                                                    "existing",
+                                                )
+                                            }
+                                            className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                                                sectionMode === "existing"
+                                                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                                    : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                                            }`}
+                                        >
+                                            1. Select Existing Section
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                handleSectionModeChange(
+                                                    "manual",
+                                                )
+                                            }
+                                            className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                                                sectionMode === "manual"
+                                                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                                    : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                                            }`}
+                                        >
+                                            2. Create New Section
+                                        </button>
+                                    </div>
+
+                                    {sectionMode === "existing" ? (
+                                        <div className="rounded-lg border border-gray-200 p-3 space-y-3">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <p className="text-sm font-semibold text-gray-800">
+                                                    Existing Sections
+                                                </p>
+                                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
+                                                    {hasValidStrand
+                                                        ? filteredExistingSections.length
+                                                        : 0}{" "}
+                                                    results
+                                                </span>
+                                            </div>
+
+                                            <input
+                                                type="text"
+                                                value={existingSectionQuery}
+                                                onChange={(event) =>
+                                                    setExistingSectionQuery(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                disabled={!hasValidStrand}
+                                                className="w-full rounded-lg border-gray-300 text-sm disabled:bg-gray-100 disabled:text-gray-500"
+                                                placeholder="Filter section by name, grade level, or track"
+                                            />
+
+                                            {!hasValidStrand ? (
+                                                <p className="text-xs text-amber-700">
+                                                    Enter a valid strand
+                                                    department code first.
+                                                </p>
+                                            ) : filteredExistingSections.length ===
+                                              0 ? (
+                                                <p className="text-xs text-gray-500">
+                                                    No existing section matched
+                                                    this strand. Switch to
+                                                    Create New Section.
+                                                </p>
+                                            ) : (
+                                                <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
+                                                    {filteredExistingSections.map(
+                                                        (section) => (
+                                                            <button
+                                                                key={
+                                                                    section.key
+                                                                }
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    handleExistingSectionSelect(
+                                                                        section,
+                                                                    )
+                                                                }
+                                                                className={`w-full rounded-lg border px-3 py-2 text-left transition ${
+                                                                    selectedExistingSectionId ===
+                                                                    section.id
+                                                                        ? "border-indigo-500 bg-indigo-50"
+                                                                        : "border-gray-200 bg-white hover:border-indigo-300"
+                                                                }`}
+                                                            >
+                                                                <p className="text-sm font-semibold text-gray-800">
+                                                                    {
+                                                                        section.grade_level
+                                                                    }
+                                                                    {" - "}
+                                                                    {
+                                                                        section.section_label
+                                                                    }
+                                                                </p>
+                                                                <p className="text-xs text-gray-500">
+                                                                    Section key:{" "}
+                                                                    {
+                                                                        section.strand
+                                                                    }
+                                                                    -
+                                                                    {
+                                                                        section.section
+                                                                    }
+                                                                    {section.track
+                                                                        ? ` • Track: ${section.track}`
+                                                                        : ""}
+                                                                </p>
+                                                            </button>
+                                                        ),
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {(errors.grade_level ||
+                                                errors.section) && (
+                                                <p className="text-sm text-red-600">
+                                                    {errors.grade_level ||
+                                                        errors.section}
+                                                </p>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-4 sm:grid-cols-2">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700">
+                                                    Grade Level
+                                                </label>
+                                                <select
+                                                    name="grade_level"
+                                                    required
+                                                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                                                    value={data.grade_level}
+                                                    onChange={handleChange}
+                                                >
+                                                    <option value="" disabled>
+                                                        Select Grade Level
+                                                    </option>
+                                                    {GRADE_LEVEL_OPTIONS.map(
+                                                        (option) => (
+                                                            <option
+                                                                key={option}
+                                                                value={option}
+                                                            >
+                                                                {option}
+                                                            </option>
+                                                        ),
+                                                    )}
+                                                </select>
+                                                {errors.grade_level && (
+                                                    <p className="text-sm text-red-600 mt-1">
+                                                        {errors.grade_level}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700">
+                                                    Section Name
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="section"
+                                                    required
+                                                    value={data.section}
+                                                    onChange={handleChange}
+                                                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                                                    placeholder="e.g., A"
+                                                />
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    Letters only. The system
+                                                    saves section as
+                                                    strand-section (example:
+                                                    STEM-A).
+                                                </p>
+                                                {errors.section && (
+                                                    <p className="text-sm text-red-600 mt-1">
+                                                        {errors.section}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {sectionMode === "existing" &&
+                                        selectedExistingSection && (
+                                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                                                Selected section:{" "}
+                                                {
+                                                    selectedExistingSection.grade_level
+                                                }
+                                                {" - "}
+                                                {
+                                                    selectedExistingSection.section_label
+                                                }
+                                            </div>
+                                        )}
+
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700">
-                                            Track
+                                            Track (optional)
                                         </label>
                                         <input
                                             type="text"
@@ -755,216 +1237,248 @@ const AddNewClassModal = ({
                                         )}
                                     </div>
                                 </div>
-                            </>
-                        )}
 
-                        {!isEditMode && step === 2 && (
-                            <div className="space-y-5">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">
-                                        Bulk Upload Classlist (CSV or Excel)
-                                    </label>
-                                    {data.classlist ? (
-                                        <div className="mt-3 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                                            <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                                                <FileText
-                                                    size={18}
-                                                    className="text-gray-500"
-                                                />
-                                                {data.classlist.name}
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    handleFileChange(null)
-                                                }
-                                                className="text-red-600 hover:text-red-800"
-                                            >
-                                                <X size={18} />
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <label className="mt-3 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 px-6 py-7 text-center text-sm text-gray-500 transition hover:border-indigo-400 hover:bg-indigo-50">
-                                            <input
-                                                type="file"
-                                                name="file"
-                                                className="hidden"
-                                                accept=".csv,text/csv,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                                                onChange={(e) =>
-                                                    handleFileChange(
-                                                        e.target.files[0],
-                                                    )
-                                                }
-                                            />
-                                            <Upload
-                                                size={26}
-                                                className="text-indigo-400"
-                                            />
-                                            <span className="mt-2 font-semibold text-gray-700">
-                                                Drop classlist or click to
-                                                browse
-                                            </span>
-                                            <span className="text-xs text-gray-500">
-                                                CSV, XLS, XLSX up to 4MB
-                                            </span>
-                                        </label>
-                                    )}
-                                    {errors.classlist && (
-                                        <p className="text-sm text-red-600 mt-1">
-                                            {errors.classlist}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="rounded-xl border border-gray-200 p-4">
-                                    <p className="text-sm font-semibold text-gray-800">
-                                        Add Student One-by-One
-                                    </p>
-                                    <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                                        <input
-                                            type="text"
-                                            value={studentDraft.student_name}
-                                            onChange={(event) =>
-                                                setStudentDraft((prev) => ({
-                                                    ...prev,
-                                                    student_name:
-                                                        event.target.value,
-                                                }))
-                                            }
-                                            placeholder="Student name"
-                                            className="rounded-lg border-gray-300 text-sm"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={studentDraft.lrn}
-                                            onChange={(event) =>
-                                                setStudentDraft((prev) => ({
-                                                    ...prev,
-                                                    lrn: sanitizeLrn(
-                                                        event.target.value,
-                                                    ),
-                                                }))
-                                            }
-                                            placeholder="LRN (12 digits)"
-                                            className="rounded-lg border-gray-300 text-sm"
-                                            maxLength={12}
-                                        />
-                                        <input
-                                            type="email"
-                                            value={studentDraft.personal_email}
-                                            onChange={(event) =>
-                                                setStudentDraft((prev) => ({
-                                                    ...prev,
-                                                    personal_email:
-                                                        event.target.value,
-                                                }))
-                                            }
-                                            placeholder="Personal email (optional)"
-                                            className="rounded-lg border-gray-300 text-sm"
-                                        />
-                                    </div>
-                                    {studentDraftError && (
-                                        <p className="mt-2 text-xs text-red-600">
-                                            {studentDraftError}
-                                        </p>
-                                    )}
-                                    <div className="mt-3 flex justify-end">
-                                        <button
-                                            type="button"
-                                            onClick={addSingleStudent}
-                                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
-                                        >
-                                            <Plus size={14} /> Queue Student
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="rounded-xl border border-gray-200 p-4">
-                                    <p className="text-sm font-semibold text-gray-800">
-                                        Bulk Queue by Text
-                                    </p>
-                                    <p className="mt-1 text-xs text-gray-500">
-                                        One line per student:
-                                        student_name,lrn,email(optional)
-                                    </p>
-                                    <textarea
-                                        value={bulkRows}
-                                        onChange={(event) =>
-                                            setBulkRows(event.target.value)
-                                        }
-                                        rows={4}
-                                        className="mt-2 w-full rounded-lg border-gray-300 text-sm"
-                                        placeholder="Juan Dela Cruz,123456789012,juan@email.com"
-                                    />
-                                    <div className="mt-3 flex justify-end">
-                                        <button
-                                            type="button"
-                                            onClick={addBulkStudents}
-                                            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
-                                        >
-                                            <Upload size={14} /> Bulk Queue
-                                        </button>
-                                    </div>
-                                    {bulkErrors.length > 0 && (
-                                        <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                                            <div className="space-y-1 text-xs text-amber-700">
-                                                {bulkErrors.map((error) => (
-                                                    <p key={error}>- {error}</p>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
-                                    <div className="mb-2 flex items-center justify-between">
-                                        <p className="text-sm font-semibold text-indigo-800">
-                                            Queued Students
-                                        </p>
-                                        <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-indigo-700">
-                                            <Users size={12} />
-                                            {manualStudents.length}
-                                        </span>
-                                    </div>
-                                    {manualStudents.length === 0 ? (
-                                        <p className="text-xs text-indigo-700">
-                                            No manually queued students yet.
-                                        </p>
-                                    ) : (
-                                        <div className="max-h-36 space-y-1.5 overflow-y-auto pr-1">
-                                            {manualStudents.map(
-                                                (student, index) => (
-                                                    <div
-                                                        key={`${student.lrn}-${index}`}
-                                                        className="flex items-center justify-between rounded-md bg-white px-3 py-2"
-                                                    >
-                                                        <div>
-                                                            <p className="text-xs font-medium text-gray-800">
-                                                                {
-                                                                    student.student_name
-                                                                }
-                                                            </p>
-                                                            <p className="text-[11px] text-gray-500">
-                                                                {student.lrn}
-                                                            </p>
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                removeQueuedStudent(
-                                                                    index,
-                                                                )
-                                                            }
-                                                            className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                                                        >
-                                                            <Trash2 size={13} />
-                                                        </button>
+                                {!isEditMode && (
+                                    <>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">
+                                                Bulk Upload Classlist (CSV or
+                                                Excel)
+                                            </label>
+                                            {data.classlist ? (
+                                                <div className="mt-3 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                                                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                                                        <FileText
+                                                            size={18}
+                                                            className="text-gray-500"
+                                                        />
+                                                        {data.classlist.name}
                                                     </div>
-                                                ),
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            handleFileChange(
+                                                                null,
+                                                            )
+                                                        }
+                                                        className="text-red-600 hover:text-red-800"
+                                                    >
+                                                        <X size={18} />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <label className="mt-3 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 px-6 py-7 text-center text-sm text-gray-500 transition hover:border-indigo-400 hover:bg-indigo-50">
+                                                    <input
+                                                        type="file"
+                                                        name="file"
+                                                        className="hidden"
+                                                        accept=".csv,text/csv,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                                        onChange={(e) =>
+                                                            handleFileChange(
+                                                                e.target
+                                                                    .files[0],
+                                                            )
+                                                        }
+                                                    />
+                                                    <Upload
+                                                        size={26}
+                                                        className="text-indigo-400"
+                                                    />
+                                                    <span className="mt-2 font-semibold text-gray-700">
+                                                        Drop classlist or click
+                                                        to browse
+                                                    </span>
+                                                    <span className="text-xs text-gray-500">
+                                                        CSV, XLS, XLSX up to 4MB
+                                                    </span>
+                                                </label>
+                                            )}
+                                            {errors.classlist && (
+                                                <p className="text-sm text-red-600 mt-1">
+                                                    {errors.classlist}
+                                                </p>
                                             )}
                                         </div>
-                                    )}
-                                </div>
+
+                                        <div className="rounded-xl border border-gray-200 p-4">
+                                            <p className="text-sm font-semibold text-gray-800">
+                                                Add Student One-by-One
+                                            </p>
+                                            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                                                <input
+                                                    type="text"
+                                                    value={
+                                                        studentDraft.student_name
+                                                    }
+                                                    onChange={(event) =>
+                                                        setStudentDraft(
+                                                            (prev) => ({
+                                                                ...prev,
+                                                                student_name:
+                                                                    event.target
+                                                                        .value,
+                                                            }),
+                                                        )
+                                                    }
+                                                    placeholder="Student name"
+                                                    className="rounded-lg border-gray-300 text-sm"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={studentDraft.lrn}
+                                                    onChange={(event) =>
+                                                        setStudentDraft(
+                                                            (prev) => ({
+                                                                ...prev,
+                                                                lrn: sanitizeLrn(
+                                                                    event.target
+                                                                        .value,
+                                                                ),
+                                                            }),
+                                                        )
+                                                    }
+                                                    placeholder="LRN (12 digits)"
+                                                    className="rounded-lg border-gray-300 text-sm"
+                                                    maxLength={12}
+                                                />
+                                                <input
+                                                    type="email"
+                                                    value={
+                                                        studentDraft.personal_email
+                                                    }
+                                                    onChange={(event) =>
+                                                        setStudentDraft(
+                                                            (prev) => ({
+                                                                ...prev,
+                                                                personal_email:
+                                                                    event.target
+                                                                        .value,
+                                                            }),
+                                                        )
+                                                    }
+                                                    placeholder="Personal email (optional)"
+                                                    className="rounded-lg border-gray-300 text-sm"
+                                                />
+                                            </div>
+                                            {studentDraftError && (
+                                                <p className="mt-2 text-xs text-red-600">
+                                                    {studentDraftError}
+                                                </p>
+                                            )}
+                                            <div className="mt-3 flex justify-end">
+                                                <button
+                                                    type="button"
+                                                    onClick={addSingleStudent}
+                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                                                >
+                                                    <Plus size={14} /> Queue
+                                                    Student
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="rounded-xl border border-gray-200 p-4">
+                                            <p className="text-sm font-semibold text-gray-800">
+                                                Bulk Queue by Text
+                                            </p>
+                                            <p className="mt-1 text-xs text-gray-500">
+                                                One line per student:
+                                                student_name,lrn,email(optional)
+                                            </p>
+                                            <textarea
+                                                value={bulkRows}
+                                                onChange={(event) =>
+                                                    setBulkRows(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                rows={4}
+                                                className="mt-2 w-full rounded-lg border-gray-300 text-sm"
+                                                placeholder="Juan Dela Cruz,123456789012,juan@email.com"
+                                            />
+                                            <div className="mt-3 flex justify-end">
+                                                <button
+                                                    type="button"
+                                                    onClick={addBulkStudents}
+                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                                                >
+                                                    <Upload size={14} /> Bulk
+                                                    Queue
+                                                </button>
+                                            </div>
+                                            {bulkErrors.length > 0 && (
+                                                <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                                                    <div className="space-y-1 text-xs text-amber-700">
+                                                        {bulkErrors.map(
+                                                            (error) => (
+                                                                <p key={error}>
+                                                                    - {error}
+                                                                </p>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                                            <div className="mb-2 flex items-center justify-between">
+                                                <p className="text-sm font-semibold text-indigo-800">
+                                                    Queued Students
+                                                </p>
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                                                    <Users size={12} />
+                                                    {manualStudents.length}
+                                                </span>
+                                            </div>
+                                            {manualStudents.length === 0 ? (
+                                                <p className="text-xs text-indigo-700">
+                                                    No manually queued students
+                                                    yet.
+                                                </p>
+                                            ) : (
+                                                <div className="max-h-36 space-y-1.5 overflow-y-auto pr-1">
+                                                    {manualStudents.map(
+                                                        (student, index) => (
+                                                            <div
+                                                                key={`${student.lrn}-${index}`}
+                                                                className="flex items-center justify-between rounded-md bg-white px-3 py-2"
+                                                            >
+                                                                <div>
+                                                                    <p className="text-xs font-medium text-gray-800">
+                                                                        {
+                                                                            student.student_name
+                                                                        }
+                                                                    </p>
+                                                                    <p className="text-[11px] text-gray-500">
+                                                                        {
+                                                                            student.lrn
+                                                                        }
+                                                                    </p>
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        removeQueuedStudent(
+                                                                            index,
+                                                                        )
+                                                                    }
+                                                                    className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                                                                >
+                                                                    <Trash2
+                                                                        size={
+                                                                            13
+                                                                        }
+                                                                    />
+                                                                </button>
+                                                            </div>
+                                                        ),
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         )}
 
@@ -1066,6 +1580,7 @@ const AddNewClassModal = ({
                             errors.color ||
                             errors.school_year ||
                             errors.strand ||
+                            errors.track ||
                             errors.manual_students) && (
                             <div className="text-sm text-red-600">
                                 Please fix the highlighted errors before
@@ -1092,10 +1607,8 @@ const AddNewClassModal = ({
                                         className="bg-indigo-600 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                                         disabled={
                                             processing ||
-                                            !data.grade_level ||
-                                            !data.section ||
-                                            !data.subject_name ||
-                                            !data.strand
+                                            !canContinueStepOne ||
+                                            !canContinueStepTwo
                                         }
                                     >
                                         {processing
@@ -1133,8 +1646,10 @@ const AddNewClassModal = ({
                                                 )
                                             }
                                             disabled={
-                                                step === 1 &&
-                                                !canContinueStepOne
+                                                (step === 1 &&
+                                                    !canContinueStepOne) ||
+                                                (step === 2 &&
+                                                    !canContinueStepTwo)
                                             }
                                             className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                                         >
@@ -1148,7 +1663,9 @@ const AddNewClassModal = ({
                                             disabled={
                                                 processing ||
                                                 !canContinueStepOne ||
-                                                !data.color
+                                                !canContinueStepTwo ||
+                                                !data.color ||
+                                                !isStepThreeSubmitReady
                                             }
                                         >
                                             {processing

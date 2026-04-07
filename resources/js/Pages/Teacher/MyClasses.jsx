@@ -86,6 +86,7 @@ const MyClasses = ({
     classes = [],
     departments = [],
     availableSubjects = [],
+    availableSections = [],
     rosters = {},
     gradeStructures = {},
     defaultSchoolYear,
@@ -1786,6 +1787,7 @@ const MyClasses = ({
                     initialFile={droppedFile}
                     departments={departments}
                     availableSubjects={availableSubjects}
+                    availableSections={availableSections}
                 />
             )}
 
@@ -1800,6 +1802,7 @@ const MyClasses = ({
                     currentSemester={currentSemester}
                     departments={departments}
                     availableSubjects={availableSubjects}
+                    availableSections={availableSections}
                 />
             )}
 

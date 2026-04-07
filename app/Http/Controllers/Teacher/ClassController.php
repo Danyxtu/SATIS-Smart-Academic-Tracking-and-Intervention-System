@@ -117,6 +117,33 @@ class ClassController extends Controller
                 'subject_code' => $subject->subject_code,
             ])
             ->values();
+        $sectionsCohort = $this->cohortFromSchoolYear($classesData['defaultSchoolYear']);
+        $availableSections = Section::query()
+            ->with('department:id,department_code,department_name')
+            ->where('is_active', true)
+            ->where('cohort', $sectionsCohort)
+            ->orderBy('section_name')
+            ->get([
+                'id',
+                'department_id',
+                'section_name',
+                'section_code',
+                'grade_level',
+                'strand',
+                'track',
+                'cohort',
+            ])
+            ->map(fn(Section $section) => [
+                'id' => (int) $section->id,
+                'section_name' => $section->section_name,
+                'section_code' => $section->section_code,
+                'grade_level' => $section->grade_level,
+                'strand' => $section->strand,
+                'track' => $section->track,
+                'department_code' => $section->department?->department_code,
+                'department_name' => $section->department?->department_name,
+            ])
+            ->values();
 
         $classes = $classesData['classes'];
         $defaultSchoolYear = $classesData['defaultSchoolYear'];
@@ -136,6 +163,7 @@ class ClassController extends Controller
             'roster',
             'departments',
             'availableSubjects',
+            'availableSections',
         ));
     }
 
