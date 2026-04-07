@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import { Head, Link } from "@inertiajs/react";
@@ -63,6 +63,7 @@ const getTodayDateString = () => new Date().toISOString().split("T")[0];
 
 const Attendance = ({ classes, rosters }) => {
     const { startLoading, stopLoading } = useLoading();
+    const dateInputRef = useRef(null);
     const [viewMode, setViewMode] = useState("grid");
     const [selectedClassId, setSelectedClassId] = useState(null);
     const [currentDate, setCurrentDate] = useState(getTodayDateString());
@@ -162,11 +163,26 @@ const Attendance = ({ classes, rosters }) => {
         }
 
         return parsedDate.toLocaleDateString("en-US", {
-            weekday: "long",
             month: "long",
-            day: "numeric",
+            day: "2-digit",
+            year: "numeric",
         });
     }, [currentDate]);
+
+    const openDatePicker = () => {
+        const input = dateInputRef.current;
+        if (!input) {
+            return;
+        }
+
+        if (typeof input.showPicker === "function") {
+            input.showPicker();
+            return;
+        }
+
+        input.focus();
+        input.click();
+    };
 
     const formatSummaryDate = (dateValue) => {
         if (!dateValue) {
@@ -570,22 +586,38 @@ const Attendance = ({ classes, rosters }) => {
                                         </p>
                                     </div>
 
-                                    <div className="w-full sm:w-auto">
+                                    <div className="w-auto">
                                         <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                                             Date
                                         </label>
-                                        <input
-                                            type="date"
-                                            className={`rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1.5 ${
-                                                isSunday
-                                                    ? "border-red-300 bg-red-50 dark:bg-red-900/20"
-                                                    : ""
-                                            }`}
-                                            value={currentDate}
-                                            onChange={(e) =>
-                                                setCurrentDate(e.target.value)
-                                            }
-                                        />
+                                        <div className="relative">
+                                            <input
+                                                ref={dateInputRef}
+                                                type="date"
+                                                className="absolute h-0 w-0 opacity-0 pointer-events-none"
+                                                value={currentDate}
+                                                onChange={(e) =>
+                                                    setCurrentDate(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                aria-label="Select attendance date"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={openDatePicker}
+                                                className={`inline-flex items-center gap-2 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-sm font-bold shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                                    isSunday
+                                                        ? "border-red-300 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-900/20 dark:text-red-300"
+                                                        : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+                                                }`}
+                                            >
+                                                <CalendarDays size={14} />
+                                                <span>
+                                                    {formattedCurrentDate}
+                                                </span>
+                                            </button>
+                                        </div>
                                         {isSunday && (
                                             <p className="text-[10px] text-red-600 dark:text-red-400 mt-0.5 flex items-center gap-1">
                                                 <AlertCircle size={10} /> Sunday

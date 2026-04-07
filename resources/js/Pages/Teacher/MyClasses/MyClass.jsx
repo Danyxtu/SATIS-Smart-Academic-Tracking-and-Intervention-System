@@ -11,8 +11,8 @@ import {
     ChevronUp,
     ChevronDown,
     ChevronRight,
-    Trash2,
     Users,
+    X,
 } from "lucide-react";
 // Utils
 import {
@@ -24,7 +24,6 @@ import {
 } from "@/Utils/Teacher/MyClasses/gradeCalculations";
 // Modals
 import {
-    AddGradeTaskModal,
     AddStudentModal,
     DeleteGradeTaskModal,
     EditGradeCategoriesModal,
@@ -215,6 +214,261 @@ const DEFAULT_DELETE_TASK_MODAL_STATE = {
     requiresTypedConfirmation: false,
 };
 
+const DEFAULT_TASK_COLUMN_MODAL_STATE = {
+    isOpen: false,
+    categoryId: null,
+    taskId: null,
+};
+
+const escapeRegex = (value = "") =>
+    String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const getAutoTaskPrefix = (category = {}) => {
+    const categoryId = String(category.id ?? "").toLowerCase();
+
+    if (categoryId.includes("written")) {
+        return "ww";
+    }
+
+    if (categoryId.includes("performance")) {
+        return "pt";
+    }
+
+    if (categoryId.includes("quarterly")) {
+        return "qe";
+    }
+
+    const labelWords = String(category.label ?? "")
+        .toLowerCase()
+        .match(/[a-z0-9]+/g);
+
+    if (!labelWords || labelWords.length === 0) {
+        return "task";
+    }
+
+    return labelWords
+        .map((word) => word[0])
+        .join("")
+        .slice(0, 3);
+};
+
+const getNextAutoTaskLabel = (category = {}) => {
+    const prefix = getAutoTaskPrefix(category);
+    const matcher = new RegExp(`^${escapeRegex(prefix)}\\s*(\\d+)$`, "i");
+
+    const maxUsedIndex = (category.tasks ?? []).reduce((maxValue, task) => {
+        const currentLabel = String(task?.label ?? "")
+            .trim()
+            .toLowerCase();
+        const matched = currentLabel.match(matcher);
+
+        if (!matched) {
+            return maxValue;
+        }
+
+        const numericSuffix = Number(matched[1]);
+        return Number.isFinite(numericSuffix)
+            ? Math.max(maxValue, numericSuffix)
+            : maxValue;
+    }, 0);
+
+    return `${prefix}${maxUsedIndex + 1}`;
+};
+
+const isQuarterlyExamCategory = (category = {}) => {
+    const categoryId = String(category.id ?? "").toLowerCase();
+    const categoryLabel = String(category.label ?? "").toLowerCase();
+
+    return (
+        categoryId === "quarterly_exam" ||
+        categoryLabel.includes("quarterly exam")
+    );
+};
+
+const TaskColumnSummaryModal = ({
+    isOpen,
+    task,
+    categoryLabel,
+    summary,
+    isSubmitting = false,
+    isReadOnly = false,
+    onClose,
+    onSave,
+    onDelete,
+    canDelete = true,
+}) => {
+    const [label, setLabel] = useState("");
+    const [total, setTotal] = useState("100");
+
+    useEffect(() => {
+        if (!isOpen || !task) {
+            return;
+        }
+
+        setLabel(String(task.label ?? ""));
+        setTotal(String(task.total ?? 100));
+    }, [isOpen, task?.id, task?.label, task?.total]);
+
+    if (!isOpen || !task) {
+        return null;
+    }
+
+    const normalizedLabel = label.trim();
+    const normalizedTotal = Number(total);
+    const canSave =
+        normalizedLabel.length > 0 &&
+        Number.isFinite(normalizedTotal) &&
+        normalizedTotal > 0;
+
+    const averageScore = summary?.averageScore;
+    const highestScore = summary?.highestScore;
+    const lowestScore = summary?.lowestScore;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div className="flex items-start justify-between border-b border-gray-200 p-4">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
+                            Activity Summary
+                        </p>
+                        <h3 className="text-lg font-bold text-gray-900">
+                            {task.label}
+                        </h3>
+                        <p className="text-xs text-gray-500">{categoryLabel}</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={isSubmitting}
+                        className="rounded-full p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="Close activity summary modal"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="space-y-4 p-4">
+                    <div className="grid grid-cols-2 gap-2 rounded-xl bg-gray-50 p-3 text-xs text-gray-600">
+                        <div>
+                            <p className="font-semibold text-gray-500">
+                                Scored
+                            </p>
+                            <p className="text-sm font-bold text-gray-900">
+                                {summary?.gradedCount ?? 0} /{" "}
+                                {summary?.totalStudents ?? 0}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="font-semibold text-gray-500">
+                                Total Points
+                            </p>
+                            <p className="text-sm font-bold text-gray-900">
+                                {task.total}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="font-semibold text-gray-500">
+                                Average Score
+                            </p>
+                            <p className="text-sm font-bold text-gray-900">
+                                {averageScore == null ? "-" : averageScore}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="font-semibold text-gray-500">Range</p>
+                            <p className="text-sm font-bold text-gray-900">
+                                {highestScore == null || lowestScore == null
+                                    ? "-"
+                                    : `${lowestScore} - ${highestScore}`}
+                            </p>
+                        </div>
+                    </div>
+
+                    <form
+                        className="space-y-3"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            if (isReadOnly || isSubmitting || !canSave) {
+                                return;
+                            }
+
+                            onSave?.({
+                                label: normalizedLabel,
+                                total: normalizedTotal,
+                            });
+                        }}
+                    >
+                        <div>
+                            <label className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                                Activity Name
+                            </label>
+                            <input
+                                type="text"
+                                value={label}
+                                onChange={(event) =>
+                                    setLabel(event.target.value)
+                                }
+                                disabled={isReadOnly || isSubmitting}
+                                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:bg-gray-100"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                                Total Points
+                            </label>
+                            <input
+                                type="number"
+                                min="1"
+                                step="0.5"
+                                value={total}
+                                onChange={(event) =>
+                                    setTotal(event.target.value)
+                                }
+                                disabled={isReadOnly || isSubmitting}
+                                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:bg-gray-100"
+                            />
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-1">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                disabled={isSubmitting}
+                                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                Close
+                            </button>
+                            {!isReadOnly && (
+                                <>
+                                    {canDelete && (
+                                        <button
+                                            type="button"
+                                            onClick={onDelete}
+                                            disabled={isSubmitting}
+                                            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            Delete
+                                        </button>
+                                    )}
+                                    <button
+                                        type="submit"
+                                        disabled={!canSave || isSubmitting}
+                                        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        {isSubmitting ? "Saving..." : "Save"}
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // Main Component
 const MyClass = (props) => {
     const {
@@ -252,7 +506,6 @@ const MyClass = (props) => {
         useState(false);
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [passwordModalData, setPasswordModalData] = useState(null);
-    const [activeGradeCategoryId, setActiveGradeCategoryId] = useState(null);
     const [selectedStudentForStatus, setSelectedStudentForStatus] =
         useState(null);
     const [gradeSubmissionModal, setGradeSubmissionModal] = useState({
@@ -266,6 +519,9 @@ const MyClass = (props) => {
     const [isSavingCategoryTask, setIsSavingCategoryTask] = useState(false);
     const [deleteTaskModal, setDeleteTaskModal] = useState(
         DEFAULT_DELETE_TASK_MODAL_STATE,
+    );
+    const [taskColumnModal, setTaskColumnModal] = useState(
+        DEFAULT_TASK_COLUMN_MODAL_STATE,
     );
     const [collapsedCategories, setCollapsedCategories] = useState({});
     const [sortConfig, setSortConfig] = useState({
@@ -481,10 +737,80 @@ const MyClass = (props) => {
 
     const hasAssignments = assignmentColumns.length > 0;
 
-    const selectedTaskCategory = useMemo(() => {
-        if (!activeGradeCategoryId) return null;
-        return gradeCategories.find((cat) => cat.id === activeGradeCategoryId);
-    }, [activeGradeCategoryId, gradeCategories]);
+    const selectedTaskColumnData = useMemo(() => {
+        if (!taskColumnModal.isOpen) {
+            return null;
+        }
+
+        const category = gradeCategories.find(
+            (item) => item.id === taskColumnModal.categoryId,
+        );
+        const task = category?.tasks?.find(
+            (item) => item.id === taskColumnModal.taskId,
+        );
+
+        if (!category || !task) {
+            return null;
+        }
+
+        const scoredValues = students.reduce((values, student) => {
+            const draftValue = dirtyGrades?.[student.id]?.[task.id];
+            const persistedValue =
+                student?.grades?.[selectedQuarter]?.[task.id];
+            const value =
+                draftValue !== undefined ? draftValue : persistedValue;
+
+            if (value === "" || value === null || value === undefined) {
+                return values;
+            }
+
+            const numericValue = Number(value);
+
+            if (!Number.isFinite(numericValue)) {
+                return values;
+            }
+
+            values.push(numericValue);
+            return values;
+        }, []);
+
+        const totalScore = scoredValues.reduce(
+            (runningTotal, currentValue) => runningTotal + currentValue,
+            0,
+        );
+        const averageScore =
+            scoredValues.length > 0
+                ? Number((totalScore / scoredValues.length).toFixed(2))
+                : null;
+        const highestScore =
+            scoredValues.length > 0 ? Math.max(...scoredValues) : null;
+        const lowestScore =
+            scoredValues.length > 0 ? Math.min(...scoredValues) : null;
+
+        return {
+            category,
+            task,
+            summary: {
+                gradedCount: scoredValues.length,
+                totalStudents: students.length,
+                averageScore,
+                highestScore,
+                lowestScore,
+            },
+        };
+    }, [
+        taskColumnModal,
+        gradeCategories,
+        students,
+        dirtyGrades,
+        selectedQuarter,
+    ]);
+
+    useEffect(() => {
+        if (taskColumnModal.isOpen && !selectedTaskColumnData) {
+            setTaskColumnModal(DEFAULT_TASK_COLUMN_MODAL_STATE);
+        }
+    }, [taskColumnModal.isOpen, selectedTaskColumnData]);
 
     const refreshCurrentClassData = async () => {
         if (!selectedClass?.id || typeof onRefreshClassData !== "function") {
@@ -742,7 +1068,6 @@ const MyClass = (props) => {
                             selectedQuarter,
                             updatedCategories,
                         );
-                        setActiveGradeCategoryId(null);
                     },
                     onError: (errors) => {
                         console.error("Failed to add task:", errors);
@@ -760,6 +1085,118 @@ const MyClass = (props) => {
         }
     };
 
+    const handleAutoAddCategoryTask = (category) => {
+        if (isArchiveReadOnly) return;
+        if (!category || isSavingCategoryTask) return;
+
+        if (
+            isQuarterlyExamCategory(category) &&
+            (category.tasks?.length ?? 0) >= 1
+        ) {
+            return;
+        }
+
+        handleCategoryTaskSave(category.id, {
+            label: getNextAutoTaskLabel(category),
+            total: 100,
+        });
+    };
+
+    const handleOpenTaskColumnModal = (categoryId, taskId) => {
+        setTaskColumnModal({
+            isOpen: true,
+            categoryId,
+            taskId,
+        });
+    };
+
+    const handleTaskColumnUpdate = async ({ label, total }) => {
+        if (isArchiveReadOnly) return;
+        if (!selectedClass || !selectedTaskColumnData || isSavingCategoryTask)
+            return;
+
+        const { category, task } = selectedTaskColumnData;
+        setIsSavingCategoryTask(true);
+
+        try {
+            const updatedCategories = gradeCategories.map((item) => {
+                const tasks = item.tasks || [];
+
+                if (item.id !== category.id) {
+                    return {
+                        id: item.id,
+                        label: item.label,
+                        weight: item.weight,
+                        tasks,
+                    };
+                }
+
+                return {
+                    id: item.id,
+                    label: item.label,
+                    weight: item.weight,
+                    tasks: tasks.map((existingTask) => {
+                        if (existingTask.id !== task.id) {
+                            return existingTask;
+                        }
+
+                        return {
+                            ...existingTask,
+                            label,
+                            total,
+                        };
+                    }),
+                };
+            });
+
+            router.post(
+                `/teacher/classes/${selectedClass.id}/grade-structure`,
+                {
+                    categories: updatedCategories,
+                    quarter: selectedQuarter,
+                },
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                    onSuccess: () => {
+                        applyCategoriesForQuarter(
+                            selectedQuarter,
+                            updatedCategories,
+                        );
+                        setTaskColumnModal(DEFAULT_TASK_COLUMN_MODAL_STATE);
+                    },
+                    onError: (errors) => {
+                        console.error("Failed to update task:", errors);
+                        alert("Failed to update activity. Please try again.");
+                    },
+                    onFinish: () => {
+                        setIsSavingCategoryTask(false);
+                    },
+                },
+            );
+        } catch (error) {
+            console.error("Error updating task:", error);
+            alert("An error occurred while updating the activity.");
+            setIsSavingCategoryTask(false);
+        }
+    };
+
+    const handleTaskColumnDeleteRequest = () => {
+        if (isArchiveReadOnly) return;
+        if (!selectedTaskColumnData) return;
+        if (isQuarterlyExamCategory(selectedTaskColumnData.category)) {
+            alert("Quarterly Exam activity cannot be deleted.");
+            return;
+        }
+
+        handleCategoryTaskDelete(
+            selectedTaskColumnData.category.id,
+            selectedTaskColumnData.task.id,
+        );
+        setTaskColumnModal(DEFAULT_TASK_COLUMN_MODAL_STATE);
+    };
+
     const handleCategoryTaskDelete = (categoryId, taskId) => {
         if (isArchiveReadOnly) return;
         if (!selectedClass || isSavingCategoryTask) return;
@@ -768,6 +1205,11 @@ const MyClass = (props) => {
         const task = category?.tasks?.find((item) => item.id === taskId);
 
         if (!category || !task) {
+            return;
+        }
+
+        if (isQuarterlyExamCategory(category)) {
+            alert("Quarterly Exam activity cannot be deleted.");
             return;
         }
 
@@ -811,6 +1253,12 @@ const MyClass = (props) => {
         const task = category?.tasks?.find((item) => item.id === taskId);
 
         if (!category || !task) {
+            closeDeleteTaskModal();
+            return;
+        }
+
+        if (isQuarterlyExamCategory(category)) {
+            alert("Quarterly Exam activity cannot be deleted.");
             closeDeleteTaskModal();
             return;
         }
@@ -859,6 +1307,13 @@ const MyClass = (props) => {
                         );
                         clearTaskFromDirtyGrades(taskId);
                         closeDeleteTaskModal();
+                        setTaskColumnModal((previousState) => {
+                            if (previousState.taskId !== taskId) {
+                                return previousState;
+                            }
+
+                            return DEFAULT_TASK_COLUMN_MODAL_STATE;
+                        });
                     },
                     onError: (errors) => {
                         console.error("Failed to delete task:", errors);
@@ -1363,8 +1818,20 @@ const MyClass = (props) => {
                                             <div
                                                 id="final-unlock-conditions"
                                                 role="status"
-                                                className="absolute left-full top-1/2 z-30 ml-2 w-72 -translate-y-1/2 rounded-lg border border-indigo-200 bg-white dark:bg-gray-900 px-3 py-2 text-xs text-indigo-900 shadow-lg"
+                                                className="absolute left-full top-1/2 z-30 ml-2 w-72 -translate-y-1/2 rounded-lg border border-indigo-200 bg-white dark:bg-gray-900 px-3 py-2 pr-8 text-xs text-indigo-900 shadow-lg"
                                             >
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setShowFinalUnlockInfo(
+                                                            false,
+                                                        )
+                                                    }
+                                                    className="absolute right-2 top-2 rounded p-0.5 text-indigo-500 transition hover:bg-indigo-100 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300 dark:hover:bg-indigo-900/40"
+                                                    aria-label="Close final tab conditions"
+                                                >
+                                                    <X size={11} />
+                                                </button>
                                                 <div className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rotate-45 border-b border-l border-indigo-200 bg-white dark:bg-gray-900" />
                                                 <p className="font-semibold">
                                                     Final opens when:
@@ -1489,7 +1956,7 @@ const MyClass = (props) => {
                                                             getLatestTask(
                                                                 category,
                                                             );
-                                                        const colSpan =
+                                                        const visibleTaskCount =
                                                             isCollapsed &&
                                                             latestTask
                                                                 ? 1
@@ -1497,6 +1964,16 @@ const MyClass = (props) => {
                                                                       tasks.length,
                                                                       1,
                                                                   );
+                                                        const canAddTask =
+                                                            !isArchiveReadOnly &&
+                                                            (!isQE ||
+                                                                tasks.length ===
+                                                                    0);
+                                                        const colSpan =
+                                                            visibleTaskCount +
+                                                            (canAddTask
+                                                                ? 1
+                                                                : 0);
 
                                                         return (
                                                             <th
@@ -1563,22 +2040,6 @@ const MyClass = (props) => {
                                                                                 </span>
                                                                             )}
                                                                     </span>
-                                                                    {!isArchiveReadOnly &&
-                                                                        (!isQE ||
-                                                                            tasks.length ===
-                                                                                0) && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() =>
-                                                                                    setActiveGradeCategoryId(
-                                                                                        category.id,
-                                                                                    )
-                                                                                }
-                                                                                className="text-[10px] font-semibold text-indigo-600 transition hover:text-indigo-700"
-                                                                            >
-                                                                                +
-                                                                            </button>
-                                                                        )}
                                                                 </div>
                                                             </th>
                                                         );
@@ -1645,124 +2106,156 @@ const MyClass = (props) => {
                                                                 category,
                                                             );
 
+                                                        const taskHeaderCells =
+                                                            [];
+
                                                         if (!tasks.length) {
-                                                            return (
+                                                            taskHeaderCells.push(
                                                                 <th
                                                                     key={`${category.id}-empty`}
-                                                                    className="px-3 py-1.5 text-left text-[10px] font-medium text-gray-400 dark:text-gray-500 border-r border-gray-200 dark:border-gray-700"
+                                                                    className={`px-3 py-1.5 text-left text-[10px] font-medium text-gray-400 dark:text-gray-500 ${
+                                                                        isArchiveReadOnly
+                                                                            ? "border-r border-gray-200 dark:border-gray-700"
+                                                                            : ""
+                                                                    }`}
                                                                 >
                                                                     No tasks
-                                                                </th>
+                                                                </th>,
                                                             );
-                                                        }
-
-                                                        if (
+                                                        } else if (
                                                             isCollapsed &&
                                                             latestTask
                                                         ) {
-                                                            return (
+                                                            taskHeaderCells.push(
                                                                 <th
                                                                     key={`${category.id}-collapsed`}
-                                                                    className="px-3 py-1.5 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700"
+                                                                    className={`px-3 py-1.5 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 bg-indigo-50/30 dark:bg-indigo-900/10 transition-colors hover:bg-indigo-100/50 dark:hover:bg-indigo-900/20 ${
+                                                                        isArchiveReadOnly
+                                                                            ? "border-r border-gray-200 dark:border-gray-700"
+                                                                            : ""
+                                                                    }`}
                                                                 >
-                                                                    <div className="flex items-start justify-between gap-1">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            handleOpenTaskColumnModal(
+                                                                                category.id,
+                                                                                latestTask.id,
+                                                                            )
+                                                                        }
+                                                                        className="w-full rounded-md px-1 py-0.5 text-left transition-colors hover:bg-indigo-100/70 hover:text-indigo-700 dark:hover:bg-indigo-900/30"
+                                                                    >
                                                                         <span className="block truncate max-w-[96px]">
                                                                             {
                                                                                 latestTask.label
                                                                             }
                                                                         </span>
-                                                                        {!isArchiveReadOnly && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() =>
-                                                                                    handleCategoryTaskDelete(
-                                                                                        category.id,
-                                                                                        latestTask.id,
-                                                                                    )
-                                                                                }
-                                                                                disabled={
-                                                                                    isSavingCategoryTask
-                                                                                }
-                                                                                className="rounded p-0.5 text-gray-400 dark:text-gray-500 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
-                                                                                title="Delete activity"
-                                                                                aria-label={`Delete ${latestTask.label}`}
-                                                                            >
-                                                                                <Trash2
-                                                                                    size={
-                                                                                        10
-                                                                                    }
-                                                                                />
-                                                                            </button>
-                                                                        )}
-                                                                    </div>
-                                                                    <span className="text-[9px] font-normal text-gray-400 dark:text-gray-500">
-                                                                        /{" "}
-                                                                        {
-                                                                            latestTask.total
-                                                                        }{" "}
-                                                                        pts
-                                                                    </span>
-                                                                </th>
-                                                            );
-                                                        }
-
-                                                        return tasks.map(
-                                                            (
-                                                                task,
-                                                                taskIndex,
-                                                            ) => (
-                                                                <th
-                                                                    key={
-                                                                        task.id
-                                                                    }
-                                                                    className={`px-3 py-1.5 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 ${
-                                                                        taskIndex ===
-                                                                        tasks.length -
-                                                                            1
-                                                                            ? "border-r border-gray-200 dark:border-gray-700"
-                                                                            : ""
-                                                                    }`}
-                                                                >
-                                                                    <div className="flex items-start justify-between gap-1">
-                                                                        <span className="block truncate max-w-[96px]">
+                                                                        <span className="text-[9px] font-normal text-gray-400 dark:text-gray-500">
+                                                                            /{" "}
                                                                             {
-                                                                                task.label
-                                                                            }
+                                                                                latestTask.total
+                                                                            }{" "}
+                                                                            pts
                                                                         </span>
-                                                                        {!isArchiveReadOnly && (
+                                                                    </button>
+                                                                </th>,
+                                                            );
+                                                        } else {
+                                                            tasks.forEach(
+                                                                (
+                                                                    task,
+                                                                    taskIndex,
+                                                                ) => {
+                                                                    const hasRightBorder =
+                                                                        isArchiveReadOnly &&
+                                                                        taskIndex ===
+                                                                            tasks.length -
+                                                                                1;
+
+                                                                    taskHeaderCells.push(
+                                                                        <th
+                                                                            key={`${category.id}-${task.id}`}
+                                                                            className={`px-3 py-1.5 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 bg-indigo-50/30 dark:bg-indigo-900/10 transition-colors hover:bg-indigo-100/50 dark:hover:bg-indigo-900/20 ${
+                                                                                hasRightBorder
+                                                                                    ? "border-r border-gray-200 dark:border-gray-700"
+                                                                                    : ""
+                                                                            }`}
+                                                                        >
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() =>
-                                                                                    handleCategoryTaskDelete(
+                                                                                    handleOpenTaskColumnModal(
                                                                                         category.id,
                                                                                         task.id,
                                                                                     )
                                                                                 }
+                                                                                className="w-full rounded-md px-1 py-0.5 text-left transition-colors hover:bg-indigo-100/70 hover:text-indigo-700 dark:hover:bg-indigo-900/30"
+                                                                            >
+                                                                                <span className="block truncate max-w-[96px]">
+                                                                                    {
+                                                                                        task.label
+                                                                                    }
+                                                                                </span>
+                                                                                <span className="text-[9px] font-normal text-gray-400 dark:text-gray-500">
+                                                                                    /{" "}
+                                                                                    {
+                                                                                        task.total
+                                                                                    }{" "}
+                                                                                    pts
+                                                                                </span>
+                                                                            </button>
+                                                                        </th>,
+                                                                    );
+                                                                },
+                                                            );
+                                                        }
+
+                                                        if (
+                                                            !isArchiveReadOnly
+                                                        ) {
+                                                            const isQECategory =
+                                                                isQuarterlyExam(
+                                                                    category,
+                                                                );
+                                                            const canAddTask =
+                                                                !isQECategory ||
+                                                                tasks.length ===
+                                                                    0;
+
+                                                            if (canAddTask) {
+                                                                taskHeaderCells.push(
+                                                                    <th
+                                                                        key={`${category.id}-add-cell`}
+                                                                        className="border-r border-gray-200 dark:border-gray-700 px-2 py-1.5"
+                                                                    >
+                                                                        <div className="flex items-center justify-center">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    handleAutoAddCategoryTask(
+                                                                                        category,
+                                                                                    )
+                                                                                }
                                                                                 disabled={
                                                                                     isSavingCategoryTask
                                                                                 }
-                                                                                className="rounded p-0.5 text-gray-400 dark:text-gray-500 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
-                                                                                title="Delete activity"
-                                                                                aria-label={`Delete ${task.label}`}
+                                                                                className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200 transition hover:bg-indigo-200 hover:text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-200 dark:ring-indigo-800 dark:hover:bg-indigo-900/50 disabled:cursor-not-allowed disabled:opacity-50"
+                                                                                title={`Add activity to ${category.label}`}
+                                                                                aria-label={`Add activity to ${category.label}`}
                                                                             >
-                                                                                <Trash2
+                                                                                <Plus
                                                                                     size={
-                                                                                        10
+                                                                                        15
                                                                                     }
                                                                                 />
                                                                             </button>
-                                                                        )}
-                                                                    </div>
-                                                                    <span className="text-[9px] font-normal text-gray-400 dark:text-gray-500">
-                                                                        /{" "}
-                                                                        {
-                                                                            task.total
-                                                                        }{" "}
-                                                                        pts
-                                                                    </span>
-                                                                </th>
-                                                            ),
-                                                        );
+                                                                        </div>
+                                                                    </th>,
+                                                                );
+                                                            }
+                                                        }
+
+                                                        return taskHeaderCells;
                                                     },
                                                 )}
 
@@ -1885,20 +2378,25 @@ const MyClass = (props) => {
                                                                             category,
                                                                         );
 
+                                                                    const gradeInputCells =
+                                                                        [];
+
                                                                     if (
                                                                         !tasks.length
                                                                     ) {
-                                                                        return (
+                                                                        gradeInputCells.push(
                                                                             <td
                                                                                 key={`${studentKey}-${category.id}-placeholder`}
-                                                                                className="px-3 py-2 text-center text-xs text-gray-400 dark:text-gray-500 border-r border-gray-200 dark:border-gray-700"
+                                                                                className={`px-3 py-2 text-center text-xs text-gray-400 dark:text-gray-500 ${
+                                                                                    isArchiveReadOnly
+                                                                                        ? "border-r border-gray-200 dark:border-gray-700"
+                                                                                        : ""
+                                                                                }`}
                                                                             >
                                                                                 —
-                                                                            </td>
+                                                                            </td>,
                                                                         );
-                                                                    }
-
-                                                                    if (
+                                                                    } else if (
                                                                         isCollapsed &&
                                                                         latestTask
                                                                     ) {
@@ -1929,10 +2427,14 @@ const MyClass = (props) => {
                                                                                 ? ""
                                                                                 : `${rawValue}`;
 
-                                                                        return (
+                                                                        gradeInputCells.push(
                                                                             <td
                                                                                 key={`${studentKey}-${category.id}-collapsed`}
-                                                                                className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700"
+                                                                                className={`px-3 py-2 text-xs text-gray-700 dark:text-gray-300 ${
+                                                                                    isArchiveReadOnly
+                                                                                        ? "border-r border-gray-200 dark:border-gray-700"
+                                                                                        : ""
+                                                                                }`}
                                                                             >
                                                                                 <input
                                                                                     type="text"
@@ -1959,82 +2461,109 @@ const MyClass = (props) => {
                                                                                     autoComplete="off"
                                                                                     className="w-16 rounded border border-gray-300 dark:border-gray-600 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:bg-gray-100 dark:bg-gray-700 disabled:text-gray-500 dark:text-gray-400"
                                                                                 />
-                                                                            </td>
+                                                                            </td>,
+                                                                        );
+                                                                    } else {
+                                                                        tasks.forEach(
+                                                                            (
+                                                                                task,
+                                                                                taskIndex,
+                                                                            ) => {
+                                                                                const rawValue =
+                                                                                    studentDraft[
+                                                                                        task
+                                                                                            .id
+                                                                                    ] !==
+                                                                                    undefined
+                                                                                        ? studentDraft[
+                                                                                              task
+                                                                                                  .id
+                                                                                          ]
+                                                                                        : student
+                                                                                              .grades?.[
+                                                                                              selectedQuarter
+                                                                                          ]?.[
+                                                                                              task
+                                                                                                  .id
+                                                                                          ];
+                                                                                const inputValue =
+                                                                                    rawValue ===
+                                                                                        "" ||
+                                                                                    rawValue ===
+                                                                                        null ||
+                                                                                    rawValue ===
+                                                                                        undefined
+                                                                                        ? ""
+                                                                                        : `${rawValue}`;
+                                                                                const hasRightBorder =
+                                                                                    isArchiveReadOnly &&
+                                                                                    taskIndex ===
+                                                                                        tasks.length -
+                                                                                            1;
+
+                                                                                gradeInputCells.push(
+                                                                                    <td
+                                                                                        key={`${studentKey}-${task.id}`}
+                                                                                        className={`px-3 py-2 text-xs text-gray-700 dark:text-gray-300 ${
+                                                                                            hasRightBorder
+                                                                                                ? "border-r border-gray-200 dark:border-gray-700"
+                                                                                                : ""
+                                                                                        }`}
+                                                                                    >
+                                                                                        <input
+                                                                                            type="text"
+                                                                                            inputMode="decimal"
+                                                                                            pattern="^\\d*(\\.\\d{0,2})?$"
+                                                                                            value={
+                                                                                                inputValue
+                                                                                            }
+                                                                                            disabled={
+                                                                                                isArchiveReadOnly
+                                                                                            }
+                                                                                            onChange={(
+                                                                                                event,
+                                                                                            ) =>
+                                                                                                handleGradeChange(
+                                                                                                    student.id,
+                                                                                                    task.id,
+                                                                                                    task.total,
+                                                                                                    event
+                                                                                                        .target
+                                                                                                        .value,
+                                                                                                )
+                                                                                            }
+                                                                                            autoComplete="off"
+                                                                                            className="w-16 rounded border border-gray-300 dark:border-gray-600 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:bg-gray-100 dark:bg-gray-700 disabled:text-gray-500 dark:text-gray-400"
+                                                                                        />
+                                                                                    </td>,
+                                                                                );
+                                                                            },
                                                                         );
                                                                     }
 
-                                                                    return tasks.map(
-                                                                        (
-                                                                            task,
-                                                                            taskIndex,
-                                                                        ) => {
-                                                                            const rawValue =
-                                                                                studentDraft[
-                                                                                    task
-                                                                                        .id
-                                                                                ] !==
-                                                                                undefined
-                                                                                    ? studentDraft[
-                                                                                          task
-                                                                                              .id
-                                                                                      ]
-                                                                                    : student
-                                                                                          .grades?.[
-                                                                                          selectedQuarter
-                                                                                      ]?.[
-                                                                                          task
-                                                                                              .id
-                                                                                      ];
-                                                                            const inputValue =
-                                                                                rawValue ===
-                                                                                    "" ||
-                                                                                rawValue ===
-                                                                                    null ||
-                                                                                rawValue ===
-                                                                                    undefined
-                                                                                    ? ""
-                                                                                    : `${rawValue}`;
+                                                                    if (
+                                                                        !isArchiveReadOnly
+                                                                    ) {
+                                                                        const canAddTask =
+                                                                            !isQuarterlyExamCategory(
+                                                                                category,
+                                                                            ) ||
+                                                                            tasks.length ===
+                                                                                0;
 
-                                                                            return (
+                                                                        if (
+                                                                            canAddTask
+                                                                        ) {
+                                                                            gradeInputCells.push(
                                                                                 <td
-                                                                                    key={`${studentKey}-${task.id}`}
-                                                                                    className={`px-3 py-2 text-xs text-gray-700 dark:text-gray-300 ${
-                                                                                        taskIndex ===
-                                                                                        tasks.length -
-                                                                                            1
-                                                                                            ? "border-r border-gray-200 dark:border-gray-700"
-                                                                                            : ""
-                                                                                    }`}
-                                                                                >
-                                                                                    <input
-                                                                                        type="text"
-                                                                                        inputMode="decimal"
-                                                                                        pattern="^\\d*(\\.\\d{0,2})?$"
-                                                                                        value={
-                                                                                            inputValue
-                                                                                        }
-                                                                                        disabled={
-                                                                                            isArchiveReadOnly
-                                                                                        }
-                                                                                        onChange={(
-                                                                                            event,
-                                                                                        ) =>
-                                                                                            handleGradeChange(
-                                                                                                student.id,
-                                                                                                task.id,
-                                                                                                task.total,
-                                                                                                event
-                                                                                                    .target
-                                                                                                    .value,
-                                                                                            )
-                                                                                        }
-                                                                                        autoComplete="off"
-                                                                                        className="w-16 rounded border border-gray-300 dark:border-gray-600 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:bg-gray-100 dark:bg-gray-700 disabled:text-gray-500 dark:text-gray-400"
-                                                                                    />
-                                                                                </td>
+                                                                                    key={`${studentKey}-${category.id}-add-slot`}
+                                                                                    className="border-r border-gray-200 dark:border-gray-700 px-2 py-2"
+                                                                                />,
                                                                             );
-                                                                        },
-                                                                    );
+                                                                        }
+                                                                    }
+
+                                                                    return gradeInputCells;
                                                                 },
                                                             )}
 
@@ -2258,19 +2787,22 @@ const MyClass = (props) => {
                     onClose={() => setIsAddStudentModalOpen(false)}
                 />
             )}
-            {!isArchiveReadOnly && selectedTaskCategory && selectedClass && (
-                <AddGradeTaskModal
-                    category={selectedTaskCategory}
-                    onClose={() => setActiveGradeCategoryId(null)}
-                    onSave={(taskData) =>
-                        handleCategoryTaskSave(
-                            selectedTaskCategory.id,
-                            taskData,
-                        )
-                    }
-                    isSubmitting={isSavingCategoryTask}
-                />
-            )}
+            <TaskColumnSummaryModal
+                isOpen={taskColumnModal.isOpen}
+                task={selectedTaskColumnData?.task}
+                categoryLabel={selectedTaskColumnData?.category?.label}
+                summary={selectedTaskColumnData?.summary}
+                isSubmitting={isSavingCategoryTask}
+                isReadOnly={isArchiveReadOnly}
+                canDelete={
+                    !isQuarterlyExamCategory(selectedTaskColumnData?.category)
+                }
+                onClose={() =>
+                    setTaskColumnModal(DEFAULT_TASK_COLUMN_MODAL_STATE)
+                }
+                onSave={handleTaskColumnUpdate}
+                onDelete={handleTaskColumnDeleteRequest}
+            />
             {isStudentStatusModalOpen && (
                 <StudentStatusModal
                     onClose={() => setIsStudentStatusModalOpen(false)}

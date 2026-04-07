@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Head, useForm, usePage, router } from "@inertiajs/react";
+import { Head, useForm, router } from "@inertiajs/react";
 import { useLoading } from "@/Context/LoadingContext";
 import { ArrowLeft } from "lucide-react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
@@ -7,16 +7,16 @@ import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 // --- Helper Function ---
 const getPriorityClasses = (priority) => {
     const baseClasses =
-        "px-2 py-0.5 inline-flex text-[10px] leading-4 font-semibold rounded-full";
+        "px-2.5 py-0.5 inline-flex items-center text-[10px] leading-4 font-semibold rounded-full border";
     switch (priority) {
         case "High":
-            return `${baseClasses} bg-red-100 text-red-800`;
+            return `${baseClasses} bg-rose-50 border-rose-200 text-rose-700`;
         case "Medium":
-            return `${baseClasses} bg-yellow-100 text-yellow-800`;
+            return `${baseClasses} bg-amber-50 border-amber-200 text-amber-700`;
         case "Low":
-            return `${baseClasses} bg-blue-100 text-blue-800`;
+            return `${baseClasses} bg-sky-50 border-sky-200 text-sky-700`;
         default:
-            return `${baseClasses} bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200`;
+            return `${baseClasses} bg-gray-100 border-gray-200 text-gray-700`;
     }
 };
 
@@ -27,6 +27,8 @@ const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
 function InterventionDashboard({ students, onSelectStudent }) {
     const [selectedIds, setSelectedIds] = useState([]);
     const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [priorityFilter, setPriorityFilter] = useState("All");
 
     // Sort students by priority: High → Medium → Low
     const sortedStudents = useMemo(() => {
@@ -37,12 +39,45 @@ function InterventionDashboard({ students, onSelectStudent }) {
         });
     }, [students]);
 
+    const filteredStudents = useMemo(() => {
+        const normalizedSearch = searchQuery.trim().toLowerCase();
+
+        return sortedStudents.filter((student) => {
+            const matchesPriority =
+                priorityFilter === "All" || student.priority === priorityFilter;
+
+            if (!normalizedSearch) {
+                return matchesPriority;
+            }
+
+            const searchableText = [
+                student.name,
+                student.alertReason,
+                student.subject,
+                student.priority,
+            ]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase();
+
+            return matchesPriority && searchableText.includes(normalizedSearch);
+        });
+    }, [priorityFilter, searchQuery, sortedStudents]);
+
     const totalStudents = students.length;
     const highPriority = students.filter((s) => s.priority === "High").length;
     const mediumPriority = students.filter(
         (s) => s.priority === "Medium",
     ).length;
     const lowPriority = students.filter((s) => s.priority === "Low").length;
+    const activeInterventions = students.filter(
+        (s) => s.hasActiveIntervention,
+    ).length;
+
+    const visibleIds = filteredStudents.map((s) => s.id);
+    const visibleSelectedCount = visibleIds.filter((id) =>
+        selectedIds.includes(id),
+    ).length;
 
     const toggleSelect = (id, e) => {
         e.stopPropagation();
@@ -52,20 +87,36 @@ function InterventionDashboard({ students, onSelectStudent }) {
     };
 
     const toggleSelectAll = () => {
-        if (selectedIds.length === sortedStudents.length) {
-            setSelectedIds([]);
-        } else {
-            setSelectedIds(sortedStudents.map((s) => s.id));
+        if (visibleIds.length === 0) {
+            return;
         }
+
+        const allVisibleSelected = visibleSelectedCount === visibleIds.length;
+
+        if (allVisibleSelected) {
+            setSelectedIds((prev) =>
+                prev.filter((id) => !visibleIds.includes(id)),
+            );
+            return;
+        }
+
+        setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
     };
 
     const clearSelection = () => {
         setSelectedIds([]);
     };
 
+    const clearFilters = () => {
+        setSearchQuery("");
+        setPriorityFilter("All");
+    };
+
     const selectedStudents = sortedStudents.filter((s) =>
         selectedIds.includes(s.id),
     );
+
+    const hasFilters = searchQuery.trim() !== "" || priorityFilter !== "All";
 
     return (
         <div className="space-y-4">
@@ -137,83 +188,99 @@ function InterventionDashboard({ students, onSelectStudent }) {
                 </div>
             )}
 
-            {/* Compact Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-white dark:bg-gray-900 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                                Total Watchlist
-                            </p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                                {totalStudents}
-                            </p>
-                        </div>
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center">
+            {/* Controls */}
+            <div className="bg-white dark:bg-gray-900 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-3">
+                <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+                    <div className="relative w-full lg:max-w-md">
+                        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
-                                className="h-5 w-5 text-indigo-600"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                            >
-                                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-gradient-to-br from-red-50 to-rose-50 p-4 rounded-xl shadow-sm border border-red-100 hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-medium text-red-600 uppercase tracking-wide">
-                                High Priority
-                            </p>
-                            <p className="text-2xl font-bold text-red-700 mt-1">
-                                {highPriority}
-                            </p>
-                        </div>
-                        <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-5 w-5 text-red-600"
+                                className="h-4 w-4"
                                 viewBox="0 0 20 20"
                                 fill="currentColor"
                             >
                                 <path
                                     fillRule="evenodd"
-                                    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                                    d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
                                     clipRule="evenodd"
                                 />
                             </svg>
-                        </div>
+                        </span>
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search student, subject, or alert reason"
+                            className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-sky-200 focus:border-sky-400"
+                        />
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                        {["All", "High", "Medium", "Low"].map((level) => {
+                            const isActive = priorityFilter === level;
+                            return (
+                                <button
+                                    key={level}
+                                    type="button"
+                                    onClick={() => setPriorityFilter(level)}
+                                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                                        isActive
+                                            ? "bg-slate-900 text-white"
+                                            : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200"
+                                    }`}
+                                >
+                                    {level}
+                                </button>
+                            );
+                        })}
+                        <button
+                            type="button"
+                            onClick={clearFilters}
+                            disabled={!hasFilters}
+                            className="px-3 py-1.5 rounded-full text-xs font-medium border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Clear Filters
+                        </button>
                     </div>
                 </div>
+            </div>
 
-                <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-4 rounded-xl shadow-sm border border-amber-100 hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-medium text-amber-600 uppercase tracking-wide">
-                                Medium Priority
-                            </p>
-                            <p className="text-2xl font-bold text-amber-700 mt-1">
-                                {mediumPriority}
-                            </p>
-                        </div>
-                        <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-5 w-5 text-amber-600"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                            >
-                                <path
-                                    fillRule="evenodd"
-                                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                                    clipRule="evenodd"
-                                />
-                            </svg>
-                        </div>
-                    </div>
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="bg-white dark:bg-gray-900 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                    <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                        Total Watchlist
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                        {totalStudents}
+                    </p>
+                </div>
+
+                <div className="bg-gradient-to-br from-red-50 to-rose-50 p-4 rounded-xl shadow-sm border border-red-100">
+                    <p className="text-[10px] font-semibold text-red-600 uppercase tracking-wide">
+                        High Priority
+                    </p>
+                    <p className="text-2xl font-bold text-red-700 mt-1">
+                        {highPriority}
+                    </p>
+                </div>
+
+                <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-4 rounded-xl shadow-sm border border-amber-100">
+                    <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide">
+                        Medium Priority
+                    </p>
+                    <p className="text-2xl font-bold text-amber-700 mt-1">
+                        {mediumPriority}
+                    </p>
+                </div>
+
+                <div className="bg-gradient-to-br from-sky-50 to-cyan-50 p-4 rounded-xl shadow-sm border border-sky-100">
+                    <p className="text-[10px] font-semibold text-sky-600 uppercase tracking-wide">
+                        Active Interventions
+                    </p>
+                    <p className="text-2xl font-bold text-sky-700 mt-1">
+                        {activeInterventions}
+                    </p>
                 </div>
             </div>
 
@@ -247,8 +314,8 @@ function InterventionDashboard({ students, onSelectStudent }) {
                             </div>
                         </div>
                         <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-medium rounded-full">
-                            {students.length} student
-                            {students.length !== 1 ? "s" : ""}
+                            {filteredStudents.length} shown
+                            {hasFilters ? ` of ${students.length}` : ""}
                         </span>
                     </div>
                 </div>
@@ -258,13 +325,13 @@ function InterventionDashboard({ students, onSelectStudent }) {
                         <thead className="bg-gray-50 dark:bg-gray-800">
                             <tr>
                                 <th className="w-10 px-3 py-2">
-                                    {sortedStudents.length > 0 && (
+                                    {filteredStudents.length > 0 && (
                                         <input
                                             type="checkbox"
                                             checked={
-                                                selectedIds.length ===
-                                                    sortedStudents.length &&
-                                                sortedStudents.length > 0
+                                                visibleSelectedCount ===
+                                                    filteredStudents.length &&
+                                                filteredStudents.length > 0
                                             }
                                             onChange={toggleSelectAll}
                                             className="w-3.5 h-3.5 text-indigo-600 border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500 cursor-pointer"
@@ -288,7 +355,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
                             </tr>
                         </thead>
                         <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-100">
-                            {sortedStudents.length === 0 ? (
+                            {filteredStudents.length === 0 ? (
                                 <tr>
                                     <td
                                         colSpan="6"
@@ -311,17 +378,20 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                                 </svg>
                                             </div>
                                             <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                                                All students doing well!
+                                                {hasFilters
+                                                    ? "No students match your filters"
+                                                    : "All students doing well!"}
                                             </p>
                                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-sm">
-                                                No students currently need
-                                                intervention.
+                                                {hasFilters
+                                                    ? "Try adjusting your search or priority filter."
+                                                    : "No students currently need intervention."}
                                             </p>
                                         </div>
                                     </td>
                                 </tr>
                             ) : (
-                                sortedStudents.map((s) => (
+                                filteredStudents.map((s) => (
                                     <tr
                                         key={s.id}
                                         onClick={() => onSelectStudent(s.id)}
@@ -2952,31 +3022,60 @@ function InterventionCenter({ watchlist = [], studentDetails = {} }) {
         ? studentDetails[selectedEnrollmentId]
         : null;
 
+    const highPriorityCount = students.filter(
+        (student) => student.priority === "High",
+    ).length;
+    const activeCasesCount = students.filter(
+        (student) => student.hasActiveIntervention,
+    ).length;
+
     return (
-        <div className="p-4 sm:p-6 font-sans">
-            <div className="flex items-center gap-4 border-b pb-4 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6 text-white"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                    >
-                        <path
-                            fillRule="evenodd"
-                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                            clipRule="evenodd"
-                        />
-                    </svg>
-                </div>
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                        Intervention Center
-                    </h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Monitor and support students who need academic
-                        intervention
-                    </p>
+        <div className="p-4 sm:p-6 font-sans space-y-6">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-teal-800 text-white p-5 sm:p-6 shadow-xl">
+                <div className="absolute -right-8 -top-10 h-32 w-32 rounded-full bg-sky-400/20 blur-2xl pointer-events-none" />
+                <div className="absolute -left-8 bottom-0 h-24 w-24 rounded-full bg-teal-400/20 blur-2xl pointer-events-none" />
+
+                <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200">
+                            Teacher Support Hub
+                        </p>
+                        <h1 className="text-3xl sm:text-4xl font-black tracking-tight mt-2">
+                            Intervention Center
+                        </h1>
+                        <p className="text-sm text-sky-100 mt-2 max-w-2xl">
+                            Monitor at-risk learners, launch interventions
+                            faster, and track progress with clear
+                            classroom-level visibility.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 sm:min-w-[280px]">
+                        <div className="rounded-lg bg-white/10 border border-white/15 px-3 py-2">
+                            <p className="text-[10px] uppercase tracking-wide text-sky-200">
+                                Watchlist
+                            </p>
+                            <p className="text-xl font-bold">
+                                {students.length}
+                            </p>
+                        </div>
+                        <div className="rounded-lg bg-white/10 border border-white/15 px-3 py-2">
+                            <p className="text-[10px] uppercase tracking-wide text-sky-200">
+                                High Risk
+                            </p>
+                            <p className="text-xl font-bold">
+                                {highPriorityCount}
+                            </p>
+                        </div>
+                        <div className="rounded-lg bg-white/10 border border-white/15 px-3 py-2">
+                            <p className="text-[10px] uppercase tracking-wide text-sky-200">
+                                Active
+                            </p>
+                            <p className="text-xl font-bold">
+                                {activeCasesCount}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -2998,7 +3097,7 @@ function InterventionCenter({ watchlist = [], studentDetails = {} }) {
 
 const Interventions = ({ watchlist = [], studentDetails = {} }) => {
     return (
-        <div className="bg-gray-100 dark:bg-gray-700 min-h-screen">
+        <div className="min-h-screen bg-gradient-to-b from-sky-50 via-slate-50 to-teal-50">
             <Head title="Intervention Center" />
             <InterventionCenter
                 watchlist={watchlist}

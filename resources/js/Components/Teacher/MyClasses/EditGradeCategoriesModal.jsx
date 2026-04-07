@@ -11,6 +11,16 @@ const EditGradeCategoriesModal = ({
     quarter = 1,
     onSuccess,
 }) => {
+    const isQuarterlyExamCategory = (category) => {
+        const categoryId = String(category?.id ?? "").toLowerCase();
+        const categoryLabel = String(category?.label ?? "").toLowerCase();
+
+        return (
+            categoryId === "quarterly_exam" ||
+            categoryLabel.includes("quarterly exam")
+        );
+    };
+
     const [localCategories, setLocalCategories] = useState([]);
 
     // Initialize local state when modal opens
@@ -142,6 +152,12 @@ const EditGradeCategoriesModal = ({
     // Remove category (only custom ones without tasks)
     const removeCategory = (index) => {
         const category = localCategories[index];
+
+        if (isQuarterlyExamCategory(category)) {
+            showToast.error("Quarterly Exam category cannot be removed.");
+            return;
+        }
+
         if (category.tasks && category.tasks.length > 0) {
             showToast.error(
                 "Cannot remove category with existing tasks. Remove tasks first.",
@@ -153,6 +169,8 @@ const EditGradeCategoriesModal = ({
 
     // Check if category can be removed
     const canRemoveCategory = (category) => {
+        // Quarterly Exam is fixed and cannot be removed
+        if (isQuarterlyExamCategory(category)) return false;
         // Can't remove if it has tasks
         if (category.tasks && category.tasks.length > 0) return false;
         // Must have at least 1 category
