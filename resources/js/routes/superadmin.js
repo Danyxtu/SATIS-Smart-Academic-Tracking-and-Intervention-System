@@ -5,6 +5,7 @@ import {
     Settings,
     Archive,
     BookOpen,
+    Layers,
 } from "lucide-react";
 
 export const superAdminRoutes = [
@@ -22,6 +23,12 @@ export const superAdminRoutes = [
         label: "Subject Management",
         path: "superadmin.subjects.index",
         icon: BookOpen,
+    },
+    {
+        label: "Academic Management",
+        path: "superadmin.academic-management.index",
+        activeCheck: "superadmin.academic-management.*",
+        icon: Layers,
     },
     {
         label: "User Management",

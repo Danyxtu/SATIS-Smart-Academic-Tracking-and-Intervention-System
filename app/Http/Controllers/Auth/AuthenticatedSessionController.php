@@ -39,7 +39,6 @@ class AuthenticatedSessionController extends Controller
         if ($user->must_change_password) {
             return redirect()->route('password.force-change');
         }
-
         // Always prioritize teacher dashboard if user has teacher role
         if ($user->isTeacher()) {
             return redirect()->route('teacher.dashboard');

@@ -11,6 +11,7 @@ class Intervention extends Model
         'type',
         'status',
         'notes',
+        'deadline_at',
         'completion_requested_at',
         'completion_request_notes',
         'approved_at',
@@ -21,6 +22,7 @@ class Intervention extends Model
     ];
 
     protected $casts = [
+        'deadline_at' => 'datetime',
         'completion_requested_at' => 'datetime',
         'approved_at' => 'datetime',
         'rejected_at' => 'datetime',

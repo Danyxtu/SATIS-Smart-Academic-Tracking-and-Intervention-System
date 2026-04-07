@@ -72,6 +72,11 @@ class StudentInterventionController extends Controller
                     'typeLabel' => Intervention::getTypes()[$intervention->type] ?? $intervention->type,
                     'status' => $intervention->status,
                     'notes' => $intervention->notes,
+                    'deadlineAt' => $intervention->deadline_at?->toIso8601String(),
+                    'deadlineLabel' => $intervention->deadline_at?->format('M d, Y h:i A'),
+                    'isDeadlineOverdue' => $intervention->status === 'active' && $intervention->deadline_at
+                        ? now()->gt($intervention->deadline_at)
+                        : false,
                     'priority' => $priority,
                     'currentGrade' => $currentGrade,
                     'attendanceRate' => $attendanceRate,

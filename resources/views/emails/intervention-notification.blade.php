@@ -65,6 +65,12 @@ You have received a notification from **{{ $teacherName }}** regarding **{{ $sub
 @endif
 @endif
 
+@if($deadlineAt)
+**Compliance deadline:** {{ $deadlineAt }}
+
+Please make sure you complete the intervention requirements before this date and time.
+@endif
+
 <x-mail::button :url="config('app.url')">
 View Your Dashboard
 </x-mail::button>

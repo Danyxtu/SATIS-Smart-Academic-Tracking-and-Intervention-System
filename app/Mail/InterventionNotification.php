@@ -21,6 +21,7 @@ class InterventionNotification extends Mailable implements ShouldQueue
     public string $interventionType;
     public string $interventionLabel;
     public ?string $notes;
+    public ?string $deadlineAt;
     public array $tasks;
     public string $notificationType;
 
@@ -40,6 +41,7 @@ class InterventionNotification extends Mailable implements ShouldQueue
         $this->interventionType = $intervention->type;
         $this->interventionLabel = Intervention::getTypes()[$intervention->type] ?? $intervention->type;
         $this->notes = $intervention->notes;
+        $this->deadlineAt = $intervention->deadline_at?->format('M d, Y h:i A');
         $this->tasks = $intervention->tasks->pluck('description')->toArray();
         $this->notificationType = $notificationType;
     }
@@ -77,6 +79,7 @@ class InterventionNotification extends Mailable implements ShouldQueue
                 'interventionType' => $this->interventionType,
                 'interventionLabel' => $this->interventionLabel,
                 'notes' => $this->notes,
+                'deadlineAt' => $this->deadlineAt,
                 'tasks' => $this->tasks,
                 'notificationType' => $this->notificationType,
             ],

@@ -12,6 +12,7 @@ use App\Services\PredictionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Support\Facades\Log;
@@ -148,6 +149,11 @@ class InterventionController extends Controller
                     'type' => $intervention->type,
                     'status' => $intervention->status,
                     'notes' => $intervention->notes,
+                    'deadlineAt' => $intervention->deadline_at?->toIso8601String(),
+                    'deadlineLabel' => $intervention->deadline_at?->format('M d, Y h:i A'),
+                    'isDeadlineOverdue' => $intervention->deadline_at
+                        ? now()->gt($intervention->deadline_at) && $intervention->status === 'active'
+                        : false,
                     'created_at' => $intervention->created_at?->format('Y-m-d'),
                     'tasks' => $intervention->tasks->map(fn($task) => [
                         'id' => $task->id,
@@ -299,10 +305,16 @@ class InterventionController extends Controller
             'enrollment_id' => 'required|exists:enrollments,id',
             'type' => 'required|string',
             'notes' => 'nullable|string',
+            'deadline_at' => 'nullable|date|after:now',
             'tasks' => 'nullable|array',
             'tasks.*' => 'string|max:500',
             'send_email' => 'nullable|boolean',
         ]);
+
+        $deadlineAt = $this->normalizeDeadlineForType(
+            $validated['type'],
+            $validated['deadline_at'] ?? null,
+        );
 
         $enrollment = Enrollment::with(['schoolClass.subject', 'subjectTeacher.subject', 'user'])->findOrFail($validated['enrollment_id']);
 
@@ -318,6 +330,7 @@ class InterventionController extends Controller
             [
                 'type' => $validated['type'],
                 'notes' => $validated['notes'] ?? '',
+                'deadline_at' => $deadlineAt,
             ]
         );
 
@@ -355,10 +368,16 @@ class InterventionController extends Controller
             'enrollment_ids.*' => 'exists:enrollments,id',
             'type' => 'required|string',
             'notes' => 'nullable|string',
+            'deadline_at' => 'nullable|date|after:now',
             'tasks' => 'nullable|array',
             'tasks.*' => 'string|max:500',
             'send_email' => 'nullable|boolean',
         ]);
+
+        $deadlineAt = $this->normalizeDeadlineForType(
+            $validated['type'],
+            $validated['deadline_at'] ?? null,
+        );
 
         $teacher = $request->user();
         $sendEmail = $validated['send_email'] ?? true;
@@ -382,6 +401,7 @@ class InterventionController extends Controller
                 [
                     'type' => $validated['type'],
                     'notes' => $validated['notes'] ?? '',
+                    'deadline_at' => $deadlineAt,
                 ]
             );
 
@@ -443,6 +463,9 @@ class InterventionController extends Controller
             ?? $enrollment->subjectTeacher?->subject?->subject_name
             ?? 'your class';
         $teacherName = $teacher->name ?? 'Your Teacher';
+        $deadlineSuffix = $intervention->deadline_at
+            ? ' Deadline: ' . $intervention->deadline_at->format('M d, Y h:i A') . '.'
+            : '';
 
         $titles = [
             'nudge' => '📚 Reminder from ' . $teacherName,
@@ -457,15 +480,15 @@ class InterventionController extends Controller
             'nudge' => "Hi {$studentName}! This is a friendly reminder to stay on track with your academic goals in {$subjectName}. " .
                 ($intervention->notes ? "Note: {$intervention->notes}" : "Keep up the great work!"),
             'task' => "Hi {$studentName}! Your teacher has assigned you goals for {$subjectName}. Please check your dashboard to view and complete them. " .
-                ($intervention->notes ? "Note: {$intervention->notes}" : ""),
+                ($intervention->notes ? "Note: {$intervention->notes}" : "") . $deadlineSuffix,
             'extension' => "Hi {$studentName}! You've been granted a deadline extension for {$subjectName}. " .
-                ($intervention->notes ? "Details: {$intervention->notes}" : "Please use this time wisely."),
+                ($intervention->notes ? "Details: {$intervention->notes}" : "Please use this time wisely.") . $deadlineSuffix,
             'agreement' => "Hi {$studentName}! An academic agreement has been recorded for {$subjectName}. " .
-                ($intervention->notes ? "Details: {$intervention->notes}" : "Please fulfill the agreed terms."),
+                ($intervention->notes ? "Details: {$intervention->notes}" : "Please fulfill the agreed terms.") . $deadlineSuffix,
             'meeting' => "Hi {$studentName}! A one-on-one intervention meeting has been logged for {$subjectName}. " .
-                ($intervention->notes ? "Notes: {$intervention->notes}" : "Please follow up as discussed."),
+                ($intervention->notes ? "Notes: {$intervention->notes}" : "Please follow up as discussed.") . $deadlineSuffix,
             'general' => "Hi {$studentName}! You have a notification regarding {$subjectName}. " .
-                ($intervention->notes ? $intervention->notes : "Please check with your teacher."),
+                ($intervention->notes ? $intervention->notes : "Please check with your teacher.") . $deadlineSuffix,
         ];
 
         StudentNotification::create([
@@ -635,5 +658,32 @@ class InterventionController extends Controller
             ?? $enrollment->subjectTeacher?->teacher_id;
 
         return (int) $classTeacherId === $teacherId;
+    }
+
+    private function typeRequiresDeadline(string $type): bool
+    {
+        return in_array($type, [
+            'task_list',
+            'extension_grant',
+            'parent_contact',
+            'academic_agreement',
+            'one_on_one_meeting',
+            'counselor_referral',
+        ], true);
+    }
+
+    private function normalizeDeadlineForType(string $type, ?string $deadlineAt): ?string
+    {
+        if (! $this->typeRequiresDeadline($type)) {
+            return null;
+        }
+
+        if (blank($deadlineAt)) {
+            throw ValidationException::withMessages([
+                'deadline_at' => 'Deadline date and time is required for Tier 2 and Tier 3 interventions.',
+            ]);
+        }
+
+        return $deadlineAt;
     }
 }

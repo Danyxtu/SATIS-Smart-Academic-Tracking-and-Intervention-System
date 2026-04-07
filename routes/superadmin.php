@@ -8,6 +8,7 @@ use App\Http\Controllers\SuperAdmin\ArchiveController;
 use App\Http\Controllers\SuperAdmin\NewSchoolYearController;
 use App\Http\Controllers\SuperAdmin\SettingsController;
 use App\Http\Controllers\SuperAdmin\SubjectController;
+use App\Http\Controllers\SuperAdmin\AcademicManagementController;
 use App\Http\Controllers\SuperAdmin\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
@@ -53,6 +54,22 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
         // Subject Management
         Route::resource('subjects', SubjectController::class)
             ->only(['index', 'store', 'update', 'destroy']);
+
+        // Academic Management (Sections + Classes)
+        Route::get('/academic-management', [AcademicManagementController::class, 'index'])
+            ->name('academic-management.index');
+        Route::post('/academic-management/sections', [AcademicManagementController::class, 'storeSection'])
+            ->name('academic-management.sections.store');
+        Route::put('/academic-management/sections/{section}', [AcademicManagementController::class, 'updateSection'])
+            ->name('academic-management.sections.update');
+        Route::delete('/academic-management/sections/{section}', [AcademicManagementController::class, 'destroySection'])
+            ->name('academic-management.sections.destroy');
+        Route::post('/academic-management/classes', [AcademicManagementController::class, 'storeClass'])
+            ->name('academic-management.classes.store');
+        Route::put('/academic-management/classes/{schoolClass}', [AcademicManagementController::class, 'updateClass'])
+            ->name('academic-management.classes.update');
+        Route::delete('/academic-management/classes/{schoolClass}', [AcademicManagementController::class, 'destroyClass'])
+            ->name('academic-management.classes.destroy');
 
         // User Management
         Route::resource('users', UserManagementController::class)

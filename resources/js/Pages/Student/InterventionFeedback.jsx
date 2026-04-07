@@ -291,6 +291,24 @@ const InterventionCard = ({ intervention }) => {
                         <Target size={12} />
                         {intervention.typeLabel}
                     </span>
+                    {intervention.deadlineLabel && (
+                        <span
+                            className={`flex items-center gap-1 font-medium ${
+                                intervention.isDeadlineOverdue
+                                    ? "text-red-600"
+                                    : "text-amber-600"
+                            }`}
+                        >
+                            {intervention.isDeadlineOverdue ? (
+                                <AlertCircle size={12} />
+                            ) : (
+                                <Clock size={12} />
+                            )}
+                            {intervention.isDeadlineOverdue
+                                ? "Deadline overdue"
+                                : `Deadline: ${intervention.deadlineLabel}`}
+                        </span>
+                    )}
                 </div>
             </div>
 
@@ -336,6 +354,23 @@ const InterventionCard = ({ intervention }) => {
                     <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
                         {intervention.notes}
                     </p>
+                )}
+
+                {intervention.deadlineLabel && (
+                    <div
+                        className={`mb-4 rounded-lg border px-3 py-2 text-sm ${
+                            intervention.isDeadlineOverdue
+                                ? "border-red-200 bg-red-50 text-red-700"
+                                : "border-amber-200 bg-amber-50 text-amber-700"
+                        }`}
+                    >
+                        <p className="font-medium">
+                            {intervention.isDeadlineOverdue
+                                ? "This intervention deadline has passed. Please contact your teacher immediately."
+                                : "Complete this intervention on or before:"}
+                        </p>
+                        <p className="mt-0.5">{intervention.deadlineLabel}</p>
+                    </div>
                 )}
 
                 {/* Stats */}
