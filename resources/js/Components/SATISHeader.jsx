@@ -92,6 +92,26 @@ export default function SATISHeader({
               : null
           : null;
 
+    const profileRouteName = useMemo(() => {
+        if (
+            userRoles.includes("student") &&
+            route().has("student.profile.edit")
+        ) {
+            return "student.profile.edit";
+        }
+
+        if (
+            (userRoles.includes("teacher") ||
+                userRoles.includes("admin") ||
+                userRoles.includes("super_admin")) &&
+            route().has("schoolstaff.profile.edit")
+        ) {
+            return "schoolstaff.profile.edit";
+        }
+
+        return null;
+    }, [userRoles]);
+
     const handleLogout = () => {
         if (onLogout) {
             onLogout();
@@ -267,8 +287,8 @@ export default function SATISHeader({
                                 </div>
                             </div>
 
-                            {route().has("profile.edit") && (
-                                <Dropdown.Link href={route("profile.edit")}>
+                            {profileRouteName && (
+                                <Dropdown.Link href={route(profileRouteName)}>
                                     <span className="inline-flex items-center gap-2">
                                         <Settings size={14} />
                                         Profile Settings

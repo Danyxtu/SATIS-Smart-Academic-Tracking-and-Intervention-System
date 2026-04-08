@@ -66,15 +66,19 @@ require __DIR__ . '/superadmin.php';
 */
 
 Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::middleware(['verified', 'can:access-school-staff-portal'])->group(function () {
+        Route::get('/staff/profile', [ProfileController::class, 'editSchoolStaff'])
+            ->name('schoolstaff.profile.edit');
+        Route::patch('/staff/profile', [ProfileController::class, 'update'])
+            ->name('schoolstaff.profile.update');
+        Route::delete('/staff/profile', [ProfileController::class, 'destroy'])
+            ->name('schoolstaff.profile.destroy');
 
-    // Password Reset Request (for teachers)
-    Route::post('/profile/request-password-reset', [ProfileController::class, 'requestPasswordReset'])
-        ->name('profile.request-password-reset');
-    Route::delete('/profile/cancel-password-reset', [ProfileController::class, 'cancelPasswordResetRequest'])
-        ->name('profile.cancel-password-reset');
+        Route::post('/staff/profile/request-password-reset', [ProfileController::class, 'requestPasswordReset'])
+            ->name('schoolstaff.profile.request-password-reset');
+        Route::delete('/staff/profile/cancel-password-reset', [ProfileController::class, 'cancelPasswordResetRequest'])
+            ->name('schoolstaff.profile.cancel-password-reset');
+    });
 });
 
 /*

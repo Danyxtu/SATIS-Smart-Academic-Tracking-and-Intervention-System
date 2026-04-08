@@ -94,7 +94,7 @@ export default function StudentLayout({ children }) {
     const SidebarContent = ({ onLinkClick }) => (
         <div className="flex h-full flex-col">
             <Link
-                href={route("profile.edit")}
+                href={route("student.profile.edit")}
                 onClick={onLinkClick}
                 className="mx-3 mt-3 flex items-center gap-3 rounded-lg p-3 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700/70"
             >

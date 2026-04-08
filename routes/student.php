@@ -4,6 +4,7 @@ use App\Http\Controllers\Student\DashboardController as StudentDashboardControll
 use App\Http\Controllers\Student\InterventionController as StudentInterventionController;
 use App\Http\Controllers\Student\AttendanceController as StudentAttendanceController;
 use App\Http\Controllers\Student\AnalyticsController as StudentAnalyticsController;
+use App\Http\Controllers\ProfileController;
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -38,6 +39,17 @@ Route::middleware(['auth', 'verified', 'can:access-student-portal'])->group(func
     Route::get('/learn-more', function () {
         return Inertia::render('Student/LearnMore');
     })->name('learn-more');
+
+    Route::get('/profile', [ProfileController::class, 'editStudent'])
+        ->name('student.profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])
+        ->name('student.profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])
+        ->name('student.profile.destroy');
+    Route::post('/profile/request-password-reset', [ProfileController::class, 'requestPasswordReset'])
+        ->name('student.profile.request-password-reset');
+    Route::delete('/profile/cancel-password-reset', [ProfileController::class, 'cancelPasswordResetRequest'])
+        ->name('student.profile.cancel-password-reset');
 
     Route::get('/attendance', [StudentAttendanceController::class, 'index'])
         ->name('attendance');

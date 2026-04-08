@@ -225,8 +225,9 @@ function SidebarContent({ initials, fullName, onLinkClick, onLogout }) {
                 .map((item) => ({ section, item })),
         );
 
-    const profileLinkRoute =
-        activeDashboardRole?.routeName ?? dashboardEntry?.item?.path;
+    const profileLinkRoute = route().has("schoolstaff.profile.edit")
+        ? "schoolstaff.profile.edit"
+        : (activeDashboardRole?.routeName ?? dashboardEntry?.item?.path);
 
     return (
         <div className="flex flex-col h-full text-xs">

@@ -18,22 +18,20 @@ class ProfileController extends Controller
     /**
      * Display the user's profile form.
      */
-    public function edit(Request $request): Response
+    public function editStudent(Request $request): Response
     {
         $user = $request->user();
-        $student = null;
 
-        // If user is a student, get their student profile data
-        if ($user->hasRole('student')) {
-            $student = Student::where('user_id', $user->id)->first();
-        }
+        abort_unless($user->hasRole('student'), 403);
+
+        $student = Student::where('user_id', $user->id)->first();
 
         // Get pending password reset request if any
         $pendingPasswordReset = PasswordResetRequest::where('user_id', $user->id)
             ->pending()
             ->first();
 
-        return Inertia::render('Profile/Edit', [
+        return Inertia::render('Student/ProfileSettings', [
             'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => session('status'),
             'student' => $student ? [
@@ -46,6 +44,33 @@ class ProfileController extends Controller
                 'track' => $student->track,
                 'avatar' => $student->avatar,
             ] : null,
+            'pendingPasswordReset' => $pendingPasswordReset ? [
+                'id' => $pendingPasswordReset->id,
+                'reason' => $pendingPasswordReset->reason,
+                'status' => $pendingPasswordReset->status,
+                'created_at' => $pendingPasswordReset->created_at->diffForHumans(),
+            ] : null,
+        ]);
+    }
+
+    /**
+     * Display the school staff profile form.
+     */
+    public function editSchoolStaff(Request $request): Response
+    {
+        $user = $request->user();
+
+        abort_unless(
+            $user->hasRole('teacher') || $user->hasRole('admin') || $user->hasRole('super_admin'),
+            403
+        );
+
+        $pendingPasswordReset = PasswordResetRequest::where('user_id', $user->id)
+            ->pending()
+            ->first();
+
+        return Inertia::render('SchoolStaff/ProfileSchoolStaff', [
+            'status' => session('status'),
             'pendingPasswordReset' => $pendingPasswordReset ? [
                 'id' => $pendingPasswordReset->id,
                 'reason' => $pendingPasswordReset->reason,
@@ -93,7 +118,7 @@ class ProfileController extends Controller
             }
         }
 
-        return Redirect::route('profile.edit')->with('status', 'profile-updated');
+        return Redirect::route($this->resolveEditRouteName($user))->with('status', 'profile-updated');
     }
 
     /**
@@ -164,5 +189,15 @@ class ProfileController extends Controller
         $pendingRequest->delete();
 
         return back()->with('success', 'Your password reset request has been cancelled.');
+    }
+
+    /**
+     * Resolve the profile edit route name based on user role.
+     */
+    private function resolveEditRouteName($user): string
+    {
+        return $user->hasRole('student')
+            ? 'student.profile.edit'
+            : 'schoolstaff.profile.edit';
     }
 }

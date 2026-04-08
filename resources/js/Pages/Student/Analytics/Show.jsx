@@ -14,7 +14,6 @@ import {
 import {
     FileDown,
     Lightbulb,
-    Bot,
     AlertTriangle,
     AlertCircle,
     CheckCircle2,
@@ -1022,26 +1021,6 @@ const SuggestionsCard = ({ suggestions }) => {
         </div>
     );
 };
-
-// Study Aids Component
-const StudyAids = () => (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-6 border-2 border-pink-200 dark:border-pink-700/50">
-        <div className="flex items-center gap-3 mb-2">
-            <Bot className="w-6 h-6 text-pink-600" />
-            <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
-                Personalized Study Aids
-            </h3>
-        </div>
-        <p className="text-gray-700 dark:text-gray-300 mb-4">
-            Struggling in certain areas? Let A.I. create a custom reviewer to
-            help you catch up!
-        </p>
-        <button className="w-full bg-pink-600 text-white font-semibold py-3 px-4 rounded-xl hover:bg-pink-700 transition-colors flex items-center justify-center gap-2">
-            <Bot size={18} />
-            Generate Personalized Quiz
-        </button>
-    </div>
-);
 
 // --- Expected Grade Factors Card ---
 // Explains the key factors that affect the expected grade calculation
@@ -2639,7 +2618,6 @@ const AnalyticsShow = ({
                             selectedQuarter={selectedQuarter}
                         />
                         <SuggestionsCard suggestions={suggestions} />
-                        <StudyAids />
                     </div>
 
                     {/* Right Column - Sidebar */}
