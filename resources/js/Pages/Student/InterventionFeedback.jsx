@@ -580,6 +580,7 @@ const FeedbackItem = ({ feedback, isHighlighted }) => {
         nudge: Bell,
         task: ListTodo,
         alert: AlertCircle,
+        extension: Clock,
     };
 
     const typeColors = {
@@ -588,6 +589,8 @@ const FeedbackItem = ({ feedback, isHighlighted }) => {
         nudge: "text-purple-600 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/30",
         task: "text-green-600 dark:text-green-300 bg-green-100 dark:bg-green-900/30",
         alert: "text-red-600 dark:text-red-300 bg-red-100 dark:bg-red-900/30",
+        extension:
+            "text-amber-600 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30",
     };
 
     const Icon = typeIcons[feedback.type] || MessageSquare;
@@ -648,6 +651,12 @@ const FeedbackItem = ({ feedback, isHighlighted }) => {
                     <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
                         {feedback.message}
                     </p>
+                    {feedback.type === "extension" &&
+                        feedback.deadlineLabel && (
+                            <p className="text-xs text-amber-600 dark:text-amber-300 font-medium mt-1.5">
+                                Updated deadline: {feedback.deadlineLabel}
+                            </p>
+                        )}
                     {!feedback.isRead && (
                         <button
                             onClick={handleMarkRead}

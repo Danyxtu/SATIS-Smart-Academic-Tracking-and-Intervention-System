@@ -84,8 +84,24 @@ class UserManagementController extends Controller
                     });
                 },
             ])
+            ->with([
+                'admins:id,first_name,middle_name,last_name,personal_email,department_id',
+            ])
             ->orderBy('department_name')
-            ->get();
+            ->get()
+            ->map(function (\App\Models\Department $department) {
+                $primaryAdmin = $department->admins->first();
+
+                $department->setAttribute('department_admin', $primaryAdmin ? [
+                    'id' => $primaryAdmin->id,
+                    'first_name' => $primaryAdmin->first_name,
+                    'last_name' => $primaryAdmin->last_name,
+                    'name' => $primaryAdmin->name,
+                    'email' => $primaryAdmin->email,
+                ] : null);
+
+                return $department;
+            });
 
         return Inertia::render('SuperAdmin/UserManagement/Index', [
             'users'       => $users,
@@ -108,6 +124,29 @@ class UserManagementController extends Controller
             'assign_as_admin' => ['nullable', 'boolean'],
             'department_id' => ['nullable', 'exists:departments,id'],
         ]);
+
+        if ($validated['role'] === 'teacher' && empty($validated['department_id'])) {
+            return back()->withErrors([
+                'department_id' => 'Department is required for teachers.',
+            ]);
+        }
+
+        if (
+            $validated['role'] === 'teacher'
+            && !empty($validated['assign_as_admin'])
+            && !empty($validated['department_id'])
+        ) {
+            $departmentAlreadyHasAdmin = \App\Models\Department::query()
+                ->whereKey($validated['department_id'])
+                ->whereHas('admins')
+                ->exists();
+
+            if ($departmentAlreadyHasAdmin) {
+                return back()->withErrors([
+                    'assign_as_admin' => 'This department already has an assigned admin.',
+                ]);
+            }
+        }
 
         if ($validated['role'] === 'teacher') {
             $assignedRoles = ['teacher'];
@@ -174,6 +213,20 @@ class UserManagementController extends Controller
             'department_id' => ['nullable', 'exists:departments,id'],
             'status' => ['required', 'in:active,inactive'],
         ]);
+
+        $currentRoles = $user->roles()->pluck('name');
+
+        if ($currentRoles->contains('teacher') && $validated['role'] === 'student') {
+            return back()->withErrors([
+                'role' => 'Teachers cannot be changed to students.',
+            ]);
+        }
+
+        if ($currentRoles->contains('student') && $validated['role'] === 'teacher') {
+            return back()->withErrors([
+                'role' => 'Students cannot be changed to teachers.',
+            ]);
+        }
 
         // Teachers must always be assigned to a department.
         if ($validated['role'] === 'teacher' && empty($validated['department_id'])) {

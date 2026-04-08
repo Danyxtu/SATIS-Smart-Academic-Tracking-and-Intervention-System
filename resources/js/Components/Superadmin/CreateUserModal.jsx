@@ -102,6 +102,18 @@ export default function CreateUserModal({ open, onClose, departments }) {
     if (!open) return null;
 
     const isTeacher = data.role === "teacher";
+    const selectedDepartment =
+        isTeacher && data.department_id
+            ? (departments?.find(
+                  (dept) => String(dept.id) === String(data.department_id),
+              ) ?? null)
+            : null;
+    const selectedAdmin = selectedDepartment?.department_admin ?? null;
+    const selectedAdminName =
+        selectedAdmin?.name ??
+        [selectedAdmin?.first_name, selectedAdmin?.last_name]
+            .filter(Boolean)
+            .join(" ");
 
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -276,17 +288,18 @@ export default function CreateUserModal({ open, onClose, departments }) {
                                 <Field
                                     label="Department"
                                     icon={Shield}
-                                    optional
+                                    required
                                     error={errors.department_id}
                                 >
                                     <select
                                         value={data.department_id}
-                                        onChange={(e) =>
+                                        onChange={(e) => {
                                             setData(
                                                 "department_id",
                                                 e.target.value,
-                                            )
-                                        }
+                                            );
+                                            setData("assign_as_admin", false);
+                                        }}
                                         className={`w-full rounded-xl border bg-slate-50 px-3 py-2 text-sm focus:border-violet-500 focus:ring-violet-500 focus:bg-white transition-colors ${errors.department_id ? "border-rose-300 bg-rose-50" : "border-slate-200"}`}
                                     >
                                         <option value="">
@@ -307,60 +320,61 @@ export default function CreateUserModal({ open, onClose, departments }) {
                                 </Field>
                             )}
 
-                            {isTeacher &&
-                                data.department_id &&
-                                (() => {
-                                    const selectedDepartment =
-                                        departments?.find(
-                                            (dept) =>
-                                                String(dept.id) ===
-                                                String(data.department_id),
-                                        ) ?? null;
-
-                                    return (
-                                        <div className="space-y-2">
-                                            {selectedDepartment?.admin_count ===
-                                                0 && (
-                                                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
-                                                    <p className="text-xs text-amber-800">
-                                                        No admin is currently
-                                                        assigned to the{" "}
-                                                        {
-                                                            selectedDepartment.department_name
-                                                        }{" "}
-                                                        department.
-                                                    </p>
-                                                </div>
-                                            )}
-
-                                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-                                                <label className="flex items-start gap-2.5 cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={
-                                                            !!data.assign_as_admin
-                                                        }
-                                                        onChange={(e) =>
-                                                            setData(
-                                                                "assign_as_admin",
-                                                                e.target
-                                                                    .checked,
-                                                            )
-                                                        }
-                                                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
-                                                    />
-                                                    <span className="text-sm text-slate-700">
-                                                        Assign as an admin of
-                                                        the{" "}
-                                                        {selectedDepartment?.department_name ??
-                                                            "selected"}{" "}
-                                                        department
-                                                    </span>
-                                                </label>
-                                            </div>
+                            {isTeacher && data.department_id && (
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                        Department Admin
+                                    </p>
+                                    {selectedAdmin ? (
+                                        <div className="mt-1.5 space-y-0.5">
+                                            <p className="text-sm font-semibold text-slate-800">
+                                                {selectedAdminName ||
+                                                    "Assigned admin"}
+                                            </p>
+                                            <p className="text-xs text-slate-600">
+                                                {selectedAdmin.email ||
+                                                    "No email provided"}
+                                            </p>
                                         </div>
-                                    );
-                                })()}
+                                    ) : (
+                                        <div className="mt-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
+                                            <p className="text-xs text-amber-800">
+                                                No admin is currently assigned
+                                                to the{" "}
+                                                {
+                                                    selectedDepartment?.department_name
+                                                }{" "}
+                                                department.
+                                            </p>
+                                            <label className="mt-2 flex items-start gap-2.5 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={
+                                                        !!data.assign_as_admin
+                                                    }
+                                                    onChange={(e) =>
+                                                        setData(
+                                                            "assign_as_admin",
+                                                            e.target.checked,
+                                                        )
+                                                    }
+                                                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                                                />
+                                                <span className="text-xs text-amber-900">
+                                                    Assign this teacher as the
+                                                    admin for this department.
+                                                </span>
+                                            </label>
+                                            {errors.assign_as_admin && (
+                                                <p className="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                                    <Info size={12} />
+                                                    {errors.assign_as_admin}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <Field
                                 label="Password"

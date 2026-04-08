@@ -288,55 +288,21 @@ export default function EditUserModal({ open, onClose, user, departments }) {
                                 />
                             </Field>
 
-                            {/* ── Role (teacher/student only) ───────────── */}
+                            {/* ── Role (teacher/student locked) ─────────── */}
                             {isTeacherOrStudent && (
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-2">
                                         Role{" "}
                                         <span className="text-rose-500">*</span>
                                     </label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {["teacher", "student"].map((role) => {
-                                            const rc = getRoleConfig(role);
-                                            const RIcon = rc.icon;
-                                            const active = data.role === role;
-                                            return (
-                                                <button
-                                                    key={role}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setData("role", role);
-                                                        if (role === "student")
-                                                            setData(
-                                                                "department_id",
-                                                                "",
-                                                            );
-                                                    }}
-                                                    className={`flex items-center gap-2.5 rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
-                                                        active
-                                                            ? role === "teacher"
-                                                                ? "border-blue-500 bg-blue-50 text-blue-700"
-                                                                : "border-emerald-500 bg-emerald-50 text-emerald-700"
-                                                            : "border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300"
-                                                    }`}
-                                                >
-                                                    <div
-                                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white"
-                                                        style={
-                                                            active
-                                                                ? rc.avatarStyle
-                                                                : {
-                                                                      background:
-                                                                          "#cbd5e1",
-                                                                  }
-                                                        }
-                                                    >
-                                                        <RIcon size={14} />
-                                                    </div>
-                                                    {rc.label}
-                                                </button>
-                                            );
-                                        })}
+                                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                        <p className="text-sm font-semibold text-slate-800">
+                                            {getRoleConfig(data.role).label}
+                                        </p>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            This role is locked. Teacher and
+                                            student accounts cannot be switched.
+                                        </p>
                                     </div>
                                     {errors.role && (
                                         <p className="mt-1.5 text-xs text-rose-600 flex items-center gap-1">

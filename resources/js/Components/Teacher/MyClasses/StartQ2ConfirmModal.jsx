@@ -113,15 +113,16 @@ const StartQ2ConfirmModal = ({
 
                         {/* Title */}
                         <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
-                            Start Quarter 2?
+                            Start Final Quarter?
                         </h3>
 
                         {/* Description */}
                         {hasQuarterlyExam ? (
                             <p className="text-sm text-gray-600 text-center mb-6">
-                                Are you sure you want to start Quarter 2? This
-                                will allow you to view Q2 grades and begin
-                                entering Q2 data.
+                                Are you sure you want to start the Final
+                                Quarter? This will allow you to view Final
+                                Quarter grades and begin entering Final Quarter
+                                data.
                             </p>
                         ) : (
                             <div className="mb-6">
@@ -130,11 +131,12 @@ const StartQ2ConfirmModal = ({
                                         ⚠️ No quarterly exam scores found
                                     </p>
                                     <p className="text-xs text-amber-700">
-                                        Quarter 1 does not have any quarterly
-                                        exam grades yet. Are you sure you want
-                                        to start Q2 without having a quarterly
-                                        grade? Students won't receive a
-                                        transmuted Q1 grade without it.
+                                        Midterm Quarter does not have any
+                                        quarterly exam grades yet. Are you sure
+                                        you want to start the Final Quarter
+                                        without having a quarterly grade?
+                                        Students won't receive a transmuted
+                                        Midterm Quarter grade without it.
                                     </p>
                                 </div>
 
@@ -214,7 +216,7 @@ const StartQ2ConfirmModal = ({
                         >
                             {isSubmitting
                                 ? "Starting..."
-                                : "Yes, Start Quarter 2"}
+                                : "Yes, Start Final Quarter"}
                         </button>
                     </div>
                 </form>

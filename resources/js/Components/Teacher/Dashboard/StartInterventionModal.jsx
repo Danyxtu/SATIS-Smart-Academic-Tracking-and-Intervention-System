@@ -112,6 +112,17 @@ const TIERS = [
     },
 ];
 
+const LOCKED_TIER_IDS = ["tier1", "tier2"];
+
+const DEADLINE_REQUIRED_TYPES = [
+    "task_list",
+    "extension_grant",
+    "parent_contact",
+    "academic_agreement",
+    "one_on_one_meeting",
+    "counselor_referral",
+];
+
 /**
  * StartInterventionModal – A reusable multi-step modal for creating interventions.
  *
@@ -143,6 +154,7 @@ export default function StartInterventionModal({
 
     /* ── form state ── */
     const [notes, setNotes] = useState("");
+    const [deadlineAt, setDeadlineAt] = useState("");
     const [tasks, setTasks] = useState([]);
     const [newTask, setNewTask] = useState("");
     const [sendEmail, setSendEmail] = useState(true);
@@ -191,6 +203,7 @@ export default function StartInterventionModal({
         setSelectedTier(null);
         setSelectedType(null);
         setNotes("");
+        setDeadlineAt("");
         setTasks([]);
         setNewTask("");
         setSendEmail(true);
@@ -229,31 +242,11 @@ export default function StartInterventionModal({
             return null;
         }
 
-        if (selectedStudent.at_risk) {
-            return {
-                tierId: "tier3",
-                label: "Tier 3 – Intensive Intervention",
-                reason: "Student is currently At Risk.",
-            };
-        }
-
-        if (selectedStudent.recent_decline && selectedStudent.needs_attention) {
-            return {
-                tierId: "tier2",
-                label: "Tier 2 – Targeted Support",
-                reason: "Student has declining grades and absences under Needs Attention.",
-            };
-        }
-
-        if (selectedStudent.recent_decline) {
-            return {
-                tierId: "tier1",
-                label: "Tier 1 – Early Intervention",
-                reason: "Student has declining grades.",
-            };
-        }
-
-        return null;
+        return {
+            tierId: "tier3",
+            label: "Tier 3 – Intensive Intervention",
+            reason: "Tier 1 and Tier 2 are disabled in this dashboard flow.",
+        };
     }, [selectedStudent]);
 
     /* ── task management ── */
@@ -274,6 +267,8 @@ export default function StartInterventionModal({
         setStep(STEP_SELECT_INTERVENTION);
     };
     const handleSelectType = (tier, type) => {
+        if (LOCKED_TIER_IDS.includes(tier.id)) return;
+
         setSelectedTier(tier);
         setSelectedType(type);
         // Reset tasks if switching away from task_list
@@ -285,6 +280,7 @@ export default function StartInterventionModal({
         setSelectedTier(null);
         setSelectedType(null);
         setNotes("");
+        setDeadlineAt("");
         setTasks([]);
         setStep(STEP_SELECT_STUDENT);
     };
@@ -292,13 +288,19 @@ export default function StartInterventionModal({
         setSelectedTier(null);
         setSelectedType(null);
         setNotes("");
+        setDeadlineAt("");
         setTasks([]);
         setStep(STEP_SELECT_INTERVENTION);
     };
 
+    const deadlineRequired = DEADLINE_REQUIRED_TYPES.includes(
+        selectedType?.key ?? "",
+    );
+
     /* ── submit via axios ── */
     const handleSubmit = async () => {
         if (!selectedStudent || !selectedType) return;
+        if (deadlineRequired && !deadlineAt) return;
 
         setSubmitting(true);
         try {
@@ -306,6 +308,7 @@ export default function StartInterventionModal({
                 enrollment_id: selectedStudent.enrollment_id,
                 type: selectedType.key,
                 notes: notes || null,
+                deadline_at: deadlineRequired ? deadlineAt : null,
                 send_email: sendEmail,
             };
             if (selectedType.key === "task_list" && tasks.length > 0) {
@@ -684,6 +687,10 @@ export default function StartInterventionModal({
                                             const style =
                                                 tierStyles[tier.id] ??
                                                 tierStyles.tier2;
+                                            const isTierLocked =
+                                                LOCKED_TIER_IDS.includes(
+                                                    tier.id,
+                                                );
                                             const isRecommendedTier =
                                                 recommendationForStudent?.tierId ===
                                                 tier.id;
@@ -695,6 +702,10 @@ export default function StartInterventionModal({
                                                         isRecommendedTier
                                                             ? "border-indigo-400 ring-1 ring-indigo-300 dark:border-indigo-500 dark:ring-indigo-800"
                                                             : "border-gray-200 dark:border-gray-700"
+                                                    } ${
+                                                        isTierLocked
+                                                            ? "opacity-60 grayscale"
+                                                            : ""
                                                     }`}
                                                 >
                                                     {/* Tier header */}
@@ -719,6 +730,12 @@ export default function StartInterventionModal({
                                                                 Recommended
                                                             </span>
                                                         )}
+                                                        {!isRecommendedTier &&
+                                                            isTierLocked && (
+                                                                <span className="inline-flex items-center rounded-md bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-white">
+                                                                    Disabled
+                                                                </span>
+                                                            )}
                                                     </div>
                                                     {/* Types */}
                                                     <div className="flex-1 space-y-2 p-3">
@@ -732,13 +749,20 @@ export default function StartInterventionModal({
                                                                             type.key
                                                                         }
                                                                         type="button"
+                                                                        disabled={
+                                                                            isTierLocked
+                                                                        }
                                                                         onClick={() =>
                                                                             handleSelectType(
                                                                                 tier,
                                                                                 type,
                                                                             )
                                                                         }
-                                                                        className={`group flex w-full items-center gap-3 rounded-lg border p-2.5 text-left transition-all hover:shadow-sm ${style.cardBg} ${style.cardBorder} ${style.cardHover}`}
+                                                                        className={`group flex w-full items-center gap-3 rounded-lg border p-2.5 text-left ${style.cardBg} ${style.cardBorder} ${
+                                                                            isTierLocked
+                                                                                ? "cursor-not-allowed opacity-70"
+                                                                                : `transition-all hover:shadow-sm ${style.cardHover}`
+                                                                        }`}
                                                                     >
                                                                         <div
                                                                             className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${style.iconBg}`}
@@ -748,7 +772,13 @@ export default function StartInterventionModal({
                                                                             />
                                                                         </div>
                                                                         <div className="flex-1 min-w-0">
-                                                                            <p className="text-xs font-medium text-gray-900 dark:text-white group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors">
+                                                                            <p
+                                                                                className={`text-xs font-medium text-gray-900 dark:text-white ${
+                                                                                    isTierLocked
+                                                                                        ? ""
+                                                                                        : "group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors"
+                                                                                }`}
+                                                                            >
                                                                                 {
                                                                                     type.label
                                                                                 }
@@ -759,7 +789,13 @@ export default function StartInterventionModal({
                                                                                 }
                                                                             </p>
                                                                         </div>
-                                                                        <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 flex-shrink-0 transition-colors" />
+                                                                        <ChevronRight
+                                                                            className={`w-4 h-4 text-gray-400 flex-shrink-0 ${
+                                                                                isTierLocked
+                                                                                    ? ""
+                                                                                    : "group-hover:text-indigo-500 transition-colors"
+                                                                            }`}
+                                                                        />
                                                                     </button>
                                                                 );
                                                             },
@@ -865,6 +901,30 @@ export default function StartInterventionModal({
                                         className="w-full text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 resize-none transition-all"
                                     />
                                 </div>
+
+                                {/* Deadline (Tier 2 and Tier 3) */}
+                                {deadlineRequired && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                            Intervention Deadline{" "}
+                                            <span className="text-red-500">
+                                                *
+                                            </span>
+                                        </label>
+                                        <input
+                                            type="datetime-local"
+                                            value={deadlineAt}
+                                            onChange={(e) =>
+                                                setDeadlineAt(e.target.value)
+                                            }
+                                            className="w-full text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 dark:text-gray-100 transition-all"
+                                        />
+                                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                            Required for Tier 2 and Tier 3
+                                            interventions.
+                                        </p>
+                                    </div>
+                                )}
 
                                 {/* Tasks (only for task_list type) */}
                                 {selectedType?.hasTasks && (
@@ -980,9 +1040,13 @@ export default function StartInterventionModal({
                                 </button>
                                 <button
                                     onClick={handleSubmit}
-                                    disabled={submitting}
+                                    disabled={
+                                        submitting ||
+                                        (deadlineRequired && !deadlineAt)
+                                    }
                                     className={`inline-flex items-center gap-2 px-4 py-1.5 text-xs font-semibold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
-                                        submitting
+                                        submitting ||
+                                        (deadlineRequired && !deadlineAt)
                                             ? "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                                             : "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5"
                                     }`}
@@ -1061,6 +1125,7 @@ export default function StartInterventionModal({
                                     onClick={() => {
                                         setResult(null);
                                         setNotes("");
+                                        setDeadlineAt("");
                                         setTasks([]);
                                         setNewTask("");
                                         setStep(STEP_SELECT_STUDENT);

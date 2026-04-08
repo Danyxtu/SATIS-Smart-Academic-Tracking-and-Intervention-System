@@ -141,6 +141,14 @@ const resolveTabFromQuery = ({ tabValue, isQ2Unlocked, isFinalUnlocked }) => {
     return "q1";
 };
 
+const QUARTER_TERM_LABELS = {
+    1: "Midterm Quarter",
+    2: "Final Quarter",
+};
+
+const getQuarterTermLabel = (quarter) =>
+    QUARTER_TERM_LABELS[quarter] ?? `Quarter ${quarter}`;
+
 const applyQuarterCategoriesToGradeStructure = ({
     currentGradeStructure,
     quarter,
@@ -283,6 +291,89 @@ const isQuarterlyExamCategory = (category = {}) => {
         categoryId === "quarterly_exam" ||
         categoryLabel.includes("quarterly exam")
     );
+};
+
+const orderQuarterCategories = (categories = []) => {
+    const list = Array.isArray(categories) ? categories : [];
+    const nonQuarterly = [];
+    const quarterlyExam = [];
+
+    list.forEach((category) => {
+        if (isQuarterlyExamCategory(category)) {
+            quarterlyExam.push(category);
+            return;
+        }
+
+        nonQuarterly.push(category);
+    });
+
+    return [...nonQuarterly, ...quarterlyExam];
+};
+
+const toNumericGradeValue = (rawValue) => {
+    if (rawValue === "" || rawValue === null || rawValue === undefined) {
+        return null;
+    }
+
+    const numericValue = Number(rawValue);
+    return Number.isFinite(numericValue) ? numericValue : null;
+};
+
+const calculateQuarterCategoryBreakdown = ({
+    student,
+    categories,
+    quarter,
+}) => {
+    const quarterGrades =
+        student?.grades?.[quarter] ?? student?.grades?.[String(quarter)] ?? {};
+    const contributionByCategory = {};
+
+    let totalAdded = 0;
+    let hasAnyContribution = false;
+
+    (categories ?? []).forEach((category) => {
+        const tasks = category?.tasks ?? [];
+        const weight = Number(category?.weight ?? 0);
+
+        if (!tasks.length || !weight) {
+            contributionByCategory[category.id] = null;
+            return;
+        }
+
+        let earned = 0;
+        let possible = 0;
+
+        tasks.forEach((task) => {
+            const score = toNumericGradeValue(quarterGrades?.[task.id]);
+            const taskTotal = Number(task?.total ?? 0);
+
+            if (
+                score === null ||
+                !Number.isFinite(taskTotal) ||
+                taskTotal <= 0
+            ) {
+                return;
+            }
+
+            earned += score;
+            possible += taskTotal;
+        });
+
+        if (possible <= 0) {
+            contributionByCategory[category.id] = null;
+            return;
+        }
+
+        const contribution = (earned / possible) * weight * 100;
+        contributionByCategory[category.id] = contribution;
+        totalAdded += contribution;
+        hasAnyContribution = true;
+    });
+
+    return {
+        contributionByCategory,
+        totalAdded: hasAnyContribution ? totalAdded : null,
+    };
 };
 
 const TaskColumnSummaryModal = ({
@@ -594,6 +685,15 @@ const MyClass = (props) => {
             localGradeStructure?.categories ??
             FALLBACK_GRADE_CATEGORIES,
         [localGradeStructure],
+    );
+
+    const midtermQuarterCategories = useMemo(
+        () => orderQuarterCategories(q1Categories),
+        [q1Categories],
+    );
+    const finalQuarterCategories = useMemo(
+        () => orderQuarterCategories(q2Categories),
+        [q2Categories],
     );
 
     const q1HasQuarterlyExam = useMemo(() => {
@@ -1748,7 +1848,7 @@ const MyClass = (props) => {
                                                 : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-900 hover:text-indigo-700"
                                         }`}
                                     >
-                                        Q1
+                                        Midterm Quarter
                                     </button>
                                     <button
                                         onClick={() => {
@@ -1769,11 +1869,11 @@ const MyClass = (props) => {
                                         }`}
                                         title={
                                             !isQ2Unlocked
-                                                ? "Start Quarter 2 first"
+                                                ? "Start Final Quarter first"
                                                 : ""
                                         }
                                     >
-                                        Q2
+                                        Final Quarter
                                     </button>
                                     <button
                                         onClick={() => {
@@ -1792,7 +1892,7 @@ const MyClass = (props) => {
                                         }`}
                                         title={
                                             !isFinalUnlocked
-                                                ? "Final Grade requires both Q1 and Q2 quarterly exam grades"
+                                                ? "Final Grade requires both Midterm Quarter and Final Quarter quarterly exam grades"
                                                 : ""
                                         }
                                     >
@@ -1838,7 +1938,8 @@ const MyClass = (props) => {
                                                 </p>
                                                 <ul className="mt-1 list-disc space-y-1 pl-4">
                                                     <li>
-                                                        Quarter 2 is started.
+                                                        Final Quarter is
+                                                        started.
                                                         <span className="ml-1 font-medium text-indigo-800">
                                                             (
                                                             {currentQuarter >= 2
@@ -1849,7 +1950,8 @@ const MyClass = (props) => {
                                                     </li>
                                                     <li>
                                                         At least one student has
-                                                        both Q1 and Q2 quarterly
+                                                        both Midterm Quarter and
+                                                        Final Quarter quarterly
                                                         exam grades.
                                                         <span className="ml-1 font-medium text-indigo-800">
                                                             (
@@ -1878,7 +1980,7 @@ const MyClass = (props) => {
                                         }
                                         className="px-2.5 py-1 rounded-md text-xs bg-emerald-600 text-white hover:bg-emerald-700 font-medium"
                                     >
-                                        Start Q2
+                                        Start Final Quarter
                                     </button>
                                 )}
                             </div>
@@ -2070,14 +2172,16 @@ const MyClass = (props) => {
                                                             Expected
                                                         </th>
                                                         <th
-                                                            className="sticky right-0 z-20 bg-indigo-50 px-3 py-2 text-left text-[10px] font-semibold text-indigo-700 uppercase tracking-wider border-l border-indigo-100 min-w-[80px] cursor-pointer hover:bg-indigo-100"
+                                                            className="sticky right-0 z-20 bg-indigo-50 px-3 py-2 text-left text-[10px] font-semibold text-indigo-700 uppercase tracking-wider border-l border-indigo-100 min-w-[130px] cursor-pointer hover:bg-indigo-100"
                                                             onClick={() =>
                                                                 handleSortToggle(
                                                                     "final",
                                                                 )
                                                             }
                                                         >
-                                                            Q{selectedQuarter}
+                                                            {getQuarterTermLabel(
+                                                                selectedQuarter,
+                                                            )}
                                                         </th>
                                                     </>
                                                 ) : (
@@ -2624,26 +2728,100 @@ const MyClass = (props) => {
                                 )}
                             </div>
                         ) : (
-                            /* Final Grade Table - Compact */
+                            /* Final Grade Table - Category Breakdown */
                             <div className="relative border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full border-collapse text-xs">
                                         <thead className="bg-gray-50 dark:bg-gray-800">
                                             <tr>
-                                                <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[160px]">
+                                                <th
+                                                    rowSpan={2}
+                                                    className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[160px]"
+                                                >
                                                     Student Name
                                                 </th>
-                                                <th className="bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[100px]">
+                                                <th
+                                                    rowSpan={2}
+                                                    className="bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[100px]"
+                                                >
                                                     LRN
                                                 </th>
-                                                <th className="bg-indigo-50 px-3 py-2 text-center text-[10px] font-semibold text-indigo-700 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[80px]">
-                                                    Q1
+                                                <th
+                                                    colSpan={
+                                                        midtermQuarterCategories.length +
+                                                        2
+                                                    }
+                                                    className="bg-indigo-50 px-3 py-2 text-center text-[10px] font-semibold text-indigo-700 uppercase tracking-wider border-r border-indigo-200"
+                                                >
+                                                    {getQuarterTermLabel(1)}
                                                 </th>
-                                                <th className="bg-indigo-50 px-3 py-2 text-center text-[10px] font-semibold text-indigo-700 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[80px]">
-                                                    Q2
+                                                <th
+                                                    colSpan={
+                                                        finalQuarterCategories.length +
+                                                        2
+                                                    }
+                                                    className="bg-violet-50 px-3 py-2 text-center text-[10px] font-semibold text-violet-700 uppercase tracking-wider border-r border-violet-200"
+                                                >
+                                                    {getQuarterTermLabel(2)}
                                                 </th>
-                                                <th className="bg-emerald-50 px-3 py-2 text-center text-[10px] font-semibold text-emerald-700 uppercase tracking-wider min-w-[100px]">
-                                                    Final
+                                                <th
+                                                    rowSpan={2}
+                                                    className="bg-emerald-50 px-3 py-2 text-center text-[10px] font-semibold text-emerald-700 uppercase tracking-wider min-w-[110px]"
+                                                >
+                                                    Overall Final
+                                                </th>
+                                            </tr>
+                                            <tr className="bg-gray-50 dark:bg-gray-800/60">
+                                                {midtermQuarterCategories.map(
+                                                    (category) => (
+                                                        <th
+                                                            key={`midterm-${category.id}`}
+                                                            className="bg-indigo-50/70 px-2 py-1.5 text-center text-[10px] font-semibold text-indigo-700 border-r border-indigo-100 min-w-[95px]"
+                                                        >
+                                                            {category.label}
+                                                            <span className="ml-1 text-[9px] font-medium text-indigo-500">
+                                                                (
+                                                                {Math.round(
+                                                                    (category.weight ??
+                                                                        0) *
+                                                                        100,
+                                                                )}
+                                                                %)
+                                                            </span>
+                                                        </th>
+                                                    ),
+                                                )}
+                                                <th className="bg-indigo-100/70 px-2 py-1.5 text-center text-[10px] font-semibold text-indigo-700 border-r border-indigo-200 min-w-[90px]">
+                                                    Total Added
+                                                </th>
+                                                <th className="bg-indigo-100/70 px-2 py-1.5 text-center text-[10px] font-semibold text-indigo-700 border-r border-indigo-200 min-w-[90px]">
+                                                    Transmuted
+                                                </th>
+
+                                                {finalQuarterCategories.map(
+                                                    (category) => (
+                                                        <th
+                                                            key={`final-${category.id}`}
+                                                            className="bg-violet-50/70 px-2 py-1.5 text-center text-[10px] font-semibold text-violet-700 border-r border-violet-100 min-w-[95px]"
+                                                        >
+                                                            {category.label}
+                                                            <span className="ml-1 text-[9px] font-medium text-violet-500">
+                                                                (
+                                                                {Math.round(
+                                                                    (category.weight ??
+                                                                        0) *
+                                                                        100,
+                                                                )}
+                                                                %)
+                                                            </span>
+                                                        </th>
+                                                    ),
+                                                )}
+                                                <th className="bg-violet-100/70 px-2 py-1.5 text-center text-[10px] font-semibold text-violet-700 border-r border-violet-200 min-w-[90px]">
+                                                    Total Added
+                                                </th>
+                                                <th className="bg-violet-100/70 px-2 py-1.5 text-center text-[10px] font-semibold text-violet-700 border-r border-violet-200 min-w-[90px]">
+                                                    Transmuted
                                                 </th>
                                             </tr>
                                         </thead>
@@ -2654,8 +2832,28 @@ const MyClass = (props) => {
                                                         gradeSummaries[
                                                             student.id
                                                         ] ?? {};
-                                                    const q1 = summary.q1_grade;
-                                                    const q2 = summary.q2_grade;
+                                                    const midtermBreakdown =
+                                                        calculateQuarterCategoryBreakdown(
+                                                            {
+                                                                student,
+                                                                categories:
+                                                                    midtermQuarterCategories,
+                                                                quarter: 1,
+                                                            },
+                                                        );
+                                                    const finalQuarterBreakdown =
+                                                        calculateQuarterCategoryBreakdown(
+                                                            {
+                                                                student,
+                                                                categories:
+                                                                    finalQuarterCategories,
+                                                                quarter: 2,
+                                                            },
+                                                        );
+                                                    const midtermTransmuted =
+                                                        summary.q1_grade;
+                                                    const finalQuarterTransmuted =
+                                                        summary.q2_grade;
                                                     const final_grade =
                                                         summary.final_grade;
                                                     const gradeColors =
@@ -2696,16 +2894,77 @@ const MyClass = (props) => {
                                                             <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 min-w-[100px]">
                                                                 {student.lrn}
                                                             </td>
-                                                            <td className="px-3 py-2 whitespace-nowrap text-xs font-semibold text-center text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-700 min-w-[80px]">
-                                                                {q1 != null
-                                                                    ? q1
+
+                                                            {midtermQuarterCategories.map(
+                                                                (category) => {
+                                                                    const contribution =
+                                                                        midtermBreakdown
+                                                                            .contributionByCategory[
+                                                                            category
+                                                                                .id
+                                                                        ];
+
+                                                                    return (
+                                                                        <td
+                                                                            key={`${student.id}-midterm-${category.id}`}
+                                                                            className="px-2 py-2 whitespace-nowrap text-xs font-medium text-center text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-700 min-w-[95px]"
+                                                                        >
+                                                                            {contribution !=
+                                                                            null
+                                                                                ? `${contribution.toFixed(1)}%`
+                                                                                : "—"}
+                                                                        </td>
+                                                                    );
+                                                                },
+                                                            )}
+                                                            <td className="px-2 py-2 whitespace-nowrap text-xs font-semibold text-center text-indigo-700 border-r border-indigo-200 min-w-[90px]">
+                                                                {midtermBreakdown.totalAdded !=
+                                                                null
+                                                                    ? `${midtermBreakdown.totalAdded.toFixed(1)}%`
                                                                     : "—"}
                                                             </td>
-                                                            <td className="px-3 py-2 whitespace-nowrap text-xs font-semibold text-center text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-700 min-w-[80px]">
-                                                                {q2 != null
-                                                                    ? q2
+                                                            <td className="px-2 py-2 whitespace-nowrap text-xs font-bold text-center text-indigo-700 border-r border-indigo-200 min-w-[90px]">
+                                                                {midtermTransmuted !=
+                                                                null
+                                                                    ? midtermTransmuted
                                                                     : "—"}
                                                             </td>
+
+                                                            {finalQuarterCategories.map(
+                                                                (category) => {
+                                                                    const contribution =
+                                                                        finalQuarterBreakdown
+                                                                            .contributionByCategory[
+                                                                            category
+                                                                                .id
+                                                                        ];
+
+                                                                    return (
+                                                                        <td
+                                                                            key={`${student.id}-final-${category.id}`}
+                                                                            className="px-2 py-2 whitespace-nowrap text-xs font-medium text-center text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-700 min-w-[95px]"
+                                                                        >
+                                                                            {contribution !=
+                                                                            null
+                                                                                ? `${contribution.toFixed(1)}%`
+                                                                                : "—"}
+                                                                        </td>
+                                                                    );
+                                                                },
+                                                            )}
+                                                            <td className="px-2 py-2 whitespace-nowrap text-xs font-semibold text-center text-violet-700 border-r border-violet-200 min-w-[90px]">
+                                                                {finalQuarterBreakdown.totalAdded !=
+                                                                null
+                                                                    ? `${finalQuarterBreakdown.totalAdded.toFixed(1)}%`
+                                                                    : "—"}
+                                                            </td>
+                                                            <td className="px-2 py-2 whitespace-nowrap text-xs font-bold text-center text-violet-700 border-r border-violet-200 min-w-[90px]">
+                                                                {finalQuarterTransmuted !=
+                                                                null
+                                                                    ? finalQuarterTransmuted
+                                                                    : "—"}
+                                                            </td>
+
                                                             <td className="px-3 py-2 whitespace-nowrap text-xs font-bold text-center text-gray-900 dark:text-gray-100 min-w-[100px]">
                                                                 <span
                                                                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${

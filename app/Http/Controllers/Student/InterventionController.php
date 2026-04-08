@@ -132,7 +132,7 @@ class InterventionController extends Controller
         // Get recent feedback/notifications from teachers
         $recentFeedback = StudentNotification::where('user_id', $user->id)
             ->with(['sender', 'intervention.enrollment.subject'])
-            ->whereIn('type', ['feedback', 'nudge', 'task', 'alert'])
+            ->whereIn('type', ['feedback', 'nudge', 'task', 'alert', 'extension'])
             ->orderBy('created_at', 'desc')
             ->limit(10)
             ->get()
@@ -144,6 +144,7 @@ class InterventionController extends Controller
                 'message' => $notification->message,
                 'senderName' => $notification->sender?->name ?? 'System',
                 'subjectName' => $notification->intervention?->enrollment?->subject?->subject_name ?? null,
+                'deadlineLabel' => $notification->intervention?->deadline_at?->format('M d, Y h:i A'),
                 'isRead' => $notification->is_read,
                 'time' => $notification->created_at->diffForHumans(),
                 'timeFull' => $notification->created_at->format('M d, Y h:i A'),

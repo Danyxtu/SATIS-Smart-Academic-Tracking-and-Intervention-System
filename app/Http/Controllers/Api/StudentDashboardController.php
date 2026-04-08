@@ -89,7 +89,7 @@ class StudentDashboardController extends Controller
             ->count();
 
         $notifications = StudentNotification::where('user_id', $user->id)
-            ->with('sender')
+            ->with(['sender', 'intervention'])
             ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get()
@@ -99,6 +99,7 @@ class StudentDashboardController extends Controller
                 'title' => $n->title,
                 'message' => $n->message,
                 'sender' => $n->sender?->name ?? 'System',
+                'deadlineLabel' => $n->intervention?->deadline_at?->format('M d, Y h:i A'),
                 'isRead' => $n->is_read,
                 'createdAt' => $n->created_at->diffForHumans(),
                 'createdAtFull' => $n->created_at->format('M d, Y h:i A'),

@@ -405,6 +405,12 @@ const NotificationItem = ({ notification, onMarkRead, isHighlighted }) => {
                     <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
                         {notification.message}
                     </p>
+                    {notification.type === "extension" &&
+                        notification.deadlineLabel && (
+                            <p className="text-[11px] font-medium text-amber-600 dark:text-amber-300 mt-1">
+                                Updated deadline: {notification.deadlineLabel}
+                            </p>
+                        )}
                     <div className="flex items-center justify-between mt-2">
                         <span className="text-xs text-gray-500 dark:text-gray-400">
                             From: {notification.sender}
@@ -649,20 +655,34 @@ const MiniChart = ({ data }) => {
 };
 
 // --- Quick Action Card ---
-const QuickActionCard = ({ title, description, icon, href }) => (
+const QuickActionCard = ({ title, icon, href }) => (
     <Link
         href={href}
-        className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700 p-4 hover:shadow-md transition-all duration-300 group"
+        className="block bg-transparent rounded-md px-2 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:ring-1 hover:ring-inset hover:ring-indigo-100 dark:hover:ring-indigo-700/50 transition-all duration-200 group"
     >
-        <div className="w-8 h-8 flex items-center justify-center mb-2">
-            {icon}
+        <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+                <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                    {icon}
+                </div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 transition-colors truncate whitespace-nowrap">
+                    {title}
+                </h3>
+            </div>
+            <svg
+                className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+            >
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                />
+            </svg>
         </div>
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 transition-colors">
-            {title}
-        </h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">
-            {description}
-        </p>
     </Link>
 );
 
@@ -1265,10 +1285,9 @@ export default function Dashboard({
                                 <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
                                     Quick Actions
                                 </h3>
-                                <div className="space-y-2.5">
+                                <div className="divide-y divide-gray-100 dark:divide-gray-700/70">
                                     <QuickActionCard
                                         title="View Analytics"
-                                        description="Performance details"
                                         href={route("analytics.index")}
                                         icon={
                                             <svg
@@ -1288,7 +1307,6 @@ export default function Dashboard({
                                     />
                                     <QuickActionCard
                                         title="Interventions & Feed"
-                                        description="Feedback and updates"
                                         href={route("interventions-feed")}
                                         icon={
                                             <svg
@@ -1308,7 +1326,6 @@ export default function Dashboard({
                                     />
                                     <QuickActionCard
                                         title="Subjects at Risk"
-                                        description="At-risk subjects"
                                         href={route("subject-at-risk")}
                                         icon={
                                             <svg
