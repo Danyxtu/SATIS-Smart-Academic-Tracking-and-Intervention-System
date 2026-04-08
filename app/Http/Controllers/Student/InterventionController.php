@@ -24,6 +24,9 @@ class InterventionController extends Controller
         $enrollments = Enrollment::with([
             'subjectTeacher.subject',
             'subjectTeacher.teacher',
+            'schoolClass.subject',
+            'schoolClass.teacher',
+            'subject',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
@@ -36,8 +39,9 @@ class InterventionController extends Controller
             ->filter(fn($e) => $e->intervention !== null)
             ->map(function ($enrollment) {
                 $intervention = $enrollment->intervention;
-                $subject = $enrollment->subjectTeacher?->subject;
-                $teacher = $enrollment->subjectTeacher?->teacher;
+                $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+                $subject = $class?->subject ?? $enrollment->subject;
+                $teacher = $class?->teacher;
 
                 // Calculate current grade
                 $grades = $enrollment->grades;
@@ -82,7 +86,7 @@ class InterventionController extends Controller
                     'id' => $intervention->id,
                     'enrollmentId' => $enrollment->id,
                     'subjectName' => $subject?->subject_name ?? 'Unknown Subject',
-                    'subjectSection' => $subject?->section,
+                    'subjectSection' => $class?->section ?? $subject?->section,
                     'teacherName' => $teacher?->name ?? 'N/A',
                     'type' => $intervention->type,
                     'typeLabel' => Intervention::getTypes()[$intervention->type] ?? $intervention->type,
@@ -131,24 +135,35 @@ class InterventionController extends Controller
 
         // Get recent feedback/notifications from teachers
         $recentFeedback = StudentNotification::where('user_id', $user->id)
-            ->with(['sender', 'intervention.enrollment.subject'])
+            ->with([
+                'sender',
+                'intervention.enrollment.subjectTeacher.subject',
+                'intervention.enrollment.schoolClass.subject',
+                'intervention.enrollment.subject',
+            ])
             ->whereIn('type', ['feedback', 'nudge', 'task', 'alert', 'extension'])
             ->orderBy('created_at', 'desc')
             ->limit(10)
             ->get()
-            ->map(fn($notification) => [
-                'id' => $notification->id,
-                'type' => $notification->type,
-                'typeLabel' => StudentNotification::getTypes()[$notification->type] ?? $notification->type,
-                'title' => $notification->title,
-                'message' => $notification->message,
-                'senderName' => $notification->sender?->name ?? 'System',
-                'subjectName' => $notification->intervention?->enrollment?->subject?->subject_name ?? null,
-                'deadlineLabel' => $notification->intervention?->deadline_at?->format('M d, Y h:i A'),
-                'isRead' => $notification->is_read,
-                'time' => $notification->created_at->diffForHumans(),
-                'timeFull' => $notification->created_at->format('M d, Y h:i A'),
-            ]);
+            ->map(function ($notification) {
+                $feedbackEnrollment = $notification->intervention?->enrollment;
+                $feedbackClass = $feedbackEnrollment?->subjectTeacher ?? $feedbackEnrollment?->schoolClass;
+                $feedbackSubject = $feedbackClass?->subject ?? $feedbackEnrollment?->subject;
+
+                return [
+                    'id' => $notification->id,
+                    'type' => $notification->type,
+                    'typeLabel' => StudentNotification::getTypes()[$notification->type] ?? $notification->type,
+                    'title' => $notification->title,
+                    'message' => $notification->message,
+                    'senderName' => $notification->sender?->name ?? 'System',
+                    'subjectName' => $feedbackSubject?->subject_name,
+                    'deadlineLabel' => $notification->intervention?->deadline_at?->format('M d, Y h:i A'),
+                    'isRead' => $notification->is_read,
+                    'time' => $notification->created_at->diffForHumans(),
+                    'timeFull' => $notification->created_at->format('M d, Y h:i A'),
+                ];
+            });
 
         $unreadFeedbackCount = StudentNotification::where('user_id', $user->id)
             ->where('is_read', false)
@@ -236,7 +251,8 @@ class InterventionController extends Controller
         ]);
 
         // Create notification for the teacher
-        $teacher = $enrollment->subjectTeacher?->teacher;
+        $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+        $teacher = $class?->teacher;
         if ($teacher) {
             StudentNotification::create([
                 'user_id' => $teacher->id,

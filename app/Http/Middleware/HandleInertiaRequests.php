@@ -32,10 +32,17 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        $user = $request->user()?->loadMissing('roles:id,name', 'department:id,department_name,department_code');
+        $user = $request->user()?->loadMissing(
+            'roles:id,name',
+            'department:id,department_name,department_code',
+            'student:id,user_id,student_name,lrn,grade_level,section,section_id,strand,track'
+        );
 
         // Build user data with explicit roles array and department for admin-capable users
         $userData = $user ? array_merge($user->toArray(), [
+            // Explicitly include computed attributes that are not in toArray().
+            'name' => $user->name,
+            'email' => $user->email,
             'roles' => $user->roles->map(fn($role) => [
                 'id' => $role->id,
                 'name' => $role->name,
@@ -44,6 +51,16 @@ class HandleInertiaRequests extends Middleware
                 'id' => $user->department->id,
                 'name' => $user->department->department_name,
                 'code' => $user->department->department_code,
+            ] : null,
+            'student' => $user->isStudent() && $user->student ? [
+                'id' => $user->student->id,
+                'student_name' => $user->student->student_name,
+                'lrn' => $user->student->lrn,
+                'grade_level' => $user->student->grade_level,
+                'section' => $user->student->section,
+                'section_id' => $user->student->section_id,
+                'strand' => $user->student->strand,
+                'track' => $user->student->track,
             ] : null,
         ]) : null;
 

@@ -30,6 +30,9 @@ class DashboardController extends Controller
         $allEnrollments = Enrollment::with([
             'subjectTeacher.subject',
             'subjectTeacher.teacher',
+            'schoolClass.subject',
+            'schoolClass.teacher',
+            'subject',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
@@ -121,6 +124,10 @@ class DashboardController extends Controller
 
         // Build subject performance data
         $subjectPerformance = $enrollments->map(function ($enrollment) {
+            $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+            $subject = $class?->subject ?? $enrollment->subject;
+            $teacher = $class?->teacher;
+
             $grades = $enrollment->grades;
             $totalScore = $grades->sum('score');
             $totalPossible = $grades->sum('total_score');
@@ -141,12 +148,10 @@ class DashboardController extends Controller
 
             return [
                 'id' => $enrollment->id,
-                'subjectId' => $enrollment->subjectTeacher?->subject_id,
-                'name' => $enrollment->subject?->subject_name ?? 'Unknown Subject',
-                'section' => $enrollment->subject?->section,
-                'teacher' => $enrollment->subjectTeacher?->teacher
-                    ? $enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name
-                    : 'N/A',
+                'subjectId' => $class?->subject_id ?? $subject?->id,
+                'name' => $subject?->subject_name ?? 'Unknown Subject',
+                'section' => $class?->section ?? $subject?->section,
+                'teacher' => $teacher?->name ?? 'N/A',
                 'grade' => $percentage,
                 'gradeDisplay' => $percentage !== null ? "{$percentage}%" : 'N/A',
                 'attendance' => $attendanceRate,
@@ -160,11 +165,14 @@ class DashboardController extends Controller
         $upcomingTasks = $activeInterventions
             ->flatMap(function ($intervention) use ($enrollments) {
                 $enrollment = $enrollments->firstWhere('id', $intervention->enrollment_id);
+                $class = $enrollment?->subjectTeacher ?? $enrollment?->schoolClass;
+                $subject = $class?->subject ?? $enrollment?->subject;
+
                 return ($intervention->tasks ?? collect())->map(fn($task) => [
                     'id' => $task->id,
                     'description' => $task->description,
                     'isCompleted' => $task->is_completed,
-                    'subject' => $enrollment?->subject?->subject_name ?? 'Unknown',
+                    'subject' => $subject?->subject_name ?? 'Unknown Subject',
                     'interventionId' => $intervention->id,
                 ]);
             })
@@ -185,7 +193,8 @@ class DashboardController extends Controller
         ];
 
         if ($lastUpdatedEnrollment) {
-            $trendSubject = $lastUpdatedEnrollment->subjectTeacher?->subject;
+            $trendClass = $lastUpdatedEnrollment->subjectTeacher ?? $lastUpdatedEnrollment->schoolClass;
+            $trendSubject = $trendClass?->subject ?? $lastUpdatedEnrollment->subject;
             $gradeTrendData['subjectName'] = $trendSubject?->subject_name ?? 'Unknown Subject';
 
             $gradeTrendData['items'] = $lastUpdatedEnrollment->grades
@@ -211,9 +220,10 @@ class DashboardController extends Controller
         return Inertia::render('Student/Dashboard', [
             'student' => [
                 'id' => $student?->id,
-                'firstName' => $user->name ? explode(' ', $user->name)[0] : 'Student',
-                'lastName' => $user->name ? (explode(' ', $user->name)[1] ?? '') : '',
-                'fullName' => $user->name,
+                'firstName' => $user->first_name ?: ($student?->student_name ? explode(' ', trim($student->student_name))[0] : 'Student'),
+                'lastName' => $user->last_name ?: '',
+                'fullName' => $user->name ?: ($student?->student_name ?? null),
+                'displayName' => $student?->student_name ?: $user->name,
                 'email' => $user->email,
                 'gradeLevel' => $student?->grade_level,
                 'section' => $student?->section,

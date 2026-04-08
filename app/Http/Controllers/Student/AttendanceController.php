@@ -21,6 +21,9 @@ class AttendanceController extends Controller
         $enrollments = Enrollment::with([
             'subjectTeacher.subject',
             'subjectTeacher.teacher',
+            'schoolClass.subject',
+            'schoolClass.teacher',
+            'subject',
             'attendanceRecords',
         ])
             ->where('user_id', $user->id)
@@ -51,6 +54,10 @@ class AttendanceController extends Controller
 
         // Build subject-wise attendance breakdown
         $subjectAttendance = $enrollments->map(function ($enrollment) {
+            $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+            $subject = $class?->subject ?? $enrollment->subject;
+            $teacher = $class?->teacher;
+
             $records = $enrollment->attendanceRecords;
             $total = $records->count();
             $present = $records->where('status', 'present')->count();
@@ -64,11 +71,9 @@ class AttendanceController extends Controller
 
             return [
                 'id' => $enrollment->id,
-                'subjectId' => $enrollment->subjectTeacher?->subject_id,
-                'subject' => $enrollment->subjectTeacher?->subject?->subject_name ?? 'Unknown Subject',
-                'instructor' => $enrollment->subjectTeacher?->teacher
-                    ? $enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name
-                    : 'N/A',
+                'subjectId' => $class?->subject_id ?? $subject?->id,
+                'subject' => $subject?->subject_name ?? 'Unknown Subject',
+                'instructor' => $teacher?->name ?? 'N/A',
                 'rate' => $rate,
                 'total' => $total,
                 'present' => $present,
@@ -82,13 +87,16 @@ class AttendanceController extends Controller
         $attendanceLog = $allAttendance
             ->map(function ($record) use ($enrollments) {
                 $enrollment = $enrollments->firstWhere('id', $record->enrollment_id);
+                $class = $enrollment?->subjectTeacher ?? $enrollment?->schoolClass;
+                $subject = $class?->subject ?? $enrollment?->subject;
+
                 return [
                     'id' => $record->id,
                     'date' => $record->date->format('M d, Y'),
                     'dateRaw' => $record->date->format('Y-m-d'),
                     'time' => $record->created_at->format('h:i A'),
-                    'subject' => $enrollment?->subjectTeacher?->subject?->subject_name ?? 'Unknown Subject',
-                    'subjectId' => $enrollment?->subjectTeacher?->subject_id,
+                    'subject' => $subject?->subject_name ?? 'Unknown Subject',
+                    'subjectId' => $class?->subject_id ?? $subject?->id,
                     'status' => ucfirst($record->status),
                     'statusRaw' => $record->status,
                 ];

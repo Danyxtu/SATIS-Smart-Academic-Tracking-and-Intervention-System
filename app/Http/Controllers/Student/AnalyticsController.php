@@ -33,6 +33,9 @@ class AnalyticsController extends Controller
         $enrollments = Enrollment::with([
             'subjectTeacher.subject',
             'subjectTeacher.teacher',
+            'schoolClass.subject',
+            'schoolClass.teacher',
+            'subject',
             'grades',
             'attendanceRecords',
             'intervention',
@@ -42,7 +45,8 @@ class AnalyticsController extends Controller
 
         // Filter enrollments by semester
         $filteredEnrollments = $enrollments->filter(function ($enrollment) use ($selectedSemester) {
-            $semester = $enrollment->subjectTeacher?->semester;
+            $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+            $semester = $class?->semester;
             // If no semester set, show in both semesters
             if (!$semester) {
                 return true;
@@ -52,6 +56,10 @@ class AnalyticsController extends Controller
 
         // Build subjects data with calculated grades and predictions
         $subjects = $filteredEnrollments->map(function ($enrollment) {
+            $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+            $subject = $class?->subject ?? $enrollment->subject;
+            $teacher = $class?->teacher;
+
             $grades = $enrollment->grades;
             $totalScore = $grades->sum('score');
             $totalPossible = $grades->sum('total_score');
@@ -78,11 +86,9 @@ class AnalyticsController extends Controller
 
             return [
                 'id' => $enrollment->id,
-                'subjectId' => $enrollment->subjectTeacher?->subject_id,
-                'subject' => $enrollment->subjectTeacher?->subject?->subject_name ?? 'Unknown Subject',
-                'teacher' => $enrollment->subjectTeacher?->teacher
-                    ? $enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name
-                    : 'N/A',
+                'subjectId' => $class?->subject_id ?? $subject?->id,
+                'subject' => $subject?->subject_name ?? 'Unknown Subject',
+                'teacher' => $teacher?->name ?? 'N/A',
                 'grade' => $percentage,
                 'attendanceRate' => $attendanceRate,
                 'missingCount' => $missingCount,
@@ -104,7 +110,7 @@ class AnalyticsController extends Controller
                 'gradeTrend' => $prediction['trend'],
                 'trendDirection' => $prediction['trend_direction'],
                 // Semester info
-                'semester' => $enrollment->subjectTeacher?->semester ?? null,
+                'semester' => $class?->semester ?? null,
             ];
         })->sortByDesc('grade')->values();
 
@@ -117,11 +123,13 @@ class AnalyticsController extends Controller
 
         // Calculate stats for each semester for navigation display
         $semester1Subjects = $enrollments->filter(function ($e) {
-            $semester = $e->subjectTeacher?->semester;
+            $class = $e->subjectTeacher ?? $e->schoolClass;
+            $semester = $class?->semester;
             return $semester === 1 || $semester === null;
         });
         $semester2Subjects = $enrollments->filter(function ($e) {
-            return $e->subjectTeacher?->semester === 2;
+            $class = $e->subjectTeacher ?? $e->schoolClass;
+            return $class?->semester === 2;
         });
 
         return Inertia::render('Student/Analytics/Index', [
@@ -154,6 +162,9 @@ class AnalyticsController extends Controller
         $enrollment = Enrollment::with([
             'subjectTeacher.subject',
             'subjectTeacher.teacher',
+            'schoolClass.subject',
+            'schoolClass.teacher',
+            'subject',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
@@ -162,7 +173,9 @@ class AnalyticsController extends Controller
             ->where('id', $enrollmentId)
             ->firstOrFail();
 
-        $subject = $enrollment->subjectTeacher?->subject;
+        $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+        $subject = $class?->subject ?? $enrollment->subject;
+        $teacher = $class?->teacher;
         $grades = $enrollment->grades;
 
         // Calculate overall grade
@@ -254,24 +267,22 @@ class AnalyticsController extends Controller
         }
 
         // Determine school year (from subject or current)
-        $schoolYear = $subject?->school_year ?? date('Y') . '-' . (date('Y') + 1);
+        $schoolYear = $class?->school_year ?? SystemSetting::getCurrentSchoolYear();
 
         return Inertia::render('Student/Analytics/Show', [
             'enrollment' => [
                 'id' => $enrollment->id,
-                'subjectId' => $enrollment->subjectTeacher?->subject_id,
+                'subjectId' => $class?->subject_id ?? $subject?->id,
             ],
             'subject' => [
                 'id' => $subject?->id,
                 // Subject model uses `subject_name` column; use that to avoid "Unknown Subject"
                 'name' => $subject?->subject_name ?? 'Unknown Subject',
                 // Safely build teacher full name (fixing previous typo)
-                'teacher' => $enrollment->subjectTeacher?->teacher
-                    ? ($enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name)
-                    : 'N/A',
-                'section' => $subject?->section,
+                'teacher' => $teacher?->name ?? 'N/A',
+                'section' => $class?->section ?? $subject?->section,
                 'schoolYear' => $schoolYear,
-                'current_quarter' => $subject?->current_quarter ?? 1,
+                'current_quarter' => $class?->current_quarter ?? 1,
             ],
             'performance' => [
                 'overallGrade' => $overallGrade,
@@ -304,6 +315,9 @@ class AnalyticsController extends Controller
         $enrollment = Enrollment::with([
             'subjectTeacher.subject',
             'subjectTeacher.teacher',
+            'schoolClass.subject',
+            'schoolClass.teacher',
+            'subject',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
@@ -313,7 +327,8 @@ class AnalyticsController extends Controller
             ->where('id', $enrollmentId)
             ->firstOrFail();
 
-        $subject = $enrollment->subjectTeacher?->subject;
+        $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+        $subject = $class?->subject ?? $enrollment->subject;
         // Build the same data as `show()` to ensure parity
         $grades = $enrollment->grades;
 
@@ -381,9 +396,9 @@ class AnalyticsController extends Controller
             ],
             'subject' => [
                 'name' => $subject?->subject_name ?? 'Unknown Subject',
-                'section' => $subject?->section,
-                'grade_level' => $subject?->grade_level,
-                'current_quarter' => $subject?->current_quarter ?? 1,
+                'section' => $class?->section ?? $subject?->section,
+                'grade_level' => $class?->grade_level ?? $subject?->grade_level,
+                'current_quarter' => $class?->current_quarter ?? 1,
             ],
             'performance' => [
                 'overallGrade' => $overallGrade,

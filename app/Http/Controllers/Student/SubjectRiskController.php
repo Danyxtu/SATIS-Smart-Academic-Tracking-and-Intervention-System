@@ -22,6 +22,9 @@ class SubjectRiskController extends Controller
         $enrollments = Enrollment::with([
             'subjectTeacher.subject',
             'subjectTeacher.teacher',
+            'schoolClass.subject',
+            'schoolClass.teacher',
+            'subject',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
@@ -31,7 +34,9 @@ class SubjectRiskController extends Controller
 
         // Process each enrollment to determine risk status
         $subjects = $enrollments->map(function ($enrollment) {
-            $subject = $enrollment->subjectTeacher?->subject;
+            $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+            $subject = $class?->subject ?? $enrollment->subject;
+            $teacher = $class?->teacher;
             $grades = $enrollment->grades;
             $attendance = $enrollment->attendanceRecords;
             $intervention = $enrollment->intervention;
@@ -180,12 +185,10 @@ class SubjectRiskController extends Controller
 
             return [
                 'id' => $enrollment->id,
-                'subjectId' => $enrollment->subjectTeacher?->subject_id,
+                'subjectId' => $class?->subject_id ?? $subject?->id,
                 'subjectName' => $subject?->subject_name ?? 'Unknown Subject',
-                'section' => $subject?->section,
-                'teacherName' => $enrollment->subjectTeacher?->teacher
-                    ? ($enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name)
-                    : 'N/A',
+                'section' => $class?->section ?? $subject?->section,
+                'teacherName' => $teacher?->name ?? 'N/A',
                 'currentGrade' => $currentGrade,
                 'expectedGrade' => $expectedGrade !== null ? round($expectedGrade, 1) : null,
                 'attendanceRate' => $attendanceRate,
