@@ -75,6 +75,7 @@ class EnrollmentGradeService
         $finalGrade = ($q1Transmuted !== null && $q2Transmuted !== null)
             ? (int) round(($q1Transmuted + $q2Transmuted) / 2)
             : null;
+        $remarks = $this->deriveRemarks($finalGrade);
 
         $enrollment->update([
             'initial_grade_q1' => $initialQ1 !== null ? round($initialQ1, 2) : null,
@@ -84,6 +85,7 @@ class EnrollmentGradeService
             'expected_grade_q2' => $expectedQ2 !== null ? round($expectedQ2, 2) : null,
             'q2_grade' => $q2Transmuted,
             'final_grade' => $finalGrade,
+            'remarks' => $remarks,
         ]);
     }
 
@@ -100,6 +102,7 @@ class EnrollmentGradeService
             'expected_grade_q2' => $enrollment->expected_grade_q2,
             'q2_grade' => $enrollment->q2_grade,
             'final_grade' => $enrollment->final_grade,
+            'remarks' => $enrollment->remarks ?? $this->deriveRemarks($enrollment->final_grade),
         ];
     }
 
@@ -270,5 +273,14 @@ class EnrollmentGradeService
 
         // Legacy flat format — same categories for both quarters
         return $storedCategories;
+    }
+
+    private function deriveRemarks(?int $finalGrade): ?string
+    {
+        if ($finalGrade === null) {
+            return null;
+        }
+
+        return $finalGrade >= 75 ? 'Passed' : 'Failed';
     }
 }

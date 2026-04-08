@@ -75,9 +75,9 @@ const FAQItem = ({ question, answer, icon, isOpen, onClick }) => (
 
 // --- Feature Card ---
 const FeatureCard = ({ title, description, icon, color, link, linkText }) => (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-300 group">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 hover:shadow-lg transition-all duration-300 group">
         <div
-            className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 ${color} group-hover:scale-110 transition-transform`}
+            className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 ${color} group-hover:scale-110 transition-transform`}
         >
             {icon}
         </div>
@@ -113,13 +113,13 @@ const FeatureCard = ({ title, description, icon, color, link, linkText }) => (
 
 // --- Study Tip Card ---
 const TipCard = ({ number, title, description, gradient }) => (
-    <div className={`rounded-2xl p-6 ${gradient} relative overflow-hidden`}>
+    <div className={`rounded-2xl p-5 ${gradient} relative overflow-hidden`}>
         <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-xl" />
         <div className="relative z-10">
             <span className="inline-block px-3 py-1 bg-white/20 rounded-full text-white text-xs font-bold mb-3">
                 Tip #{number}
             </span>
-            <h3 className="font-bold text-white text-lg mb-2">{title}</h3>
+            <h3 className="font-bold text-white text-base mb-2">{title}</h3>
             <p className="text-white/90 text-sm leading-relaxed">
                 {description}
             </p>
@@ -136,9 +136,9 @@ const ContactCard = ({
     actionText,
     gradient,
 }) => (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 p-6 text-center hover:shadow-lg transition-all duration-300 group">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 text-center hover:shadow-lg transition-all duration-300 group">
         <div
-            className={`w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center ${gradient} group-hover:scale-110 transition-transform`}
+            className={`w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center ${gradient} group-hover:scale-110 transition-transform`}
         >
             {icon}
         </div>
@@ -241,7 +241,7 @@ const LearnMore = () => {
         },
         {
             question: "What does 'At Risk' mean?",
-            answer: "When a subject is marked 'At Risk', it means your grade is below 75% or you have concerning attendance patterns. Don't worry! This early warning helps you and your teachers take action early. Check the Subjects at Risk section to see what areas need improvement.",
+            answer: "When a subject is marked 'At Risk', it means your grade is below 75% or you have concerning attendance patterns. Don't worry! This early warning helps you and your teachers take action early. Open Performance Analytics and use the Risk Overview filters to focus on subjects that need improvement.",
             icon: (
                 <svg
                     className="w-5 h-5"
@@ -369,9 +369,9 @@ const LearnMore = () => {
             linkText: "View Feedback",
         },
         {
-            title: "Subjects at Risk",
+            title: "Risk Overview",
             description:
-                "Early warning system for struggling subjects. Identify areas needing attention before they become bigger problems.",
+                "Use Performance Analytics filters to quickly focus on at-risk subjects and review what needs attention.",
             icon: (
                 <svg
                     className="w-7 h-7 text-white"
@@ -388,8 +388,8 @@ const LearnMore = () => {
                 </svg>
             ),
             color: "bg-gradient-to-br from-red-500 to-rose-600",
-            link: route("subject-at-risk"),
-            linkText: "Check Status",
+            link: route("analytics.index", { risk: "at-risk" }),
+            linkText: "Open Risk Overview",
         },
     ];
 
@@ -430,7 +430,7 @@ const LearnMore = () => {
 
             <div className="min-h-screen bg-gray-50/50 dark:bg-gray-950">
                 {/* Hero Header */}
-                <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-2xl mx-4 mt-4 p-8 text-white relative overflow-hidden">
+                <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-2xl mx-4 mt-4 p-5 sm:p-6 text-white relative overflow-hidden">
                     <div className="absolute inset-0 opacity-10">
                         <svg
                             className="w-full h-full"
@@ -457,10 +457,10 @@ const LearnMore = () => {
                     </div>
 
                     <div className="relative z-10">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                        <div className="flex items-center gap-3 mb-2.5">
+                            <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
                                 <svg
-                                    className="w-6 h-6"
+                                    className="w-4 h-4"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -473,9 +473,11 @@ const LearnMore = () => {
                                     />
                                 </svg>
                             </div>
-                            <h1 className="text-3xl font-bold">Learn More</h1>
+                            <h1 className="text-lg md:text-xl font-bold">
+                                Learn More
+                            </h1>
                         </div>
-                        <p className="text-indigo-100 text-lg max-w-2xl">
+                        <p className="text-indigo-100 text-sm sm:text-base max-w-2xl">
                             Explore resources to help you succeed in your
                             academic journey. Find answers to common questions,
                             learn how to use SATIS features, and discover study
@@ -487,10 +489,10 @@ const LearnMore = () => {
                     <div className="absolute -right-5 -bottom-10 w-32 h-32 bg-pink-400/20 rounded-full blur-xl" />
                 </div>
 
-                <div className="max-w-7xl mx-auto px-4 py-8 space-y-12">
+                <div className="max-w-7xl mx-auto px-4 py-5 md:py-6 space-y-8">
                     {/* Platform Features */}
                     <section>
-                        <div className="flex items-center gap-3 mb-6">
+                        <div className="flex items-center gap-3 mb-5">
                             <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center">
                                 <svg
                                     className="w-5 h-5 text-indigo-600"
@@ -507,7 +509,7 @@ const LearnMore = () => {
                                 </svg>
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                                <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100">
                                     Platform Features
                                 </h2>
                                 <p className="text-gray-500 dark:text-gray-400">
@@ -516,7 +518,7 @@ const LearnMore = () => {
                                 </p>
                             </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             {features.map((feature, index) => (
                                 <FeatureCard key={index} {...feature} />
                             ))}
@@ -525,12 +527,12 @@ const LearnMore = () => {
 
                     {/* Tutorials Section */}
                     <section>
-                        <div className="flex items-center gap-3 mb-6">
+                        <div className="flex items-center gap-3 mb-5">
                             <div className="w-10 h-10 bg-pink-100 dark:bg-pink-900/30 rounded-xl flex items-center justify-center">
                                 <BookOpen className="w-5 h-5 text-pink-600" />
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                                <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100">
                                     Step-by-Step Tutorials
                                 </h2>
                                 <p className="text-gray-500 dark:text-gray-400">
@@ -557,7 +559,7 @@ const LearnMore = () => {
 
                     {/* FAQ Section */}
                     <section>
-                        <div className="flex items-center gap-3 mb-6">
+                        <div className="flex items-center gap-3 mb-5">
                             <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center">
                                 <svg
                                     className="w-5 h-5 text-purple-600"
@@ -574,7 +576,7 @@ const LearnMore = () => {
                                 </svg>
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                                <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100">
                                     Frequently Asked Questions
                                 </h2>
                                 <p className="text-gray-500 dark:text-gray-400">
@@ -600,7 +602,7 @@ const LearnMore = () => {
 
                     {/* Study Tips */}
                     <section>
-                        <div className="flex items-center gap-3 mb-6">
+                        <div className="flex items-center gap-3 mb-5">
                             <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center">
                                 <svg
                                     className="w-5 h-5 text-amber-600"
@@ -617,7 +619,7 @@ const LearnMore = () => {
                                 </svg>
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                                <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100">
                                     Study Tips for Success
                                 </h2>
                                 <p className="text-gray-500 dark:text-gray-400">
@@ -626,7 +628,7 @@ const LearnMore = () => {
                                 </p>
                             </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             {studyTips.map((tip, index) => (
                                 <TipCard key={index} {...tip} />
                             ))}
@@ -634,8 +636,8 @@ const LearnMore = () => {
                     </section>
 
                     {/* Understanding Your Progress */}
-                    <section className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 p-8">
-                        <div className="flex items-center gap-3 mb-6">
+                    <section className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 p-6">
+                        <div className="flex items-center gap-3 mb-5">
                             <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center">
                                 <svg
                                     className="w-5 h-5 text-emerald-600"
@@ -652,7 +654,7 @@ const LearnMore = () => {
                                 </svg>
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                                <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100">
                                     Understanding Your Progress
                                 </h2>
                                 <p className="text-gray-500 dark:text-gray-400">
@@ -662,8 +664,8 @@ const LearnMore = () => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="p-5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-700/40">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                            <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-700/40">
                                 <div className="flex items-center gap-3 mb-3">
                                     <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-sm font-semibold rounded-full border border-emerald-200">
                                         On Track
@@ -679,7 +681,7 @@ const LearnMore = () => {
                                 </p>
                             </div>
 
-                            <div className="p-5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-700/40">
+                            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-700/40">
                                 <div className="flex items-center gap-3 mb-3">
                                     <span className="px-3 py-1 bg-amber-100 text-amber-700 text-sm font-semibold rounded-full border border-amber-200">
                                         Needs Attention
@@ -695,7 +697,7 @@ const LearnMore = () => {
                                 </p>
                             </div>
 
-                            <div className="p-5 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-700/40">
+                            <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-700/40">
                                 <div className="flex items-center gap-3 mb-3">
                                     <span className="px-3 py-1 bg-red-100 text-red-700 text-sm font-semibold rounded-full border border-red-200">
                                         At Risk
@@ -715,7 +717,7 @@ const LearnMore = () => {
 
                     {/* Contact & Resources */}
                     <section>
-                        <div className="flex items-center gap-3 mb-6">
+                        <div className="flex items-center gap-3 mb-5">
                             <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
                                 <svg
                                     className="w-5 h-5 text-blue-600"
@@ -732,7 +734,7 @@ const LearnMore = () => {
                                 </svg>
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                                <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100">
                                     Contact & Resources
                                 </h2>
                                 <p className="text-gray-500 dark:text-gray-400">
@@ -740,7 +742,7 @@ const LearnMore = () => {
                                 </p>
                             </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <ContactCard
                                 icon={
                                     <svg
@@ -816,7 +818,7 @@ const LearnMore = () => {
                     </section>
 
                     {/* Still Need Help Banner */}
-                    <section className="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-2xl p-8 text-center relative overflow-hidden">
+                    <section className="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-2xl p-6 text-center relative overflow-hidden">
                         <div className="absolute inset-0 opacity-10">
                             <svg
                                 className="w-full h-full"
@@ -847,9 +849,9 @@ const LearnMore = () => {
                         </div>
 
                         <div className="relative z-10">
-                            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <svg
-                                    className="w-8 h-8 text-white"
+                                    className="w-7 h-7 text-white"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -862,15 +864,15 @@ const LearnMore = () => {
                                     />
                                 </svg>
                             </div>
-                            <h2 className="text-2xl font-bold text-white mb-2">
+                            <h2 className="text-lg md:text-xl font-bold text-white mb-2">
                                 Still Need Help?
                             </h2>
-                            <p className="text-indigo-100 mb-6 max-w-md mx-auto">
+                            <p className="text-indigo-100 mb-5 max-w-md mx-auto">
                                 Our support team is ready to assist you with any
                                 questions or concerns about your academic
                                 journey.
                             </p>
-                            <button className="px-8 py-3 bg-white text-indigo-600 font-semibold rounded-xl hover:bg-indigo-50 transition-colors shadow-lg">
+                            <button className="px-6 py-2.5 bg-white text-indigo-600 font-semibold rounded-xl hover:bg-indigo-50 transition-colors shadow-lg text-sm">
                                 Contact Support Team
                             </button>
                         </div>

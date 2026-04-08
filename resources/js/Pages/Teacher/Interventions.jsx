@@ -27,7 +27,6 @@ import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 // CONSTANTS & PURE HELPERS
 // ─────────────────────────────────────────────
 
-const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
 const INTERVENTION_STUDENT_QUERY_KEY = "student";
 
 /** Returns Tailwind badge classes for a given priority level. */
@@ -1572,14 +1571,18 @@ function InterventionDashboard({ students, onSelectStudent }) {
         return () => window.cancelAnimationFrame(frame);
     }, []);
 
-    // Sort by priority: High → Medium → Low
+    // Sort alphabetically by backend sort key (last, first middle-initial format)
     const sortedStudents = useMemo(
         () =>
-            [...students].sort(
-                (a, b) =>
-                    (PRIORITY_ORDER[a.priority] ?? 99) -
-                    (PRIORITY_ORDER[b.priority] ?? 99),
-            ),
+            [...students].sort((a, b) => {
+                const left = String(a.sort_key ?? a.name ?? "");
+                const right = String(b.sort_key ?? b.name ?? "");
+
+                return left.localeCompare(right, undefined, {
+                    sensitivity: "base",
+                    numeric: true,
+                });
+            }),
         [students],
     );
 

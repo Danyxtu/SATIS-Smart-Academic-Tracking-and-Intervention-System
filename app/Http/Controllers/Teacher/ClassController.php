@@ -1320,6 +1320,54 @@ class ClassController extends Controller
         ];
     }
 
+    private function formatStudentDisplayName(?User $user, ?Student $studentProfile): string
+    {
+        $lastName = trim((string) ($user?->last_name ?? ''));
+        $firstName = trim((string) ($user?->first_name ?? ''));
+        $middleName = trim((string) ($user?->middle_name ?? ''));
+
+        if ($lastName !== '' || $firstName !== '' || $middleName !== '') {
+            $middleInitial = $middleName !== ''
+                ? Str::upper(Str::substr($middleName, 0, 1)) . '.'
+                : '';
+
+            $firstAndMiddle = trim($firstName . ($middleInitial !== '' ? ' ' . $middleInitial : ''));
+
+            if ($lastName !== '' && $firstAndMiddle !== '') {
+                return $lastName . ', ' . $firstAndMiddle;
+            }
+
+            if ($lastName !== '') {
+                return $lastName;
+            }
+
+            return $firstAndMiddle;
+        }
+
+        $fallbackName = preg_replace(
+            '/\s+/',
+            ' ',
+            trim((string) ($studentProfile?->student_name ?? $user?->name ?? 'Student')),
+        );
+
+        return is_string($fallbackName) && trim($fallbackName) !== ''
+            ? trim($fallbackName)
+            : 'Student';
+    }
+
+    private function buildStudentSortKey(?User $user, ?Student $studentProfile): string
+    {
+        $lastName = Str::lower(trim((string) ($user?->last_name ?? '')));
+        $firstName = Str::lower(trim((string) ($user?->first_name ?? '')));
+        $middleName = Str::lower(trim((string) ($user?->middle_name ?? '')));
+
+        if ($lastName !== '' || $firstName !== '' || $middleName !== '') {
+            return trim($lastName . ' ' . $firstName . ' ' . $middleName);
+        }
+
+        return Str::lower($this->formatStudentDisplayName($user, $studentProfile));
+    }
+
     private function generateStudentUsername(string $firstName, string $lastName, ?string $lrn = null): string
     {
         $seed = trim("{$firstName} {$lastName}");
@@ -1673,15 +1721,12 @@ class ClassController extends Controller
                 ->map(function ($enrollment) use ($subjectTeacher) {
                     $user = $enrollment->user;
                     $studentProfile = $user?->student;
-
-                    // Get name from student_name field, or fallback to user name
-                    $fullName = $studentProfile?->student_name
-                        ?? $user?->name
-                        ?? 'Student';
+                    $formattedName = $this->formatStudentDisplayName($user, $studentProfile);
 
                     return [
                         'id' => $enrollment->id,
-                        'name' => $fullName,
+                        'name' => $formattedName,
+                        'sort_key' => $this->buildStudentSortKey($user, $studentProfile),
                         'lrn' => $studentProfile?->lrn,
                         'username' => $user?->username,
                         'personal_email' => $user?->personal_email,
@@ -1699,7 +1744,9 @@ class ClassController extends Controller
                         })->toArray(),
                     ];
                 })
-                ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+                ->sortBy('sort_key', SORT_NATURAL | SORT_FLAG_CASE)
+                ->values()
+                ->map(fn(array $student) => array_diff_key($student, ['sort_key' => true]))
                 ->values();
 
             // Calculate grades for all students using the service

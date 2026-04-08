@@ -51,12 +51,12 @@ const getGradeStyles = (grade) => {
 
 // --- Stat Card Component ---
 const StatCard = ({ label, value, icon: Icon, color, bgColor }) => (
-    <div className="bg-white rounded-2xl shadow-lg p-5 flex items-center space-x-4 hover:shadow-xl transition-shadow">
+    <div className="bg-white rounded-2xl shadow-lg p-4 flex items-center space-x-3 hover:shadow-xl transition-shadow">
         <div className={`p-3 rounded-full ${bgColor}`}>
             <Icon size={24} className={color} />
         </div>
         <div>
-            <p className="text-2xl font-bold text-gray-800">{value}</p>
+            <p className="text-xl font-bold text-gray-800">{value}</p>
             <p className="text-sm font-medium text-gray-500">{label}</p>
         </div>
     </div>
@@ -64,7 +64,7 @@ const StatCard = ({ label, value, icon: Icon, color, bgColor }) => (
 
 // --- Empty State Component ---
 const EmptyState = ({ title, message }) => (
-    <div className="bg-white rounded-2xl shadow-lg p-12 text-center col-span-full">
+    <div className="bg-white rounded-2xl shadow-lg p-10 text-center col-span-full">
         <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
             <BookOpen size={32} className="text-gray-400" />
         </div>
@@ -91,7 +91,7 @@ const SubjectGradeCard = ({
             : "NO GRADES YET";
 
     return (
-        <div className="bg-white rounded-2xl shadow-lg p-6 transition-all hover:shadow-xl hover:scale-[1.02] relative overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-lg p-5 transition-all hover:shadow-xl hover:scale-[1.02] relative overflow-hidden">
             {/* Status indicator */}
             {hasIntervention && (
                 <div className="absolute top-3 right-3">
@@ -102,14 +102,14 @@ const SubjectGradeCard = ({
                 </div>
             )}
 
-            <h3 className="text-xl font-bold text-gray-800 pr-20">{subject}</h3>
-            <p className="text-sm text-gray-500 mb-4">{teacher}</p>
+            <h3 className="text-lg font-bold text-gray-800 pr-20">{subject}</h3>
+            <p className="text-sm text-gray-500 mb-3">{teacher}</p>
 
             <p className="text-xs text-gray-500 uppercase tracking-wider">
                 {gradeLabel}
             </p>
             <div className="flex items-end gap-2">
-                <p className={`text-6xl font-bold ${color}`}>
+                <p className={`text-3xl font-bold ${color}`}>
                     {grade !== null ? grade : "—"}
                 </p>
                 {grade !== null && (
@@ -120,7 +120,7 @@ const SubjectGradeCard = ({
             </div>
 
             {/* Progress bar */}
-            <div className="w-full bg-gray-200 rounded-full h-2.5 mt-4">
+            <div className="w-full bg-gray-200 rounded-full h-2.5 mt-3">
                 <div
                     className={`${bg} h-2.5 rounded-full transition-all duration-500`}
                     style={{ width: grade !== null ? `${grade}%` : "0%" }}
@@ -153,8 +153,65 @@ const SubjectGradeCard = ({
 };
 
 // --- Main Page Component ---
-const AnalyticsIndex = ({ subjects = [], stats = {}, semesters = {} }) => {
-    const hasSubjects = subjects && subjects.length > 0;
+const AnalyticsIndex = ({
+    subjects = [],
+    stats = {},
+    semesters = {},
+    activeRiskFilter = "all",
+}) => {
+    const hasSubjects = Array.isArray(subjects) && subjects.length > 0;
+    const [riskFilter, setRiskFilter] = React.useState(
+        activeRiskFilter || "all",
+    );
+
+    React.useEffect(() => {
+        setRiskFilter(activeRiskFilter || "all");
+    }, [activeRiskFilter]);
+
+    const criticalCount = React.useMemo(
+        () =>
+            subjects.filter((item) => item.riskCategory === "critical").length,
+        [subjects],
+    );
+
+    const filteredSubjects = React.useMemo(() => {
+        if (!hasSubjects) return [];
+
+        if (riskFilter === "all") return subjects;
+        if (riskFilter === "at-risk") {
+            return subjects.filter((item) =>
+                ["at_risk", "critical"].includes(item.riskCategory),
+            );
+        }
+
+        return subjects.filter((item) => item.riskCategory === riskFilter);
+    }, [hasSubjects, riskFilter, subjects]);
+
+    const riskTabs = [
+        { key: "all", label: "All", count: subjects.length },
+        {
+            key: "at-risk",
+            label: "At Risk",
+            count: stats.subjectsAtRisk || 0,
+        },
+        {
+            key: "needs_attention",
+            label: "Needs Attention",
+            count: stats.subjectsNeedingAttention || 0,
+        },
+        {
+            key: "critical",
+            label: "Critical",
+            count: criticalCount,
+        },
+        {
+            key: "on_track",
+            label: "On Track",
+            count: stats.subjectsOnTrack || 0,
+        },
+    ];
+
+    const hasVisibleSubjects = filteredSubjects.length > 0;
 
     const handleRefresh = () => {
         window.location.reload();
@@ -164,11 +221,11 @@ const AnalyticsIndex = ({ subjects = [], stats = {}, semesters = {} }) => {
         <>
             <Head title="Performance Analytics" />
 
-            <div className="max-w-7xl mx-auto space-y-6">
+            <div className="max-w-7xl mx-auto space-y-5">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-3">
-                        <BarChart3 size={36} className="text-pink-600" />
+                    <h1 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2.5">
+                        <BarChart3 size={24} className="text-pink-600" />
                         Performance Analytics
                     </h1>
                     <button
@@ -190,7 +247,7 @@ const AnalyticsIndex = ({ subjects = [], stats = {}, semesters = {} }) => {
 
                 {/* Stats Summary */}
                 {hasSubjects && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                         <StatCard
                             label="Overall Grade"
                             value={
@@ -229,7 +286,7 @@ const AnalyticsIndex = ({ subjects = [], stats = {}, semesters = {} }) => {
                 {/* Overall Performance Message */}
                 {hasSubjects && stats.overallGrade !== null && (
                     <div
-                        className={`rounded-2xl p-6 border ${
+                        className={`rounded-2xl p-5 border ${
                             stats.overallGrade >= 85
                                 ? "bg-gradient-to-r from-green-50 to-emerald-50 border-green-200"
                                 : stats.overallGrade >= 75
@@ -288,27 +345,74 @@ const AnalyticsIndex = ({ subjects = [], stats = {}, semesters = {} }) => {
                     </div>
                 )}
 
+                {/* Risk Filter Panel */}
+                {hasSubjects && (
+                    <div className="bg-white rounded-2xl shadow-lg p-4 border border-gray-100">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <h2 className="text-sm font-semibold text-gray-800">
+                                Risk Overview
+                            </h2>
+                            <p className="text-xs text-gray-500">
+                                Showing {filteredSubjects.length} of{" "}
+                                {subjects.length} subjects
+                            </p>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 mt-3">
+                            {riskTabs.map((tab) => (
+                                <button
+                                    key={tab.key}
+                                    onClick={() => setRiskFilter(tab.key)}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                                        riskFilter === tab.key
+                                            ? "bg-pink-100 text-pink-700 border-pink-200"
+                                            : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
+                                    }`}
+                                >
+                                    {tab.label}
+                                    <span
+                                        className={`px-1.5 py-0.5 rounded-full text-[11px] ${
+                                            riskFilter === tab.key
+                                                ? "bg-pink-200 text-pink-700"
+                                                : "bg-gray-200 text-gray-600"
+                                        }`}
+                                    >
+                                        {tab.count}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Grid of Subject Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {hasSubjects ? (
-                        subjects.map((item) => (
-                            <Link
-                                href={route("analytics.show", {
-                                    enrollment: item.id,
-                                })}
-                                key={item.id}
-                                className="focus:outline-none focus:ring-2 focus:ring-pink-400 rounded-2xl"
-                            >
-                                <SubjectGradeCard
-                                    subject={item.subject}
-                                    teacher={item.teacher}
-                                    grade={item.grade}
-                                    status={item.status}
-                                    hasIntervention={item.hasIntervention}
-                                    gradeCount={item.gradeCount}
-                                />
-                            </Link>
-                        ))
+                        hasVisibleSubjects ? (
+                            filteredSubjects.map((item) => (
+                                <Link
+                                    href={route("analytics.show", {
+                                        enrollment: item.id,
+                                    })}
+                                    key={item.id}
+                                    className="focus:outline-none focus:ring-2 focus:ring-pink-400 rounded-2xl"
+                                >
+                                    <SubjectGradeCard
+                                        subject={item.subject}
+                                        teacher={item.teacher}
+                                        grade={item.grade}
+                                        status={item.status}
+                                        hasIntervention={item.hasIntervention}
+                                        gradeCount={item.gradeCount}
+                                    />
+                                </Link>
+                            ))
+                        ) : (
+                            <EmptyState
+                                title="No Subjects In This Filter"
+                                message="Try another risk filter to view subjects in a different performance category."
+                            />
+                        )
                     ) : (
                         <EmptyState
                             title="No Subjects Found"
@@ -320,8 +424,9 @@ const AnalyticsIndex = ({ subjects = [], stats = {}, semesters = {} }) => {
                 {/* Help text */}
                 {hasSubjects && (
                     <p className="text-center text-gray-500 text-sm">
-                        Click on any subject card to view detailed analytics,
-                        grade breakdown, and personalized study suggestions.
+                        Select a risk filter, then click any subject card to
+                        view detailed analytics, quarterly grades, and
+                        personalized suggestions.
                     </p>
                 )}
             </div>

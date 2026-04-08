@@ -39,13 +39,13 @@ const SubjectGradeCard = ({ subject, teacher, grade }) => {
     const label = grade > 75 ? "EXPECTED FINAL GRADE" : "FINAL GRADE";
 
     return (
-        <div className="bg-white rounded-2xl shadow-lg p-6 transition-all hover:shadow-xl hover:scale-[1.02]">
-            <h3 className="text-xl font-bold text-gray-800">{subject}</h3>
+        <div className="bg-white rounded-2xl shadow-lg p-5 transition-all hover:shadow-xl hover:scale-[1.02]">
+            <h3 className="text-lg font-bold text-gray-800">{subject}</h3>
             <p className="text-sm text-gray-500 mb-4">{teacher}</p>
             <p className="text-xs text-gray-500 uppercase tracking-wider">
                 {label}
             </p>
-            <p className={`text-6xl font-bold ${color}`}>{grade}</p>
+            <p className={`text-3xl font-bold ${color}`}>{grade}</p>
             <div className="w-full bg-gray-200 rounded-full h-2.5 mt-4">
                 <div
                     className={`${bg} h-2.5 rounded-full`}
@@ -63,14 +63,14 @@ const AnalyticsIndex = () => {
         <>
             <Head title="Performance Analytics" />
 
-            <div className="max-w-7xl mx-auto space-y-8">
-                <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-3">
-                    <BarChart3 size={36} className="text-pink-600" />
+            <div className="max-w-7xl mx-auto space-y-5">
+                <h1 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2.5">
+                    <BarChart3 size={24} className="text-pink-600" />
                     Performance Analytics
                 </h1>
 
                 {/* Grid of Subject Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {subjectsData.map((item) => (
                         // --- MODIFICATION: Wrapped in a Link ---
                         <Link

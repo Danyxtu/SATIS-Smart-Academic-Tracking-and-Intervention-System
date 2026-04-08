@@ -164,7 +164,7 @@ const StatCard = ({ icon: Icon, label, value, color = "gray" }) => {
                 <Icon size={20} />
             </div>
             <div>
-                <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                <p className="text-xl font-bold text-gray-800 dark:text-gray-100">
                     {value}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -333,7 +333,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                 <Dialog.Panel className="pointer-events-auto w-screen max-w-md">
                                     <div className="flex h-full flex-col bg-white dark:bg-gray-900 shadow-xl overflow-y-auto">
                                         {/* Header */}
-                                        <div className="bg-gradient-to-r from-pink-500 to-purple-600 px-6 py-5">
+                                        <div className="bg-gradient-to-r from-pink-500 to-purple-600 px-5 py-4">
                                             <div className="flex items-start justify-between">
                                                 <div>
                                                     <Dialog.Title className="text-xl font-bold text-white">
@@ -359,7 +359,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                         </div>
 
                                         {/* Content */}
-                                        <div className="flex-1 px-6 py-5 space-y-6">
+                                        <div className="flex-1 px-5 py-4 space-y-5">
                                             {/* Risk Reasons */}
                                             {subject.riskReasons.length > 0 && (
                                                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-700/40 rounded-xl p-4">
@@ -747,7 +747,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
 
 // --- Empty State ---
 const EmptyState = () => (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-12 text-center">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-10 text-center">
         <ShieldCheck size={64} className="mx-auto text-green-400 mb-4" />
         <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-2">
             All Subjects Looking Good!
@@ -785,11 +785,11 @@ const SubjectRisk = ({ subjects = [], stats = {} }) => {
         <>
             <Head title="Subjects at Risk" />
 
-            <div className="max-w-5xl mx-auto space-y-6">
+            <div className="max-w-5xl mx-auto space-y-5">
                 {/* Header */}
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
-                        <ShieldAlert size={32} className="text-pink-600" />
+                    <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2.5">
+                        <ShieldAlert size={20} className="text-pink-600" />
                         Subjects at Risk
                     </h1>
                     <p className="text-gray-500 dark:text-gray-400 mt-1">
@@ -883,7 +883,7 @@ const SubjectRisk = ({ subjects = [], stats = {} }) => {
                 )}
 
                 {/* Info Card */}
-                <div className="bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 border border-pink-100 dark:border-pink-800/40 rounded-xl p-5">
+                <div className="bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 border border-pink-100 dark:border-pink-800/40 rounded-xl p-4">
                     <div className="flex items-start gap-3">
                         <Info
                             size={20}

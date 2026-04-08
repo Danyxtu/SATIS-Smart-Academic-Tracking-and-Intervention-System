@@ -26,6 +26,7 @@ This document outlines the proper way to test the SATIS (Smart Academic Tracking
 ## Testing Levels Explained
 
 ### 1. **Unit Tests** (Bottom - Foundation)
+
 - Test individual functions, methods, and classes in **isolation**
 - Mock external dependencies
 - Fastest to run
@@ -34,6 +35,7 @@ This document outlines the proper way to test the SATIS (Smart Academic Tracking
 **Example**: Testing if a prediction service correctly calculates attendance risk
 
 ### 2. **Feature/Integration Tests** (Middle)
+
 - Test how multiple components work **together**
 - Test HTTP endpoints and routes
 - Test database interactions
@@ -42,6 +44,7 @@ This document outlines the proper way to test the SATIS (Smart Academic Tracking
 **Example**: Testing "Create a student" workflow (form → controller → database → response)
 
 ### 3. **End-to-End Tests** (Top - User Perspective)
+
 - Test **complete user workflows** through the UI
 - Simulate real user interactions (clicks, typing, etc.)
 - Slowest but most realistic
@@ -132,11 +135,13 @@ test('user can log in', function () {
 ### **PHASE 1: Authentication & Authorization**
 
 #### 1.1 Unit Tests - Authentication Logic
+
 - [ ] Test password hashing
 - [ ] Test token generation
 - [ ] Test role validation
 
 #### 1.2 Feature Tests - Login/Logout
+
 - [ ] User can log in with correct credentials
 - [ ] User cannot log in with wrong password
 - [ ] User cannot log in with non-existent email
@@ -146,6 +151,7 @@ test('user can log in', function () {
 - [ ] Session is destroyed after logout
 
 **Sample Test:**
+
 ```php
 test('student can login', function () {
     $student = User::factory()->create(['role' => 'student']);
@@ -169,6 +175,7 @@ test('student cannot access admin dashboard', function () {
 ### **PHASE 2: Student Portal**
 
 #### 2.1 Dashboard & Notifications
+
 - [ ] Student can access dashboard
 - [ ] Dashboard displays enrolled subjects
 - [ ] Dashboard shows at-risk subjects
@@ -178,6 +185,7 @@ test('student cannot access admin dashboard', function () {
 - [ ] Unread count is accurate
 
 #### 2.2 Interventions Feed
+
 - [ ] Student sees assigned interventions
 - [ ] Student can view intervention details
 - [ ] Student can complete intervention tasks
@@ -186,6 +194,7 @@ test('student cannot access admin dashboard', function () {
 - [ ] Intervention status updates correctly
 
 #### 2.3 Analytics & Reporting
+
 - [ ] Student can view analytics for each enrollment
 - [ ] Analytics show correct grades
 - [ ] Analytics show attendance data
@@ -193,24 +202,27 @@ test('student cannot access admin dashboard', function () {
 - [ ] PDF contains all necessary data
 
 #### 2.4 Attendance Viewing
+
 - [ ] Student can view attendance records
 - [ ] Attendance shows correct dates
 - [ ] Attendance shows present/absent status
 
-#### 2.5 Subject at Risk
-- [ ] Page displays at-risk subjects
-- [ ] Shows reasons for risk (low grades, high absences)
-- [ ] Links to interventions work
+#### 2.5 Risk Overview in Analytics
+
+- [ ] Analytics supports risk-focused filters (at-risk, critical, needs-attention, on-track)
+- [ ] At-risk filter shows only at-risk/critical subjects
+- [ ] Subject cards open analytics detail correctly from filtered view
 
 **Sample Test:**
+
 ```php
 test('student can view analytics', function () {
     $student = User::factory()->create(['role' => 'student']);
     $enrollment = Enrollment::factory()->for($student)->create();
-    
+
     $response = $this->actingAs($student)
         ->get("/analytics/{$enrollment->id}");
-    
+
     $response->assertOk();
     $response->assertInertia(fn ($page) =>
         $page
@@ -226,12 +238,14 @@ test('student can view analytics', function () {
 ### **PHASE 3: Teacher Portal**
 
 #### 3.1 Dashboard
+
 - [ ] Teacher can access dashboard
 - [ ] Dashboard shows taught subjects
 - [ ] Dashboard shows class statistics
 - [ ] Shows upcoming classes/interventions
 
 #### 3.2 Class Management
+
 - [ ] Teacher can view classes
 - [ ] Teacher can create new class
 - [ ] Teacher can add students to class (manually)
@@ -241,6 +255,7 @@ test('student can view analytics', function () {
 - [ ] Class list displays correctly
 
 #### 3.3 Attendance Management
+
 - [ ] Teacher can access attendance page
 - [ ] Teacher can take attendance (mark present/absent)
 - [ ] Teacher can save attendance records
@@ -250,6 +265,7 @@ test('student can view analytics', function () {
 - [ ] Attendance history is maintained
 
 #### 3.4 Grades Management
+
 - [ ] Teacher can input grades
 - [ ] Teacher can bulk upload grades
 - [ ] Teacher can import grades (CSV/Excel)
@@ -258,6 +274,7 @@ test('student can view analytics', function () {
 - [ ] Can view grade breakdown per student
 
 #### 3.5 Interventions
+
 - [ ] Teacher can view all interventions
 - [ ] Teacher can create intervention for student
 - [ ] Teacher can create bulk interventions
@@ -269,15 +286,17 @@ test('student can view analytics', function () {
 - [ ] Intervention status reflects correctly
 
 #### 3.6 Pending Approval Page
+
 - [ ] Teacher sees pending approval message if not approved
 - [ ] Teacher can access portal once approved
 
 **Sample Test:**
+
 ```php
 test('teacher can take attendance', function () {
     $teacher = User::factory()->create(['role' => 'teacher']);
     $subject = Subject::factory()->for($teacher)->create();
-    
+
     $response = $this->actingAs($teacher)
         ->post('/teacher/attendance', [
             'subject_id' => $subject->id,
@@ -287,7 +306,7 @@ test('teacher can take attendance', function () {
                 'student_2' => 'absent',
             ],
         ]);
-    
+
     $response->assertRedirect();
     $this->assertDatabaseHas('attendance_records', [
         'subject_id' => $subject->id,
@@ -301,11 +320,13 @@ test('teacher can take attendance', function () {
 ### **PHASE 4: Admin Portal**
 
 #### 4.1 Dashboard
+
 - [ ] Admin can access dashboard
 - [ ] Dashboard shows system statistics
 - [ ] Shows user counts, pending approvals
 
 #### 4.2 User Management
+
 - [ ] Admin can view all users
 - [ ] Admin can create new user (student/teacher)
 - [ ] Admin can edit user information
@@ -315,12 +336,14 @@ test('teacher can take attendance', function () {
 - [ ] User email is sent with credentials/password
 
 #### 4.3 Password Reset Requests
+
 - [ ] Admin can view pending password reset requests
 - [ ] Admin can approve password reset request
 - [ ] Admin can reject password reset request
 - [ ] User receives appropriate notifications
 
 #### 4.4 Teacher Registration Approvals
+
 - [ ] Admin can view pending registrations
 - [ ] Admin can view uploaded documents
 - [ ] Admin can approve registration
@@ -329,10 +352,11 @@ test('teacher can take attendance', function () {
 - [ ] Approved teacher can access portal
 
 **Sample Test:**
+
 ```php
 test('admin can manage users', function () {
     $admin = User::factory()->create(['role' => 'admin']);
-    
+
     $response = $this->actingAs($admin)
         ->post('/admin/users', [
             'name' => 'John Doe',
@@ -340,7 +364,7 @@ test('admin can manage users', function () {
             'role' => 'student',
             'password' => 'password123',
         ]);
-    
+
     $response->assertRedirect('/admin/users');
     $this->assertDatabaseHas('users', [
         'email' => 'john@example.com',
@@ -354,10 +378,12 @@ test('admin can manage users', function () {
 ### **PHASE 5: Super Admin Portal**
 
 #### 5.1 Dashboard
+
 - [ ] Super Admin can access dashboard
 - [ ] Shows system-wide statistics
 
 #### 5.2 Department Management
+
 - [ ] Super Admin can view all departments
 - [ ] Can create new department
 - [ ] Can edit department
@@ -366,6 +392,7 @@ test('admin can manage users', function () {
 - [ ] Department list is accurate
 
 #### 5.3 Admin Management
+
 - [ ] Super Admin can view all admins
 - [ ] Can create new admin
 - [ ] Can edit admin
@@ -375,6 +402,7 @@ test('admin can manage users', function () {
 - [ ] Admin credentials email is sent
 
 #### 5.4 Curriculum Management
+
 - [ ] Super Admin can view all master subjects
 - [ ] Can create new master subject
 - [ ] Can edit master subject
@@ -384,6 +412,7 @@ test('admin can manage users', function () {
 - [ ] Subject list shows correctly with prerequisites
 
 #### 5.5 System Settings
+
 - [ ] Super Admin can view settings
 - [ ] Can update academic settings (terms, quarters)
 - [ ] Can update enrollment settings
@@ -393,16 +422,17 @@ test('admin can manage users', function () {
 - [ ] Settings affect system behavior
 
 **Sample Test:**
+
 ```php
 test('super admin can manage departments', function () {
     $superAdmin = User::factory()->create(['role' => 'super_admin']);
-    
+
     $response = $this->actingAs($superAdmin)
         ->post('/superadmin/departments', [
             'name' => 'Computer Science',
             'code' => 'CS',
         ]);
-    
+
     $response->assertRedirect();
     $this->assertDatabaseHas('departments', [
         'name' => 'Computer Science',
@@ -415,6 +445,7 @@ test('super admin can manage departments', function () {
 ### **PHASE 6: Profile & Universal Routes**
 
 #### 6.1 Profile Management
+
 - [ ] User can view profile
 - [ ] User can edit profile information
 - [ ] User can update password
@@ -423,6 +454,7 @@ test('super admin can manage departments', function () {
 - [ ] Changes are saved correctly
 
 #### 6.2 Redirect After Login
+
 - [ ] Student redirects to student dashboard
 - [ ] Teacher redirects to teacher dashboard
 - [ ] Admin redirects to admin dashboard
@@ -433,6 +465,7 @@ test('super admin can manage departments', function () {
 ### **PHASE 7: Data Validation & Error Handling**
 
 #### 7.1 Input Validation
+
 - [ ] Email format validation
 - [ ] Required fields validation
 - [ ] Numeric field validation
@@ -441,6 +474,7 @@ test('super admin can manage departments', function () {
 - [ ] Error messages display correctly
 
 #### 7.2 Business Logic Validation
+
 - [ ] Cannot enroll student in same subject twice
 - [ ] Cannot take attendance for future dates
 - [ ] Cannot create intervention without valid subject
@@ -448,6 +482,7 @@ test('super admin can manage departments', function () {
 - [ ] Attendance percentage calculates correctly
 
 #### 7.3 Authorization & Access Control
+
 - [ ] Teacher cannot access other teacher's classes
 - [ ] Admin cannot manage super admin accounts
 - [ ] Student cannot access teacher routes
@@ -459,6 +494,7 @@ test('super admin can manage departments', function () {
 ### **PHASE 8: Database Integrity**
 
 #### 8.1 Relationships
+
 - [ ] Student has many enrollments
 - [ ] Teacher has many subjects
 - [ ] Subject has many enrollments
@@ -466,11 +502,13 @@ test('super admin can manage departments', function () {
 - [ ] Attendance records are linked correctly
 
 #### 8.2 Cascading Operations
+
 - [ ] Deleting user deletes related records
 - [ ] Deleting subject handles orphaned enrollments
 - [ ] Deleting intervention deletes tasks
 
 #### 8.3 Data Consistency
+
 - [ ] Enrollment count matches actual records
 - [ ] Grade calculations match stored values
 - [ ] Attendance percentages are accurate
@@ -480,12 +518,14 @@ test('super admin can manage departments', function () {
 ### **PHASE 9: Performance & Edge Cases**
 
 #### 9.1 Performance
+
 - [ ] Dashboard loads in < 1 second
 - [ ] Reports generate in reasonable time
 - [ ] Pagination works for large datasets
 - [ ] Search/filter functions efficiently
 
 #### 9.2 Edge Cases
+
 - [ ] System handles 1000+ students
 - [ ] System handles special characters in names
 - [ ] Concurrent requests don't cause conflicts
@@ -497,6 +537,7 @@ test('super admin can manage departments', function () {
 ### **PHASE 10: Email & Notifications**
 
 #### 10.1 Email Functionality
+
 - [ ] Welcome email sent on user creation
 - [ ] Password reset email has correct link
 - [ ] Admin credentials sent to new admin
@@ -504,6 +545,7 @@ test('super admin can manage departments', function () {
 - [ ] Email templates render correctly
 
 #### 10.2 Notifications
+
 - [ ] Notifications created correctly
 - [ ] Read status toggles properly
 - [ ] Notification count accurate
@@ -514,32 +556,38 @@ test('super admin can manage departments', function () {
 ## How to Run Tests
 
 ### Run All Tests
+
 ```bash
 php artisan test
 ```
 
 ### Run Specific Test Suite
+
 ```bash
 php artisan test tests/Feature/Auth
 php artisan test tests/Unit/Services
 ```
 
 ### Run Single Test File
+
 ```bash
 php artisan test tests/Feature/Student/DashboardTest.php
 ```
 
 ### Run with Coverage Report
+
 ```bash
 php artisan test --coverage
 ```
 
 ### Run Tests in Parallel (faster)
+
 ```bash
 php artisan test --parallel
 ```
 
 ### Run Specific Test Method
+
 ```bash
 php artisan test tests/Feature/AuthTest.php --filter=test_user_can_login
 ```
@@ -632,46 +680,50 @@ $response->assertInertia(fn ($page) =>
 ### ✅ DO
 
 1. **Use Descriptive Names**
-   ```php
-   test('teacher_can_create_intervention_for_student'); // ✅ Good
-   test('create'); // ❌ Bad
-   ```
+
+    ```php
+    test('teacher_can_create_intervention_for_student'); // ✅ Good
+    test('create'); // ❌ Bad
+    ```
 
 2. **Follow AAA Pattern (Arrange, Act, Assert)**
-   ```php
-   // Arrange: Setup
-   $user = User::factory()->create();
-   
-   // Act: Do something
-   $response = $this->actingAs($user)->post('/users', [...]);
-   
-   // Assert: Verify
-   $response->assertRedirect();
-   ```
+
+    ```php
+    // Arrange: Setup
+    $user = User::factory()->create();
+
+    // Act: Do something
+    $response = $this->actingAs($user)->post('/users', [...]);
+
+    // Assert: Verify
+    $response->assertRedirect();
+    ```
 
 3. **Use Factories for Test Data**
-   ```php
-   $user = User::factory()->create(); // ✅ Clean, reusable
-   $user = new User(...); // ❌ Messy
-   ```
+
+    ```php
+    $user = User::factory()->create(); // ✅ Clean, reusable
+    $user = new User(...); // ❌ Messy
+    ```
 
 4. **Test One Thing Per Test**
-   ```php
-   // ✅ Good - single responsibility
-   test('user_can_login');
-   test('user_cannot_login_with_wrong_password');
-   
-   // ❌ Bad - testing multiple things
-   test('user_login_workflow');
-   ```
+
+    ```php
+    // ✅ Good - single responsibility
+    test('user_can_login');
+    test('user_cannot_login_with_wrong_password');
+
+    // ❌ Bad - testing multiple things
+    test('user_login_workflow');
+    ```
 
 5. **Use Transactions to Rollback**
-   ```php
-   class TestCase extends BaseTestCase
-   {
-       use DatabaseTransactions; // Rolls back after each test
-   }
-   ```
+    ```php
+    class TestCase extends BaseTestCase
+    {
+        use DatabaseTransactions; // Rolls back after each test
+    }
+    ```
 
 ### ❌ DON'T
 
@@ -710,19 +762,19 @@ Create `.github/workflows/tests.yml`:
 name: Tests
 
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
+    push:
+        branches: [main, develop]
+    pull_request:
+        branches: [main, develop]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - uses: actions/checkout@v3
-      - uses: php-actions/composer@v6
-      - run: php artisan test
+    test:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v3
+            - uses: php-actions/composer@v6
+            - run: php artisan test
 ```
 
 ---
@@ -739,13 +791,13 @@ jobs:
 
 ### Common Issues
 
-| Issue | Solution |
-|-------|----------|
+| Issue                  | Solution                                            |
+| ---------------------- | --------------------------------------------------- |
 | "Table does not exist" | Run migrations: `php artisan migrate --env=testing` |
-| "Factory not found" | Check factory path and namespace |
-| "Undefined method" | Ensure method exists on model/class |
-| "Assertion failed" | Check actual vs expected values |
-| "CSRF token mismatch" | Disable CSRF for API tests or use session |
+| "Factory not found"    | Check factory path and namespace                    |
+| "Undefined method"     | Ensure method exists on model/class                 |
+| "Assertion failed"     | Check actual vs expected values                     |
+| "CSRF token mismatch"  | Disable CSRF for API tests or use session           |
 
 ---
 
@@ -765,4 +817,3 @@ jobs:
 - [Pest PHP Docs](https://pestphp.com/)
 - [PHPUnit Docs](https://phpunit.de/documentation.html)
 - [Testing Best Practices](https://laravel.com/docs/testing#best-practices)
-

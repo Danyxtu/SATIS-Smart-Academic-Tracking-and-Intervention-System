@@ -9,6 +9,7 @@ use App\Models\Intervention;
 use App\Models\InterventionTask;
 use App\Models\StudentNotification;
 use App\Services\PredictionService;
+use App\Support\StudentNameFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Redirect;
@@ -58,6 +59,8 @@ class InterventionController extends Controller
         $watchlist = $enrollments->map(function ($enrollment) {
             $user = $enrollment->user;
             $student = $user?->student;
+            $displayName = StudentNameFormatter::format($user, $student);
+            $sortKey = StudentNameFormatter::sortKey($user, $student);
             $classAssignment = $enrollment->schoolClass ?? $enrollment->subjectTeacher;
             $subject = $classAssignment?->subject;
             $subjectName = $subject?->subject_name ?? 'N/A';
@@ -113,7 +116,8 @@ class InterventionController extends Controller
                 'id' => $enrollment->id,
                 'student_id' => $student?->id,
                 'user_id' => $user?->id,
-                'name' => $student?->student_name ?? $user?->name ?? 'Student',
+                'name' => $displayName,
+                'sort_key' => $sortKey,
                 'lrn' => $student?->lrn,
                 'email' => $user?->email,
                 'avatar' => $student?->avatar,
@@ -172,18 +176,14 @@ class InterventionController extends Controller
         })
             // Only include students who are NOT on_track or have active intervention
             ->filter(fn($s) => $s['riskCategory'] !== 'on_track' || $s['hasActiveIntervention'])
-            ->sortByDesc(fn($s) => match ($s['riskCategory']) {
-                'critical' => 4,
-                'at_risk' => 3,
-                'needs_attention' => 2,
-                default => 1,
-            })
+            ->sortBy('sort_key', SORT_NATURAL | SORT_FLAG_CASE)
             ->values();
 
         // Build detailed student data for the profile view
         $studentDetails = $enrollments->mapWithKeys(function ($enrollment) {
             $user = $enrollment->user;
             $student = $user?->student;
+            $displayName = StudentNameFormatter::format($user, $student);
             $grades = $enrollment->grades;
 
             $totalScore = $grades->sum('score');
@@ -263,7 +263,7 @@ class InterventionController extends Controller
             return [
                 $enrollment->id => [
                     'id' => $enrollment->id,
-                    'name' => $student?->student_name ?? $user?->name ?? 'Student',
+                    'name' => $displayName,
                     'currentGrade' => $gradePercentage !== null ? "{$gradePercentage}%" : 'N/A',
                     'gradeTrend' => $gradeTrend,
                     'specialPrograms' => [],

@@ -95,12 +95,12 @@ const ErrorState = ({ message, onRetry }) => (
 
 // Top Summary Card
 const SummaryCard = ({ label, value, icon: Icon, color, bgColor, trend }) => (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-5 flex items-center space-x-4 hover:shadow-xl transition-shadow border border-transparent dark:border-gray-700">
-        <div className={`p-3 rounded-full ${bgColor}`}>
+    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-4 flex items-center space-x-3 hover:shadow-xl transition-shadow border border-transparent dark:border-gray-700">
+        <div className={`p-2.5 rounded-full ${bgColor}`}>
             <Icon size={24} className={color} />
         </div>
         <div className="flex-1">
-            <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+            <p className="text-xl font-bold text-gray-800 dark:text-gray-100">
                 {value}
             </p>
             <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -180,10 +180,10 @@ const StatusBadge = ({ status }) => {
 
 // Subject Attendance Card
 const SubjectAttendanceCard = ({ item }) => (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-5 transition-all hover:shadow-xl hover:-translate-y-1 border border-transparent dark:border-gray-700">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-4 transition-all hover:shadow-xl hover:-translate-y-1 border border-transparent dark:border-gray-700">
         <div className="flex justify-between items-start mb-3">
             <div className="flex-1">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 line-clamp-1">
+                <h3 className="text-base font-bold text-gray-800 dark:text-gray-100 line-clamp-1">
                     {item.subject}
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -192,7 +192,7 @@ const SubjectAttendanceCard = ({ item }) => (
             </div>
             <div className="text-right">
                 <span
-                    className={`text-2xl font-bold ${
+                    className={`text-xl font-bold ${
                         item.rate >= 90
                             ? "text-green-600"
                             : item.rate >= 80
@@ -205,9 +205,9 @@ const SubjectAttendanceCard = ({ item }) => (
             </div>
         </div>
         <AttendanceProgressBar rate={item.rate} />
-        <div className="grid grid-cols-4 gap-2 mt-4 text-center">
+        <div className="grid grid-cols-4 gap-2 mt-3 text-center">
             <div className="bg-green-50 dark:bg-green-900/25 rounded-lg p-2">
-                <p className="text-lg font-bold text-green-600">
+                <p className="text-base font-bold text-green-600">
                     {item.present}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -215,7 +215,7 @@ const SubjectAttendanceCard = ({ item }) => (
                 </p>
             </div>
             <div className="bg-red-50 dark:bg-red-900/25 rounded-lg p-2">
-                <p className="text-lg font-bold text-red-600">
+                <p className="text-base font-bold text-red-600">
                     {item.absences}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -223,13 +223,13 @@ const SubjectAttendanceCard = ({ item }) => (
                 </p>
             </div>
             <div className="bg-yellow-50 dark:bg-yellow-900/25 rounded-lg p-2">
-                <p className="text-lg font-bold text-yellow-600">
+                <p className="text-base font-bold text-yellow-600">
                     {item.lates}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Late</p>
             </div>
             <div className="bg-blue-50 dark:bg-blue-900/25 rounded-lg p-2">
-                <p className="text-lg font-bold text-blue-600">
+                <p className="text-base font-bold text-blue-600">
                     {item.excused}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -521,11 +521,11 @@ const Attendance = ({
                 }
             `}</style>
 
-            <div className="max-w-7xl mx-auto space-y-8">
+            <div className="max-w-7xl mx-auto space-y-5">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
-                        <CalendarCheck size={36} className="text-pink-600" />
+                    <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2.5">
+                        <CalendarCheck size={22} className="text-pink-600" />
                         Attendance Overview
                     </h1>
                     <button
@@ -549,13 +549,13 @@ const Attendance = ({
                 {/* Loading State */}
                 {isLoading ? (
                     <>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                             {[...Array(4)].map((_, i) => (
                                 <CardSkeleton key={i} />
                             ))}
                         </div>
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5">
                                 {[...Array(4)].map((_, i) => (
                                     <SubjectCardSkeleton key={i} />
                                 ))}
@@ -566,13 +566,13 @@ const Attendance = ({
                     <>
                         {/* Summary Stats Grid */}
                         {hasAttendanceData ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                                 {summaryCards.map((stat) => (
                                     <SummaryCard key={stat.label} {...stat} />
                                 ))}
                             </div>
                         ) : (
-                            <div className="bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 rounded-2xl p-6 border border-pink-100 dark:border-pink-700/50">
+                            <div className="bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 rounded-2xl p-5 border border-pink-100 dark:border-pink-700/50">
                                 <div className="flex items-center gap-4">
                                     <div className="p-3 bg-white dark:bg-gray-900 rounded-full shadow-sm border border-transparent dark:border-gray-700">
                                         <CalendarCheck
@@ -595,16 +595,16 @@ const Attendance = ({
                         )}
 
                         {/* Main Content: 2-Column Layout */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                             {/* Left Column: Subject Breakdown */}
-                            <div className="lg:col-span-2 space-y-6">
-                                <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                                    <BookOpen size={24} />
+                            <div className="lg:col-span-2 space-y-5">
+                                <h2 className="text-lg md:text-xl font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                                    <BookOpen size={22} />
                                     Attendance by Subject
                                 </h2>
 
                                 {hasSubjects ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                         {subjectAttendance.map((item) => (
                                             <SubjectAttendanceCard
                                                 key={item.id}
@@ -622,7 +622,7 @@ const Attendance = ({
                             </div>
 
                             {/* Right Column: Calendar & Activity */}
-                            <div className="space-y-6">
+                            <div className="space-y-5">
                                 <AttendanceCalendar
                                     calendarData={calendarData || {}}
                                 />
@@ -634,7 +634,7 @@ const Attendance = ({
 
                         {/* Attendance Tips Section */}
                         {hasAttendanceData && summaryStats.overallRate < 90 && (
-                            <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-2xl p-6 border border-yellow-200 dark:border-yellow-700/50">
+                            <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-2xl p-5 border border-yellow-200 dark:border-yellow-700/50">
                                 <div className="flex items-start gap-4">
                                     <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
                                         <AlertCircle
@@ -672,7 +672,7 @@ const Attendance = ({
                         {/* Excellent Attendance Recognition */}
                         {hasAttendanceData &&
                             summaryStats.overallRate >= 95 && (
-                                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl p-6 border border-green-200 dark:border-green-700/50">
+                                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl p-5 border border-green-200 dark:border-green-700/50">
                                     <div className="flex items-center gap-4">
                                         <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
                                             <CheckCircle2

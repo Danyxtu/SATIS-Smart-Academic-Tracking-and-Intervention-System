@@ -22,6 +22,7 @@ class Enrollment extends Model
         'expected_grade_q2',
         'q2_grade',
         'final_grade',
+        'remarks',
     ];
 
     protected $casts = [
@@ -32,6 +33,7 @@ class Enrollment extends Model
         'expected_grade_q2' => 'float',
         'q2_grade' => 'integer',
         'final_grade' => 'integer',
+        'remarks' => 'string',
     ];
 
     public function user()

@@ -1,6 +1,7 @@
-import { Head, Link, router, useForm } from "@inertiajs/react";
+import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import DeleteConfirmModal from "@/Components/Superadmin/DeleteConfirmModal";
+import AddSectionWizardModal from "@/Components/Superadmin/AcademicManagement/AddSectionWizardModal";
 import {
     BookOpen,
     Building2,
@@ -737,6 +738,7 @@ export default function Index({
     sections,
     classes,
     departments = [],
+    availableStudents = [],
     sectionOptions = [],
     subjects = [],
     teachers = [],
@@ -745,6 +747,8 @@ export default function Index({
     filters,
     stats,
 }) {
+    const { flash } = usePage().props;
+
     const resolvedColorOptions = useMemo(
         () =>
             Array.isArray(colorOptions) && colorOptions.length > 0
@@ -788,8 +792,8 @@ export default function Index({
         filters?.department_id ? String(filters.department_id) : "",
     );
 
+    const [showSectionWizard, setShowSectionWizard] = useState(false);
     const [showSectionModal, setShowSectionModal] = useState(false);
-    const [sectionModalMode, setSectionModalMode] = useState("create");
     const [sectionToEdit, setSectionToEdit] = useState(null);
 
     const [showClassModal, setShowClassModal] = useState(false);
@@ -802,11 +806,9 @@ export default function Index({
     const {
         data: sectionData,
         setData: setSectionData,
-        post: postSection,
         put: putSection,
         processing: sectionProcessing,
         errors: sectionErrors,
-        reset: resetSection,
         clearErrors: clearSectionErrors,
     } = useForm(defaultSectionState);
 
@@ -912,17 +914,15 @@ export default function Index({
         goToIndex(activeTab, "", "");
     };
 
-    const openCreateSectionModal = () => {
-        setSectionModalMode("create");
-        setSectionToEdit(null);
-        clearSectionErrors();
-        resetSection();
-        setSectionData({ ...defaultSectionState });
-        setShowSectionModal(true);
+    const openCreateSectionWizard = () => {
+        setShowSectionWizard(true);
+    };
+
+    const closeSectionWizard = () => {
+        setShowSectionWizard(false);
     };
 
     const openEditSectionModal = (section) => {
-        setSectionModalMode("edit");
         setSectionToEdit(section);
         clearSectionErrors();
         setSectionData({
@@ -951,23 +951,56 @@ export default function Index({
     const handleSectionSubmit = (event) => {
         event.preventDefault();
 
-        if (sectionModalMode === "edit" && sectionToEdit) {
-            putSection(
+        if (!sectionToEdit) {
+            return;
+        }
+
+        putSection(
+            route(
+                "superadmin.academic-management.sections.update",
+                sectionToEdit.id,
+            ),
+            {
+                preserveScroll: true,
+                onSuccess: closeSectionModal,
+            },
+        );
+    };
+
+    const sectionCreateSummary = flash?.section_create_summary || null;
+
+    const assignedStudentsSummary = Array.isArray(
+        sectionCreateSummary?.assigned_existing_students,
+    )
+        ? sectionCreateSummary.assigned_existing_students
+        : [];
+
+    const createdStudentsSummary = Array.isArray(
+        sectionCreateSummary?.created_students,
+    )
+        ? sectionCreateSummary.created_students
+        : [];
+
+    const handleClassSubmit = (event) => {
+        event.preventDefault();
+
+        if (classModalMode === "edit" && classToEdit) {
+            putClass(
                 route(
-                    "superadmin.academic-management.sections.update",
-                    sectionToEdit.id,
+                    "superadmin.academic-management.classes.update",
+                    classToEdit.id,
                 ),
                 {
                     preserveScroll: true,
-                    onSuccess: closeSectionModal,
+                    onSuccess: closeClassModal,
                 },
             );
             return;
         }
 
-        postSection(route("superadmin.academic-management.sections.store"), {
+        postClass(route("superadmin.academic-management.classes.store"), {
             preserveScroll: true,
-            onSuccess: closeSectionModal,
+            onSuccess: closeClassModal,
         });
     };
 
@@ -998,29 +1031,6 @@ export default function Index({
         setShowClassModal(false);
         setClassToEdit(null);
         clearClassErrors();
-    };
-
-    const handleClassSubmit = (event) => {
-        event.preventDefault();
-
-        if (classModalMode === "edit" && classToEdit) {
-            putClass(
-                route(
-                    "superadmin.academic-management.classes.update",
-                    classToEdit.id,
-                ),
-                {
-                    preserveScroll: true,
-                    onSuccess: closeClassModal,
-                },
-            );
-            return;
-        }
-
-        postClass(route("superadmin.academic-management.classes.store"), {
-            preserveScroll: true,
-            onSuccess: closeClassModal,
-        });
     };
 
     const openDeleteModal = (type, item) => {
@@ -1101,7 +1111,7 @@ export default function Index({
                         type="button"
                         onClick={() =>
                             activeTab === "sections"
-                                ? openCreateSectionModal()
+                                ? openCreateSectionWizard()
                                 : openCreateClassModal()
                         }
                         className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 sm:w-auto"
@@ -1110,6 +1120,95 @@ export default function Index({
                         {activeTab === "sections" ? "Add Section" : "Add Class"}
                     </button>
                 </div>
+
+                {sectionCreateSummary && (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                        <p className="text-sm font-semibold text-emerald-800">
+                            Section created: {sectionCreateSummary.section_name}{" "}
+                            ({sectionCreateSummary.section_code})
+                        </p>
+                        <p className="mt-1 text-xs text-emerald-700">
+                            Department: {sectionCreateSummary.department_code} -{" "}
+                            {sectionCreateSummary.department_name} | Grade:{" "}
+                            {sectionCreateSummary.grade_level} | Cohort:{" "}
+                            {sectionCreateSummary.cohort} | School Year:{" "}
+                            {sectionCreateSummary.school_year}
+                        </p>
+                        <p className="mt-1 text-xs text-emerald-700">
+                            Existing assigned:{" "}
+                            {sectionCreateSummary.existing_assigned_count} | New
+                            students created:{" "}
+                            {sectionCreateSummary.new_students_created_count} |
+                            Total: {sectionCreateSummary.total_students}
+                        </p>
+
+                        {(assignedStudentsSummary.length > 0 ||
+                            createdStudentsSummary.length > 0) && (
+                            <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                                <div className="rounded-xl border border-emerald-100 bg-white/70 p-3">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                                        Assigned Existing Students (
+                                        {assignedStudentsSummary.length})
+                                    </p>
+                                    <div className="mt-2 max-h-40 space-y-1 overflow-y-auto">
+                                        {assignedStudentsSummary.length ===
+                                        0 ? (
+                                            <p className="text-xs text-emerald-700">
+                                                No existing students were
+                                                assigned.
+                                            </p>
+                                        ) : (
+                                            assignedStudentsSummary.map(
+                                                (student) => (
+                                                    <p
+                                                        key={`assigned-${student.id}-${student.lrn || "none"}`}
+                                                        className="rounded-md bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-900"
+                                                    >
+                                                        {student.student_name} (
+                                                        {student.lrn || "-"})
+                                                        {student.previous_section
+                                                            ? ` from ${student.previous_section}`
+                                                            : ""}
+                                                    </p>
+                                                ),
+                                            )
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="rounded-xl border border-emerald-100 bg-white/70 p-3">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                                        Newly Created Students (
+                                        {createdStudentsSummary.length})
+                                    </p>
+                                    <div className="mt-2 max-h-40 space-y-1 overflow-y-auto">
+                                        {createdStudentsSummary.length === 0 ? (
+                                            <p className="text-xs text-emerald-700">
+                                                No new student accounts were
+                                                created.
+                                            </p>
+                                        ) : (
+                                            createdStudentsSummary.map(
+                                                (student) => (
+                                                    <p
+                                                        key={`created-${student.id}-${student.lrn || "none"}`}
+                                                        className="rounded-md bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-900"
+                                                    >
+                                                        {student.student_name} (
+                                                        {student.lrn || "-"})
+                                                        {student.personal_email
+                                                            ? ` • ${student.personal_email}`
+                                                            : ""}
+                                                    </p>
+                                                ),
+                                            )
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <StatCard
@@ -1678,7 +1777,7 @@ export default function Index({
 
             <SectionFormModal
                 isOpen={showSectionModal}
-                mode={sectionModalMode}
+                mode="edit"
                 data={sectionData}
                 setData={setSectionData}
                 errors={sectionErrors}
@@ -1686,6 +1785,14 @@ export default function Index({
                 onClose={closeSectionModal}
                 onSubmit={handleSectionSubmit}
                 departments={departments}
+            />
+
+            <AddSectionWizardModal
+                isOpen={showSectionWizard}
+                onClose={closeSectionWizard}
+                departments={departments}
+                currentSchoolYear={currentSchoolYear}
+                availableStudents={availableStudents}
             />
 
             <ClassFormModal

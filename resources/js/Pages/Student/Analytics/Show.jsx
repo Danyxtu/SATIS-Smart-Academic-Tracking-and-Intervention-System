@@ -1,6 +1,6 @@
 import React, { useMemo, useState, Fragment } from "react";
 import StudentLayout from "@/Layouts/StudentLayout";
-import { Head, Link } from "@inertiajs/react";
+import { Head, Link, router } from "@inertiajs/react";
 import { Dialog, Transition } from "@headlessui/react";
 import {
     XAxis,
@@ -90,6 +90,14 @@ const getRemarks = (grade) => {
     };
 };
 
+const normalizeQuarter = (quarterValue) => {
+    if (quarterValue === null || quarterValue === undefined) return null;
+    const numericQuarter = Number(String(quarterValue).replace(/[^0-9]/g, ""));
+    return Number.isFinite(numericQuarter) && numericQuarter > 0
+        ? numericQuarter
+        : null;
+};
+
 // Quarter Grade Card Component
 const QuarterGradeCard = ({
     quarter,
@@ -99,6 +107,8 @@ const QuarterGradeCard = ({
     attendance,
     assignmentCount,
     hasStarted = true,
+    isSelected = false,
+    onClick,
 }) => {
     const remarks = getRemarks(grade);
     const gradeColor = getGradeColor(grade);
@@ -107,7 +117,20 @@ const QuarterGradeCard = ({
     // Card for quarters that haven't started - NO expected grade, just message
     if (!hasStarted) {
         return (
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-5 border border-dashed border-gray-200 dark:border-gray-700">
+            <button
+                type="button"
+                onClick={onClick}
+                className={`w-full text-left bg-white dark:bg-gray-900 rounded-2xl shadow-md p-5 border border-dashed transition-all hover:shadow-lg ${
+                    isSelected
+                        ? "border-pink-300 ring-2 ring-pink-200"
+                        : "border-gray-200 dark:border-gray-700"
+                }`}
+                title={
+                    isSelected
+                        ? `Quarter ${quarterNum} is selected and has not started yet.`
+                        : `Quarter ${quarterNum} has not started yet. Click to open quarter details.`
+                }
+            >
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                         <div className="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
@@ -126,20 +149,33 @@ const QuarterGradeCard = ({
                 </div>
 
                 <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
-                    <p className="text-4xl font-bold text-gray-300 dark:text-gray-500 mb-2">
+                    <p className="text-3xl font-bold text-gray-300 dark:text-gray-500 mb-2">
                         --
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                         Quarter {quarterNum} has not started yet.
                     </p>
                 </div>
-            </div>
+            </button>
         );
     }
 
     // Card for active quarters with actual data
     return (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-5 hover:shadow-lg transition-shadow border border-transparent dark:border-gray-700">
+        <button
+            type="button"
+            onClick={onClick}
+            className={`w-full text-left bg-white dark:bg-gray-900 rounded-2xl shadow-md p-5 hover:shadow-lg transition-all border ${
+                isSelected
+                    ? "border-pink-300 ring-2 ring-pink-200"
+                    : "border-transparent dark:border-gray-700"
+            }`}
+            title={
+                isSelected
+                    ? "Showing this quarter."
+                    : "Click to open quarter details"
+            }
+        >
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                     <div
@@ -184,7 +220,7 @@ const QuarterGradeCard = ({
                 <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Current Grade
                 </p>
-                <p className={`text-4xl font-bold ${gradeColor}`}>
+                <p className={`text-3xl font-bold ${gradeColor}`}>
                     {grade !== null ? grade : "--"}
                 </p>
             </div>
@@ -223,12 +259,16 @@ const QuarterGradeCard = ({
                     </p>
                 </div>
             </div>
-        </div>
+        </button>
     );
 };
 
 // Quarterly Grades Cards Section
-const QuarterlyGradesCards = ({ data }) => {
+const QuarterlyGradesCards = ({
+    data,
+    selectedQuarter = null,
+    onQuarterSelect,
+}) => {
     // Find Q1 and Q2 data
     const q1Data = data.find((q) => q.quarterNum === 1);
     const q2Data = data.find((q) => q.quarterNum === 2);
@@ -251,6 +291,11 @@ const QuarterlyGradesCards = ({ data }) => {
             : calculateExpectedGrade(q1Data.grade, q1Data.assignmentCount)
         : null;
 
+    const handleQuarterClick = (quarterNum) => {
+        if (typeof onQuarterSelect !== "function") return;
+        onQuarterSelect(selectedQuarter === quarterNum ? null : quarterNum);
+    };
+
     // If no data at all
     if (!data || data.length === 0) {
         return (
@@ -268,6 +313,8 @@ const QuarterlyGradesCards = ({ data }) => {
                         attendance="--"
                         assignmentCount={0}
                         hasStarted={false}
+                        isSelected={selectedQuarter === 1}
+                        onClick={() => handleQuarterClick(1)}
                     />
                     <QuarterGradeCard
                         quarter="Q2"
@@ -277,6 +324,8 @@ const QuarterlyGradesCards = ({ data }) => {
                         attendance="--"
                         assignmentCount={0}
                         hasStarted={false}
+                        isSelected={selectedQuarter === 2}
+                        onClick={() => handleQuarterClick(2)}
                     />
                 </div>
             </div>
@@ -285,10 +334,22 @@ const QuarterlyGradesCards = ({ data }) => {
 
     return (
         <div className="space-y-4">
-            <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                <Calendar size={22} className="text-pink-600" />
-                Quarterly Grades
-            </h3>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                    <Calendar size={22} className="text-pink-600" />
+                    Quarterly Grades
+                </h3>
+
+                {selectedQuarter !== null && (
+                    <button
+                        type="button"
+                        onClick={() => onQuarterSelect?.(null)}
+                        className="text-xs font-medium px-2.5 py-1.5 rounded-full bg-pink-100 text-pink-700 hover:bg-pink-200 transition-colors"
+                    >
+                        Showing Q{selectedQuarter} • Clear filter
+                    </button>
+                )}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* First Quarter Card */}
                 <QuarterGradeCard
@@ -299,6 +360,8 @@ const QuarterlyGradesCards = ({ data }) => {
                     attendance={q1HasStarted ? q1Data.attendance : "--"}
                     assignmentCount={q1HasStarted ? q1Data.assignmentCount : 0}
                     hasStarted={q1HasStarted}
+                    isSelected={selectedQuarter === 1}
+                    onClick={() => handleQuarterClick(1)}
                 />
 
                 {/* Second Quarter Card */}
@@ -310,6 +373,8 @@ const QuarterlyGradesCards = ({ data }) => {
                     attendance={q2HasStarted ? q2Data.attendance : "--"}
                     assignmentCount={q2HasStarted ? q2Data.assignmentCount : 0}
                     hasStarted={q2HasStarted}
+                    isSelected={selectedQuarter === 2}
+                    onClick={() => handleQuarterClick(2)}
                 />
             </div>
 
@@ -334,6 +399,8 @@ const QuarterlyGradesCards = ({ data }) => {
                                 q3HasStarted ? q3Data.assignmentCount : 0
                             }
                             hasStarted={q3HasStarted}
+                            isSelected={selectedQuarter === 3}
+                            onClick={() => handleQuarterClick(3)}
                         />
                     )}
                     {q4Data && (
@@ -359,6 +426,8 @@ const QuarterlyGradesCards = ({ data }) => {
                                 q4HasStarted ? q4Data.assignmentCount : 0
                             }
                             hasStarted={q4HasStarted}
+                            isSelected={selectedQuarter === 4}
+                            onClick={() => handleQuarterClick(4)}
                         />
                     )}
                 </div>
@@ -368,7 +437,12 @@ const QuarterlyGradesCards = ({ data }) => {
 };
 
 // Grade Breakdown - split into three sections (Written Works, Performance Task, Quarterly Exam)
-const GradeBreakdown = ({ data }) => {
+const GradeBreakdown = ({ data, selectedQuarter = null }) => {
+    const matchesSelectedQuarter = (item) => {
+        if (selectedQuarter === null) return true;
+        return normalizeQuarter(item?.quarter) === selectedQuarter;
+    };
+
     // Handle both old array format and new structured format
     let writtenWorks = [];
     let performanceTasks = [];
@@ -376,12 +450,18 @@ const GradeBreakdown = ({ data }) => {
 
     if (data && typeof data === "object" && !Array.isArray(data)) {
         // New structured format
-        writtenWorks = data.writtenWorks?.items || [];
-        performanceTasks = data.performanceTask?.items || [];
-        quarterlyExams = data.quarterlyExam?.items || [];
+        writtenWorks = (data.writtenWorks?.items || []).filter(
+            matchesSelectedQuarter,
+        );
+        performanceTasks = (data.performanceTask?.items || []).filter(
+            matchesSelectedQuarter,
+        );
+        quarterlyExams = (data.quarterlyExam?.items || []).filter(
+            matchesSelectedQuarter,
+        );
     } else if (Array.isArray(data)) {
         // Legacy array format - categorize items
-        const items = data;
+        const items = data.filter(matchesSelectedQuarter);
 
         const matchBucket = (item, keywords) => {
             const text = (
@@ -417,6 +497,7 @@ const GradeBreakdown = ({ data }) => {
             <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-6 border border-transparent dark:border-gray-700">
                 <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4">
                     Grade Breakdown
+                    {selectedQuarter ? ` - Q${selectedQuarter}` : ""}
                 </h3>
                 <div className="text-center py-8">
                     <BookOpen
@@ -424,7 +505,9 @@ const GradeBreakdown = ({ data }) => {
                         className="mx-auto text-gray-300 dark:text-gray-500 mb-3"
                     />
                     <p className="text-gray-500 dark:text-gray-400">
-                        No assignments graded yet.
+                        {selectedQuarter
+                            ? `No graded assignments found for Q${selectedQuarter}.`
+                            : "No assignments graded yet."}
                     </p>
                 </div>
             </div>
@@ -488,7 +571,7 @@ const GradeBreakdown = ({ data }) => {
     return (
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-6 border border-transparent dark:border-gray-700">
             <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4">
-                Grade Breakdown
+                Grade Breakdown{selectedQuarter ? ` - Q${selectedQuarter}` : ""}
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -553,9 +636,14 @@ const detectCategory = (item) => {
 };
 
 // Grade Trend Line Chart - plots each score as a percentage, one line per category
-const GradeChart = ({ data }) => {
+const GradeChart = ({ data, selectedQuarter = null }) => {
     // data = gradeBreakdown array of { id, name, key, score, totalScore, percentage, quarter, createdAt }
-    const items = Array.isArray(data) ? data : [];
+    const items = Array.isArray(data)
+        ? data.filter((item) => {
+              if (selectedQuarter === null) return true;
+              return normalizeQuarter(item?.quarter) === selectedQuarter;
+          })
+        : [];
 
     // Filter items that have valid scores
     const validItems = items.filter(
@@ -567,11 +655,13 @@ const GradeChart = ({ data }) => {
             <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-4 border border-transparent dark:border-gray-700">
                 <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
                     <TrendingUp size={16} className="text-pink-600" />
-                    Grade Trend
+                    Grade Trend{selectedQuarter ? ` (Q${selectedQuarter})` : ""}
                 </h3>
                 <div className="h-32 flex items-center justify-center bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <p className="text-gray-400 dark:text-gray-500 text-sm">
-                        No data yet
+                        {selectedQuarter
+                            ? `No trend data for Q${selectedQuarter}`
+                            : "No data yet"}
                     </p>
                 </div>
             </div>
@@ -662,7 +752,7 @@ const GradeChart = ({ data }) => {
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-4 border border-transparent dark:border-gray-700">
             <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2 flex items-center gap-2">
                 <TrendingUp size={16} className="text-pink-600" />
-                Grade Trend
+                Grade Trend{selectedQuarter ? ` (Q${selectedQuarter})` : ""}
             </h3>
 
             {/* Legend */}
@@ -2361,6 +2451,72 @@ const AnalyticsShow = ({
         quarterlyGrades = [],
         gradeBreakdown = {},
     } = performance;
+    const [selectedQuarter, setSelectedQuarter] = useState(null);
+
+    const handleQuarterSelect = (quarterNum) => {
+        if (quarterNum === null) {
+            setSelectedQuarter(null);
+            return;
+        }
+
+        if (!enrollment?.id) return;
+
+        setSelectedQuarter(quarterNum);
+        router.get(
+            route("analytics.quarter.show", {
+                enrollment: enrollment.id,
+                quarter: quarterNum,
+            }),
+        );
+    };
+
+    const filteredGradeBreakdown = useMemo(() => {
+        if (selectedQuarter === null) return gradeBreakdown;
+
+        if (Array.isArray(gradeBreakdown)) {
+            return gradeBreakdown.filter(
+                (item) => normalizeQuarter(item?.quarter) === selectedQuarter,
+            );
+        }
+
+        if (gradeBreakdown && typeof gradeBreakdown === "object") {
+            const filterQuarterItems = (items = []) =>
+                items.filter(
+                    (item) =>
+                        normalizeQuarter(item?.quarter) === selectedQuarter,
+                );
+
+            return {
+                ...gradeBreakdown,
+                writtenWorks: gradeBreakdown.writtenWorks
+                    ? {
+                          ...gradeBreakdown.writtenWorks,
+                          items: filterQuarterItems(
+                              gradeBreakdown.writtenWorks.items || [],
+                          ),
+                      }
+                    : gradeBreakdown.writtenWorks,
+                performanceTask: gradeBreakdown.performanceTask
+                    ? {
+                          ...gradeBreakdown.performanceTask,
+                          items: filterQuarterItems(
+                              gradeBreakdown.performanceTask.items || [],
+                          ),
+                      }
+                    : gradeBreakdown.performanceTask,
+                quarterlyExam: gradeBreakdown.quarterlyExam
+                    ? {
+                          ...gradeBreakdown.quarterlyExam,
+                          items: filterQuarterItems(
+                              gradeBreakdown.quarterlyExam.items || [],
+                          ),
+                      }
+                    : gradeBreakdown.quarterlyExam,
+            };
+        }
+
+        return gradeBreakdown;
+    }, [gradeBreakdown, selectedQuarter]);
 
     // Determine grade status
     const gradeStatus = useMemo(() => {
@@ -2406,7 +2562,7 @@ const AnalyticsShow = ({
         <>
             <Head title={subject.name || "Subject Analytics"} />
 
-            <div className="max-w-7xl mx-auto space-y-6">
+            <div className="max-w-7xl mx-auto space-y-5">
                 {/* Breadcrumbs */}
                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2">
                     <Link
@@ -2424,18 +2580,18 @@ const AnalyticsShow = ({
                 {/* Header */}
                 <div className="flex flex-wrap justify-between items-start gap-4">
                     <div>
-                        <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
+                        <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100">
                             {subject.name}
                         </h1>
-                        <p className="text-lg text-gray-600 dark:text-gray-300">
+                        <p className="text-sm md:text-base text-gray-600 dark:text-gray-300">
                             {subject.teacher} • {subject.schoolYear}
                             {subject.section && ` • ${subject.section}`}
                         </p>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                         <button
                             onClick={handleExportPdf}
-                            className="flex items-center gap-2 bg-pink-600 text-white font-semibold py-2 px-4 rounded-xl hover:bg-pink-700 transition-colors"
+                            className="flex items-center gap-2 bg-pink-600 text-white font-semibold py-2 px-3.5 rounded-xl hover:bg-pink-700 transition-colors text-sm"
                         >
                             <FileDown size={18} />
                             Export PDF
@@ -2446,7 +2602,7 @@ const AnalyticsShow = ({
                             </p>
                             <div className="flex items-end gap-2">
                                 <p
-                                    className={`text-6xl font-bold ${gradeStatus.color}`}
+                                    className={`text-2xl md:text-3xl font-bold ${gradeStatus.color}`}
                                 >
                                     {overallGrade !== null ? overallGrade : "—"}
                                 </p>
@@ -2463,10 +2619,14 @@ const AnalyticsShow = ({
                 </div>
 
                 {/* Main Content Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                     {/* Left Column - Main Content */}
-                    <div className="lg:col-span-2 space-y-6">
-                        <QuarterlyGradesCards data={quarterlyGrades} />
+                    <div className="lg:col-span-2 space-y-5">
+                        <QuarterlyGradesCards
+                            data={quarterlyGrades}
+                            selectedQuarter={selectedQuarter}
+                            onQuarterSelect={handleQuarterSelect}
+                        />
                         <ExpectedGradeFactorsCard />
                         <ForYourCaseCard
                             currentGrade={overallGrade}
@@ -2474,14 +2634,20 @@ const AnalyticsShow = ({
                             quarterlyGrades={quarterlyGrades}
                             gradeBreakdown={gradeBreakdown}
                         />
-                        <GradeBreakdown data={gradeBreakdown} />
+                        <GradeBreakdown
+                            data={filteredGradeBreakdown}
+                            selectedQuarter={selectedQuarter}
+                        />
                         <SuggestionsCard suggestions={suggestions} />
                         <StudyAids />
                     </div>
 
                     {/* Right Column - Sidebar */}
-                    <div className="space-y-6">
-                        <GradeChart data={gradeBreakdown} />
+                    <div className="space-y-5">
+                        <GradeChart
+                            data={filteredGradeBreakdown}
+                            selectedQuarter={selectedQuarter}
+                        />
                         <AttendanceSummary attendance={attendance} />
                         {intervention && (
                             <InterventionCard intervention={intervention} />

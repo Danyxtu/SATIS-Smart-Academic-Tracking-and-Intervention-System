@@ -72,13 +72,23 @@ class ClassesServices
             return [
                 $schoolClass->id => $schoolClass->enrollments
                     ->map(function ($enrollment) {
+                        $user = $enrollment->user;
+                        $studentProfile = $user?->student;
+
                         return [
                             'id' => $enrollment->user_id,
-                            'name' => $enrollment->user->name,
-                            'student_number' => $enrollment->user->student?->student_number ?? 'N/A',
+                            'name' => $this->formatStudentDisplayName($user, $studentProfile),
+                            'student_number' => $studentProfile?->student_number ?? 'N/A',
+                            'sort_key' => $this->buildStudentSortKey($user, $studentProfile),
                         ];
                     })
-                    ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+                    ->sortBy('sort_key', SORT_NATURAL | SORT_FLAG_CASE)
+                    ->values()
+                    ->map(fn(array $student) => [
+                        'id' => $student['id'],
+                        'name' => $student['name'],
+                        'student_number' => $student['student_number'],
+                    ])
                     ->values(),
             ];
         });
@@ -91,6 +101,54 @@ class ClassesServices
             'semester2Count' => $semester2Count,
             'roster' => $roster,
         ];
+    }
+
+    private function formatStudentDisplayName($user, $studentProfile): string
+    {
+        $lastName = trim((string) ($user?->last_name ?? ''));
+        $firstName = trim((string) ($user?->first_name ?? ''));
+        $middleName = trim((string) ($user?->middle_name ?? ''));
+
+        if ($lastName !== '' || $firstName !== '' || $middleName !== '') {
+            $middleInitial = $middleName !== ''
+                ? Str::upper(Str::substr($middleName, 0, 1)) . '.'
+                : '';
+
+            $firstAndMiddle = trim($firstName . ($middleInitial !== '' ? ' ' . $middleInitial : ''));
+
+            if ($lastName !== '' && $firstAndMiddle !== '') {
+                return $lastName . ', ' . $firstAndMiddle;
+            }
+
+            if ($lastName !== '') {
+                return $lastName;
+            }
+
+            return $firstAndMiddle;
+        }
+
+        $fallbackName = preg_replace(
+            '/\s+/',
+            ' ',
+            trim((string) ($studentProfile?->student_name ?? $user?->name ?? 'Student')),
+        );
+
+        return is_string($fallbackName) && trim($fallbackName) !== ''
+            ? trim($fallbackName)
+            : 'Student';
+    }
+
+    private function buildStudentSortKey($user, $studentProfile): string
+    {
+        $lastName = Str::lower(trim((string) ($user?->last_name ?? '')));
+        $firstName = Str::lower(trim((string) ($user?->first_name ?? '')));
+        $middleName = Str::lower(trim((string) ($user?->middle_name ?? '')));
+
+        if ($lastName !== '' || $firstName !== '' || $middleName !== '') {
+            return trim($lastName . ' ' . $firstName . ' ' . $middleName);
+        }
+
+        return Str::lower($this->formatStudentDisplayName($user, $studentProfile));
     }
 
     public function createClass() {}

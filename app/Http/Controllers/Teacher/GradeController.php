@@ -75,6 +75,7 @@ class GradeController extends Controller
         $summary = [
             'updated' => 0,
             'cleared' => 0,
+            'auto_filled' => 0,
             'skipped' => 0,
             'errors' => [],
         ];
@@ -131,6 +132,12 @@ class GradeController extends Controller
 
             $summary['updated']++;
         }
+
+        $summary['auto_filled'] = $this->autoFillBlankScoresAfterQuarterlyExam(
+            $data['grades'],
+            $assignmentsByQuarter,
+            $enrollments->keys()->all(),
+        );
 
         return back()
             ->with('success', 'Grades updated successfully.')
@@ -424,6 +431,102 @@ class GradeController extends Controller
         }
 
         return true;
+    }
+
+    /**
+     * If a quarterly exam is already scored for a touched student+quarter,
+     * auto-fill any remaining blank activity scores with 0.
+     */
+    private function autoFillBlankScoresAfterQuarterlyExam(array $gradePayloads, array $assignmentsByQuarter, array $validEnrollmentIds): int
+    {
+        if (empty($gradePayloads) || empty($assignmentsByQuarter) || empty($validEnrollmentIds)) {
+            return 0;
+        }
+
+        $validEnrollmentLookup = array_fill_keys(array_map('intval', $validEnrollmentIds), true);
+
+        $touchedPairs = collect($gradePayloads)
+            ->map(function ($payload) {
+                return [
+                    'enrollment_id' => (int) ($payload['enrollment_id'] ?? 0),
+                    'quarter' => (int) ($payload['quarter'] ?? 1),
+                ];
+            })
+            ->filter(function (array $pair) use ($validEnrollmentLookup) {
+                return $pair['enrollment_id'] > 0
+                    && $pair['quarter'] > 0
+                    && isset($validEnrollmentLookup[$pair['enrollment_id']]);
+            })
+            ->unique(fn(array $pair) => $pair['enrollment_id'] . ':' . $pair['quarter'])
+            ->values();
+
+        if ($touchedPairs->isEmpty()) {
+            return 0;
+        }
+
+        $autoFilledCount = 0;
+
+        foreach ($touchedPairs as $pair) {
+            $enrollmentId = $pair['enrollment_id'];
+            $quarter = $pair['quarter'];
+            $assignments = $assignmentsByQuarter[$quarter] ?? $assignmentsByQuarter[1] ?? collect();
+
+            if (! $assignments || $assignments->isEmpty()) {
+                continue;
+            }
+
+            $quarterlyExamAssignmentIds = $assignments
+                ->filter(function ($assignment) {
+                    $categoryId = Str::lower((string) ($assignment['category_id'] ?? ''));
+                    $categoryLabel = Str::lower((string) ($assignment['category_label'] ?? ''));
+
+                    return $categoryId === 'quarterly_exam' || Str::contains($categoryLabel, 'quarterly exam');
+                })
+                ->pluck('id')
+                ->values();
+
+            if ($quarterlyExamAssignmentIds->isEmpty()) {
+                continue;
+            }
+
+            $hasQuarterlyExamScore = Grade::query()
+                ->where('enrollment_id', $enrollmentId)
+                ->where('quarter', $quarter)
+                ->whereIn('assignment_key', $quarterlyExamAssignmentIds->all())
+                ->exists();
+
+            if (! $hasQuarterlyExamScore) {
+                continue;
+            }
+
+            $existingAssignmentKeys = Grade::query()
+                ->where('enrollment_id', $enrollmentId)
+                ->where('quarter', $quarter)
+                ->pluck('assignment_key')
+                ->filter()
+                ->flip();
+
+            foreach ($assignments as $assignment) {
+                $assignmentId = (string) ($assignment['id'] ?? '');
+
+                if ($assignmentId === '' || $existingAssignmentKeys->has($assignmentId)) {
+                    continue;
+                }
+
+                Grade::create([
+                    'enrollment_id' => $enrollmentId,
+                    'assignment_key' => $assignmentId,
+                    'assignment_name' => $assignment['label'] ?? $assignmentId,
+                    'score' => 0,
+                    'total_score' => (float) ($assignment['total'] ?? 0),
+                    'quarter' => $quarter,
+                ]);
+
+                $autoFilledCount++;
+            }
+        }
+
+        return $autoFilledCount;
     }
 
     private function ensureTeacherOwnsClass(int $teacherId, SchoolClass $subjectTeacher): void

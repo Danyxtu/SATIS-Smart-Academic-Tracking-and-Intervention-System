@@ -70,12 +70,12 @@ const StatCard = ({ label, value, icon: Icon, color = "pink" }) => {
     };
 
     return (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-4 flex items-center gap-4 border border-transparent dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-3.5 flex items-center gap-3 border border-transparent dark:border-gray-700">
             <div className={`p-3 rounded-xl ${colorClasses[color]}`}>
                 <Icon size={24} />
             </div>
             <div>
-                <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                <p className="text-xl font-bold text-gray-800 dark:text-gray-100">
                     {value}
                 </p>
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -498,7 +498,7 @@ const InterventionCard = ({ intervention }) => {
                                 {intervention.subjectName}
                             </p>
                         </div>
-                        <div className="p-6">
+                        <div className="p-5">
                             <p className="text-gray-600 dark:text-gray-300 text-sm mb-4">
                                 You're requesting to mark this Tier 3
                                 intervention as complete. Your teacher will
@@ -697,7 +697,7 @@ const RecentFeedbackCard = ({ feedback, highlightId }) => {
 
     if (feedback.length === 0) {
         return (
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-6 border border-transparent dark:border-gray-700">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-5 border border-transparent dark:border-gray-700">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
                     <MessageSquare size={20} className="text-pink-600" />
                     Recent Feedback
@@ -719,7 +719,7 @@ const RecentFeedbackCard = ({ feedback, highlightId }) => {
     }
 
     return (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-6 border border-transparent dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-5 border border-transparent dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
                 <MessageSquare size={20} className="text-pink-600" />
                 Recent Feedback
@@ -842,12 +842,12 @@ const InterventionFeedback = ({
                 }
             `}</style>
 
-            <div className="max-w-7xl mx-auto space-y-6">
+            <div className="max-w-7xl mx-auto space-y-5">
                 {/* Header */}
                 <div className="flex flex-wrap justify-between items-center gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
-                            <ListTodo size={32} className="text-pink-600" />
+                        <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2.5">
+                            <ListTodo size={20} className="text-pink-600" />
                             Interventions & Feedback
                         </h1>
                         <p className="text-gray-500 dark:text-gray-400 mt-1">
@@ -891,7 +891,7 @@ const InterventionFeedback = ({
                 </div>
 
                 {/* Main Content */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
                     {/* Left Column: Interventions */}
                     <div className="lg:col-span-2 space-y-4">
                         {filteredInterventions.length > 0 ? (
@@ -914,9 +914,9 @@ const InterventionFeedback = ({
                         />
 
                         {/* Tips Card */}
-                        <div className="bg-gradient-to-br from-pink-500 to-purple-600 rounded-2xl shadow-md p-6 text-white">
-                            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                                <BookOpen size={20} />
+                        <div className="bg-gradient-to-br from-pink-500 to-purple-600 rounded-2xl shadow-md p-5 text-white">
+                            <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
+                                <BookOpen size={18} />
                                 Quick Tips
                             </h3>
                             <ul className="space-y-2 text-sm text-pink-100">

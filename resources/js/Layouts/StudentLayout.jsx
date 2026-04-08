@@ -4,7 +4,6 @@ import ConfirmationDialog from "@/Components/ConfirmationDialog";
 import { Link, usePage, router } from "@inertiajs/react";
 import getInitials from "@/utils/initialsHelper";
 import {
-    Book,
     House,
     Lightbulb,
     LogOut,
@@ -89,13 +88,6 @@ export default function StudentLayout({ children }) {
             activeCheck: "interventions-feed",
             showBadge: true,
             badgeCount: unreadCount,
-        },
-        {
-            icon: <Book size={19} />,
-            label: "Subject at Risk",
-            destination: "subject-at-risk",
-            activeCheck: "subject-at-risk",
-            showBadge: false,
         },
     ];
 

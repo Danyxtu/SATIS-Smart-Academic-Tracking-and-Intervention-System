@@ -6,11 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Department;
 use App\Models\SchoolClass;
 use App\Models\Section;
+use App\Models\Student;
 use App\Models\Subject;
 use App\Models\SystemSetting;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -230,6 +233,33 @@ class AcademicManagementController extends Controller
             ])
             ->values();
 
+        $availableStudents = Student::query()
+            ->with([
+                'user:id,first_name,middle_name,last_name,personal_email,department_id',
+                'sectionRecord:id,department_id,section_name',
+            ])
+            ->whereHas('user.roles', function ($query) {
+                $query->where('name', 'student');
+            })
+            ->orderBy('student_name')
+            ->get()
+            ->map(function (Student $student) {
+                return [
+                    'id' => (int) $student->id,
+                    'user_id' => $student->user_id ? (int) $student->user_id : null,
+                    'student_name' => $student->student_name,
+                    'lrn' => $student->lrn,
+                    'grade_level' => $student->grade_level,
+                    'strand' => $student->strand,
+                    'track' => $student->track,
+                    'personal_email' => $student->user?->personal_email,
+                    'department_id' => $student->user?->department_id ? (int) $student->user->department_id : null,
+                    'section_id' => $student->section_id ? (int) $student->section_id : null,
+                    'section_name' => $student->sectionRecord?->section_name ?? $student->section,
+                ];
+            })
+            ->values();
+
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
 
         return Inertia::render('SuperAdmin/AcademicManagement/Index', [
@@ -240,6 +270,7 @@ class AcademicManagementController extends Controller
             'sectionOptions' => $sectionOptions,
             'subjects' => $subjects,
             'teachers' => $teachers,
+            'availableStudents' => $availableStudents,
             'currentSchoolYear' => $currentSchoolYear,
             'colorOptions' => self::COLOR_OPTIONS,
             'filters' => [
@@ -257,37 +288,175 @@ class AcademicManagementController extends Controller
 
     public function storeSection(Request $request): RedirectResponse
     {
-        $validated = $request->validate($this->sectionValidationRules());
+        $validated = $request->validate($this->sectionCreateValidationRules());
 
         $department = Department::query()->findOrFail((int) $validated['department_id']);
-        $sectionName = $this->normalizeText($validated['section_name']);
-        $cohort = $this->normalizeText($validated['cohort']);
+        $schoolYear = SystemSetting::getCurrentSchoolYear();
+        $cohort = $this->resolveCohortFromSchoolYear($schoolYear);
 
-        $sectionCode = $this->normalizeNullableText($validated['section_code'] ?? null);
-        $sectionCode = $sectionCode !== null
-            ? $this->normalizeSectionCode($sectionCode)
-            : $this->generateSectionCode($sectionName);
+        $sectionBaseName = $this->normalizeText($validated['section_name']);
+        $gradeLevel = $this->normalizeGradeLevel($validated['grade_level']);
+        $formattedSectionName = $this->formatSectionName(
+            $gradeLevel,
+            $department->department_code,
+            $sectionBaseName,
+        );
 
-        $this->ensureUniqueSectionName((int) $department->id, $cohort, $sectionName);
+        $sectionCode = $this->generateSectionCode($formattedSectionName);
+
+        $this->ensureUniqueSectionName((int) $department->id, $cohort, $formattedSectionName);
         $sectionCode = $this->ensureUniqueSectionCode((int) $department->id, $cohort, $sectionCode);
 
-        Section::create([
-            'department_id' => (int) $department->id,
-            'created_by' => $request->user()?->id,
-            'section_name' => $sectionName,
-            'section_code' => $sectionCode,
-            'cohort' => $cohort,
-            'grade_level' => $this->normalizeNullableText($validated['grade_level'] ?? null),
-            'strand' => $this->normalizeNullableText($validated['strand'] ?? null) ?? $department->department_code,
-            'track' => $this->normalizeNullableText($validated['track'] ?? null),
-            'school_year' => $this->normalizeNullableText($validated['school_year'] ?? null) ?? SystemSetting::getCurrentSchoolYear(),
-            'description' => $this->normalizeNullableText($validated['description'] ?? null),
-            'is_active' => (bool) ($validated['is_active'] ?? true),
-        ]);
+        $assignedStudentIds = collect($validated['assigned_student_ids'] ?? [])
+            ->map(fn($value) => (int) $value)
+            ->filter(fn($value) => $value > 0)
+            ->unique()
+            ->values();
+
+        $newStudents = collect($validated['new_students'] ?? [])
+            ->map(function (array $item) {
+                return [
+                    'first_name' => $this->normalizeText($item['first_name'] ?? ''),
+                    'last_name' => $this->normalizeText($item['last_name'] ?? ''),
+                    'middle_name' => isset($item['middle_name']) ? $this->normalizeNullableText($item['middle_name']) : null,
+                    'lrn' => $this->normalizeText($item['lrn'] ?? ''),
+                    'personal_email' => isset($item['personal_email']) ? $this->normalizeNullableEmail($item['personal_email']) : null,
+                ];
+            })
+            ->values();
+
+        if ($assignedStudentIds->isEmpty() && $newStudents->isEmpty()) {
+            throw ValidationException::withMessages([
+                'student_assignment' => 'Add at least one student (assign existing or create new) before saving.',
+            ]);
+        }
+
+        $summary = DB::transaction(function () use (
+            $request,
+            $department,
+            $schoolYear,
+            $cohort,
+            $gradeLevel,
+            $formattedSectionName,
+            $sectionCode,
+            $assignedStudentIds,
+            $newStudents
+        ) {
+            $section = Section::create([
+                'department_id' => (int) $department->id,
+                'created_by' => $request->user()?->id,
+                'section_name' => $formattedSectionName,
+                'section_code' => $sectionCode,
+                'cohort' => $cohort,
+                'grade_level' => $gradeLevel,
+                'strand' => $department->department_code,
+                'track' => null,
+                'school_year' => $schoolYear,
+                'description' => null,
+                'is_active' => true,
+            ]);
+
+            $assignedExistingStudents = [];
+            if ($assignedStudentIds->isNotEmpty()) {
+                $students = Student::query()
+                    ->with('user')
+                    ->whereIn('id', $assignedStudentIds)
+                    ->get();
+
+                foreach ($students as $student) {
+                    $previousSection = $student->section;
+
+                    if (
+                        $student->user &&
+                        (int) ($student->user->department_id ?? 0) !== (int) $department->id
+                    ) {
+                        $student->user->update(['department_id' => (int) $department->id]);
+                    }
+
+                    $student->update([
+                        'section_id' => (int) $section->id,
+                        'section' => $section->section_name,
+                        'grade_level' => $section->grade_level,
+                        'strand' => $section->strand,
+                        'track' => $section->track,
+                    ]);
+
+                    $assignedExistingStudents[] = [
+                        'id' => (int) $student->id,
+                        'student_name' => $student->student_name,
+                        'lrn' => $student->lrn,
+                        'previous_section' => $previousSection,
+                    ];
+                }
+            }
+
+            $createdStudents = [];
+            foreach ($newStudents as $newStudent) {
+                $temporaryPassword = Str::random(10);
+
+                $user = User::create([
+                    'first_name' => $newStudent['first_name'],
+                    'middle_name' => $newStudent['middle_name'],
+                    'last_name' => $newStudent['last_name'],
+                    'username' => User::generateUniqueUsername($newStudent['first_name'] . ' ' . $newStudent['last_name']),
+                    'personal_email' => $newStudent['personal_email'],
+                    'password' => Hash::make($temporaryPassword),
+                    'must_change_password' => true,
+                    'department_id' => (int) $department->id,
+                    'created_by' => $request->user()?->id,
+                ]);
+
+                $user->syncRolesByName(['student']);
+
+                $middleName = $newStudent['middle_name'];
+                $studentName = trim(
+                    $newStudent['first_name']
+                        . ' '
+                        . ($middleName ? $middleName . ' ' : '')
+                        . $newStudent['last_name']
+                );
+
+                $createdStudent = Student::create([
+                    'user_id' => (int) $user->id,
+                    'student_name' => $studentName,
+                    'lrn' => $newStudent['lrn'],
+                    'grade_level' => $section->grade_level,
+                    'section' => $section->section_name,
+                    'section_id' => (int) $section->id,
+                    'strand' => $section->strand,
+                    'track' => $section->track,
+                ]);
+
+                $createdStudents[] = [
+                    'id' => (int) $createdStudent->id,
+                    'student_name' => $createdStudent->student_name,
+                    'lrn' => $createdStudent->lrn,
+                    'personal_email' => $newStudent['personal_email'],
+                ];
+            }
+
+            return [
+                'section_id' => (int) $section->id,
+                'section_name' => $section->section_name,
+                'section_code' => $section->section_code,
+                'department_name' => $department->department_name,
+                'department_code' => $department->department_code,
+                'cohort' => $section->cohort,
+                'grade_level' => $section->grade_level,
+                'school_year' => $section->school_year,
+                'is_active' => (bool) $section->is_active,
+                'existing_assigned_count' => count($assignedExistingStudents),
+                'new_students_created_count' => count($createdStudents),
+                'total_students' => count($assignedExistingStudents) + count($createdStudents),
+                'assigned_existing_students' => $assignedExistingStudents,
+                'created_students' => $createdStudents,
+            ];
+        });
 
         return redirect()
             ->route('superadmin.academic-management.index', ['tab' => 'sections'])
-            ->with('success', 'Section created successfully.');
+            ->with('success', 'Section created successfully.')
+            ->with('section_create_summary', $summary);
     }
 
     public function updateSection(Request $request, Section $section): RedirectResponse
@@ -322,6 +491,27 @@ class AcademicManagementController extends Controller
         return redirect()
             ->route('superadmin.academic-management.index', ['tab' => 'sections'])
             ->with('success', 'Section updated successfully.');
+    }
+
+    /**
+     * @return array<string, array<int, mixed>>
+     */
+    private function sectionCreateValidationRules(): array
+    {
+        return [
+            'department_id' => ['required', 'integer', Rule::exists('departments', 'id')],
+            'section_name' => ['required', 'string', 'max:255'],
+            'grade_level' => ['required', 'string', 'max:100'],
+            'school_year' => ['nullable', 'string', 'max:20'],
+            'assigned_student_ids' => ['nullable', 'array'],
+            'assigned_student_ids.*' => ['integer', Rule::exists('students', 'id')],
+            'new_students' => ['nullable', 'array'],
+            'new_students.*.first_name' => ['required', 'string', 'max:255'],
+            'new_students.*.last_name' => ['required', 'string', 'max:255'],
+            'new_students.*.middle_name' => ['nullable', 'string', 'max:255'],
+            'new_students.*.lrn' => ['required', 'string', 'max:20', 'distinct', Rule::unique('students', 'lrn')],
+            'new_students.*.personal_email' => ['nullable', 'email', 'max:255', Rule::unique('users', 'personal_email')],
+        ];
     }
 
     public function destroySection(Section $section): RedirectResponse
@@ -502,6 +692,60 @@ class AcademicManagementController extends Controller
         $normalized = $this->normalizeText($value);
 
         return $normalized !== '' ? $normalized : null;
+    }
+
+    private function normalizeNullableEmail(?string $value): ?string
+    {
+        $normalized = $this->normalizeNullableText($value);
+
+        return $normalized !== null ? Str::lower($normalized) : null;
+    }
+
+    private function normalizeGradeLevel(string $value): string
+    {
+        $normalized = $this->normalizeText($value);
+
+        if (preg_match('/(\d{1,2})/', $normalized, $matches) === 1) {
+            return 'Grade ' . $matches[1];
+        }
+
+        return $normalized;
+    }
+
+    private function extractGradeToken(string $gradeLevel): string
+    {
+        if (preg_match('/(\d{1,2})/', $gradeLevel, $matches) === 1) {
+            return $matches[1];
+        }
+
+        return $gradeLevel;
+    }
+
+    private function formatSectionName(string $gradeLevel, string $departmentCode, string $baseSectionName): string
+    {
+        $gradeToken = $this->extractGradeToken($gradeLevel);
+        $normalizedDepartmentCode = Str::upper($this->normalizeText($departmentCode));
+        $normalizedSectionName = $this->normalizeText($baseSectionName);
+
+        return sprintf(
+            '%s - %s - %s',
+            $gradeToken,
+            $normalizedDepartmentCode,
+            $normalizedSectionName,
+        );
+    }
+
+    private function resolveCohortFromSchoolYear(string $schoolYear): string
+    {
+        if (preg_match('/^(\d{4})-\d{4}$/', $schoolYear, $matches) === 1) {
+            return $matches[1];
+        }
+
+        if (preg_match('/(\d{4})/', $schoolYear, $matches) === 1) {
+            return $matches[1];
+        }
+
+        return (string) now()->year;
     }
 
     private function normalizeSectionCode(string $value): string

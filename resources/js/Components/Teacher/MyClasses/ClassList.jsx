@@ -13,9 +13,9 @@ const ClassList = ({
     };
 
     return (
-        <div className="overflow-hidden border border-gray-200 rounded-lg">
+        <div className="overflow-hidden border border-gray-400 dark:border-gray-600 rounded-lg">
             <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="bg-gray-50 dark:bg-gray-800/80 border-b border-gray-400 dark:border-gray-600">
                     <tr>
                         <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                             Student Name
@@ -34,11 +34,11 @@ const ClassList = ({
                         </th>
                     </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-400 dark:divide-gray-600">
                     {filteredStudents.map((student, index) => (
                         <tr
                             key={buildStudentKey(student, index)}
-                            className="hover:bg-gray-50 transition-colors"
+                            className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors"
                         >
                             {/* Student Name */}
                             <td className="px-6 py-4">

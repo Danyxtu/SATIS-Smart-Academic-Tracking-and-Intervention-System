@@ -248,19 +248,19 @@ export const tutorialData = {
 
     subjectsAtRisk: {
         id: "subjectsAtRisk",
-        title: "Subjects at Risk",
+        title: "Risk Overview",
         description:
-            "Identify and manage subjects that need immediate attention",
+            "Identify and manage subjects that need immediate attention inside Performance Analytics",
         icon: AlertTriangle,
         color: "#DC2626",
         steps: [
             {
                 title: "Risk Overview",
                 description:
-                    "This page shows all subjects where your grade is below the passing threshold or declining rapidly. Early intervention is key to success!",
+                    "Use the Risk Overview filter chips in Performance Analytics to show only At Risk, Critical, Needs Attention, or On Track subjects.",
                 icon: AlertTriangle,
                 highlightArea: "Risk Summary",
-                tip: "Check this page weekly to catch issues early.",
+                tip: "Check this section weekly to catch issues early.",
             },
             {
                 title: "Risk Levels",
@@ -272,24 +272,24 @@ export const tutorialData = {
             {
                 title: "Subject Details",
                 description:
-                    "Click on any at-risk subject to see detailed information including: current grade, grade trend, missing assignments, and intervention options.",
+                    "Click any subject card to open full analytics with grade breakdown, trend analysis, and intervention context.",
                 icon: BookOpen,
                 highlightArea: "Subject Cards",
             },
             {
                 title: "Missing Assignments",
                 description:
-                    "View all missing or incomplete assignments for each subject. Completing these can quickly improve your grade.",
+                    "Inside subject analytics, review assignment-level grades by category and quarter to find missing or low-scoring work quickly.",
                 icon: XCircle,
                 highlightArea: "Missing Work Section",
                 tip: "Submitting late work is usually better than not submitting at all!",
             },
             {
-                title: "Request Intervention",
+                title: "Take Action",
                 description:
-                    "If you need additional help, you can request an intervention directly from this page. Teachers will be notified of your need for support.",
+                    "When a subject is at risk, coordinate through Interventions & Feedback and follow assigned tasks from your teacher.",
                 icon: Users,
-                highlightArea: "Request Button",
+                highlightArea: "Intervention Workflow",
             },
         ],
     },

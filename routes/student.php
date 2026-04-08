@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
 use App\Http\Controllers\Student\InterventionController as StudentInterventionController;
-use App\Http\Controllers\Student\SubjectRiskController as StudentSubjectRiskController;
 use App\Http\Controllers\Student\AttendanceController as StudentAttendanceController;
 use App\Http\Controllers\Student\AnalyticsController as StudentAnalyticsController;
 
@@ -32,8 +31,9 @@ Route::middleware(['auth', 'verified', 'can:access-student-portal'])->group(func
     Route::post('/feedback/{notification}/read', [StudentInterventionController::class, 'markFeedbackRead'])
         ->name('feedback.read');
 
-    Route::get('/subject-at-risk', [StudentSubjectRiskController::class, 'index'])
-        ->name('subject-at-risk');
+    Route::get('/subject-at-risk', function () {
+        return redirect()->route('analytics.index', ['risk' => 'at-risk']);
+    })->name('subject-at-risk');
 
     Route::get('/learn-more', function () {
         return Inertia::render('Student/LearnMore');
@@ -44,6 +44,9 @@ Route::middleware(['auth', 'verified', 'can:access-student-portal'])->group(func
 
     Route::get('/analytics', [StudentAnalyticsController::class, 'index'])
         ->name('analytics.index');
+
+    Route::get('/analytics/{enrollment}/quarter/{quarter}', [StudentAnalyticsController::class, 'showQuarter'])
+        ->name('analytics.quarter.show');
 
     Route::get('/analytics/{enrollment}', [StudentAnalyticsController::class, 'show'])
         ->name('analytics.show');

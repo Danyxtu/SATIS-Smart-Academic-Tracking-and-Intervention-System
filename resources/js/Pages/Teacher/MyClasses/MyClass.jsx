@@ -605,6 +605,7 @@ const MyClass = (props) => {
         message: "",
     });
     const [dirtyGrades, setDirtyGrades] = useState({});
+    const [isEditingGrades, setIsEditingGrades] = useState(false);
     const [isImportingGrades, setIsImportingGrades] = useState(false);
     const [isSavingGrades, setIsSavingGrades] = useState(false);
     const [isSavingCategoryTask, setIsSavingCategoryTask] = useState(false);
@@ -924,6 +925,11 @@ const MyClass = (props) => {
         setLocalGradeStructure(gradeStructure);
     }, [gradeStructure, selectedClass?.id]);
 
+    useEffect(() => {
+        setDirtyGrades({});
+        setIsEditingGrades(false);
+    }, [selectedClass?.id]);
+
     const applyCategoriesForQuarter = (
         quarterToUpdate,
         categoriesForQuarter,
@@ -1010,8 +1016,17 @@ const MyClass = (props) => {
     ]);
 
     // Event Handlers
+    const handleStartEditingGrades = () => {
+        if (isArchiveReadOnly || selectedTab === "final") {
+            return;
+        }
+
+        setIsEditingGrades(true);
+    };
+
     const handleSaveGrades = async () => {
         if (isArchiveReadOnly) return;
+        if (!isEditingGrades) return;
         if (!hasGradeChanges || !selectedClass) return;
 
         const payload = [];
@@ -1046,6 +1061,7 @@ const MyClass = (props) => {
                 replace: true,
                 onSuccess: async () => {
                     setDirtyGrades({});
+                    setIsEditingGrades(false);
                     setGradeSubmissionModal({
                         isOpen: true,
                         status: "success",
@@ -1074,7 +1090,7 @@ const MyClass = (props) => {
     };
 
     const handleGradeChange = (studentId, assignmentId, maxScore, rawValue) => {
-        if (isArchiveReadOnly) {
+        if (isArchiveReadOnly || !isEditingGrades) {
             return;
         }
 
@@ -1666,9 +1682,11 @@ const MyClass = (props) => {
                             {/* View Mode Toggle - Compact */}
                             <div className="flex items-center p-0.5 bg-gray-100 dark:bg-gray-700 rounded-md">
                                 <button
-                                    onClick={() =>
-                                        setStudentViewMode("classList")
-                                    }
+                                    onClick={() => {
+                                        setStudentViewMode("classList");
+                                        setDirtyGrades({});
+                                        setIsEditingGrades(false);
+                                    }}
                                     className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
                                         studentViewMode === "classList"
                                             ? "bg-white dark:bg-gray-900 text-indigo-700 shadow-sm"
@@ -1747,26 +1765,34 @@ const MyClass = (props) => {
                                         ? "Uploading…"
                                         : "Upload Grades"}
                                 </button>
-                                <button
-                                    onClick={handleSaveGrades}
-                                    disabled={
-                                        !hasGradeChanges ||
-                                        isSavingGrades ||
-                                        isArchiveReadOnly
-                                    }
-                                    className="flex items-center gap-1 bg-emerald-600 text-white font-medium py-1.5 px-2.5 rounded-md hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 text-xs"
-                                    title={
-                                        isArchiveReadOnly
-                                            ? readOnlyHint
-                                            : "Save updated grades"
-                                    }
-                                >
-                                    {isSavingGrades
-                                        ? "Saving…"
-                                        : hasGradeChanges
-                                          ? `Save (${dirtyGradeCount})`
-                                          : "Save"}
-                                </button>
+                                {selectedTab !== "final" &&
+                                    !isArchiveReadOnly &&
+                                    (isEditingGrades ? (
+                                        <button
+                                            onClick={handleSaveGrades}
+                                            disabled={
+                                                !hasGradeChanges ||
+                                                isSavingGrades
+                                            }
+                                            className="flex items-center gap-1 bg-emerald-600 text-white font-medium py-1.5 px-2.5 rounded-md hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 text-xs"
+                                            title="Save updated grades"
+                                        >
+                                            {isSavingGrades
+                                                ? "Saving Grades..."
+                                                : hasGradeChanges
+                                                  ? `Save Grades (${dirtyGradeCount})`
+                                                  : "Save Grades"}
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={handleStartEditingGrades}
+                                            disabled={!selectedClass}
+                                            className="flex items-center gap-1 bg-indigo-600 text-white font-medium py-1.5 px-2.5 rounded-md hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60 text-xs"
+                                            title="Edit grades"
+                                        >
+                                            Edit Grades
+                                        </button>
+                                    ))}
                             </>
                         )}
 
@@ -1840,6 +1866,7 @@ const MyClass = (props) => {
                                             setSelectedTab("q1");
                                             setSelectedQuarter(1);
                                             setDirtyGrades({});
+                                            setIsEditingGrades(false);
                                         }}
                                         aria-pressed={selectedTab === "q1"}
                                         className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 ${
@@ -1856,6 +1883,7 @@ const MyClass = (props) => {
                                                 setSelectedTab("q2");
                                                 setSelectedQuarter(2);
                                                 setDirtyGrades({});
+                                                setIsEditingGrades(false);
                                             }
                                         }}
                                         disabled={!isQ2Unlocked}
@@ -1879,6 +1907,8 @@ const MyClass = (props) => {
                                         onClick={() => {
                                             if (isFinalUnlocked) {
                                                 setSelectedTab("final");
+                                                setDirtyGrades({});
+                                                setIsEditingGrades(false);
                                             }
                                         }}
                                         disabled={!isFinalUnlocked}
@@ -2374,7 +2404,7 @@ const MyClass = (props) => {
                                                 )}
                                             </tr>
                                         </thead>
-                                        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200">
+                                        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-400 dark:divide-gray-600">
                                             {sortedStudents.map(
                                                 (student, index) => {
                                                     const draftValues = {
@@ -2540,31 +2570,41 @@ const MyClass = (props) => {
                                                                                         : ""
                                                                                 }`}
                                                                             >
-                                                                                <input
-                                                                                    type="text"
-                                                                                    inputMode="decimal"
-                                                                                    pattern="^\\d*(\\.\\d{0,2})?$"
-                                                                                    value={
-                                                                                        inputValue
-                                                                                    }
-                                                                                    disabled={
-                                                                                        isArchiveReadOnly
-                                                                                    }
-                                                                                    onChange={(
-                                                                                        event,
-                                                                                    ) =>
-                                                                                        handleGradeChange(
-                                                                                            student.id,
-                                                                                            latestTask.id,
-                                                                                            latestTask.total,
-                                                                                            event
-                                                                                                .target
-                                                                                                .value,
-                                                                                        )
-                                                                                    }
-                                                                                    autoComplete="off"
-                                                                                    className="w-16 rounded border border-gray-300 dark:border-gray-600 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:bg-gray-100 dark:bg-gray-700 disabled:text-gray-500 dark:text-gray-400"
-                                                                                />
+                                                                                {isArchiveReadOnly ||
+                                                                                !isEditingGrades ? (
+                                                                                    <span className="inline-flex w-16 items-center justify-center rounded bg-gray-100/80 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                                                                                        {inputValue ===
+                                                                                        ""
+                                                                                            ? "—"
+                                                                                            : inputValue}
+                                                                                    </span>
+                                                                                ) : (
+                                                                                    <input
+                                                                                        type="text"
+                                                                                        inputMode="decimal"
+                                                                                        pattern="^\\d*(\\.\\d{0,2})?$"
+                                                                                        value={
+                                                                                            inputValue
+                                                                                        }
+                                                                                        disabled={
+                                                                                            isArchiveReadOnly
+                                                                                        }
+                                                                                        onChange={(
+                                                                                            event,
+                                                                                        ) =>
+                                                                                            handleGradeChange(
+                                                                                                student.id,
+                                                                                                latestTask.id,
+                                                                                                latestTask.total,
+                                                                                                event
+                                                                                                    .target
+                                                                                                    .value,
+                                                                                            )
+                                                                                        }
+                                                                                        autoComplete="off"
+                                                                                        className="w-16 rounded border border-gray-300 dark:border-gray-600 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:bg-gray-100 dark:bg-gray-700 disabled:text-gray-500 dark:text-gray-400"
+                                                                                    />
+                                                                                )}
                                                                             </td>,
                                                                         );
                                                                     } else {
@@ -2614,31 +2654,41 @@ const MyClass = (props) => {
                                                                                                 : ""
                                                                                         }`}
                                                                                     >
-                                                                                        <input
-                                                                                            type="text"
-                                                                                            inputMode="decimal"
-                                                                                            pattern="^\\d*(\\.\\d{0,2})?$"
-                                                                                            value={
-                                                                                                inputValue
-                                                                                            }
-                                                                                            disabled={
-                                                                                                isArchiveReadOnly
-                                                                                            }
-                                                                                            onChange={(
-                                                                                                event,
-                                                                                            ) =>
-                                                                                                handleGradeChange(
-                                                                                                    student.id,
-                                                                                                    task.id,
-                                                                                                    task.total,
-                                                                                                    event
-                                                                                                        .target
-                                                                                                        .value,
-                                                                                                )
-                                                                                            }
-                                                                                            autoComplete="off"
-                                                                                            className="w-16 rounded border border-gray-300 dark:border-gray-600 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:bg-gray-100 dark:bg-gray-700 disabled:text-gray-500 dark:text-gray-400"
-                                                                                        />
+                                                                                        {isArchiveReadOnly ||
+                                                                                        !isEditingGrades ? (
+                                                                                            <span className="inline-flex w-16 items-center justify-center rounded bg-gray-100/80 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                                                                                                {inputValue ===
+                                                                                                ""
+                                                                                                    ? "—"
+                                                                                                    : inputValue}
+                                                                                            </span>
+                                                                                        ) : (
+                                                                                            <input
+                                                                                                type="text"
+                                                                                                inputMode="decimal"
+                                                                                                pattern="^\\d*(\\.\\d{0,2})?$"
+                                                                                                value={
+                                                                                                    inputValue
+                                                                                                }
+                                                                                                disabled={
+                                                                                                    isArchiveReadOnly
+                                                                                                }
+                                                                                                onChange={(
+                                                                                                    event,
+                                                                                                ) =>
+                                                                                                    handleGradeChange(
+                                                                                                        student.id,
+                                                                                                        task.id,
+                                                                                                        task.total,
+                                                                                                        event
+                                                                                                            .target
+                                                                                                            .value,
+                                                                                                    )
+                                                                                                }
+                                                                                                autoComplete="off"
+                                                                                                className="w-16 rounded border border-gray-300 dark:border-gray-600 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:bg-gray-100 dark:bg-gray-700 disabled:text-gray-500 dark:text-gray-400"
+                                                                                            />
+                                                                                        )}
                                                                                     </td>,
                                                                                 );
                                                                             },
@@ -2765,8 +2815,8 @@ const MyClass = (props) => {
                                                     {getQuarterTermLabel(2)}
                                                 </th>
                                                 <th
-                                                    rowSpan={2}
-                                                    className="bg-emerald-50 px-3 py-2 text-center text-[10px] font-semibold text-emerald-700 uppercase tracking-wider min-w-[110px]"
+                                                    colSpan={2}
+                                                    className="bg-emerald-50 px-3 py-2 text-center text-[10px] font-semibold text-emerald-700 uppercase tracking-wider"
                                                 >
                                                     Overall Final
                                                 </th>
@@ -2823,9 +2873,15 @@ const MyClass = (props) => {
                                                 <th className="bg-violet-100/70 px-2 py-1.5 text-center text-[10px] font-semibold text-violet-700 border-r border-violet-200 min-w-[90px]">
                                                     Transmuted
                                                 </th>
+                                                <th className="bg-emerald-100/70 px-2 py-1.5 text-center text-[10px] font-semibold text-emerald-700 border-r border-emerald-200 min-w-[90px]">
+                                                    Final Grade
+                                                </th>
+                                                <th className="bg-emerald-100/70 px-2 py-1.5 text-center text-[10px] font-semibold text-emerald-700 min-w-[90px]">
+                                                    Remarks
+                                                </th>
                                             </tr>
                                         </thead>
-                                        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200">
+                                        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-400 dark:divide-gray-600">
                                             {sortedStudents.map(
                                                 (student, index) => {
                                                     const summary =
@@ -2856,6 +2912,13 @@ const MyClass = (props) => {
                                                         summary.q2_grade;
                                                     const final_grade =
                                                         summary.final_grade;
+                                                    const remarks =
+                                                        summary.remarks ??
+                                                        (final_grade == null
+                                                            ? "N/A"
+                                                            : final_grade >= 75
+                                                              ? "Passed"
+                                                              : "Failed");
                                                     const gradeColors =
                                                         getGradeRowColors(
                                                             final_grade != null
@@ -2981,6 +3044,21 @@ const MyClass = (props) => {
                                                                     null
                                                                         ? final_grade
                                                                         : "—"}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-3 py-2 whitespace-nowrap text-xs font-bold text-center text-gray-900 dark:text-gray-100 min-w-[100px]">
+                                                                <span
+                                                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                                        remarks ===
+                                                                        "Passed"
+                                                                            ? "bg-green-100 text-green-800"
+                                                                            : remarks ===
+                                                                                "Failed"
+                                                                              ? "bg-red-100 text-red-800"
+                                                                              : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                                                                    }`}
+                                                                >
+                                                                    {remarks}
                                                                 </span>
                                                             </td>
                                                         </tr>

@@ -174,7 +174,7 @@ Press `F12` to open DevTools. You'll want:
     - [ ] "View Interventions" button
     - [ ] "Check Attendance" button
     - [ ] "View Analytics" button
-    - [ ] "Subject at Risk" button
+    - [ ] "Risk Overview" button (opens Analytics filtered to at-risk)
 
 **Test Steps:**
 
@@ -240,24 +240,23 @@ Press `F12` to open DevTools. You'll want:
 5. Check PDF in Downloads folder
 ```
 
-#### 2.4 Subject at Risk
+#### 2.4 Risk Overview (Merged in Analytics)
 
-- [ ] Page loads
-- [ ] Shows only "at-risk" subjects
-- [ ] For each subject displays:
+- [ ] Analytics page loads with at-risk filter (from dashboard quick action or `?risk=at-risk`)
+- [ ] Shows only at-risk/critical subjects in filtered view
+- [ ] For each subject card displays:
     - [ ] Subject name
-    - [ ] Risk level (high/medium)
-    - [ ] Reason for risk
+    - [ ] Risk status badge (At Risk / Needs Attention / On Track)
     - [ ] Current grade
-    - [ ] Link to interventions
+- [ ] Clicking a subject opens detailed analytics page
 
 **Test Steps:**
 
 ```
-1. Go to /subject-at-risk
-2. Verify only at-risk subjects shown
-3. Click on subject to see details
-4. Click "View Interventions" link
+1. Go to /analytics?risk=at-risk
+2. Verify only at-risk/critical subjects are shown
+3. Switch risk tabs and verify counts/results update
+4. Click a subject and verify detailed analytics opens
 ```
 
 ---

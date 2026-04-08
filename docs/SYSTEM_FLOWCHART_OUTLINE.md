@@ -100,7 +100,7 @@ Pending approval path:
 - `Student Dashboard -> Mark Notification Read -> POST /notifications/{notification}/read (notifications.read) -> Dashboard Updated`
 - `Student Dashboard -> Mark All Notifications Read -> POST /notifications/read-all (notifications.read-all) -> Dashboard Updated`
 - `Student Dashboard -> Go to Interventions Feed -> GET /interventions-feed (interventions-feed) -> Interventions Feed`
-- `Student Dashboard -> Go to Subject at Risk -> GET /subject-at-risk (subject-at-risk) -> Subject Risk Page`
+- `Student Dashboard -> Go to Risk Overview -> GET /analytics?risk=at-risk (analytics.index) -> Analytics List (At Risk Filter)`
 - `Student Dashboard -> Go to Attendance -> GET /attendance (attendance) -> Attendance Page`
 - `Student Dashboard -> Go to Analytics -> GET /analytics (analytics.index) -> Analytics List`
 

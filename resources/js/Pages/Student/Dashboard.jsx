@@ -764,7 +764,7 @@ export default function Dashboard({
 
             <div className="min-h-screen bg-gray-50/50 dark:bg-gray-950">
                 {/* Welcome Header */}
-                <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-2xl mx-4 mt-4 p-6 text-white relative overflow-hidden">
+                <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-2xl mx-4 mt-4 p-5 text-white relative overflow-hidden">
                     {/* Background Pattern */}
                     <div className="absolute inset-0 opacity-10">
                         <svg
@@ -794,7 +794,7 @@ export default function Dashboard({
                     <div className="relative z-10">
                         <div className="flex items-center gap-2.5 mb-1.5">
                             <span className="text-xl">👋</span>
-                            <h1 className="text-2xl font-bold">
+                            <h1 className="text-lg md:text-xl font-bold">
                                 {getGreeting()},{" "}
                                 {student.firstName || "Student"}!
                             </h1>
@@ -804,30 +804,30 @@ export default function Dashboard({
                         </p>
 
                         {/* Quick Stats in Header */}
-                        <div className="mt-5 flex flex-wrap gap-3">
-                            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2.5">
+                        <div className="mt-4 flex flex-wrap gap-3">
+                            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3.5 py-2">
                                 <p className="text-xs text-indigo-100">
                                     Overall Grade
                                 </p>
-                                <p className="text-xl font-bold leading-tight">
+                                <p className="text-lg font-bold leading-tight">
                                     {stats.overallGrade !== null
                                         ? `${stats.overallGrade}%`
                                         : "N/A"}
                                 </p>
                             </div>
-                            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2.5">
+                            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3.5 py-2">
                                 <p className="text-xs text-indigo-100">
                                     Attendance
                                 </p>
-                                <p className="text-xl font-bold leading-tight">
+                                <p className="text-lg font-bold leading-tight">
                                     {stats.overallAttendance}%
                                 </p>
                             </div>
-                            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2.5">
+                            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3.5 py-2">
                                 <p className="text-xs text-indigo-100">
                                     Tasks Completed
                                 </p>
-                                <p className="text-xl font-bold leading-tight">
+                                <p className="text-lg font-bold leading-tight">
                                     {stats.completedTasks}/{stats.totalTasks}
                                 </p>
                             </div>
@@ -840,7 +840,7 @@ export default function Dashboard({
                 </div>
 
                 {/* Main Content */}
-                <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+                <div className="max-w-7xl mx-auto px-4 py-5 space-y-5">
                     {/* Stats Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <StatCard
@@ -930,9 +930,9 @@ export default function Dashboard({
                     </div>
 
                     {/* Main Grid - Two Columns */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         {/* Left Column - Subject Performance */}
-                        <div className="lg:col-span-2 space-y-5">
+                        <div className="lg:col-span-2 space-y-4">
                             {/* Semester Toggle */}
                             {(semesters?.semester1Count > 0 ||
                                 semesters?.semester2Count > 0) && (
@@ -1054,8 +1054,8 @@ export default function Dashboard({
                             )}
 
                             {/* Subject Performance Section */}
-                            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
-                                <div className="flex items-center justify-between mb-5">
+                            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
+                                <div className="flex items-center justify-between mb-4">
                                     <div>
                                         <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                                             Subject Performance
@@ -1121,9 +1121,9 @@ export default function Dashboard({
                             </div>
 
                             {/* Grade Trend & Quick Actions */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* Grade Trend Card */}
-                                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
+                                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
                                     <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
                                         Grade Trend
                                     </h3>
@@ -1143,7 +1143,7 @@ export default function Dashboard({
                                 </div>
 
                                 {/* Upcoming Tasks */}
-                                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
+                                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
                                     <div className="flex items-center justify-between mb-3">
                                         <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                                             Pending Tasks
@@ -1188,9 +1188,9 @@ export default function Dashboard({
                         </div>
 
                         {/* Right Column - Notifications */}
-                        <div className="space-y-5">
+                        <div className="space-y-4">
                             {/* Notifications Section */}
-                            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
+                            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-3">
                                         <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">
@@ -1281,7 +1281,7 @@ export default function Dashboard({
                             </div>
 
                             {/* Quick Actions */}
-                            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
+                            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
                                 <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
                                     Quick Actions
                                 </h3>
@@ -1325,8 +1325,10 @@ export default function Dashboard({
                                         }
                                     />
                                     <QuickActionCard
-                                        title="Subjects at Risk"
-                                        href={route("subject-at-risk")}
+                                        title="Risk Overview"
+                                        href={route("analytics.index", {
+                                            risk: "at-risk",
+                                        })}
                                         icon={
                                             <svg
                                                 className="w-5 h-5 text-amber-500"

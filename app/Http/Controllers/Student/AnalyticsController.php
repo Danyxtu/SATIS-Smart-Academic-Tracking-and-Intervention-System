@@ -29,6 +29,12 @@ class AnalyticsController extends Controller
         $selectedSemester = $request->query('semester', SystemSetting::getCurrentSemester());
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
 
+        $requestedRiskFilter = (string) $request->query('risk', 'all');
+        $allowedRiskFilters = ['all', 'at-risk', 'critical', 'needs_attention', 'on_track'];
+        $activeRiskFilter = in_array($requestedRiskFilter, $allowedRiskFilters, true)
+            ? $requestedRiskFilter
+            : 'all';
+
         // Get all enrollments for this student with related data
         $enrollments = Enrollment::with([
             'subjectTeacher.subject',
@@ -148,6 +154,7 @@ class AnalyticsController extends Controller
                 'semester1Count' => $semester1Subjects->count(),
                 'semester2Count' => $semester2Subjects->count(),
             ],
+            'activeRiskFilter' => $activeRiskFilter,
         ]);
     }
 
@@ -303,6 +310,275 @@ class AnalyticsController extends Controller
             'risk' => $analytics['risk'],
             'suggestions' => $analytics['suggestions'],
         ]);
+    }
+
+    /**
+     * Display quarter details page with grade category/activity breakdown.
+     */
+    public function showQuarter(Request $request, $enrollmentId, $quarter): Response
+    {
+        $user = $request->user();
+        $selectedQuarter = (int) $quarter;
+
+        if ($selectedQuarter < 1 || $selectedQuarter > 4) {
+            abort(404);
+        }
+
+        $enrollment = Enrollment::with([
+            'subjectTeacher.subject',
+            'subjectTeacher.teacher',
+            'schoolClass.subject',
+            'schoolClass.teacher',
+            'subject',
+            'grades',
+        ])
+            ->where('user_id', $user->id)
+            ->where('id', $enrollmentId)
+            ->firstOrFail();
+
+        $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+        $subject = $class?->subject ?? $enrollment->subject;
+        $teacher = $class?->teacher;
+        $storedCategories = $class?->grade_categories ?? [];
+
+        $quarterNumbers = collect([1, 2, $selectedQuarter])
+            ->filter(fn($q) => $q >= 1 && $q <= 4)
+            ->unique()
+            ->values();
+
+        $quarters = $quarterNumbers
+            ->map(function ($quarterNumber) use ($enrollment, $storedCategories) {
+                $categories = $this->resolveQuarterCategories($storedCategories, (int) $quarterNumber);
+                return $this->buildQuarterInsights($enrollment, (int) $quarterNumber, $categories);
+            })
+            ->values();
+
+        $midtermQuarter = $quarters->firstWhere('quarter', 1);
+        $finalQuarter = $quarters->firstWhere('quarter', 2);
+
+        $midtermQuarterGrade = $midtermQuarter['quarterlyGrade'] ?? null;
+        $finalQuarterGrade = $finalQuarter['quarterlyGrade'] ?? null;
+
+        $combinedAverage = ($midtermQuarterGrade !== null && $finalQuarterGrade !== null)
+            ? $enrollment->final_grade
+            : null;
+
+        $remarks = trim((string) ($enrollment->remarks ?? ''));
+        $remarks = $remarks !== '' ? $remarks : 'N/A';
+
+        if ($finalQuarterGrade === null || $combinedAverage === null) {
+            $remarks = 'N/A';
+        }
+
+        $schoolYear = $class?->school_year ?? SystemSetting::getCurrentSchoolYear();
+
+        return Inertia::render('Student/Analytics/QuarterDetails', [
+            'enrollment' => [
+                'id' => $enrollment->id,
+                'subjectId' => $class?->subject_id ?? $subject?->id,
+            ],
+            'subject' => [
+                'id' => $subject?->id,
+                'name' => $subject?->subject_name ?? 'Unknown Subject',
+                'teacher' => $teacher?->name ?? 'N/A',
+                'section' => $class?->section ?? $subject?->section,
+                'schoolYear' => $schoolYear,
+            ],
+            'selectedQuarter' => $selectedQuarter,
+            'quarters' => $quarters,
+            'overallFinal' => [
+                'midtermQuarterGrade' => $midtermQuarterGrade,
+                'finalQuarterGrade' => $finalQuarterGrade,
+                'combinedAverage' => $combinedAverage,
+                'remarks' => $remarks,
+            ],
+        ]);
+    }
+
+    private function buildQuarterInsights(Enrollment $enrollment, int $quarter, array $categories): array
+    {
+        $quarterGrades = $enrollment->grades
+            ->where('quarter', $quarter)
+            ->values();
+
+        $scoredQuarterGrades = $quarterGrades
+            ->filter(fn($grade) => $grade->score !== null && $grade->score !== '')
+            ->values();
+
+        $hasStarted = $scoredQuarterGrades->isNotEmpty();
+
+        $scoresByKey = $quarterGrades->keyBy(fn($grade) => (string) $grade->assignment_key);
+
+        $totalScore = (float) $scoredQuarterGrades->sum(fn($grade) => (float) $grade->score);
+        $totalPossible = (float) $scoredQuarterGrades->sum(fn($grade) => (float) ($grade->total_score ?? 0));
+        $rawQuarterGrade = $totalPossible > 0
+            ? round(($totalScore / $totalPossible) * 100, 1)
+            : null;
+
+        $initialGrade = match ($quarter) {
+            1 => $hasStarted ? $enrollment->initial_grade_q1 : null,
+            2 => $hasStarted ? $enrollment->initial_grade_q2 : null,
+            default => $rawQuarterGrade,
+        };
+
+        $expectedGrade = match ($quarter) {
+            1 => $hasStarted ? $enrollment->expected_grade_q1 : null,
+            2 => $hasStarted ? $enrollment->expected_grade_q2 : null,
+            default => $rawQuarterGrade,
+        };
+
+        $quarterlyGrade = match ($quarter) {
+            1 => $hasStarted ? $enrollment->q1_grade : null,
+            2 => $hasStarted ? $enrollment->q2_grade : null,
+            default => $rawQuarterGrade !== null ? (int) round($rawQuarterGrade) : null,
+        };
+
+        $categoryRows = collect($categories)
+            ->map(function ($category) use ($scoresByKey, $quarterlyGrade) {
+                $tasks = collect($category['tasks'] ?? [])
+                    ->filter(fn($task) => is_array($task))
+                    ->values();
+
+                $activities = $tasks
+                    ->map(function ($task) use ($scoresByKey) {
+                        $taskId = (string) ($task['id'] ?? '');
+                        $grade = $taskId !== '' ? $scoresByKey->get($taskId) : null;
+
+                        $taskTotal = is_numeric($task['total'] ?? null)
+                            ? (float) $task['total']
+                            : (float) ($grade?->total_score ?? 0);
+
+                        $score = $grade?->score;
+                        $percentage = ($score !== null && $taskTotal > 0)
+                            ? round(((float) $score / $taskTotal) * 100, 1)
+                            : null;
+
+                        $taskName = trim((string) ($grade?->assignment_name ?? ($task['label'] ?? ($task['name'] ?? ''))));
+
+                        if ($taskName === '') {
+                            $taskName = $taskId !== '' ? $taskId : 'Activity';
+                        }
+
+                        return [
+                            'id' => $taskId,
+                            'name' => $taskName,
+                            'score' => $score,
+                            'totalScore' => $taskTotal > 0 ? round($taskTotal, 2) : null,
+                            'percentage' => $percentage,
+                        ];
+                    })
+                    ->values();
+
+                $completedActivities = $activities->filter(fn($item) => $item['score'] !== null)->count();
+                $earnedScore = (float) $activities
+                    ->filter(fn($item) => $item['score'] !== null)
+                    ->sum(fn($item) => (float) $item['score']);
+                $possibleScore = (float) $activities
+                    ->filter(fn($item) => $item['score'] !== null && $item['totalScore'] !== null)
+                    ->sum(fn($item) => (float) $item['totalScore']);
+
+                $categoryInitial = $possibleScore > 0
+                    ? round(($earnedScore / $possibleScore) * 100, 1)
+                    : null;
+
+                return [
+                    'id' => (string) ($category['id'] ?? ''),
+                    'label' => (string) ($category['label'] ?? 'Category'),
+                    'weight' => (float) ($category['weight'] ?? 0),
+                    'activitiesCount' => $tasks->count(),
+                    'completedActivities' => $completedActivities,
+                    'initialGrade' => $categoryInitial,
+                    'expectedGrade' => $categoryInitial,
+                    'quarterlyGrade' => $quarterlyGrade,
+                    'activities' => $activities,
+                ];
+            })
+            ->values();
+
+        $knownTaskIds = collect($categories)
+            ->flatMap(fn($category) => collect($category['tasks'] ?? [])->pluck('id'))
+            ->filter()
+            ->map(fn($id) => (string) $id)
+            ->values();
+
+        $uncategorizedGrades = $quarterGrades
+            ->filter(fn($grade) => !$knownTaskIds->contains((string) $grade->assignment_key))
+            ->values();
+
+        if ($uncategorizedGrades->isNotEmpty()) {
+            $uncategorizedActivities = $uncategorizedGrades
+                ->map(function ($grade) {
+                    $taskTotal = (float) $grade->total_score;
+                    $score = $grade->score;
+                    $percentage = ($score !== null && $taskTotal > 0)
+                        ? round(((float) $score / $taskTotal) * 100, 1)
+                        : null;
+
+                    return [
+                        'id' => (string) ($grade->assignment_key ?? $grade->id),
+                        'name' => (string) ($grade->assignment_name ?? 'Activity'),
+                        'score' => $score,
+                        'totalScore' => $taskTotal > 0 ? round($taskTotal, 2) : null,
+                        'percentage' => $percentage,
+                    ];
+                })
+                ->values();
+
+            $earnedScore = (float) $uncategorizedActivities
+                ->filter(fn($item) => $item['score'] !== null)
+                ->sum(fn($item) => (float) $item['score']);
+            $possibleScore = (float) $uncategorizedActivities
+                ->filter(fn($item) => $item['score'] !== null && $item['totalScore'] !== null)
+                ->sum(fn($item) => (float) $item['totalScore']);
+
+            $uncategorizedInitial = $possibleScore > 0
+                ? round(($earnedScore / $possibleScore) * 100, 1)
+                : null;
+
+            $categoryRows->push([
+                'id' => 'uncategorized',
+                'label' => 'Uncategorized Activities',
+                'weight' => 0,
+                'activitiesCount' => $uncategorizedActivities->count(),
+                'completedActivities' => $uncategorizedActivities->filter(fn($item) => $item['score'] !== null)->count(),
+                'initialGrade' => $uncategorizedInitial,
+                'expectedGrade' => $uncategorizedInitial,
+                'quarterlyGrade' => $quarterlyGrade,
+                'activities' => $uncategorizedActivities,
+            ]);
+        }
+
+        return [
+            'quarter' => $quarter,
+            'label' => $this->quarterLabel($quarter),
+            'hasStarted' => $hasStarted,
+            'initialGrade' => $initialGrade,
+            'expectedGrade' => $expectedGrade,
+            'quarterlyGrade' => $quarterlyGrade,
+            'totalActivities' => $categoryRows->sum('activitiesCount'),
+            'completedActivities' => $categoryRows->sum('completedActivities'),
+            'categories' => $categoryRows,
+        ];
+    }
+
+    private function resolveQuarterCategories(array $storedCategories, int $quarter): array
+    {
+        $firstQuarter = $storedCategories['1'] ?? $storedCategories[1] ?? null;
+
+        if ($firstQuarter !== null && is_array($firstQuarter) && !isset($firstQuarter['id']) && !isset($firstQuarter['label'])) {
+            return $storedCategories[$quarter] ?? $storedCategories[(string) $quarter] ?? [];
+        }
+
+        return $storedCategories;
+    }
+
+    private function quarterLabel(int $quarter): string
+    {
+        return match ($quarter) {
+            1 => 'Midterm Quarter (Q1)',
+            2 => 'Final Quarter (Q2)',
+            default => "Quarter {$quarter}",
+        };
     }
 
     /**
