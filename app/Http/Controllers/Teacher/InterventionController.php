@@ -8,23 +8,24 @@ use App\Models\Enrollment;
 use App\Models\Intervention;
 use App\Models\InterventionTask;
 use App\Models\StudentNotification;
-use App\Services\PredictionService;
+use App\Services\WatchlistRuleService;
 use App\Support\StudentNameFormatter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
-use Illuminate\Support\Facades\Log;
 
 class InterventionController extends Controller
 {
-    protected PredictionService $predictionService;
+    protected WatchlistRuleService $watchlistRuleService;
 
-    public function __construct(PredictionService $predictionService)
+    public function __construct(WatchlistRuleService $watchlistRuleService)
     {
-        $this->predictionService = $predictionService;
+        $this->watchlistRuleService = $watchlistRuleService;
     }
 
     /**
@@ -66,11 +67,11 @@ class InterventionController extends Controller
             $subjectName = $subject?->subject_name ?? 'N/A';
             $classSection = $classAssignment?->section;
 
+            $risk = $this->watchlistRuleService->evaluateEnrollment($enrollment);
+            $metrics = $risk['metrics'] ?? [];
+
             // Calculate current grade percentage
-            $grades = $enrollment->grades;
-            $totalScore = $grades->sum('score');
-            $totalPossible = $grades->sum('total_score');
-            $gradePercentage = $totalPossible > 0 ? round(($totalScore / $totalPossible) * 100) : null;
+            $gradePercentage = data_get($metrics, 'current_grade');
 
             // Calculate attendance rate
             $attendanceRecords = $enrollment->attendanceRecords;
@@ -78,39 +79,19 @@ class InterventionController extends Controller
             $presentDays = $attendanceRecords->where('status', 'present')->count();
             $attendanceRate = $totalDays > 0 ? round(($presentDays / $totalDays) * 100) : 100;
 
-            // Count missing assignments (scores that are 0 or null)
-            $missingAssignments = $grades->filter(fn($g) => $g->score === null || $g->score == 0)->count();
-
-            // Use PredictionService for risk category
-            $riskCategory = $this->predictionService->determineRiskCategory(
-                $gradePercentage,
-                $missingAssignments,
-                $attendanceRate
-            );
-            $riskKey = $this->predictionService->getRiskCategoryKey(
-                $gradePercentage,
-                $missingAssignments,
-                $attendanceRate
-            );
-
-            // Build alert reasons
-            $alertReasons = [];
-            if ($gradePercentage !== null && $gradePercentage < 75) {
-                $alertReasons[] = "Grade: {$gradePercentage}%";
-            }
-            if ($missingAssignments >= 2) {
-                $alertReasons[] = "{$missingAssignments} Missing";
-            }
-            if ($attendanceRate < 90) {
-                $alertReasons[] = "Attendance: {$attendanceRate}%";
-            }
+            $failingActivities = (int) data_get($metrics, 'failing_activities_total', 0);
+            $alertReasons = $risk['reasons'] ?? [];
 
             // Get existing intervention info
             $intervention = $enrollment->intervention;
             $lastInterventionDate = $intervention?->updated_at?->format('Y-m-d');
 
             // Get prediction data
-            $prediction = $this->predictionService->predictFinalGrade($enrollment);
+            $prediction = [
+                'predicted_grade' => data_get($metrics, 'predicted_grade'),
+                'trend' => data_get($metrics, 'trend', 'Stable'),
+                'trend_direction' => (int) data_get($metrics, 'trend_direction', 0),
+            ];
 
             return [
                 'id' => $enrollment->id,
@@ -129,47 +110,23 @@ class InterventionController extends Controller
                 'gradeNumeric' => $gradePercentage,
                 'attendanceRate' => $attendanceRate,
                 'attendanceSummary' => $this->buildAttendanceSummary($enrollment->attendanceRecords),
-                'missingAssignmentCount' => $missingAssignments,
+                'missingAssignmentCount' => $failingActivities,
+                'failingActivityCount' => $failingActivities,
                 // New risk category format
-                'riskCategory' => $riskKey,
-                'riskLabel' => $riskCategory['label'],
-                'riskColor' => $riskCategory['color'],
+                'riskCategory' => $risk['risk_key'] ?? 'on_track',
+                'riskLabel' => $risk['risk_label'] ?? 'On Track',
+                'riskColor' => $risk['risk_color'] ?? 'green',
                 // Keep legacy priority for backwards compatibility
-                'priority' => match ($riskKey) {
-                    'critical' => 'High',
-                    'at_risk' => 'High',
-                    'needs_attention' => 'Medium',
-                    default => 'Low',
-                },
-                'alertReason' => !empty($alertReasons) ? implode(', ', $alertReasons) : 'Under Observation',
+                'priority' => $risk['priority'] ?? 'Low',
+                'watchLevel' => $risk['watch_level'] ?? 'none',
+                'alertReason' => !empty($alertReasons) ? implode(' ', $alertReasons) : 'Under Observation',
                 'lastInterventionDate' => $lastInterventionDate ?? 'Never',
                 'hasActiveIntervention' => $intervention && $intervention->status === 'active',
                 // Prediction data
                 'predictedGrade' => $prediction['predicted_grade'],
                 'gradeTrend' => $prediction['trend'],
                 'trendDirection' => $prediction['trend_direction'],
-                'intervention' => $intervention ? [
-                    'id' => $intervention->id,
-                    'type' => $intervention->type,
-                    'status' => $intervention->status,
-                    'notes' => $intervention->notes,
-                    'deadlineAt' => $intervention->deadline_at?->toIso8601String(),
-                    'deadlineLabel' => $intervention->deadline_at?->format('M d, Y h:i A'),
-                    'isDeadlineOverdue' => $intervention->deadline_at
-                        ? now()->gt($intervention->deadline_at) && $intervention->status === 'active'
-                        : false,
-                    'created_at' => $intervention->created_at?->format('Y-m-d'),
-                    'tasks' => $intervention->tasks->map(fn($task) => [
-                        'id' => $task->id,
-                        'description' => $task->description,
-                        'is_completed' => $task->is_completed,
-                    ])->toArray(),
-                    // Tier 3 completion request fields
-                    'isTier3' => $intervention->isTier3(),
-                    'isPendingApproval' => $intervention->isPendingApproval(),
-                    'completionRequestedAt' => $intervention->completion_requested_at?->format('M d, Y'),
-                    'completionRequestNotes' => $intervention->completion_request_notes,
-                ] : null,
+                'intervention' => $intervention ? $this->serializeIntervention($intervention) : null,
                 // Flag for pending completion requests (for easy filtering)
                 'hasPendingCompletionRequest' => $intervention?->isPendingApproval() ?? false,
             ];
@@ -217,36 +174,9 @@ class InterventionController extends Controller
                 ];
             }
 
-            // Calculate risk category to determine priority
-            $grades = $enrollment->grades;
-            $totalScore = $grades->sum('score');
-            $totalPossibleGrade = $grades->sum('total_score');
-            $gradePercentageForRisk = $totalPossibleGrade > 0 ? round(($totalScore / $totalPossibleGrade) * 100) : null;
-
-            $attendanceRecords = $enrollment->attendanceRecords;
-            $totalClasses = $attendanceRecords->count();
-            $presentCount = $attendanceRecords->whereIn('status', ['present', 'late', 'excused'])->count();
-            $attendanceRateForRisk = $totalClasses > 0 ? round(($presentCount / $totalClasses) * 100) : 100;
-
-            // Determine risk category
-            if ($gradePercentageForRisk !== null && $gradePercentageForRisk < 60) {
-                $riskKey = 'critical';
-            } elseif ($attendanceRateForRisk < 70) {
-                $riskKey = 'critical';
-            } elseif ($gradePercentageForRisk !== null && $gradePercentageForRisk < 75) {
-                $riskKey = 'at_risk';
-            } elseif ($attendanceRateForRisk < 85) {
-                $riskKey = 'needs_attention';
-            } else {
-                $riskKey = 'on_track';
-            }
-
-            $priority = match ($riskKey) {
-                'critical' => 'High',
-                'at_risk' => 'High',
-                'needs_attention' => 'Medium',
-                default => 'Low',
-            };
+            // Use shared global watchlist rules for profile priority as well.
+            $risk = $this->watchlistRuleService->evaluateEnrollment($enrollment);
+            $priority = $risk['priority'] ?? 'Low';
 
             // Build pending completion request data
             $pendingCompletionRequest = null;
@@ -275,6 +205,7 @@ class InterventionController extends Controller
                     'interventionLog' => $interventionLog,
                     'priority' => $priority,
                     'pendingCompletionRequest' => $pendingCompletionRequest,
+                    'activeIntervention' => $intervention ? $this->serializeIntervention($intervention) : null,
                 ],
             ];
         })->toArray();
@@ -307,7 +238,6 @@ class InterventionController extends Controller
             'notes' => 'nullable|string',
             'deadline_at' => 'nullable|date|after:now',
             'tasks' => 'nullable|array',
-            'tasks.*' => 'string|max:500',
             'send_email' => 'nullable|boolean',
         ]);
 
@@ -370,7 +300,6 @@ class InterventionController extends Controller
             'notes' => 'nullable|string',
             'deadline_at' => 'nullable|date|after:now',
             'tasks' => 'nullable|array',
-            'tasks.*' => 'string|max:500',
             'send_email' => 'nullable|boolean',
         ]);
 
@@ -418,6 +347,197 @@ class InterventionController extends Controller
     }
 
     /**
+     * Update an intervention record from the teacher management modal.
+     */
+    public function update(Request $request, Intervention $intervention)
+    {
+        $teacher = $request->user();
+        $this->authorizeInterventionForTeacher($intervention, (int) $teacher->id);
+
+        $validated = $request->validate([
+            'type' => ['required', 'string', Rule::in(array_keys(Intervention::getTypes()))],
+            'notes' => 'nullable|string|max:5000',
+            'deadline_at' => 'nullable|date|after:now',
+        ]);
+
+        $deadlineValue = array_key_exists('deadline_at', $validated)
+            ? $validated['deadline_at']
+            : $intervention->deadline_at?->toDateTimeString();
+
+        $intervention->update([
+            'type' => $validated['type'],
+            'notes' => $validated['notes'] ?? '',
+            'deadline_at' => $this->normalizeDeadlineForType($validated['type'], $deadlineValue),
+        ]);
+
+        return Redirect::back()->with('success', 'Intervention updated successfully.');
+    }
+
+    /**
+     * Delete an intervention and all related tasks.
+     */
+    public function destroy(Request $request, Intervention $intervention)
+    {
+        $teacher = $request->user();
+        $this->authorizeInterventionForTeacher($intervention, (int) $teacher->id);
+
+        $intervention->delete();
+
+        return Redirect::back()->with('success', 'Intervention deleted successfully.');
+    }
+
+    /**
+     * Add one task to an intervention.
+     */
+    public function storeTask(Request $request, Intervention $intervention)
+    {
+        $teacher = $request->user();
+        $this->authorizeInterventionForTeacher($intervention, (int) $teacher->id);
+
+        $validated = $request->validate([
+            'task_name' => 'required|string|max:150',
+            'description' => 'nullable|string|max:255',
+            'delivery_mode' => ['nullable', 'string', Rule::in(['remote', 'face_to_face'])],
+            'is_completed' => 'nullable|boolean',
+        ]);
+
+        $isCompleted = (bool) ($validated['is_completed'] ?? false);
+
+        $intervention->tasks()->create([
+            'task_name' => trim($validated['task_name']),
+            'description' => trim((string) ($validated['description'] ?? $validated['task_name'])),
+            'delivery_mode' => $validated['delivery_mode'] ?? null,
+            'is_completed' => $isCompleted,
+            'completed_at' => $isCompleted ? now() : null,
+            'approved_by_teacher_at' => $isCompleted ? now() : null,
+        ]);
+
+        return Redirect::back()->with('success', 'Task added to intervention.');
+    }
+
+    /**
+     * Update one task for an intervention.
+     */
+    public function updateTask(Request $request, Intervention $intervention, InterventionTask $task)
+    {
+        $teacher = $request->user();
+        $this->authorizeInterventionForTeacher($intervention, (int) $teacher->id);
+        $this->ensureTaskBelongsToIntervention($intervention, $task);
+
+        $validated = $request->validate([
+            'task_name' => 'required|string|max:150',
+            'description' => 'nullable|string|max:255',
+            'delivery_mode' => ['nullable', 'string', Rule::in(['remote', 'face_to_face'])],
+            'is_completed' => 'nullable|boolean',
+        ]);
+
+        $isCompleted = array_key_exists('is_completed', $validated)
+            ? (bool) $validated['is_completed']
+            : (bool) $task->is_completed;
+
+        $task->update([
+            'task_name' => trim($validated['task_name']),
+            'description' => trim((string) ($validated['description'] ?? $validated['task_name'])),
+            'delivery_mode' => $validated['delivery_mode'] ?? null,
+            'is_completed' => $isCompleted,
+            'completed_at' => $isCompleted ? ($task->completed_at ?? now()) : null,
+            'approved_by_teacher_at' => $isCompleted ? now() : null,
+        ]);
+
+        return Redirect::back()->with('success', 'Task updated successfully.');
+    }
+
+    /**
+     * Toggle task completion progress from the teacher modal.
+     */
+    public function toggleTaskCompletion(Request $request, Intervention $intervention, InterventionTask $task)
+    {
+        $teacher = $request->user();
+        $this->authorizeInterventionForTeacher($intervention, (int) $teacher->id);
+        $this->ensureTaskBelongsToIntervention($intervention, $task);
+
+        $validated = $request->validate([
+            'is_completed' => 'required|boolean',
+        ]);
+
+        $isCompleted = (bool) $validated['is_completed'];
+
+        $task->update([
+            'is_completed' => $isCompleted,
+            'completed_at' => $isCompleted ? now() : null,
+            'approved_by_teacher_at' => $isCompleted ? now() : null,
+        ]);
+
+        return Redirect::back()->with(
+            'success',
+            $isCompleted ? 'Task marked as done.' : 'Task marked as pending.'
+        );
+    }
+
+    /**
+     * Delete one task from an intervention.
+     */
+    public function destroyTask(Request $request, Intervention $intervention, InterventionTask $task)
+    {
+        $teacher = $request->user();
+        $this->authorizeInterventionForTeacher($intervention, (int) $teacher->id);
+        $this->ensureTaskBelongsToIntervention($intervention, $task);
+
+        $task->delete();
+
+        return Redirect::back()->with('success', 'Task deleted successfully.');
+    }
+
+    /**
+     * Allow teachers to directly approve completion for Tier 3 interventions.
+     */
+    public function completeWithoutRequest(Request $request, Intervention $intervention)
+    {
+        $teacher = $request->user();
+        $enrollment = $this->authorizeInterventionForTeacher($intervention, (int) $teacher->id);
+
+        if (! $intervention->isTier3()) {
+            return Redirect::back()->with('error', 'Only Tier 3 interventions can be directly approved.');
+        }
+
+        $validated = $request->validate([
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        $intervention->tasks()
+            ->where('is_completed', false)
+            ->update([
+                'is_completed' => true,
+                'completed_at' => now(),
+                'approved_by_teacher_at' => now(),
+            ]);
+
+        $intervention->update([
+            'status' => 'completed',
+            'approved_at' => now(),
+            'approved_by' => $teacher->id,
+            'approval_notes' => $validated['notes'] ?? null,
+            'completion_requested_at' => $intervention->completion_requested_at ?? now(),
+            'rejected_at' => null,
+            'rejection_reason' => null,
+        ]);
+
+        StudentNotification::create([
+            'user_id' => $enrollment->user_id,
+            'intervention_id' => $intervention->id,
+            'sender_id' => $teacher->id,
+            'type' => 'feedback',
+            'title' => '✅ Intervention Completed by Teacher',
+            'message' => 'Your teacher marked your intervention as complete. ' .
+                ($validated['notes'] ?? null
+                    ? "Teacher notes: {$validated['notes']}"
+                    : 'Please keep up the progress in this class.'),
+        ]);
+
+        return Redirect::back()->with('success', 'Intervention approved and completed.');
+    }
+
+    /**
      * Process intervention based on type.
      */
     private function processIntervention(Enrollment $enrollment, Intervention $intervention, array $validated, $teacher, bool $sendEmail)
@@ -427,8 +547,8 @@ class InterventionController extends Controller
         // Create in-app notification
         $this->createNotification($enrollment, $intervention, $teacher, $notificationType);
 
-        // If this is a task list, create the tasks
-        if ($validated['type'] === 'task_list' && !empty($validated['tasks'])) {
+        // Academic agreement and checklist-based interventions share a task flow.
+        if (in_array($validated['type'], ['task_list', 'academic_agreement'], true) && !empty($validated['tasks'])) {
             $this->createTasks($intervention, $validated['tasks']);
         }
 
@@ -502,24 +622,102 @@ class InterventionController extends Controller
     }
 
     /**
-     * Create task list items for the intervention.
+     * Create intervention tasks from either legacy string lists or rich task objects.
      */
-    private function createTasks(Intervention $intervention, array $tasks)
+    private function createTasks(Intervention $intervention, array $tasks, bool $replaceExisting = true): void
     {
-        // Delete existing tasks for this intervention (in case of update)
-        $intervention->tasks()->delete();
+        if ($replaceExisting) {
+            $intervention->tasks()->delete();
+        }
 
-        // Create new tasks
-        foreach ($tasks as $taskDescription) {
+        foreach ($tasks as $taskPayload) {
+            $normalizedTask = $this->normalizeTaskPayload($taskPayload);
+
             InterventionTask::create([
                 'intervention_id' => $intervention->id,
-                'description' => $taskDescription,
-                'is_completed' => false,
+                'task_name' => $normalizedTask['task_name'],
+                'description' => $normalizedTask['description'],
+                'delivery_mode' => $normalizedTask['delivery_mode'],
+                'is_completed' => $normalizedTask['is_completed'],
+                'completed_at' => $normalizedTask['is_completed'] ? now() : null,
+                'approved_by_teacher_at' => null,
             ]);
         }
 
-        // Reload tasks for email
         $intervention->load('tasks');
+    }
+
+    /**
+     * Normalize task payload from legacy strings or object-based task forms.
+     */
+    private function normalizeTaskPayload(mixed $taskPayload): array
+    {
+        if (is_string($taskPayload)) {
+            $taskName = trim($taskPayload);
+
+            if ($taskName === '') {
+                throw ValidationException::withMessages([
+                    'tasks' => 'Task names cannot be empty.',
+                ]);
+            }
+
+            return [
+                'task_name' => $taskName,
+                'description' => $taskName,
+                'delivery_mode' => null,
+                'is_completed' => false,
+            ];
+        }
+
+        if (!is_array($taskPayload)) {
+            throw ValidationException::withMessages([
+                'tasks' => 'Each task must be a string or task object.',
+            ]);
+        }
+
+        $taskName = trim((string) (
+            $taskPayload['task_name']
+            ?? $taskPayload['name']
+            ?? $taskPayload['title']
+            ?? ''
+        ));
+
+        if ($taskName === '') {
+            throw ValidationException::withMessages([
+                'tasks' => 'Each task object must include a task name.',
+            ]);
+        }
+
+        if (mb_strlen($taskName) > 150) {
+            throw ValidationException::withMessages([
+                'tasks' => 'Task name may not be greater than 150 characters.',
+            ]);
+        }
+
+        $description = trim((string) ($taskPayload['description'] ?? $taskName));
+        if ($description === '') {
+            $description = $taskName;
+        }
+
+        if (mb_strlen($description) > 255) {
+            throw ValidationException::withMessages([
+                'tasks' => 'Task description may not be greater than 255 characters.',
+            ]);
+        }
+
+        $deliveryMode = $taskPayload['delivery_mode'] ?? null;
+        if ($deliveryMode !== null && !in_array($deliveryMode, ['remote', 'face_to_face'], true)) {
+            throw ValidationException::withMessages([
+                'tasks' => 'Task delivery mode must be either remote or face_to_face.',
+            ]);
+        }
+
+        return [
+            'task_name' => $taskName,
+            'description' => $description,
+            'delivery_mode' => $deliveryMode,
+            'is_completed' => (bool) ($taskPayload['is_completed'] ?? false),
+        ];
     }
 
     /**
@@ -588,6 +786,14 @@ class InterventionController extends Controller
             'notes' => 'nullable|string|max:1000',
         ]);
 
+        $intervention->tasks()
+            ->where('is_completed', false)
+            ->update([
+                'is_completed' => true,
+                'completed_at' => now(),
+                'approved_by_teacher_at' => now(),
+            ]);
+
         $intervention->update([
             'status' => 'completed',
             'approved_at' => now(),
@@ -650,6 +856,78 @@ class InterventionController extends Controller
         ]);
 
         return back()->with('success', 'Completion request rejected. Student has been notified.');
+    }
+
+    private function authorizeInterventionForTeacher(Intervention $intervention, int $teacherId): Enrollment
+    {
+        $enrollment = $intervention->enrollment;
+
+        if (! $enrollment || ! $this->enrollmentOwnedByTeacher($enrollment, $teacherId)) {
+            abort(403, 'Unauthorized');
+        }
+
+        return $enrollment;
+    }
+
+    private function ensureTaskBelongsToIntervention(Intervention $intervention, InterventionTask $task): void
+    {
+        if ((int) $task->intervention_id !== (int) $intervention->id) {
+            abort(404, 'Task not found for this intervention.');
+        }
+    }
+
+    private function serializeIntervention(Intervention $intervention): array
+    {
+        $tasks = $intervention->tasks
+            ->map(fn(InterventionTask $task) => $this->serializeInterventionTask($task))
+            ->values();
+
+        $completedTasks = $tasks->where('is_completed', true)->count();
+        $totalTasks = $tasks->count();
+
+        return [
+            'id' => $intervention->id,
+            'type' => $intervention->type,
+            'typeLabel' => Intervention::getTypes()[$intervention->type] ?? $intervention->type,
+            'status' => $intervention->status,
+            'notes' => $intervention->notes,
+            'deadlineAt' => $intervention->deadline_at?->toIso8601String(),
+            'deadlineLabel' => $intervention->deadline_at?->format('M d, Y h:i A'),
+            'isDeadlineOverdue' => $intervention->deadline_at
+                ? now()->gt($intervention->deadline_at) && $intervention->status === 'active'
+                : false,
+            'created_at' => $intervention->created_at?->format('Y-m-d'),
+            'tasks' => $tasks->toArray(),
+            'completedTasks' => $completedTasks,
+            'totalTasks' => $totalTasks,
+            'progressPercent' => $totalTasks > 0
+                ? (int) round(($completedTasks / $totalTasks) * 100)
+                : 0,
+            'isTier3' => $intervention->isTier3(),
+            'isPendingApproval' => $intervention->isPendingApproval(),
+            'completionRequestedAt' => $intervention->completion_requested_at?->format('M d, Y'),
+            'completionRequestNotes' => $intervention->completion_request_notes,
+        ];
+    }
+
+    private function serializeInterventionTask(InterventionTask $task): array
+    {
+        $taskName = trim((string) ($task->task_name ?: $task->description));
+
+        return [
+            'id' => $task->id,
+            'task_name' => $taskName,
+            'description' => $task->description,
+            'delivery_mode' => $task->delivery_mode,
+            'delivery_mode_label' => match ($task->delivery_mode) {
+                'remote' => 'Remote',
+                'face_to_face' => 'Face-to-Face',
+                default => null,
+            },
+            'is_completed' => (bool) $task->is_completed,
+            'completed_at' => $task->completed_at?->toIso8601String(),
+            'approved_by_teacher_at' => $task->approved_by_teacher_at?->toIso8601String(),
+        ];
     }
 
     private function enrollmentOwnedByTeacher(Enrollment $enrollment, int $teacherId): bool

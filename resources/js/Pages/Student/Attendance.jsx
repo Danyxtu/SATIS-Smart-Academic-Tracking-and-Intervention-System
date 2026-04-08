@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import StudentLayout from "@/Layouts/StudentLayout";
-import { Head, usePage } from "@inertiajs/react";
+import { Head, Link, usePage } from "@inertiajs/react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import {
@@ -179,66 +179,86 @@ const StatusBadge = ({ status }) => {
 };
 
 // Subject Attendance Card
-const SubjectAttendanceCard = ({ item }) => (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-4 transition-all hover:shadow-xl hover:-translate-y-1 border border-transparent dark:border-gray-700">
-        <div className="flex justify-between items-start mb-3">
-            <div className="flex-1">
-                <h3 className="text-base font-bold text-gray-800 dark:text-gray-100 line-clamp-1">
-                    {item.subject}
-                </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {item.instructor}
-                </p>
+const SubjectAttendanceCard = ({ item }) => {
+    const hasStarted = Number(item.total) > 0;
+
+    return (
+        <Link
+            href={route("attendance.show", { enrollment: item.id })}
+            className="block bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-4 transition-all hover:shadow-xl hover:-translate-y-1 border border-transparent dark:border-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+            title={`View ${item.subject} attendance summary`}
+        >
+            <div className="flex justify-between items-start mb-3">
+                <div className="flex-1">
+                    <h3 className="text-base font-bold text-gray-800 dark:text-gray-100 line-clamp-1">
+                        {item.subject}
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {item.instructor}
+                    </p>
+                </div>
+                <div className="text-right">
+                    {hasStarted ? (
+                        <span
+                            className={`text-xl font-bold ${
+                                item.rate >= 90
+                                    ? "text-green-600"
+                                    : item.rate >= 80
+                                      ? "text-yellow-600"
+                                      : "text-red-600"
+                            }`}
+                        >
+                            {item.rate}%
+                        </span>
+                    ) : (
+                        <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                            Not yet Started
+                        </span>
+                    )}
+                </div>
             </div>
-            <div className="text-right">
-                <span
-                    className={`text-xl font-bold ${
-                        item.rate >= 90
-                            ? "text-green-600"
-                            : item.rate >= 80
-                              ? "text-yellow-600"
-                              : "text-red-600"
-                    }`}
-                >
-                    {item.rate}%
-                </span>
+            <AttendanceProgressBar rate={hasStarted ? item.rate : 0} />
+            <div className="grid grid-cols-4 gap-2 mt-3 text-center">
+                <div className="bg-green-50 dark:bg-green-900/25 rounded-lg p-2">
+                    <p className="text-base font-bold text-green-600">
+                        {item.present}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Present
+                    </p>
+                </div>
+                <div className="bg-red-50 dark:bg-red-900/25 rounded-lg p-2">
+                    <p className="text-base font-bold text-red-600">
+                        {item.absences}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Absent
+                    </p>
+                </div>
+                <div className="bg-yellow-50 dark:bg-yellow-900/25 rounded-lg p-2">
+                    <p className="text-base font-bold text-yellow-600">
+                        {item.lates}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Late
+                    </p>
+                </div>
+                <div className="bg-blue-50 dark:bg-blue-900/25 rounded-lg p-2">
+                    <p className="text-base font-bold text-blue-600">
+                        {item.excused}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Excused
+                    </p>
+                </div>
             </div>
-        </div>
-        <AttendanceProgressBar rate={item.rate} />
-        <div className="grid grid-cols-4 gap-2 mt-3 text-center">
-            <div className="bg-green-50 dark:bg-green-900/25 rounded-lg p-2">
-                <p className="text-base font-bold text-green-600">
-                    {item.present}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Present
-                </p>
-            </div>
-            <div className="bg-red-50 dark:bg-red-900/25 rounded-lg p-2">
-                <p className="text-base font-bold text-red-600">
-                    {item.absences}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Absent
-                </p>
-            </div>
-            <div className="bg-yellow-50 dark:bg-yellow-900/25 rounded-lg p-2">
-                <p className="text-base font-bold text-yellow-600">
-                    {item.lates}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Late</p>
-            </div>
-            <div className="bg-blue-50 dark:bg-blue-900/25 rounded-lg p-2">
-                <p className="text-base font-bold text-blue-600">
-                    {item.excused}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Excused
-                </p>
-            </div>
-        </div>
-    </div>
-);
+
+            <p className="mt-3 text-xs font-medium text-pink-600 dark:text-pink-400">
+                View attendance summary
+            </p>
+        </Link>
+    );
+};
 
 // Calendar Component with real data
 const AttendanceCalendar = ({ calendarData }) => {
@@ -393,6 +413,7 @@ const Attendance = ({
     const { props } = usePage();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+    const hashScrollDoneRef = useRef(false);
 
     // Build summary cards from real data
     const summaryCards = useMemo(() => {
@@ -437,6 +458,20 @@ const Attendance = ({
     // Check if we have any data
     const hasAttendanceData = summaryStats && summaryStats.totalDays > 0;
     const hasSubjects = subjectAttendance && subjectAttendance.length > 0;
+
+    useEffect(() => {
+        if (hashScrollDoneRef.current) return;
+        if (typeof window === "undefined") return;
+        if (window.location.hash !== "#attendance-subject-cards") return;
+
+        const target = document.getElementById("attendance-subject-cards");
+        if (!target) return;
+
+        hashScrollDoneRef.current = true;
+        window.requestAnimationFrame(() => {
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+    }, [hasSubjects, isLoading]);
 
     return (
         <>
@@ -597,7 +632,10 @@ const Attendance = ({
                         {/* Main Content: 2-Column Layout */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                             {/* Left Column: Subject Breakdown */}
-                            <div className="lg:col-span-2 space-y-5">
+                            <div
+                                id="attendance-subject-cards"
+                                className="lg:col-span-2 space-y-5 scroll-mt-24"
+                            >
                                 <h2 className="text-lg md:text-xl font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                                     <BookOpen size={22} />
                                     Attendance by Subject

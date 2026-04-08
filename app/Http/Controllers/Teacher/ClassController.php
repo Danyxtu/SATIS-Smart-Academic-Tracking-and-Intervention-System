@@ -1658,6 +1658,7 @@ class ClassController extends Controller
                 'subject',
                 'enrollments.user.student',
                 'enrollments.grades',
+                'enrollments.attendanceRecords',
             ]);
 
             // Use a try-catch to handle potential errors
@@ -1722,6 +1723,21 @@ class ClassController extends Controller
                     $user = $enrollment->user;
                     $studentProfile = $user?->student;
                     $formattedName = $this->formatStudentDisplayName($user, $studentProfile);
+                    $attendanceRecords = $enrollment->attendanceRecords
+                        ->sortByDesc('date')
+                        ->values();
+
+                    $presentDays = (int) $attendanceRecords->where('status', 'present')->count();
+                    $absentDays = (int) $attendanceRecords->where('status', 'absent')->count();
+                    $lateDays = (int) $attendanceRecords->where('status', 'late')->count();
+                    $excusedDays = (int) $attendanceRecords->where('status', 'excused')->count();
+                    $totalAttendanceDays = (int) $attendanceRecords->count();
+                    $attendedDays = $presentDays + $lateDays + $excusedDays;
+                    $attendanceRate = $totalAttendanceDays > 0
+                        ? round(($attendedDays / $totalAttendanceDays) * 100, 1)
+                        : null;
+
+                    $latestAttendance = $attendanceRecords->first();
 
                     return [
                         'id' => $enrollment->id,
@@ -1742,6 +1758,29 @@ class ClassController extends Controller
                                 $grade->assignment_key ?: Str::slug($grade->assignment_name, '_') => $grade->score,
                             ])->all();
                         })->toArray(),
+                        'attendance' => [
+                            'summary' => [
+                                'total_days' => $totalAttendanceDays,
+                                'present_days' => $presentDays,
+                                'absent_days' => $absentDays,
+                                'late_days' => $lateDays,
+                                'excused_days' => $excusedDays,
+                                'attended_days' => $attendedDays,
+                                'attendance_rate' => $attendanceRate,
+                                'last_status' => $latestAttendance?->status,
+                                'last_recorded_at' => $latestAttendance?->date?->format('Y-m-d'),
+                            ],
+                            'records' => $attendanceRecords
+                                ->take(20)
+                                ->map(fn($record) => [
+                                    'date' => $record->date?->format('Y-m-d'),
+                                    'date_label' => $record->date?->format('M d, Y'),
+                                    'status' => $record->status,
+                                    'status_label' => Str::headline(str_replace('_', ' ', (string) $record->status)),
+                                ])
+                                ->values()
+                                ->all(),
+                        ],
                     ];
                 })
                 ->sortBy('sort_key', SORT_NATURAL | SORT_FLAG_CASE)

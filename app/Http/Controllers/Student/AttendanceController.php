@@ -132,4 +132,66 @@ class AttendanceController extends Controller
             'calendarData' => $calendarData,
         ]);
     }
+
+    /**
+     * Display attendance summary for a specific enrolled subject.
+     */
+    public function show(Request $request, Enrollment $enrollment): Response
+    {
+        $enrollment = Enrollment::with([
+            'subjectTeacher.subject',
+            'subjectTeacher.teacher',
+            'schoolClass.subject',
+            'schoolClass.teacher',
+            'subject',
+            'attendanceRecords',
+        ])
+            ->whereKey($enrollment->id)
+            ->where('user_id', $request->user()->id)
+            ->firstOrFail();
+
+        $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+        $subject = $class?->subject ?? $enrollment->subject;
+        $teacher = $class?->teacher;
+
+        $records = $enrollment->attendanceRecords
+            ->sortByDesc(fn($record) => $record->date?->toDateString())
+            ->values();
+
+        $total = $records->count();
+        $present = $records->where('status', 'present')->count();
+        $absent = $records->where('status', 'absent')->count();
+        $late = $records->where('status', 'late')->count();
+        $excused = $records->where('status', 'excused')->count();
+
+        $effectivePresent = $present + $excused + ($late * 0.5);
+        $rate = $total > 0 ? round(($effectivePresent / $total) * 100) : null;
+
+        return Inertia::render('Student/AttendanceSummary', [
+            'subject' => [
+                'enrollmentId' => $enrollment->id,
+                'name' => $subject?->subject_name ?? 'Unknown Subject',
+                'instructor' => $teacher?->name ?? 'N/A',
+            ],
+            'hasStarted' => $total > 0,
+            'summary' => [
+                'rate' => $rate,
+                'total' => $total,
+                'present' => $present,
+                'absent' => $absent,
+                'late' => $late,
+                'excused' => $excused,
+            ],
+            'records' => $records->map(function ($record) {
+                return [
+                    'id' => $record->id,
+                    'date' => $record->date->format('M d, Y'),
+                    'dateRaw' => $record->date->toDateString(),
+                    'status' => ucfirst($record->status),
+                    'statusRaw' => $record->status,
+                    'recordedAt' => $record->created_at?->format('h:i A'),
+                ];
+            })->values(),
+        ]);
+    }
 }

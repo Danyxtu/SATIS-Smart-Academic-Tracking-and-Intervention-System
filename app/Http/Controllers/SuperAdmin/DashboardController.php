@@ -21,6 +21,7 @@ class DashboardController extends Controller
     {
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
         $currentSemester = SystemSetting::getCurrentSemester();
+        $classTable = (new SubjectTeacher())->getTable();
 
         $stats = [
             'total_departments' => Department::count(),
@@ -40,17 +41,17 @@ class DashboardController extends Controller
 
         $classesByDepartment = SubjectTeacher::query()
             ->selectRaw('users.department_id, COUNT(*) as classes_count')
-            ->join('users', 'users.id', '=', 'subject_teachers.teacher_id')
-            ->where('subject_teachers.school_year', $currentSchoolYear)
+            ->join('users', 'users.id', '=', "{$classTable}.teacher_id")
+            ->where("{$classTable}.school_year", $currentSchoolYear)
             ->whereNotNull('users.department_id')
             ->groupBy('users.department_id')
             ->pluck('classes_count', 'users.department_id');
 
         $enrolledStudentsByDepartment = Enrollment::query()
             ->selectRaw('users.department_id, COUNT(DISTINCT enrollments.user_id) as students_count')
-            ->join('subject_teachers', 'subject_teachers.id', '=', 'enrollments.subject_teachers_id')
-            ->join('users', 'users.id', '=', 'subject_teachers.teacher_id')
-            ->where('subject_teachers.school_year', $currentSchoolYear)
+            ->join($classTable, "{$classTable}.id", '=', 'enrollments.class_id')
+            ->join('users', 'users.id', '=', "{$classTable}.teacher_id")
+            ->where("{$classTable}.school_year", $currentSchoolYear)
             ->whereNotNull('users.department_id')
             ->groupBy('users.department_id')
             ->pluck('students_count', 'users.department_id');

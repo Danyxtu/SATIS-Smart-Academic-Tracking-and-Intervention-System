@@ -117,10 +117,9 @@ const SubjectCard = ({ subject }) => {
 
     const getProgressColor = (grade) => {
         if (grade === null) return "bg-gray-200";
-        if (grade >= 85)
-            return "bg-gradient-to-r from-emerald-400 to-emerald-500";
-        if (grade >= 75) return "bg-gradient-to-r from-amber-400 to-amber-500";
-        return "bg-gradient-to-r from-red-400 to-red-500";
+        if (grade >= 85) return "bg-emerald-500";
+        if (grade >= 75) return "bg-amber-500";
+        return "bg-red-500";
     };
 
     return (
@@ -762,85 +761,56 @@ export default function Dashboard({
                 }
             `}</style>
 
-            <div className="min-h-screen bg-gray-50/50 dark:bg-gray-950">
+            <div className="max-w-7xl mx-auto space-y-5">
                 {/* Welcome Header */}
-                <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-2xl mx-4 mt-4 p-5 text-white relative overflow-hidden">
-                    {/* Background Pattern */}
-                    <div className="absolute inset-0 opacity-10">
-                        <svg
-                            className="w-full h-full"
-                            viewBox="0 0 100 100"
-                            preserveAspectRatio="none"
-                        >
-                            <defs>
-                                <pattern
-                                    id="grid"
-                                    width="10"
-                                    height="10"
-                                    patternUnits="userSpaceOnUse"
-                                >
-                                    <path
-                                        d="M 10 0 L 0 0 0 10"
-                                        fill="none"
-                                        stroke="white"
-                                        strokeWidth="0.5"
-                                    />
-                                </pattern>
-                            </defs>
-                            <rect width="100" height="100" fill="url(#grid)" />
-                        </svg>
-                    </div>
-
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-2.5 mb-1.5">
-                            <span className="text-xl">👋</span>
-                            <h1 className="text-lg md:text-xl font-bold">
-                                {getGreeting()},{" "}
-                                {student.firstName || "Student"}!
-                            </h1>
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                        <div>
+                            <div className="flex items-center gap-2.5 mb-1.5">
+                                <span className="text-xl">👋</span>
+                                <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100">
+                                    {getGreeting()},{" "}
+                                    {student.firstName || "Student"}!
+                                </h1>
+                            </div>
+                            <p className="text-gray-600 dark:text-gray-300 text-sm sm:text-base">
+                                Your progress at a glance.
+                            </p>
                         </div>
-                        <p className="text-indigo-100 text-sm sm:text-base">
-                            Your progress at a glance.
-                        </p>
 
-                        {/* Quick Stats in Header */}
-                        <div className="mt-4 flex flex-wrap gap-3">
-                            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3.5 py-2">
-                                <p className="text-xs text-indigo-100">
+                        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3 lg:w-auto">
+                            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3.5 py-2">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
                                     Overall Grade
                                 </p>
-                                <p className="text-lg font-bold leading-tight">
+                                <p className="text-lg font-bold leading-tight text-gray-900 dark:text-gray-100">
                                     {stats.overallGrade !== null
                                         ? `${stats.overallGrade}%`
                                         : "N/A"}
                                 </p>
                             </div>
-                            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3.5 py-2">
-                                <p className="text-xs text-indigo-100">
+                            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3.5 py-2">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
                                     Attendance
                                 </p>
-                                <p className="text-lg font-bold leading-tight">
+                                <p className="text-lg font-bold leading-tight text-gray-900 dark:text-gray-100">
                                     {stats.overallAttendance}%
                                 </p>
                             </div>
-                            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3.5 py-2">
-                                <p className="text-xs text-indigo-100">
+                            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3.5 py-2">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
                                     Tasks Completed
                                 </p>
-                                <p className="text-lg font-bold leading-tight">
+                                <p className="text-lg font-bold leading-tight text-gray-900 dark:text-gray-100">
                                     {stats.completedTasks}/{stats.totalTasks}
                                 </p>
                             </div>
                         </div>
                     </div>
-
-                    {/* Decorative Elements */}
-                    <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
-                    <div className="absolute -right-5 -bottom-10 w-32 h-32 bg-pink-400/20 rounded-full blur-xl" />
                 </div>
 
                 {/* Main Content */}
-                <div className="max-w-7xl mx-auto px-4 py-5 space-y-5">
+                <div className="space-y-5">
                     {/* Stats Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <StatCard

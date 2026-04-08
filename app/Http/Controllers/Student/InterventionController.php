@@ -75,7 +75,9 @@ class InterventionController extends Controller
                 // Get tasks
                 $tasks = ($intervention->tasks ?? collect())->map(fn($task) => [
                     'id' => $task->id,
-                    'text' => $task->description,
+                    'text' => $task->task_name ?: $task->description,
+                    'description' => $task->description,
+                    'delivery_mode' => $task->delivery_mode,
                     'completed' => $task->is_completed,
                 ]);
 

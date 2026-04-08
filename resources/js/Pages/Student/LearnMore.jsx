@@ -318,7 +318,7 @@ const LearnMore = () => {
                     />
                 </svg>
             ),
-            color: "bg-gradient-to-br from-indigo-500 to-purple-600",
+            color: "bg-indigo-600 dark:bg-indigo-500",
             link: route("dashboard"),
             linkText: "Go to Dashboard",
         },
@@ -341,7 +341,7 @@ const LearnMore = () => {
                     />
                 </svg>
             ),
-            color: "bg-gradient-to-br from-emerald-500 to-teal-600",
+            color: "bg-emerald-600 dark:bg-emerald-500",
             link: route("analytics.index"),
             linkText: "View Analytics",
         },
@@ -364,7 +364,7 @@ const LearnMore = () => {
                     />
                 </svg>
             ),
-            color: "bg-gradient-to-br from-amber-500 to-orange-600",
+            color: "bg-amber-600 dark:bg-amber-500",
             link: route("interventions-feed"),
             linkText: "View Feedback",
         },
@@ -387,7 +387,7 @@ const LearnMore = () => {
                     />
                 </svg>
             ),
-            color: "bg-gradient-to-br from-red-500 to-rose-600",
+            color: "bg-rose-600 dark:bg-rose-500",
             link: route("analytics.index", { risk: "at-risk" }),
             linkText: "Open Risk Overview",
         },
@@ -399,28 +399,28 @@ const LearnMore = () => {
             title: "Set a Study Schedule",
             description:
                 "Create a consistent study routine. Study at the same time each day to build a habit that sticks.",
-            gradient: "bg-gradient-to-br from-blue-500 to-indigo-600",
+            gradient: "bg-blue-600 dark:bg-blue-500",
         },
         {
             number: 2,
             title: "Take Active Notes",
             description:
                 "Don't just read - write summaries, create diagrams, and ask yourself questions about the material.",
-            gradient: "bg-gradient-to-br from-purple-500 to-pink-600",
+            gradient: "bg-purple-600 dark:bg-purple-500",
         },
         {
             number: 3,
             title: "Break It Down",
             description:
                 "Large tasks feel overwhelming. Break them into smaller, manageable chunks and tackle them one at a time.",
-            gradient: "bg-gradient-to-br from-orange-500 to-red-600",
+            gradient: "bg-orange-600 dark:bg-orange-500",
         },
         {
             number: 4,
             title: "Ask For Help Early",
             description:
                 "Struggling? Don't wait! Ask your teacher for help as soon as you don't understand something.",
-            gradient: "bg-gradient-to-br from-teal-500 to-emerald-600",
+            gradient: "bg-teal-600 dark:bg-teal-500",
         },
     ];
 
@@ -428,68 +428,37 @@ const LearnMore = () => {
         <>
             <Head title="Learn More" />
 
-            <div className="min-h-screen bg-gray-50/50 dark:bg-gray-950">
+            <div className="max-w-7xl mx-auto space-y-5">
                 {/* Hero Header */}
-                <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-2xl mx-4 mt-4 p-5 sm:p-6 text-white relative overflow-hidden">
-                    <div className="absolute inset-0 opacity-10">
-                        <svg
-                            className="w-full h-full"
-                            viewBox="0 0 100 100"
-                            preserveAspectRatio="none"
-                        >
-                            <defs>
-                                <pattern
-                                    id="grid"
-                                    width="10"
-                                    height="10"
-                                    patternUnits="userSpaceOnUse"
-                                >
-                                    <path
-                                        d="M 10 0 L 0 0 0 10"
-                                        fill="none"
-                                        stroke="white"
-                                        strokeWidth="0.5"
-                                    />
-                                </pattern>
-                            </defs>
-                            <rect width="100" height="100" fill="url(#grid)" />
-                        </svg>
-                    </div>
-
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-3 mb-2.5">
-                            <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
-                                <svg
-                                    className="w-4 h-4"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                                    />
-                                </svg>
-                            </div>
-                            <h1 className="text-lg md:text-xl font-bold">
-                                Learn More
-                            </h1>
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5 sm:p-6">
+                    <div className="flex items-center gap-3 mb-2.5">
+                        <div className="w-9 h-9 bg-pink-100 dark:bg-pink-900/30 rounded-xl flex items-center justify-center">
+                            <svg
+                                className="w-4 h-4 text-pink-600 dark:text-pink-300"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                                />
+                            </svg>
                         </div>
-                        <p className="text-indigo-100 text-sm sm:text-base max-w-2xl">
-                            Explore resources to help you succeed in your
-                            academic journey. Find answers to common questions,
-                            learn how to use SATIS features, and discover study
-                            tips.
-                        </p>
+                        <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100">
+                            Learn More
+                        </h1>
                     </div>
-
-                    <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
-                    <div className="absolute -right-5 -bottom-10 w-32 h-32 bg-pink-400/20 rounded-full blur-xl" />
+                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 max-w-2xl">
+                        Explore resources to help you succeed in your academic
+                        journey. Find answers to common questions, learn how to
+                        use SATIS features, and discover study tips.
+                    </p>
                 </div>
 
-                <div className="max-w-7xl mx-auto px-4 py-5 md:py-6 space-y-8">
+                <div className="space-y-8">
                     {/* Platform Features */}
                     <section>
                         <div className="flex items-center gap-3 mb-5">
@@ -766,7 +735,7 @@ const LearnMore = () => {
                                         "mailto:support@satis.edu")
                                 }
                                 actionText="Send Email →"
-                                gradient="bg-gradient-to-br from-amber-400 to-orange-500"
+                                gradient="bg-amber-500 dark:bg-amber-400"
                             />
                             <ContactCard
                                 icon={
@@ -790,7 +759,7 @@ const LearnMore = () => {
                                     (window.location.href = "tel:123456789")
                                 }
                                 actionText="Call Now →"
-                                gradient="bg-gradient-to-br from-emerald-400 to-teal-500"
+                                gradient="bg-emerald-500 dark:bg-emerald-400"
                             />
                             <ContactCard
                                 icon={
@@ -812,73 +781,38 @@ const LearnMore = () => {
                                 subtitle="Contact Administration"
                                 action={() => {}}
                                 actionText="Open Chat →"
-                                gradient="bg-gradient-to-br from-purple-400 to-pink-500"
+                                gradient="bg-purple-500 dark:bg-purple-400"
                             />
                         </div>
                     </section>
 
                     {/* Still Need Help Banner */}
-                    <section className="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-2xl p-6 text-center relative overflow-hidden">
-                        <div className="absolute inset-0 opacity-10">
+                    <section className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 p-6 text-center">
+                        <div className="w-14 h-14 bg-pink-100 dark:bg-pink-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
                             <svg
-                                className="w-full h-full"
-                                viewBox="0 0 100 100"
-                                preserveAspectRatio="none"
+                                className="w-7 h-7 text-pink-600 dark:text-pink-300"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
                             >
-                                <defs>
-                                    <pattern
-                                        id="dots"
-                                        width="10"
-                                        height="10"
-                                        patternUnits="userSpaceOnUse"
-                                    >
-                                        <circle
-                                            cx="1"
-                                            cy="1"
-                                            r="1"
-                                            fill="white"
-                                        />
-                                    </pattern>
-                                </defs>
-                                <rect
-                                    width="100"
-                                    height="100"
-                                    fill="url(#dots)"
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"
                                 />
                             </svg>
                         </div>
-
-                        <div className="relative z-10">
-                            <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg
-                                    className="w-7 h-7 text-white"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"
-                                    />
-                                </svg>
-                            </div>
-                            <h2 className="text-lg md:text-xl font-bold text-white mb-2">
-                                Still Need Help?
-                            </h2>
-                            <p className="text-indigo-100 mb-5 max-w-md mx-auto">
-                                Our support team is ready to assist you with any
-                                questions or concerns about your academic
-                                journey.
-                            </p>
-                            <button className="px-6 py-2.5 bg-white text-indigo-600 font-semibold rounded-xl hover:bg-indigo-50 transition-colors shadow-lg text-sm">
-                                Contact Support Team
-                            </button>
-                        </div>
-
-                        <div className="absolute -left-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
-                        <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-pink-400/20 rounded-full blur-xl" />
+                        <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                            Still Need Help?
+                        </h2>
+                        <p className="text-gray-600 dark:text-gray-300 mb-5 max-w-md mx-auto">
+                            Our support team is ready to assist you with any
+                            questions or concerns about your academic journey.
+                        </p>
+                        <button className="px-6 py-2.5 bg-pink-600 text-white font-semibold rounded-xl hover:bg-pink-700 transition-colors shadow-sm text-sm">
+                            Contact Support Team
+                        </button>
                     </section>
                 </div>
             </div>

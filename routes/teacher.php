@@ -111,8 +111,22 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
             ->name('interventions.store');
         Route::post('/interventions/bulk', [InterventionController::class, 'bulkStore'])
             ->name('interventions.bulk');
+        Route::put('/interventions/{intervention}', [InterventionController::class, 'update'])
+            ->name('interventions.update');
+        Route::delete('/interventions/{intervention}', [InterventionController::class, 'destroy'])
+            ->name('interventions.destroy');
+        Route::post('/interventions/{intervention}/complete', [InterventionController::class, 'completeWithoutRequest'])
+            ->name('interventions.complete');
         Route::post('/interventions/{intervention}/approve', [InterventionController::class, 'approveCompletion'])
             ->name('interventions.approve');
         Route::post('/interventions/{intervention}/reject', [InterventionController::class, 'rejectCompletion'])
             ->name('interventions.reject');
+        Route::post('/interventions/{intervention}/tasks', [InterventionController::class, 'storeTask'])
+            ->name('interventions.tasks.store');
+        Route::put('/interventions/{intervention}/tasks/{task}', [InterventionController::class, 'updateTask'])
+            ->name('interventions.tasks.update');
+        Route::post('/interventions/{intervention}/tasks/{task}/toggle', [InterventionController::class, 'toggleTaskCompletion'])
+            ->name('interventions.tasks.toggle');
+        Route::delete('/interventions/{intervention}/tasks/{task}', [InterventionController::class, 'destroyTask'])
+            ->name('interventions.tasks.destroy');
     });

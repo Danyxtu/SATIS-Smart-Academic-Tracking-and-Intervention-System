@@ -42,6 +42,9 @@ Route::middleware(['auth', 'verified', 'can:access-student-portal'])->group(func
     Route::get('/attendance', [StudentAttendanceController::class, 'index'])
         ->name('attendance');
 
+    Route::get('/attendance/{enrollment}', [StudentAttendanceController::class, 'show'])
+        ->name('attendance.show');
+
     Route::get('/analytics', [StudentAnalyticsController::class, 'index'])
         ->name('analytics.index');
 

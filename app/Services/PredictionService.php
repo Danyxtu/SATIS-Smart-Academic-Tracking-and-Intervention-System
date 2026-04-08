@@ -108,7 +108,9 @@ class PredictionService
      */
     public function predictFinalGrade(Enrollment $enrollment): array
     {
-        $grades = $enrollment->grades()->orderBy('created_at')->get();
+        $grades = $enrollment->relationLoaded('grades')
+            ? $enrollment->grades->sortBy('created_at')->values()
+            : $enrollment->grades()->orderBy('created_at')->get();
 
         if ($grades->isEmpty()) {
             return [
@@ -214,7 +216,9 @@ class PredictionService
         }
 
         // Count completed assignments
-        $completed = $enrollment->grades()->count();
+        $completed = $enrollment->relationLoaded('grades')
+            ? $enrollment->grades->count()
+            : $enrollment->grades()->count();
 
         // Estimate remaining (minimum 3 for prediction purposes)
         return max(3, $totalExpected - $completed);

@@ -41,6 +41,27 @@ const getPriorityClasses = (priority) => {
     return map[priority] ?? `${base} bg-gray-100 border-gray-200 text-gray-700`;
 };
 
+/** Returns Tailwind badge classes for intervention status labels. */
+const getInterventionStatusClasses = (status) => {
+    const base =
+        "px-2.5 py-0.5 inline-flex items-center text-[10px] leading-4 font-semibold rounded-full border";
+
+    const map = {
+        active: `${base} bg-emerald-50 border-emerald-200 text-emerald-700`,
+        completed: `${base} bg-sky-50 border-sky-200 text-sky-700`,
+        pending_approval: `${base} bg-amber-50 border-amber-200 text-amber-700`,
+    };
+
+    return map[status] ?? `${base} bg-gray-100 border-gray-200 text-gray-700`;
+};
+
+const formatInterventionStatus = (status) => {
+    if (!status) return "Unknown";
+    return status
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 /** Reads the `student` query-param from the URL as a positive integer. */
 const getSelectedEnrollmentIdFromUrl = () => {
     if (typeof window === "undefined") return null;
@@ -56,6 +77,13 @@ const getSelectedEnrollmentIdFromUrl = () => {
 const toDateTimeLocalValue = (date) => {
     const p = (v) => String(v).padStart(2, "0");
     return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}T${p(date.getHours())}:${p(date.getMinutes())}`;
+};
+
+const toDateTimeLocalFromIso = (isoValue) => {
+    if (!isoValue) return "";
+    const parsed = new Date(isoValue);
+    if (Number.isNaN(parsed.getTime())) return "";
+    return toDateTimeLocalValue(parsed);
 };
 
 /** Formats a date string/value into a human-readable "Month Day, Year". */
@@ -252,6 +280,16 @@ const INTERVENTION_STRATEGIES = {
         tierColor: "red",
     },
 };
+
+const TASK_DELIVERY_MODES = [
+    { value: "remote", label: "Remote" },
+    { value: "face_to_face", label: "Face-to-Face" },
+];
+
+const TASK_SUPPORTED_TYPES = ["task_list", "academic_agreement"];
+
+const getTaskDeliveryModeLabel = (mode) =>
+    TASK_DELIVERY_MODES.find((item) => item.value === mode)?.label ?? "";
 
 // ─────────────────────────────────────────────
 // SHARED UI PRIMITIVES
@@ -1144,7 +1182,11 @@ function StartInterventionModal({
         tasks: [],
     });
 
-    const [newTask, setNewTask] = useState("");
+    const [taskDraft, setTaskDraft] = useState({
+        task_name: "",
+        description: "",
+        delivery_mode: "remote",
+    });
 
     useEffect(() => {
         setData("enrollment_id", enrollmentId);
@@ -1152,15 +1194,41 @@ function StartInterventionModal({
 
     const selectedStrategy = INTERVENTION_STRATEGIES[data.type];
     const deadlineRequired = (selectedStrategy?.tier ?? 1) >= 2;
+    const requiresTaskChecklist = TASK_SUPPORTED_TYPES.includes(data.type);
+    const isAcademicAgreement = data.type === "academic_agreement";
 
     useEffect(() => {
         if (!deadlineRequired) setData("deadline_at", "");
     }, [deadlineRequired]);
 
+    useEffect(() => {
+        if (!requiresTaskChecklist && data.tasks.length > 0) {
+            setData("tasks", []);
+        }
+    }, [requiresTaskChecklist]);
+
     const addTask = () => {
-        if (!newTask.trim()) return;
-        setData("tasks", [...data.tasks, newTask.trim()]);
-        setNewTask("");
+        const taskName = taskDraft.task_name.trim();
+        if (!taskName) return;
+
+        const taskDescription = taskDraft.description.trim() || taskName;
+
+        setData("tasks", [
+            ...data.tasks,
+            {
+                task_name: taskName,
+                description: taskDescription,
+                delivery_mode: isAcademicAgreement
+                    ? taskDraft.delivery_mode
+                    : null,
+            },
+        ]);
+
+        setTaskDraft((prev) => ({
+            ...prev,
+            task_name: "",
+            description: "",
+        }));
     };
 
     const removeTask = (index) =>
@@ -1182,7 +1250,11 @@ function StartInterventionModal({
         post(route("teacher.interventions.store"), {
             onSuccess: () => {
                 reset();
-                setNewTask("");
+                setTaskDraft({
+                    task_name: "",
+                    description: "",
+                    delivery_mode: "remote",
+                });
                 onClose();
             },
         });
@@ -1195,12 +1267,12 @@ function StartInterventionModal({
     const canSubmit =
         !processing &&
         !(deadlineRequired && !data.deadline_at) &&
-        !(data.type === "task_list" && data.tasks.length === 0);
+        !(requiresTaskChecklist && data.tasks.length === 0);
 
     const footerHint =
         deadlineRequired && !data.deadline_at
             ? "⚠️ Deadline date and time is required for this tier"
-            : data.type === "task_list" && data.tasks.length === 0
+            : requiresTaskChecklist && data.tasks.length === 0
               ? "⚠️ Please add at least one task before starting"
               : "This will create a new intervention record";
 
@@ -1342,33 +1414,81 @@ function StartInterventionModal({
                         />
                     </div>
 
-                    {/* Task list editor (task_list type only) */}
-                    {data.type === "task_list" && (
+                    {/* Checklist editor for task_list and academic_agreement */}
+                    {requiresTaskChecklist && (
                         <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
                             <label className="block text-sm font-semibold text-amber-800 mb-3">
-                                Goal Checklist Tasks{" "}
+                                {isAcademicAgreement
+                                    ? "Academic Agreement Tasks"
+                                    : "Goal Checklist Tasks"}{" "}
                                 <span className="text-amber-600 font-normal">
                                     (Add at least 1)
                                 </span>
                             </label>
 
-                            <div className="flex gap-2 mb-3">
+                            <div className="space-y-2 mb-3">
                                 <input
                                     type="text"
-                                    value={newTask}
-                                    onChange={(e) => setNewTask(e.target.value)}
+                                    value={taskDraft.task_name}
+                                    onChange={(e) =>
+                                        setTaskDraft((prev) => ({
+                                            ...prev,
+                                            task_name: e.target.value,
+                                        }))
+                                    }
                                     onKeyDown={handleTaskKeyDown}
-                                    placeholder="e.g., Submit missing Lab Report by Friday"
-                                    className="flex-1 border-amber-300 rounded-lg shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm"
+                                    placeholder={
+                                        isAcademicAgreement
+                                            ? "Task name (e.g., Attend tutorial session)"
+                                            : "Task name (e.g., Submit missing Lab Report)"
+                                    }
+                                    className="w-full border-amber-300 rounded-lg shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm"
                                 />
-                                <button
-                                    type="button"
-                                    onClick={addTask}
-                                    disabled={!newTask.trim()}
-                                    className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                                >
-                                    Add
-                                </button>
+
+                                <textarea
+                                    value={taskDraft.description}
+                                    onChange={(e) =>
+                                        setTaskDraft((prev) => ({
+                                            ...prev,
+                                            description: e.target.value,
+                                        }))
+                                    }
+                                    placeholder="Task description or completion details"
+                                    className="w-full border-amber-300 rounded-lg shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm h-20 resize-none"
+                                />
+
+                                {isAcademicAgreement && (
+                                    <select
+                                        value={taskDraft.delivery_mode}
+                                        onChange={(e) =>
+                                            setTaskDraft((prev) => ({
+                                                ...prev,
+                                                delivery_mode: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full border-amber-300 rounded-lg shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm"
+                                    >
+                                        {TASK_DELIVERY_MODES.map((option) => (
+                                            <option
+                                                key={option.value}
+                                                value={option.value}
+                                            >
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
+
+                                <div className="flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={addTask}
+                                        disabled={!taskDraft.task_name.trim()}
+                                        className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                                    >
+                                        Add Task
+                                    </button>
+                                </div>
                             </div>
 
                             {data.tasks.length > 0 ? (
@@ -1383,9 +1503,22 @@ function StartInterventionModal({
                                                     {i + 1}
                                                 </span>
                                             </div>
-                                            <span className="flex-1 text-sm text-gray-700 dark:text-gray-300">
-                                                {task}
-                                            </span>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                                                    {task.task_name ?? task}
+                                                </p>
+                                                <p className="text-xs text-gray-600 dark:text-gray-400">
+                                                    {task.description ?? task}
+                                                </p>
+                                                {isAcademicAgreement &&
+                                                    task.delivery_mode && (
+                                                        <span className="inline-flex mt-1 rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                                                            {getTaskDeliveryModeLabel(
+                                                                task.delivery_mode,
+                                                            )}
+                                                        </span>
+                                                    )}
+                                            </div>
                                             <button
                                                 type="button"
                                                 onClick={() => removeTask(i)}
@@ -1414,7 +1547,7 @@ function StartInterventionModal({
                             )}
 
                             <p className="text-xs text-amber-600 mt-3">
-                                💡 Tip: Press Enter to quickly add tasks.
+                                💡 Tip: use one task per actionable deliverable.
                             </p>
                         </div>
                     )}
@@ -1523,6 +1656,630 @@ function CompletionActionModal({
     );
 }
 
+function InterventionManagementModal({
+    open,
+    onClose,
+    studentName,
+    intervention,
+}) {
+    const { data, setData, put, processing, errors } = useForm({
+        type: "",
+        notes: "",
+        deadline_at: "",
+    });
+
+    const [taskDraft, setTaskDraft] = useState({
+        task_name: "",
+        description: "",
+        delivery_mode: "remote",
+    });
+    const [editingTaskId, setEditingTaskId] = useState(null);
+    const [editingTaskDraft, setEditingTaskDraft] = useState({
+        task_name: "",
+        description: "",
+        delivery_mode: "remote",
+        is_completed: false,
+    });
+    const [completionNotes, setCompletionNotes] = useState("");
+    const [isMutating, setIsMutating] = useState(false);
+
+    useEffect(() => {
+        if (!open || !intervention) return;
+
+        setData("type", intervention.type ?? "");
+        setData("notes", intervention.notes ?? "");
+        setData("deadline_at", toDateTimeLocalFromIso(intervention.deadlineAt));
+        setTaskDraft({
+            task_name: "",
+            description: "",
+            delivery_mode: "remote",
+        });
+        setEditingTaskId(null);
+        setCompletionNotes("");
+    }, [open, intervention]);
+
+    if (!open || !intervention) return null;
+
+    const tasks = Array.isArray(intervention.tasks) ? intervention.tasks : [];
+    const completedTasks =
+        intervention.completedTasks ??
+        tasks.filter((task) => task.is_completed).length;
+    const totalTasks = intervention.totalTasks ?? tasks.length;
+    const progressPercent =
+        intervention.progressPercent ??
+        (totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0);
+    const selectedStrategy = INTERVENTION_STRATEGIES[data.type] ?? null;
+    const deadlineRequired = (selectedStrategy?.tier ?? 1) >= 2;
+    const canApproveDirectly =
+        intervention.isTier3 && intervention.status === "active";
+
+    const handleSaveIntervention = (e) => {
+        e.preventDefault();
+
+        put(
+            route("teacher.interventions.update", {
+                intervention: intervention.id,
+            }),
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setIsMutating(true),
+                onFinish: () => setIsMutating(false),
+            },
+        );
+    };
+
+    const handleAddTask = () => {
+        const taskName = taskDraft.task_name.trim();
+        if (!taskName) return;
+
+        router.post(
+            route("teacher.interventions.tasks.store", {
+                intervention: intervention.id,
+            }),
+            {
+                task_name: taskName,
+                description: taskDraft.description.trim() || taskName,
+                delivery_mode: taskDraft.delivery_mode,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setIsMutating(true),
+                onSuccess: () => {
+                    setTaskDraft({
+                        task_name: "",
+                        description: "",
+                        delivery_mode: "remote",
+                    });
+                },
+                onFinish: () => setIsMutating(false),
+            },
+        );
+    };
+
+    const beginTaskEdit = (task) => {
+        setEditingTaskId(task.id);
+        setEditingTaskDraft({
+            task_name: task.task_name ?? task.description ?? "",
+            description: task.description ?? task.task_name ?? "",
+            delivery_mode: task.delivery_mode ?? "remote",
+            is_completed: Boolean(task.is_completed),
+        });
+    };
+
+    const handleSaveTaskEdit = (taskId) => {
+        const taskName = editingTaskDraft.task_name.trim();
+        if (!taskName) return;
+
+        router.put(
+            route("teacher.interventions.tasks.update", {
+                intervention: intervention.id,
+                task: taskId,
+            }),
+            {
+                task_name: taskName,
+                description: editingTaskDraft.description.trim() || taskName,
+                delivery_mode: editingTaskDraft.delivery_mode,
+                is_completed: editingTaskDraft.is_completed,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setIsMutating(true),
+                onSuccess: () => setEditingTaskId(null),
+                onFinish: () => setIsMutating(false),
+            },
+        );
+    };
+
+    const handleToggleTask = (task) => {
+        router.post(
+            route("teacher.interventions.tasks.toggle", {
+                intervention: intervention.id,
+                task: task.id,
+            }),
+            {
+                is_completed: !task.is_completed,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setIsMutating(true),
+                onFinish: () => setIsMutating(false),
+            },
+        );
+    };
+
+    const handleDeleteTask = (task) => {
+        if (!window.confirm("Delete this task from the intervention?")) return;
+
+        router.delete(
+            route("teacher.interventions.tasks.destroy", {
+                intervention: intervention.id,
+                task: task.id,
+            }),
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setIsMutating(true),
+                onFinish: () => setIsMutating(false),
+            },
+        );
+    };
+
+    const handleApproveDirectly = () => {
+        router.post(
+            route("teacher.interventions.complete", {
+                intervention: intervention.id,
+            }),
+            {
+                notes: completionNotes,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setIsMutating(true),
+                onSuccess: () => setCompletionNotes(""),
+                onFinish: () => setIsMutating(false),
+            },
+        );
+    };
+
+    const handleDeleteIntervention = () => {
+        if (
+            !window.confirm(
+                "Delete this intervention and all related tasks? This cannot be undone.",
+            )
+        ) {
+            return;
+        }
+
+        router.delete(
+            route("teacher.interventions.destroy", {
+                intervention: intervention.id,
+            }),
+            {
+                preserveScroll: true,
+                onStart: () => setIsMutating(true),
+                onSuccess: () => onClose(),
+                onFinish: () => setIsMutating(false),
+            },
+        );
+    };
+
+    const busy = processing || isMutating;
+
+    return (
+        <ModalShell maxWidth="max-w-5xl">
+            <ModalHeader
+                icon={
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                    >
+                        <path
+                            fillRule="evenodd"
+                            d="M3 3a1 1 0 011-1h12a1 1 0 011 1v14a1 1 0 01-1 1H4a1 1 0 01-1-1V3zm5 4a1 1 0 012 0v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1H7a1 1 0 110-2h1V7z"
+                            clipRule="evenodd"
+                        />
+                    </svg>
+                }
+                title="Manage Intervention"
+                subtitle={
+                    <>
+                        for <span className="font-semibold">{studentName}</span>
+                    </>
+                }
+                onClose={onClose}
+            />
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <p className="text-sm font-semibold text-indigo-900">
+                                {intervention.typeLabel ?? intervention.type}
+                            </p>
+                            <p className="text-xs text-indigo-700">
+                                Status: {intervention.status}
+                            </p>
+                        </div>
+                        <span className="rounded-full border border-indigo-300 bg-white px-3 py-1 text-xs font-semibold text-indigo-700">
+                            {completedTasks}/{totalTasks} tasks done
+                        </span>
+                    </div>
+                    <div className="mt-3 h-2 w-full rounded-full bg-indigo-100">
+                        <div
+                            className="h-2 rounded-full bg-indigo-600 transition-all"
+                            style={{ width: `${progressPercent}%` }}
+                        />
+                    </div>
+                    <p className="mt-1 text-xs text-indigo-700">
+                        Progress: {progressPercent}%
+                    </p>
+                </div>
+
+                <form
+                    onSubmit={handleSaveIntervention}
+                    className="rounded-xl border border-gray-200 bg-white p-4 space-y-4"
+                >
+                    <h3 className="text-sm font-semibold text-gray-800">
+                        Intervention Details
+                    </h3>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div>
+                            <label className="mb-1 block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                Intervention Type
+                            </label>
+                            <select
+                                value={data.type}
+                                onChange={(e) =>
+                                    setData("type", e.target.value)
+                                }
+                                className="w-full rounded-lg border border-gray-300 text-sm"
+                            >
+                                {Object.entries(INTERVENTION_STRATEGIES).map(
+                                    ([key, strategy]) => (
+                                        <option key={key} value={key}>
+                                            {strategy.label}
+                                        </option>
+                                    ),
+                                )}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                Deadline
+                            </label>
+                            <input
+                                type="datetime-local"
+                                value={data.deadline_at}
+                                onChange={(e) =>
+                                    setData("deadline_at", e.target.value)
+                                }
+                                min={toDateTimeLocalValue(
+                                    new Date(Date.now() + 60_000),
+                                )}
+                                className="w-full rounded-lg border border-gray-300 text-sm"
+                                required={deadlineRequired}
+                            />
+                            {errors.deadline_at && (
+                                <p className="mt-1 text-xs text-red-600">
+                                    {errors.deadline_at}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="mb-1 block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                            Notes
+                        </label>
+                        <textarea
+                            value={data.notes}
+                            onChange={(e) => setData("notes", e.target.value)}
+                            className="w-full rounded-lg border border-gray-300 text-sm h-24 resize-none"
+                        />
+                    </div>
+
+                    <div className="flex justify-end">
+                        <button
+                            type="submit"
+                            disabled={busy}
+                            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                            {processing ? "Saving..." : "Save Intervention"}
+                        </button>
+                    </div>
+                </form>
+
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-4">
+                    <h3 className="text-sm font-semibold text-amber-900">
+                        Task Checklist CRUD
+                    </h3>
+
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                        <input
+                            type="text"
+                            value={taskDraft.task_name}
+                            onChange={(e) =>
+                                setTaskDraft((prev) => ({
+                                    ...prev,
+                                    task_name: e.target.value,
+                                }))
+                            }
+                            placeholder="Task name"
+                            className="rounded-lg border border-amber-300 text-sm"
+                        />
+                        <select
+                            value={taskDraft.delivery_mode}
+                            onChange={(e) =>
+                                setTaskDraft((prev) => ({
+                                    ...prev,
+                                    delivery_mode: e.target.value,
+                                }))
+                            }
+                            className="rounded-lg border border-amber-300 text-sm"
+                        >
+                            {TASK_DELIVERY_MODES.map((mode) => (
+                                <option key={mode.value} value={mode.value}>
+                                    {mode.label}
+                                </option>
+                            ))}
+                        </select>
+                        <button
+                            type="button"
+                            onClick={handleAddTask}
+                            disabled={busy || !taskDraft.task_name.trim()}
+                            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                        >
+                            Add Task
+                        </button>
+                    </div>
+
+                    <textarea
+                        value={taskDraft.description}
+                        onChange={(e) =>
+                            setTaskDraft((prev) => ({
+                                ...prev,
+                                description: e.target.value,
+                            }))
+                        }
+                        placeholder="Task description"
+                        className="w-full rounded-lg border border-amber-300 text-sm h-20 resize-none"
+                    />
+
+                    {tasks.length > 0 ? (
+                        <div className="space-y-2">
+                            {tasks.map((task) => (
+                                <div
+                                    key={task.id}
+                                    className="rounded-lg border border-amber-200 bg-white p-3"
+                                >
+                                    {editingTaskId === task.id ? (
+                                        <div className="space-y-2">
+                                            <input
+                                                type="text"
+                                                value={
+                                                    editingTaskDraft.task_name
+                                                }
+                                                onChange={(e) =>
+                                                    setEditingTaskDraft(
+                                                        (prev) => ({
+                                                            ...prev,
+                                                            task_name:
+                                                                e.target.value,
+                                                        }),
+                                                    )
+                                                }
+                                                className="w-full rounded-lg border border-amber-300 text-sm"
+                                            />
+                                            <textarea
+                                                value={
+                                                    editingTaskDraft.description
+                                                }
+                                                onChange={(e) =>
+                                                    setEditingTaskDraft(
+                                                        (prev) => ({
+                                                            ...prev,
+                                                            description:
+                                                                e.target.value,
+                                                        }),
+                                                    )
+                                                }
+                                                className="w-full rounded-lg border border-amber-300 text-sm h-20 resize-none"
+                                            />
+                                            <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                                                <select
+                                                    value={
+                                                        editingTaskDraft.delivery_mode
+                                                    }
+                                                    onChange={(e) =>
+                                                        setEditingTaskDraft(
+                                                            (prev) => ({
+                                                                ...prev,
+                                                                delivery_mode:
+                                                                    e.target
+                                                                        .value,
+                                                            }),
+                                                        )
+                                                    }
+                                                    className="rounded-lg border border-amber-300 text-sm"
+                                                >
+                                                    {TASK_DELIVERY_MODES.map(
+                                                        (mode) => (
+                                                            <option
+                                                                key={mode.value}
+                                                                value={
+                                                                    mode.value
+                                                                }
+                                                            >
+                                                                {mode.label}
+                                                            </option>
+                                                        ),
+                                                    )}
+                                                </select>
+                                                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={
+                                                            editingTaskDraft.is_completed
+                                                        }
+                                                        onChange={(e) =>
+                                                            setEditingTaskDraft(
+                                                                (prev) => ({
+                                                                    ...prev,
+                                                                    is_completed:
+                                                                        e.target
+                                                                            .checked,
+                                                                }),
+                                                            )
+                                                        }
+                                                    />
+                                                    Completed
+                                                </label>
+                                                <div className="flex justify-end gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setEditingTaskId(
+                                                                null,
+                                                            )
+                                                        }
+                                                        className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-600"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            handleSaveTaskEdit(
+                                                                task.id,
+                                                            )
+                                                        }
+                                                        disabled={busy}
+                                                        className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                                                    >
+                                                        Save
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                                            <div>
+                                                <p className="text-sm font-semibold text-gray-800">
+                                                    {task.task_name ??
+                                                        task.description}
+                                                </p>
+                                                <p className="text-xs text-gray-600">
+                                                    {task.description}
+                                                </p>
+                                                {task.delivery_mode && (
+                                                    <span className="mt-1 inline-flex rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                                                        {getTaskDeliveryModeLabel(
+                                                            task.delivery_mode,
+                                                        )}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        handleToggleTask(task)
+                                                    }
+                                                    disabled={busy}
+                                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${task.is_completed ? "bg-slate-200 text-slate-700" : "bg-emerald-600 text-white"} disabled:opacity-50`}
+                                                >
+                                                    {task.is_completed
+                                                        ? "Mark Pending"
+                                                        : "Mark Done"}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        beginTaskEdit(task)
+                                                    }
+                                                    disabled={busy}
+                                                    className="rounded-lg border border-indigo-300 px-3 py-1.5 text-xs font-semibold text-indigo-700 disabled:opacity-50"
+                                                >
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        handleDeleteTask(task)
+                                                    }
+                                                    disabled={busy}
+                                                    className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-50"
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-amber-700">
+                            No tasks yet. Add one to start tracking progress.
+                        </p>
+                    )}
+                </div>
+
+                {canApproveDirectly && (
+                    <div className="rounded-xl border border-green-200 bg-green-50 p-4 space-y-3">
+                        <h3 className="text-sm font-semibold text-green-900">
+                            Teacher Direct Approval
+                        </h3>
+                        <p className="text-xs text-green-800">
+                            You can approve completion even without a student
+                            completion request.
+                        </p>
+                        <textarea
+                            value={completionNotes}
+                            onChange={(e) => setCompletionNotes(e.target.value)}
+                            placeholder="Optional notes for the student"
+                            className="w-full rounded-lg border border-green-300 text-sm h-20 resize-none"
+                        />
+                        <button
+                            type="button"
+                            onClick={handleApproveDirectly}
+                            disabled={busy}
+                            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                        >
+                            Approve and Complete Intervention
+                        </button>
+                    </div>
+                )}
+
+                <div className="flex items-center justify-between gap-3 border-t border-gray-100 pt-3">
+                    <button
+                        type="button"
+                        onClick={handleDeleteIntervention}
+                        disabled={busy}
+                        className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                    >
+                        Delete Intervention
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </ModalShell>
+    );
+}
+
 // ─────────────────────────────────────────────
 // INTERVENTION DASHBOARD
 // ─────────────────────────────────────────────
@@ -1564,6 +2321,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
     const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [priorityFilter, setPriorityFilter] = useState("All");
+    const [viewMode, setViewMode] = useState("watchlist");
     const [isReady, setIsReady] = useState(false);
 
     useEffect(() => {
@@ -1586,28 +2344,60 @@ function InterventionDashboard({ students, onSelectStudent }) {
         [students],
     );
 
+    const interventionGivenStudents = useMemo(
+        () => sortedStudents.filter((s) => s.hasActiveIntervention),
+        [sortedStudents],
+    );
+
+    const studentsForCurrentView =
+        viewMode === "intervention_given"
+            ? interventionGivenStudents
+            : sortedStudents;
+
     const filteredStudents = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
-        return sortedStudents.filter((s) => {
+        return studentsForCurrentView.filter((s) => {
             const matchesPriority =
                 priorityFilter === "All" || s.priority === priorityFilter;
             if (!q) return matchesPriority;
-            const searchable = [s.name, s.alertReason, s.subject, s.priority]
+
+            const searchable = [
+                s.name,
+                s.alertReason,
+                s.subject,
+                s.priority,
+                s.intervention?.typeLabel,
+                s.intervention?.status,
+            ]
                 .filter(Boolean)
                 .join(" ")
                 .toLowerCase();
+
             return matchesPriority && searchable.includes(q);
         });
-    }, [priorityFilter, searchQuery, sortedStudents]);
+    }, [priorityFilter, searchQuery, studentsForCurrentView]);
+
+    useEffect(() => {
+        setSelectedIds([]);
+    }, [viewMode]);
 
     // Summary counts
-    const highPriority = students.filter((s) => s.priority === "High").length;
-    const mediumPriority = students.filter(
+    const highPriority = studentsForCurrentView.filter(
+        (s) => s.priority === "High",
+    ).length;
+    const mediumPriority = studentsForCurrentView.filter(
         (s) => s.priority === "Medium",
     ).length;
-    const activeInterventions = students.filter(
+    const activeInterventions = interventionGivenStudents.filter(
         (s) => s.hasActiveIntervention,
     ).length;
+
+    const tableTitle =
+        viewMode === "watchlist" ? "Priority Watchlist" : "Intervention Given";
+    const tableSubtitle =
+        viewMode === "watchlist"
+            ? "Students requiring attention"
+            : "Students with active interventions";
 
     // Selection helpers
     const visibleIds = filteredStudents.map((s) => s.id);
@@ -1618,7 +2408,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
         visibleSelectedCount === filteredStudents.length &&
         filteredStudents.length > 0;
     const hasFilters = searchQuery.trim() !== "" || priorityFilter !== "All";
-    const selectedStudents = sortedStudents.filter((s) =>
+    const selectedStudents = studentsForCurrentView.filter((s) =>
         selectedIds.includes(s.id),
     );
 
@@ -1656,8 +2446,36 @@ function InterventionDashboard({ students, onSelectStudent }) {
                 selectedStudents={selectedStudents}
             />
 
+            {/* View toggle */}
+            <div className="rounded-2xl border border-gray-200/90 bg-white p-2 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <button
+                        type="button"
+                        onClick={() => setViewMode("watchlist")}
+                        className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
+                            viewMode === "watchlist"
+                                ? "bg-indigo-600 text-white shadow-sm"
+                                : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300"
+                        }`}
+                    >
+                        Priority Watchlist
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setViewMode("intervention_given")}
+                        className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
+                            viewMode === "intervention_given"
+                                ? "bg-indigo-600 text-white shadow-sm"
+                                : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300"
+                        }`}
+                    >
+                        Intervention Given
+                    </button>
+                </div>
+            </div>
+
             {/* Bulk selection action bar */}
-            {selectedIds.length > 0 && (
+            {viewMode === "watchlist" && selectedIds.length > 0 && (
                 <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-900/40 dark:bg-indigo-900/20">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-2">
@@ -1705,68 +2523,15 @@ function InterventionDashboard({ students, onSelectStudent }) {
                 </div>
             )}
 
-            {/* Search + filter bar */}
-            <div className="rounded-2xl border border-gray-200/90 bg-gradient-to-br from-white via-white to-slate-50 p-4 shadow-sm dark:border-gray-700 dark:from-gray-800 dark:via-gray-800 dark:to-gray-900/80 space-y-3">
-                <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
-                    <div className="relative w-full lg:max-w-md">
-                        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-4 w-4"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                            >
-                                <path
-                                    fillRule="evenodd"
-                                    d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                                    clipRule="evenodd"
-                                />
-                            </svg>
-                        </span>
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search student, subject, or alert reason"
-                            className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white/90 dark:bg-gray-900 text-sm text-gray-700 dark:text-gray-300 shadow-inner focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
-                        />
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        {["All", "High", "Medium", "Low"].map((level) => (
-                            <button
-                                key={level}
-                                type="button"
-                                onClick={() => setPriorityFilter(level)}
-                                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-                                    priorityFilter === level
-                                        ? "bg-indigo-600 text-white"
-                                        : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200"
-                                }`}
-                            >
-                                {level}
-                            </button>
-                        ))}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setSearchQuery("");
-                                setPriorityFilter("All");
-                            }}
-                            disabled={!hasFilters}
-                            className="px-3 py-1.5 rounded-full text-xs font-medium border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Clear Filters
-                        </button>
-                    </div>
-                </div>
-            </div>
-
             {/* Summary stat cards */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <StatCard
-                    label="Total Watchlist"
-                    value={students.length}
+                    label={
+                        viewMode === "watchlist"
+                            ? "Total Watchlist"
+                            : "Intervention Given"
+                    }
+                    value={studentsForCurrentView.length}
                     tone="from-white to-slate-50/90 dark:from-gray-800 dark:to-gray-800"
                 />
                 <StatCard
@@ -1815,17 +2580,79 @@ function InterventionDashboard({ students, onSelectStudent }) {
                             </div>
                             <div>
                                 <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                                    Priority Watchlist
+                                    {tableTitle}
                                 </h3>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                    Students requiring attention
+                                    {tableSubtitle}
                                 </p>
                             </div>
                         </div>
                         <span className="px-2 py-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200 text-xs font-medium rounded-full">
                             {filteredStudents.length} shown
-                            {hasFilters ? ` of ${students.length}` : ""}
+                            {hasFilters
+                                ? ` of ${studentsForCurrentView.length}`
+                                : ""}
                         </span>
+                    </div>
+                </div>
+
+                <div className="border-b border-gray-100 px-5 py-4 dark:border-gray-700">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="relative w-full lg:max-w-md">
+                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-4 w-4"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                >
+                                    <path
+                                        fillRule="evenodd"
+                                        d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                                        clipRule="evenodd"
+                                    />
+                                </svg>
+                            </span>
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder={
+                                    viewMode === "watchlist"
+                                        ? "Search student, subject, or alert reason"
+                                        : "Search student, subject, or intervention type"
+                                }
+                                className="w-full rounded-lg border border-gray-300 bg-white/90 py-2.5 pl-9 pr-3 text-sm text-gray-700 shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300"
+                            />
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            {["All", "High", "Medium", "Low"].map((level) => (
+                                <button
+                                    key={level}
+                                    type="button"
+                                    onClick={() => setPriorityFilter(level)}
+                                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                        priorityFilter === level
+                                            ? "bg-indigo-600 text-white"
+                                            : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300"
+                                    }`}
+                                >
+                                    {level}
+                                </button>
+                            ))}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSearchQuery("");
+                                    setPriorityFilter("All");
+                                }}
+                                disabled={!hasFilters}
+                                className="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-400"
+                            >
+                                Clear Filters
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1834,23 +2661,34 @@ function InterventionDashboard({ students, onSelectStudent }) {
                         <thead className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur dark:bg-gray-800/95">
                             <tr>
                                 {/* Select-all checkbox */}
-                                <th className="w-10 px-3 py-2">
-                                    {filteredStudents.length > 0 && (
-                                        <input
-                                            type="checkbox"
-                                            checked={allVisibleSelected}
-                                            onChange={toggleSelectAll}
-                                            className="h-3.5 w-3.5 cursor-pointer rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600"
-                                        />
-                                    )}
-                                </th>
-                                {[
-                                    "Student Name",
-                                    "Alert Reason",
-                                    "Priority",
-                                    "Subject",
-                                    "Last Intervention",
-                                ].map((head) => (
+                                {viewMode === "watchlist" && (
+                                    <th className="w-10 px-3 py-2">
+                                        {filteredStudents.length > 0 && (
+                                            <input
+                                                type="checkbox"
+                                                checked={allVisibleSelected}
+                                                onChange={toggleSelectAll}
+                                                className="h-3.5 w-3.5 cursor-pointer rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600"
+                                            />
+                                        )}
+                                    </th>
+                                )}
+                                {(viewMode === "watchlist"
+                                    ? [
+                                          "Student Name",
+                                          "Alert Reason",
+                                          "Priority",
+                                          "Subject",
+                                          "Last Intervention",
+                                      ]
+                                    : [
+                                          "Student Name",
+                                          "Intervention Type",
+                                          "Status",
+                                          "Subject",
+                                          "Last Intervention",
+                                      ]
+                                ).map((head) => (
                                     <th
                                         key={head}
                                         className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400"
@@ -1865,7 +2703,9 @@ function InterventionDashboard({ students, onSelectStudent }) {
                             {filteredStudents.length === 0 ? (
                                 <tr>
                                     <td
-                                        colSpan="6"
+                                        colSpan={
+                                            viewMode === "watchlist" ? "6" : "5"
+                                        }
                                         className="px-6 py-12 text-center"
                                     >
                                         <div className="flex flex-col items-center">
@@ -1887,12 +2727,18 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                             <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
                                                 {hasFilters
                                                     ? "No students match your filters"
-                                                    : "All students doing well!"}
+                                                    : viewMode ===
+                                                        "intervention_given"
+                                                      ? "No active interventions yet"
+                                                      : "All students doing well!"}
                                             </p>
                                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-sm">
                                                 {hasFilters
                                                     ? "Try adjusting your search or priority filter."
-                                                    : "No students currently need intervention."}
+                                                    : viewMode ===
+                                                        "intervention_given"
+                                                      ? "Students with active interventions will appear here."
+                                                      : "No students currently need intervention."}
                                             </p>
                                         </div>
                                     </td>
@@ -1905,21 +2751,25 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                         className={`hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 cursor-pointer transition-colors group ${selectedIds.includes(s.id) ? "bg-indigo-50 dark:bg-indigo-900/30" : ""}`}
                                     >
                                         {/* Checkbox cell – prevents row click */}
-                                        <td
-                                            className="px-3 py-3 whitespace-nowrap"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.includes(
-                                                    s.id,
-                                                )}
-                                                onChange={(e) =>
-                                                    toggleSelect(s.id, e)
+                                        {viewMode === "watchlist" && (
+                                            <td
+                                                className="px-3 py-3 whitespace-nowrap"
+                                                onClick={(e) =>
+                                                    e.stopPropagation()
                                                 }
-                                                className="h-3.5 w-3.5 cursor-pointer rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600"
-                                            />
-                                        </td>
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.includes(
+                                                        s.id,
+                                                    )}
+                                                    onChange={(e) =>
+                                                        toggleSelect(s.id, e)
+                                                    }
+                                                    className="h-3.5 w-3.5 cursor-pointer rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600"
+                                                />
+                                            </td>
+                                        )}
 
                                         {/* Student name + status */}
                                         <td className="px-4 py-3 whitespace-nowrap">
@@ -1948,20 +2798,47 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                             </div>
                                         </td>
 
-                                        <td className="px-4 py-3 whitespace-nowrap">
-                                            <span className="text-xs text-gray-600 dark:text-gray-400">
-                                                {s.alertReason}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap">
-                                            <span
-                                                className={getPriorityClasses(
-                                                    s.priority,
-                                                )}
-                                            >
-                                                {s.priority}
-                                            </span>
-                                        </td>
+                                        {viewMode === "watchlist" ? (
+                                            <>
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                                                        {s.alertReason}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    <span
+                                                        className={getPriorityClasses(
+                                                            s.priority,
+                                                        )}
+                                                    >
+                                                        {s.priority}
+                                                    </span>
+                                                </td>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                                                        {s.intervention
+                                                            ?.typeLabel ??
+                                                            "N/A"}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    <span
+                                                        className={getInterventionStatusClasses(
+                                                            s.intervention
+                                                                ?.status,
+                                                        )}
+                                                    >
+                                                        {formatInterventionStatus(
+                                                            s.intervention
+                                                                ?.status,
+                                                        )}
+                                                    </span>
+                                                </td>
+                                            </>
+                                        )}
                                         <td className="px-4 py-3 whitespace-nowrap">
                                             <span className="text-xs text-gray-600 dark:text-gray-400">
                                                 {s.subject}
@@ -2001,6 +2878,10 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
     const [openFeedbackModal, setOpenFeedbackModal] = useState(false);
     const [isInterventionModalOpen, setIsInterventionModalOpen] =
         useState(false);
+    const [
+        showInterventionManagementModal,
+        setShowInterventionManagementModal,
+    ] = useState(false);
     const [showApprovalModal, setShowApprovalModal] = useState(false);
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [approvalNotes, setApprovalNotes] = useState("");
@@ -2012,6 +2893,8 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
     }, [studentData]);
 
     const pendingRequest = studentData?.pendingCompletionRequest ?? null;
+    const activeIntervention = student?.activeIntervention ?? null;
+    const hasActiveIntervention = Boolean(activeIntervention);
 
     // Grade-related derived values
     const numericGrade = parseInt(student?.currentGrade ?? "0");
@@ -2117,7 +3000,13 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                 Send Feedback
                             </button>
                             <button
-                                onClick={() => setIsInterventionModalOpen(true)}
+                                onClick={() =>
+                                    hasActiveIntervention
+                                        ? setShowInterventionManagementModal(
+                                              true,
+                                          )
+                                        : setIsInterventionModalOpen(true)
+                                }
                                 className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 sm:w-auto"
                             >
                                 <svg
@@ -2132,7 +3021,9 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                         clipRule="evenodd"
                                     />
                                 </svg>
-                                Start Intervention
+                                {hasActiveIntervention
+                                    ? "Manage Intervention"
+                                    : "Start Intervention"}
                             </button>
                         </div>
                     </div>
@@ -2484,11 +3375,17 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                 </button>
                                 <button
                                     onClick={() =>
-                                        setIsInterventionModalOpen(true)
+                                        hasActiveIntervention
+                                            ? setShowInterventionManagementModal(
+                                                  true,
+                                              )
+                                            : setIsInterventionModalOpen(true)
                                     }
                                     className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 sm:w-auto"
                                 >
-                                    Start Intervention
+                                    {hasActiveIntervention
+                                        ? "Manage Intervention"
+                                        : "Start Intervention"}
                                 </button>
                             </div>
                         </div>
@@ -2608,6 +3505,13 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                 enrollmentId={enrollmentId}
                 studentName={student.name}
                 priority={student.priority}
+            />
+
+            <InterventionManagementModal
+                open={showInterventionManagementModal}
+                onClose={() => setShowInterventionManagementModal(false)}
+                studentName={student.name}
+                intervention={activeIntervention}
             />
 
             {/* Approval modal */}
@@ -2795,13 +3699,20 @@ function InterventionCenter({ watchlist = [], studentDetails = {} }) {
 const Interventions = ({ watchlist = [], studentDetails = {} }) => (
     <>
         <Head title="Interventions" />
-        <div className="min-h-full bg-gray-50/70 dark:bg-gray-900/20">
-            <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-                <InterventionCenter
-                    watchlist={watchlist}
-                    studentDetails={studentDetails}
-                />
+        <div className="space-y-4">
+            <div>
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                    Interventions
+                </h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Track watchlist students and manage active interventions.
+                </p>
             </div>
+
+            <InterventionCenter
+                watchlist={watchlist}
+                studentDetails={studentDetails}
+            />
         </div>
     </>
 );

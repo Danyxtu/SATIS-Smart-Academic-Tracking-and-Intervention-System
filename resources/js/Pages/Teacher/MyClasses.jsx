@@ -931,7 +931,7 @@ const MyClasses = ({
 
             <div className="space-y-4">
                 {/* Compact Header */}
-                <header className="flex items-center justify-between">
+                <header className="flex items-start justify-between gap-3">
                     {hasSelectedClass ? (
                         <div className="flex items-center gap-2">
                             <button
@@ -947,9 +947,16 @@ const MyClasses = ({
                             </span>
                         </div>
                     ) : (
-                        <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                            {myClassesLabel}
-                        </h1>
+                        <div>
+                            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                                {myClassesLabel}
+                            </h1>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                {isArchiveMode
+                                    ? "Review archived classes from previous terms."
+                                    : "Select a class card to manage class details and student records."}
+                            </p>
+                        </div>
                     )}
 
                     {!hasSelectedClass && (

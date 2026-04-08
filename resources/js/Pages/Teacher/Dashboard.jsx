@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
-import { Head, Link } from "@inertiajs/react";
+import { Head, Link, router } from "@inertiajs/react";
 import {
     AlertTriangle,
     ClipboardList,
@@ -14,6 +14,7 @@ import {
     Upload,
     FileText,
     Users,
+    ChevronRight,
 } from "lucide-react";
 import { getSemesterLabel } from "@/Utils/Teacher/Dashboard";
 import {
@@ -23,6 +24,48 @@ import {
     StartInterventionModal,
 } from "@/Components/Teacher/Dashboard";
 import UnifiedDashboardSwitcher from "@/Components/UnifiedDashboardSwitcher";
+
+const getAttentionStatusClasses = (status) => {
+    const normalized = String(status || "").toLowerCase();
+
+    if (normalized === "high") {
+        return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+    }
+
+    if (normalized === "medium") {
+        return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300";
+    }
+
+    return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300";
+};
+
+const getAttentionStatusLabel = (status) => {
+    const normalized = String(status || "low").toLowerCase();
+    if (normalized === "high") return "High";
+    if (normalized === "medium") return "Medium";
+    return "Low";
+};
+
+const getAttentionRowAccentClasses = (status) => {
+    const normalized = String(status || "low").toLowerCase();
+    if (normalized === "high") return "bg-red-500";
+    if (normalized === "medium") return "bg-amber-500";
+    return "bg-blue-500";
+};
+
+const getAttentionRowHoverClasses = (status) => {
+    const normalized = String(status || "low").toLowerCase();
+
+    if (normalized === "high") {
+        return "hover:bg-gradient-to-r hover:from-red-50 hover:via-rose-50 hover:to-orange-50 dark:hover:from-red-900/25 dark:hover:via-rose-900/20 dark:hover:to-orange-900/20 hover:ring-1 hover:ring-red-200/70 dark:hover:ring-red-700/40";
+    }
+
+    if (normalized === "medium") {
+        return "hover:bg-gradient-to-r hover:from-amber-50 hover:via-orange-50 hover:to-yellow-50 dark:hover:from-amber-900/25 dark:hover:via-orange-900/20 dark:hover:to-yellow-900/20 hover:ring-1 hover:ring-amber-200/70 dark:hover:ring-amber-700/40";
+    }
+
+    return "hover:bg-gradient-to-r hover:from-sky-50 hover:via-blue-50 hover:to-cyan-50 dark:hover:from-sky-900/25 dark:hover:via-blue-900/20 dark:hover:to-cyan-900/20 hover:ring-1 hover:ring-sky-200/70 dark:hover:ring-sky-700/40";
+};
 
 const Dashboard = ({
     auth,
@@ -145,6 +188,14 @@ const Dashboard = ({
             color: "from-violet-500 to-violet-600",
         },
     ];
+
+    const openInterventionDetails = (enrollmentId) => {
+        if (!enrollmentId) return;
+
+        router.get(
+            route("teacher.interventions.index", { student: enrollmentId }),
+        );
+    };
 
     return (
         <>
@@ -339,52 +390,133 @@ const Dashboard = ({
                                             <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900/40">
                                                 <tr>
                                                     <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                                        Student Name
+                                                        STUDENT_NAME
                                                     </th>
                                                     <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                                        Section
+                                                        SECTION
                                                     </th>
                                                     <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                                        Subject
+                                                        SUBJECT
                                                     </th>
                                                     <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                                        Grade
+                                                        STATUS
                                                     </th>
                                                     <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                                        Absences
+                                                        REASON
                                                     </th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                                 {filteredStudents.map(
-                                                    (student, index) => (
-                                                        <tr
-                                                            key={`${student.enrollment_id}-${index}`}
-                                                            className="hover:bg-gray-50 dark:hover:bg-gray-700/40"
-                                                        >
-                                                            <td className="px-4 py-2.5 text-sm font-medium text-gray-900 dark:text-white">
-                                                                {
-                                                                    student.student_name
+                                                    (student, index) => {
+                                                        const canOpenIntervention =
+                                                            Boolean(
+                                                                student.enrollment_id,
+                                                            );
+
+                                                        return (
+                                                            <tr
+                                                                key={`${student.enrollment_id}-${index}`}
+                                                                role={
+                                                                    canOpenIntervention
+                                                                        ? "link"
+                                                                        : undefined
                                                                 }
-                                                            </td>
-                                                            <td className="px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300">
-                                                                {student.section ||
-                                                                    "N/A"}
-                                                            </td>
-                                                            <td className="px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300">
-                                                                {student.subject ||
-                                                                    "N/A"}
-                                                            </td>
-                                                            <td className="px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300">
-                                                                {student.grade ??
-                                                                    "N/A"}
-                                                            </td>
-                                                            <td className="px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300">
-                                                                {student.absences ??
-                                                                    0}
-                                                            </td>
-                                                        </tr>
-                                                    ),
+                                                                tabIndex={
+                                                                    canOpenIntervention
+                                                                        ? 0
+                                                                        : -1
+                                                                }
+                                                                onClick={() =>
+                                                                    openInterventionDetails(
+                                                                        student.enrollment_id,
+                                                                    )
+                                                                }
+                                                                onKeyDown={(
+                                                                    event,
+                                                                ) => {
+                                                                    if (
+                                                                        !canOpenIntervention
+                                                                    ) {
+                                                                        return;
+                                                                    }
+
+                                                                    if (
+                                                                        event.key ===
+                                                                            "Enter" ||
+                                                                        event.key ===
+                                                                            " "
+                                                                    ) {
+                                                                        event.preventDefault();
+                                                                        openInterventionDetails(
+                                                                            student.enrollment_id,
+                                                                        );
+                                                                    }
+                                                                }}
+                                                                className={`group transition-all duration-300 ${
+                                                                    canOpenIntervention
+                                                                        ? `cursor-pointer bg-white dark:bg-gray-800 hover:-translate-y-[1px] hover:shadow-lg ${getAttentionRowHoverClasses(
+                                                                              student.status,
+                                                                          )} focus:outline-none focus:ring-2 focus:ring-indigo-300`
+                                                                        : "bg-white dark:bg-gray-800"
+                                                                }`}
+                                                            >
+                                                                <td className="relative px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                                                    <span
+                                                                        className={`absolute inset-y-2 left-0 w-1 rounded-r-full transition-all duration-300 group-hover:w-1.5 ${getAttentionRowAccentClasses(
+                                                                            student.status,
+                                                                        )}`}
+                                                                    />
+                                                                    <div className="pl-2">
+                                                                        <p className="font-semibold transition-colors group-hover:text-indigo-700 dark:group-hover:text-indigo-300">
+                                                                            {
+                                                                                student.student_name
+                                                                            }
+                                                                        </p>
+                                                                        <p className="text-[11px] text-gray-500 transition-colors group-hover:text-indigo-600/80 dark:text-gray-400 dark:group-hover:text-indigo-300/80">
+                                                                            Open
+                                                                            intervention
+                                                                            details
+                                                                        </p>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                                                                    <span className="inline-flex rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700 dark:border-gray-600 dark:bg-gray-700/70 dark:text-gray-200">
+                                                                        {student.section ||
+                                                                            "N/A"}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                                                                    <span className="inline-flex rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200">
+                                                                        {student.subject ||
+                                                                            "N/A"}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                                                                    <span
+                                                                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getAttentionStatusClasses(
+                                                                            student.status,
+                                                                        )}`}
+                                                                    >
+                                                                        {getAttentionStatusLabel(
+                                                                            student.status,
+                                                                        )}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                                                                    <div className="flex items-start justify-between gap-2">
+                                                                        <span className="leading-5">
+                                                                            {student.reason ||
+                                                                                "N/A"}
+                                                                        </span>
+                                                                        {canOpenIntervention && (
+                                                                            <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-gray-300 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-indigo-500 dark:text-gray-500" />
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    },
                                                 )}
                                             </tbody>
                                         </table>

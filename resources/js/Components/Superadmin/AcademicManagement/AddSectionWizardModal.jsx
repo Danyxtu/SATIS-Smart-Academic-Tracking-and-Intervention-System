@@ -36,6 +36,13 @@ const WIZARD_STEPS = [
 
 const GRADE_LEVEL_OPTIONS = ["Grade 11", "Grade 12"];
 
+const STEP_ONE_ERROR_FIELDS = [
+    "department_id",
+    "section_name",
+    "grade_level",
+    "school_year",
+];
+
 function FieldError({ message }) {
     if (!message) return null;
 
@@ -82,6 +89,278 @@ function emptyDraftStudent() {
         personal_email: "",
     };
 }
+
+const CSV_HEADER_ALIASES = {
+    student_name: ["studentname", "student", "name", "fullname", "full_name"],
+    first_name: ["firstname", "first", "first_name"],
+    last_name: ["lastname", "last", "surname", "last_name"],
+    middle_name: ["middlename", "middle", "middle_name"],
+    lrn: ["lrn", "learnerreferencenumber", "learnerreference"],
+    personal_email: ["personalemail", "email", "personal_email"],
+};
+
+const normalizeCsvHeader = (value = "") =>
+    String(value)
+        .replace(/^\uFEFF/, "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+
+const parseCsvLine = (line = "") => {
+    const values = [];
+    let currentValue = "";
+    let inQuotes = false;
+
+    for (let index = 0; index < line.length; index += 1) {
+        const character = line[index];
+
+        if (character === '"') {
+            if (inQuotes && line[index + 1] === '"') {
+                currentValue += '"';
+                index += 1;
+            } else {
+                inQuotes = !inQuotes;
+            }
+
+            continue;
+        }
+
+        if (character === "," && !inQuotes) {
+            values.push(currentValue.trim());
+            currentValue = "";
+            continue;
+        }
+
+        currentValue += character;
+    }
+
+    values.push(currentValue.trim());
+
+    return values;
+};
+
+const resolveCsvHeaderIndexes = (headerValues = []) => {
+    const normalizedHeaderValues = headerValues.map(normalizeCsvHeader);
+
+    const findIndex = (aliases = []) =>
+        normalizedHeaderValues.findIndex((headerValue) =>
+            aliases.includes(headerValue),
+        );
+
+    const indexes = {
+        student_name: findIndex(CSV_HEADER_ALIASES.student_name),
+        first_name: findIndex(CSV_HEADER_ALIASES.first_name),
+        last_name: findIndex(CSV_HEADER_ALIASES.last_name),
+        middle_name: findIndex(CSV_HEADER_ALIASES.middle_name),
+        lrn: findIndex(CSV_HEADER_ALIASES.lrn),
+        personal_email: findIndex(CSV_HEADER_ALIASES.personal_email),
+    };
+
+    const hasExplicitNameHeaders =
+        indexes.first_name !== -1 && indexes.last_name !== -1;
+    const hasSingleNameHeader = indexes.student_name !== -1;
+    const hasRequiredHeaders =
+        indexes.lrn !== -1 && (hasExplicitNameHeaders || hasSingleNameHeader);
+
+    return {
+        indexes,
+        hasRequiredHeaders,
+    };
+};
+
+const splitStudentFullName = (fullName = "") => {
+    const normalizedName = String(fullName).replace(/\s+/g, " ").trim();
+
+    if (!normalizedName) {
+        return {
+            first_name: "",
+            middle_name: "",
+            last_name: "",
+        };
+    }
+
+    const parts = normalizedName.split(" ");
+
+    if (parts.length === 1) {
+        return {
+            first_name: parts[0],
+            middle_name: "",
+            last_name: "",
+        };
+    }
+
+    return {
+        first_name: parts[0],
+        middle_name: "",
+        last_name: parts.slice(1).join(" "),
+    };
+};
+
+const parseStudentsFromCsvText = (csvText, existingLrns = new Set()) => {
+    const parsedRows = [];
+    const parseErrors = [];
+
+    const normalizedText = String(csvText || "")
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .trim();
+
+    if (!normalizedText) {
+        return {
+            parsedRows,
+            parseErrors: ["The uploaded CSV file is empty."],
+        };
+    }
+
+    const lines = normalizedText
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line !== "");
+
+    if (lines.length === 0) {
+        return {
+            parsedRows,
+            parseErrors: ["The uploaded CSV file is empty."],
+        };
+    }
+
+    const firstRowValues = parseCsvLine(lines[0]);
+    const { indexes, hasRequiredHeaders } =
+        resolveCsvHeaderIndexes(firstRowValues);
+    const useHeaderRow = hasRequiredHeaders;
+    const startIndex = useHeaderRow ? 1 : 0;
+    const seenLrns = new Set();
+
+    for (let rowIndex = startIndex; rowIndex < lines.length; rowIndex += 1) {
+        const lineNumber = rowIndex + 1;
+        const rowValues = parseCsvLine(lines[rowIndex]);
+
+        if (rowValues.every((value) => String(value || "").trim() === "")) {
+            continue;
+        }
+
+        const fullNameFromHeader = useHeaderRow
+            ? indexes.student_name !== -1
+                ? String(rowValues[indexes.student_name] ?? "").trim()
+                : ""
+            : "";
+        const splitName = splitStudentFullName(fullNameFromHeader);
+
+        const firstName = useHeaderRow
+            ? String(rowValues[indexes.first_name] ?? "").trim() ||
+              splitName.first_name
+            : String(rowValues[0] ?? "").trim();
+        const lastName = useHeaderRow
+            ? String(rowValues[indexes.last_name] ?? "").trim() ||
+              splitName.last_name
+            : String(rowValues[1] ?? "").trim();
+        const lrn = useHeaderRow
+            ? String(rowValues[indexes.lrn] ?? "").trim()
+            : String(rowValues[2] ?? "").trim();
+        const personalEmailRaw = useHeaderRow
+            ? indexes.personal_email !== -1
+                ? String(rowValues[indexes.personal_email] ?? "").trim()
+                : ""
+            : String(rowValues[3] ?? "").trim();
+        const middleName = useHeaderRow
+            ? indexes.middle_name !== -1
+                ? String(rowValues[indexes.middle_name] ?? "").trim()
+                : splitName.middle_name
+            : String(rowValues[4] ?? "").trim();
+
+        if (!firstName || !lastName || !lrn) {
+            parseErrors.push(
+                `Line ${lineNumber}: first_name, last_name, and lrn are required.`,
+            );
+            continue;
+        }
+
+        if (existingLrns.has(lrn) || seenLrns.has(lrn)) {
+            parseErrors.push(`Line ${lineNumber}: duplicate lrn ${lrn}.`);
+            continue;
+        }
+
+        seenLrns.add(lrn);
+
+        parsedRows.push({
+            id: crypto.randomUUID(),
+            first_name: firstName,
+            last_name: lastName,
+            middle_name: middleName,
+            lrn,
+            personal_email: personalEmailRaw.toLowerCase(),
+        });
+    }
+
+    if (useHeaderRow && lines.length === 1) {
+        parseErrors.push("CSV contains headers but no student rows.");
+    }
+
+    return {
+        parsedRows,
+        parseErrors,
+    };
+};
+
+const formatValidationFieldLabel = (field = "") => {
+    if (field.startsWith("new_students.")) {
+        const matched = field.match(/^new_students\.(\d+)\.(.+)$/);
+
+        if (matched) {
+            const rowNumber = Number(matched[1]) + 1;
+            const attribute = matched[2].replace(/_/g, " ");
+            return `New student #${rowNumber} (${attribute})`;
+        }
+
+        return "New students";
+    }
+
+    if (field.startsWith("assigned_student_ids.")) {
+        const matched = field.match(/^assigned_student_ids\.(\d+)$/);
+
+        if (matched) {
+            const rowNumber = Number(matched[1]) + 1;
+            return `Assigned student #${rowNumber}`;
+        }
+
+        return "Assigned students";
+    }
+
+    return field.replace(/_/g, " ");
+};
+
+const resolveStepFromValidationErrors = (validationErrors = {}) => {
+    const keys = Object.keys(validationErrors || {});
+
+    if (keys.length === 0) {
+        return 3;
+    }
+
+    const hasStepOneErrors = keys.some((key) =>
+        STEP_ONE_ERROR_FIELDS.some(
+            (fieldName) => key === fieldName || key.startsWith(`${fieldName}.`),
+        ),
+    );
+
+    if (hasStepOneErrors) {
+        return 1;
+    }
+
+    const hasStepTwoErrors = keys.some(
+        (key) =>
+            key === "student_assignment" ||
+            key === "assigned_student_ids" ||
+            key.startsWith("assigned_student_ids.") ||
+            key === "new_students" ||
+            key.startsWith("new_students."),
+    );
+
+    if (hasStepTwoErrors) {
+        return 2;
+    }
+
+    return 3;
+};
 
 export default function AddSectionWizardModal({
     isOpen,
@@ -251,6 +530,31 @@ export default function AddSectionWizardModal({
 
         return issues;
     }, [assignmentCount, newStudentsQueue, stepOneIssues]);
+
+    const serverValidationEntries = useMemo(
+        () =>
+            Object.entries(errors || {}).flatMap(([field, message]) => {
+                const messages = Array.isArray(message) ? message : [message];
+
+                return messages
+                    .map((entry, index) => {
+                        const normalizedMessage = String(entry || "").trim();
+
+                        if (!normalizedMessage) {
+                            return null;
+                        }
+
+                        return {
+                            key: `${field}-${index}`,
+                            field,
+                            fieldLabel: formatValidationFieldLabel(field),
+                            message: normalizedMessage,
+                        };
+                    })
+                    .filter(Boolean);
+            }),
+        [errors],
+    );
 
     const resetWizardState = () => {
         setStep(1);
@@ -427,7 +731,7 @@ export default function AddSectionWizardModal({
         const parsedRows = [];
 
         lines.forEach((line, index) => {
-            const parts = line.split(",").map((item) => item.trim());
+            const parts = parseCsvLine(line);
 
             if (parts.length < 3) {
                 parseErrors.push(
@@ -490,6 +794,65 @@ export default function AddSectionWizardModal({
         }
     };
 
+    const handleCsvFileImport = async (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+
+        if (!file) {
+            return;
+        }
+
+        const fileName = String(file.name || "").toLowerCase();
+        const isCsvFile = fileName.endsWith(".csv") || file.type === "text/csv";
+
+        if (!isCsvFile) {
+            setBulkImportErrors(["Please upload a valid CSV file."]);
+            setWizardNotice("CSV import failed. Invalid file type.");
+            return;
+        }
+
+        try {
+            const csvText = await file.text();
+            const existingLrns = new Set(
+                newStudentsQueue.map((student) => student.lrn),
+            );
+            const { parsedRows, parseErrors } = parseStudentsFromCsvText(
+                csvText,
+                existingLrns,
+            );
+
+            if (parsedRows.length > 0) {
+                setNewStudentsQueue((previousStudents) => [
+                    ...previousStudents,
+                    ...parsedRows,
+                ]);
+            }
+
+            setBulkImportErrors(parseErrors);
+
+            if (parsedRows.length > 0) {
+                const importedLabel =
+                    parsedRows.length === 1 ? "student" : "students";
+                const skippedLabel = parseErrors.length === 1 ? "row" : "rows";
+                setWizardNotice(
+                    parseErrors.length > 0
+                        ? `Imported ${parsedRows.length} ${importedLabel} from ${file.name}. ${parseErrors.length} ${skippedLabel} skipped.`
+                        : `Imported ${parsedRows.length} ${importedLabel} from ${file.name}.`,
+                );
+                return;
+            }
+
+            setWizardNotice(
+                `No students were imported from ${file.name}. Check the errors below.`,
+            );
+        } catch (error) {
+            setBulkImportErrors([
+                "Unable to read the CSV file. Please try again.",
+            ]);
+            setWizardNotice("CSV import failed. Unable to read the file.");
+        }
+    };
+
     const removeQueuedNewStudent = (studentId) => {
         setNewStudentsQueue((previousStudents) =>
             previousStudents.filter((student) => student.id !== studentId),
@@ -510,8 +873,8 @@ export default function AddSectionWizardModal({
                 resetWizardState();
                 onClose?.();
             },
-            onError: () => {
-                setStep(3);
+            onError: (validationErrors) => {
+                setStep(resolveStepFromValidationErrors(validationErrors));
                 setWizardNotice(
                     "Unable to save section. Review validation messages below.",
                 );
@@ -572,6 +935,23 @@ export default function AddSectionWizardModal({
                     {wizardNotice && (
                         <div className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700 sm:mx-6">
                             {wizardNotice}
+                        </div>
+                    )}
+
+                    {serverValidationEntries.length > 0 && (
+                        <div className="mx-4 mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 sm:mx-6">
+                            <p className="font-semibold">Validation errors:</p>
+                            <ul className="mt-1 space-y-1">
+                                {serverValidationEntries.map((entry) => (
+                                    <li key={entry.key}>
+                                        -{" "}
+                                        <span className="font-medium">
+                                            {entry.fieldLabel}:
+                                        </span>{" "}
+                                        {entry.message}
+                                    </li>
+                                ))}
+                            </ul>
                         </div>
                     )}
 
@@ -1019,8 +1399,30 @@ export default function AddSectionWizardModal({
                                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                                             Bulk Add
                                         </p>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700">
+                                                <Upload size={13} />
+                                                Upload CSV File
+                                                <input
+                                                    type="file"
+                                                    accept=".csv,text/csv"
+                                                    className="hidden"
+                                                    onChange={
+                                                        handleCsvFileImport
+                                                    }
+                                                    disabled={processing}
+                                                />
+                                            </label>
+                                            <p className="text-xs text-slate-500">
+                                                Required: lrn plus either
+                                                student_name or
+                                                first_name/last_name. Optional:
+                                                personal_email and middle_name.
+                                            </p>
+                                        </div>
                                         <p className="text-xs text-slate-500">
                                             Format:
+                                            student_name,lrn,email(optional) or
                                             first_name,last_name,lrn,email(optional),middle_name(optional)
                                         </p>
                                         <textarea
@@ -1241,7 +1643,14 @@ export default function AddSectionWizardModal({
 
                                 {(errors.student_assignment ||
                                     errors.assigned_student_ids ||
-                                    errors.new_students) && (
+                                    errors.new_students ||
+                                    Object.keys(errors || {}).some(
+                                        (key) =>
+                                            key.startsWith("new_students.") ||
+                                            key.startsWith(
+                                                "assigned_student_ids.",
+                                            ),
+                                    )) && (
                                     <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                                         <p className="font-semibold">
                                             Validation errors:
@@ -1255,6 +1664,36 @@ export default function AddSectionWizardModal({
                                         {errors.new_students && (
                                             <p>{errors.new_students}</p>
                                         )}
+                                        {Object.entries(errors || {})
+                                            .filter(
+                                                ([key]) =>
+                                                    key.startsWith(
+                                                        "new_students.",
+                                                    ) ||
+                                                    key.startsWith(
+                                                        "assigned_student_ids.",
+                                                    ),
+                                            )
+                                            .map(([key, message]) => {
+                                                const messages = Array.isArray(
+                                                    message,
+                                                )
+                                                    ? message
+                                                    : [message];
+
+                                                return messages.map(
+                                                    (entry, index) => (
+                                                        <p
+                                                            key={`${key}-${index}`}
+                                                        >
+                                                            {formatValidationFieldLabel(
+                                                                key,
+                                                            )}
+                                                            : {entry}
+                                                        </p>
+                                                    ),
+                                                );
+                                            })}
                                     </div>
                                 )}
                             </div>
