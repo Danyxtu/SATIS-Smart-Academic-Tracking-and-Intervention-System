@@ -68,23 +68,25 @@ class WatchlistRuleService
         );
 
         $grades = $enrollment->grades;
-        $overallGrade = $this->calculateOverallGradePercentage($grades);
+        $scoredGrades = $this->filterScoredGrades($grades);
+
+        $overallGrade = $this->calculateOverallGradePercentage($scoredGrades);
         $hasGrades = $overallGrade !== null;
 
         $absences = (int) $enrollment->attendanceRecords
             ->where('status', 'absent')
             ->count();
 
-        $failingActivitiesTotal = $this->countFailingActivities($grades, $passingGrade);
+        $failingActivitiesTotal = $this->countFailingActivities($scoredGrades, $passingGrade);
 
-        $quarterAverages = $this->calculateQuarterAverages($grades);
+        $quarterAverages = $this->calculateQuarterAverages($scoredGrades);
         $midtermGrade = $this->resolveMidtermAverage($quarterAverages);
         $finalQuarterGrade = $this->resolveFinalQuarterAverage($quarterAverages);
         $finalQuarterNumber = $quarterAverages->keys()->last();
 
         $finalQuarterFailingActivities = $finalQuarterNumber !== null
             ? $this->countFailingActivities(
-                $grades->where('quarter', (int) $finalQuarterNumber),
+                $scoredGrades->where('quarter', (int) $finalQuarterNumber),
                 $passingGrade,
             )
             : 0;
@@ -165,6 +167,8 @@ class WatchlistRuleService
             ),
             'metrics' => [
                 'has_grades' => $hasGrades,
+                'graded_items_count' => $scoredGrades->count(),
+                'total_items_count' => $grades->count(),
                 'current_grade' => $overallGrade,
                 'absences' => $absences,
                 'failing_activities_total' => $failingActivitiesTotal,
@@ -240,17 +244,35 @@ class WatchlistRuleService
     {
         return $grades
             ->filter(function ($grade) use ($passingGrade) {
+                $score = $grade->score;
+                if ($score === null || ! is_numeric($score)) {
+                    return false;
+                }
+
                 $totalScore = (float) ($grade->total_score ?? 0);
                 if ($totalScore <= 0) {
                     return false;
                 }
 
-                $score = (float) ($grade->score ?? 0);
-                $percentage = ($score / $totalScore) * 100;
+                $percentage = (((float) $score) / $totalScore) * 100;
 
                 return $percentage < $passingGrade;
             })
             ->count();
+    }
+
+    private function filterScoredGrades(Collection $grades): Collection
+    {
+        return $grades
+            ->filter(function ($grade) {
+                $score = $grade->score;
+                if ($score === null || ! is_numeric($score)) {
+                    return false;
+                }
+
+                return (float) ($grade->total_score ?? 0) > 0;
+            })
+            ->values();
     }
 
     private function buildReasons(

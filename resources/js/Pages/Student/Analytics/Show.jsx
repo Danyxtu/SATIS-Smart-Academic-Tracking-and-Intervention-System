@@ -39,15 +39,6 @@ import {
 
 // --- Helper Components ---
 
-// Helper function to calculate expected grade (simple projection)
-const calculateExpectedGrade = (currentGrade, assignmentCount) => {
-    if (currentGrade === null || assignmentCount === 0) return null;
-    // Simple projection - in real scenario this could be more sophisticated
-    // Adding a small boost for expected performance
-    const expected = Math.min(100, Math.round(currentGrade * 1.02));
-    return expected;
-};
-
 // Helper function to get grade color
 const getGradeColor = (grade) => {
     if (grade === null) return "text-gray-400";
@@ -317,15 +308,9 @@ const QuarterlyGradesCards = ({
     const q1HasStarted = q1Data && q1Data.assignmentCount > 0;
     const q2HasStarted = q2Data && q2Data.assignmentCount > 0;
 
-    // Calculate expected grades
-    const q1Expected = q1HasStarted
-        ? calculateExpectedGrade(q1Data.grade, q1Data.assignmentCount)
-        : null;
-    const q2Expected = q1HasStarted
-        ? q2HasStarted
-            ? calculateExpectedGrade(q2Data.grade, q2Data.assignmentCount)
-            : calculateExpectedGrade(q1Data.grade, q1Data.assignmentCount)
-        : null;
+    // Expected grades come from the backend teacher/global-rule computation.
+    const q1Expected = q1HasStarted ? (q1Data?.expectedGrade ?? null) : null;
+    const q2Expected = q2HasStarted ? (q2Data?.expectedGrade ?? null) : null;
 
     const selectedQuarterLabel =
         selectedQuarter !== null
@@ -1116,6 +1101,7 @@ const ForYourCaseCard = ({
     quarterlyGrades = [],
     gradeBreakdown,
     gradeTrend = [],
+    risk = null,
 }) => {
     const [showApproachModal, setShowApproachModal] = useState(false);
 
@@ -1278,89 +1264,63 @@ const ForYourCaseCard = ({
             riskScore += 5;
         }
 
-        // Classify Risk Level
-        let riskLevel = "Low";
+        // Classify Risk Level (fallback) and then override with backend watchlist risk when available.
+        let riskLevel = "On Track";
         let riskColor = "text-green-600";
         let riskBgColor = "bg-green-100";
         if (riskScore >= 50) {
-            riskLevel = "High";
+            riskLevel = "At Risk";
             riskColor = "text-red-600";
             riskBgColor = "bg-red-100";
         } else if (riskScore >= 25) {
-            riskLevel = "Moderate";
+            riskLevel = "Needs Attention";
             riskColor = "text-yellow-600";
             riskBgColor = "bg-yellow-100";
+        }
+
+        const backendRiskKey = risk?.key || null;
+        const backendRiskLabel = risk?.label || null;
+        const backendRiskReasons = Array.isArray(risk?.reasons)
+            ? risk.reasons
+            : [];
+
+        if (backendRiskKey) {
+            if (backendRiskKey === "at_risk") {
+                riskColor = "text-red-600";
+                riskBgColor = "bg-red-100";
+            } else if (backendRiskKey === "needs_attention") {
+                riskColor = "text-yellow-600";
+                riskBgColor = "bg-yellow-100";
+            } else if (backendRiskKey === "recent_decline") {
+                riskColor = "text-blue-600";
+                riskBgColor = "bg-blue-100";
+            } else {
+                riskColor = "text-green-600";
+                riskBgColor = "bg-green-100";
+            }
+
+            riskLevel = backendRiskLabel || riskLevel;
+
+            if (backendRiskReasons.length > 0) {
+                const severity =
+                    backendRiskKey === "at_risk"
+                        ? "high"
+                        : backendRiskKey === "needs_attention"
+                          ? "medium"
+                          : "low";
+
+                riskFactors.splice(
+                    0,
+                    riskFactors.length,
+                    ...backendRiskReasons.map((text) => ({ text, severity })),
+                );
+            }
         }
 
         // =============================================
         // STEP 4: EXPECTED GRADE CALCULATION
         // =============================================
-        const gradeExplanation = [];
-        let expectedGrade = baseGrade > 0 ? baseGrade : 75;
-
-        // Base Grade
-        gradeExplanation.push({
-            label: "Base (Current Grade)",
-            value: baseGrade || 75,
-            impact: 0,
-            formula: "Starting point from actual scores",
-        });
-
-        // Attendance Adjustment
-        let attendanceAdj = 0;
-        if (attendanceRate >= 90) {
-            attendanceAdj = 1;
-        } else if (attendanceRate >= 80) {
-            attendanceAdj = 0;
-        } else {
-            attendanceAdj = -Math.round((90 - attendanceRate) * 0.3);
-        }
-        expectedGrade += attendanceAdj;
-        gradeExplanation.push({
-            label: "Attendance Effect",
-            value: attendanceRate,
-            impact: attendanceAdj,
-            formula:
-                attendanceAdj >= 0
-                    ? "≥90%: +1 | 80-89%: 0"
-                    : "(90 - rate) × 0.3 penalty",
-        });
-
-        // Trend Adjustment
-        let trendAdj = 0;
-        if (trendDirection === "improving" && trendChange > 0) {
-            trendAdj = Math.min(3, Math.round(trendChange * 0.4));
-        } else if (
-            trendDirection === "declining" ||
-            trendDirection === "slightly declining"
-        ) {
-            trendAdj = Math.max(-3, Math.round(trendChange * 0.3));
-        }
-        expectedGrade += trendAdj;
-        gradeExplanation.push({
-            label: "Trend Projection",
-            value: trendDirection,
-            impact: trendAdj,
-            formula: "Improving: +change×0.4 | Declining: change×0.3",
-        });
-
-        // Completion Adjustment
-        let completionAdj = 0;
-        if (completionRate >= 80) {
-            completionAdj = 1;
-        } else if (completionRate < 60) {
-            completionAdj = -2;
-        }
-        expectedGrade += completionAdj;
-        gradeExplanation.push({
-            label: "Task Completion",
-            value: `${completionRate}%`,
-            impact: completionAdj,
-            formula: "≥80%: +1 | <60%: -2",
-        });
-
         // Improvement Potential (from weak categories)
-        let improvementAdj = 0;
         const categoryScores = {
             writtenWorksAvg,
             performanceTaskAvg,
@@ -1390,22 +1350,49 @@ const ForYourCaseCard = ({
             weakestCategory = "quarterlyExam";
         }
 
-        if (weakestCategory && avgCategoryScore - weakestScore >= 10) {
-            improvementAdj = 2;
-            gradeExplanation.push({
-                label: "Improvement Potential",
-                value: `Gap: ${Math.round(avgCategoryScore - weakestScore)}pts`,
-                impact: improvementAdj,
-                formula: "Weak category 10+ below avg: +2 potential",
-            });
-            expectedGrade += improvementAdj;
-        }
+        const latestExpectedQuarter = [...quarterlyGrades]
+            .filter(
+                (quarter) =>
+                    quarter?.expectedGrade !== null &&
+                    quarter?.expectedGrade !== undefined,
+            )
+            .sort(
+                (a, b) =>
+                    (normalizeQuarter(a?.quarterNum ?? a?.quarter) ?? 0) -
+                    (normalizeQuarter(b?.quarterNum ?? b?.quarter) ?? 0),
+            )
+            .at(-1);
 
-        // Clamp and round
-        expectedGrade = Math.max(60, Math.min(100, Math.round(expectedGrade)));
+        const expectedGrade =
+            latestExpectedQuarter?.expectedGrade !== null &&
+            latestExpectedQuarter?.expectedGrade !== undefined
+                ? Math.round(Number(latestExpectedQuarter.expectedGrade))
+                : null;
+
+        const gradeExplanation =
+            expectedGrade !== null
+                ? [
+                      {
+                          label: "Teacher Projection (Global Rule)",
+                          value: expectedGrade,
+                          impact: 0,
+                          formula:
+                              "Computed from the same backend rule set used by teachers.",
+                      },
+                  ]
+                : [
+                      {
+                          label: "Expected Grade",
+                          value: "Pending",
+                          impact: 0,
+                          formula:
+                              "Expected grade appears after enough graded activities are recorded.",
+                      },
+                  ];
 
         // Gap to target (85 - Very Satisfactory)
-        const expectedTo85Gap = Math.max(0, 85 - expectedGrade);
+        const expectedTo85Gap =
+            expectedGrade !== null ? Math.max(0, 85 - expectedGrade) : null;
 
         return {
             currentGrade: baseGrade,
@@ -1433,7 +1420,7 @@ const ForYourCaseCard = ({
             gradeExplanation,
             expectedTo85Gap,
         };
-    }, [currentGrade, attendance, quarterlyGrades, gradeBreakdown]);
+    }, [currentGrade, attendance, quarterlyGrades, gradeBreakdown, risk]);
 
     // Alias for backwards compatibility
     const insights = personalizedInsights;
@@ -1457,6 +1444,10 @@ const ForYourCaseCard = ({
             absentDays,
             totalDays,
         } = personalizedInsights;
+
+        if (expectedGrade === null || expectedGrade === undefined) {
+            return null;
+        }
 
         const targetGrade = 85; // Very Satisfactory
         const gapToTarget = Math.max(0, targetGrade - expectedGrade);
@@ -1736,10 +1727,14 @@ const ForYourCaseCard = ({
                             Expected Grade
                         </p>
                         <p className={`text-3xl font-bold ${gradeColor}`}>
-                            {insights.expectedGrade}%
+                            {insights.expectedGrade !== null
+                                ? `${insights.expectedGrade}%`
+                                : "--"}
                         </p>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                            Computed Projection
+                            {insights.expectedGrade !== null
+                                ? "Teacher Projection"
+                                : "Awaiting teacher projection"}
                         </p>
                     </div>
                 </div>
@@ -1747,11 +1742,14 @@ const ForYourCaseCard = ({
                 {/* Why Expected Grade Section */}
                 <div className="bg-white dark:bg-gray-900 rounded-xl p-4 mb-5 shadow-sm border border-transparent dark:border-gray-700">
                     <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2">
-                        📊 Why is your expected grade {insights.expectedGrade}%?
+                        {insights.expectedGrade !== null
+                            ? `📊 Why is your expected grade ${insights.expectedGrade}%?`
+                            : "📊 Why is expected grade pending?"}
                     </h4>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                        Your expected grade is calculated using multiple
-                        performance factors:
+                        {insights.expectedGrade !== null
+                            ? "Your expected grade is calculated using the same backend global rule set used by teachers:"
+                            : "Expected grade appears once enough graded activities are available for backend projection."}
                     </p>
 
                     {/* Formula Breakdown */}
@@ -1790,7 +1788,9 @@ const ForYourCaseCard = ({
                                 Final Expected Grade
                             </span>
                             <span className={`text-xl font-bold ${gradeColor}`}>
-                                {insights.expectedGrade}%
+                                {insights.expectedGrade !== null
+                                    ? `${insights.expectedGrade}%`
+                                    : "--"}
                             </span>
                         </div>
                     </div>
@@ -1802,7 +1802,9 @@ const ForYourCaseCard = ({
                         Final Expected Grade
                     </span>
                     <span className="text-white text-2xl font-bold">
-                        {insights.expectedGrade}%
+                        {insights.expectedGrade !== null
+                            ? `${insights.expectedGrade}%`
+                            : "--"}
                     </span>
                 </div>
 
@@ -1989,18 +1991,32 @@ const ForYourCaseCard = ({
                 )}
 
                 {/* System-Generated Approach Button */}
-                <button
-                    onClick={() => setShowApproachModal(true)}
-                    className="w-full bg-pink-600 text-white font-semibold py-3 px-4 rounded-xl hover:bg-pink-700 transition-colors flex items-center justify-center gap-2"
-                >
-                    <Lightbulb size={18} />
-                    System-Generated Approach
-                    <ArrowRight size={16} />
-                </button>
-                <p className="text-xs text-gray-500 text-center mt-2">
-                    Tap to see how to improve from {insights.expectedGrade}% →
-                    85%
-                </p>
+                {improvementPlan ? (
+                    <>
+                        <button
+                            onClick={() => setShowApproachModal(true)}
+                            className="w-full bg-pink-600 text-white font-semibold py-3 px-4 rounded-xl hover:bg-pink-700 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Lightbulb size={18} />
+                            System-Generated Approach
+                            <ArrowRight size={16} />
+                        </button>
+                        <p className="text-xs text-gray-500 text-center mt-2">
+                            Tap to see how to improve from{" "}
+                            {insights.expectedGrade}% to 85%
+                        </p>
+                    </>
+                ) : (
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                            Expected grade is not available yet.
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            This appears after graded activities are recorded
+                            using the teacher's global rule settings.
+                        </p>
+                    </div>
+                )}
             </div>
 
             {/* System-Generated Approach Modal */}
@@ -2420,6 +2436,7 @@ const AnalyticsShow = ({
     subject = {},
     performance = {},
     attendance = {},
+    risk = null,
     intervention = null,
     suggestions = [],
 }) => {
@@ -2610,6 +2627,7 @@ const AnalyticsShow = ({
                             attendance={attendance}
                             quarterlyGrades={quarterlyGrades}
                             gradeBreakdown={gradeBreakdown}
+                            risk={risk}
                         />
                         <GradeBreakdown
                             data={filteredGradeBreakdown}

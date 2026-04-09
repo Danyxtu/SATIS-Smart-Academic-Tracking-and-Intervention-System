@@ -29,28 +29,28 @@ import {
 } from "lucide-react";
 
 // --- Risk Level Badge ---
-const RiskBadge = ({ level, size = "md" }) => {
+const RiskBadge = ({ level, size = "md", label }) => {
     const config = {
         high: {
             bg: "bg-red-100 dark:bg-red-900/30",
             text: "text-red-700 dark:text-red-300",
             border: "border-red-200 dark:border-red-700/50",
             icon: XCircle,
-            label: "High Risk",
+            label: "At Risk",
         },
         medium: {
             bg: "bg-yellow-100 dark:bg-yellow-900/30",
             text: "text-yellow-700 dark:text-yellow-300",
             border: "border-yellow-200 dark:border-yellow-700/50",
             icon: AlertTriangle,
-            label: "Medium Risk",
+            label: "Needs Attention",
         },
         low: {
             bg: "bg-green-100 dark:bg-green-900/30",
             text: "text-green-700 dark:text-green-300",
             border: "border-green-200 dark:border-green-700/50",
             icon: CheckCircle,
-            label: "Low Risk",
+            label: "On Track",
         },
     };
 
@@ -64,7 +64,7 @@ const RiskBadge = ({ level, size = "md" }) => {
             className={`inline-flex items-center gap-1 rounded-full font-semibold border ${c.bg} ${c.text} ${c.border} ${sizeClasses}`}
         >
             <Icon size={size === "sm" ? 12 : 14} />
-            {c.label}
+            {label || c.label}
         </span>
     );
 };
@@ -192,11 +192,16 @@ const SubjectCard = ({ subject, onClick }) => {
         low: "border-l-green-500 hover:border-green-200 dark:hover:border-green-700/60",
     };
 
+    const borderClass =
+        subject.riskKey === "recent_decline"
+            ? "border-l-blue-500 hover:border-blue-200 dark:hover:border-blue-700/60"
+            : riskBorderColors[subject.riskLevel] || riskBorderColors.low;
+
     return (
         <button
             onClick={onClick}
             className={`w-full bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-l-4 ${
-                riskBorderColors[subject.riskLevel]
+                borderClass
             } p-4 text-left hover:shadow-md transition-all duration-200 group`}
         >
             <div className="flex items-start justify-between gap-4">
@@ -279,7 +284,11 @@ const SubjectCard = ({ subject, onClick }) => {
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
-                    <RiskBadge level={subject.riskLevel} size="sm" />
+                    <RiskBadge
+                        level={subject.riskLevel}
+                        size="sm"
+                        label={subject.riskLabel}
+                    />
                     <ChevronRight
                         size={20}
                         className="text-gray-400 dark:text-gray-500 group-hover:text-pink-500 transition-colors"
@@ -354,6 +363,7 @@ const DetailPanel = ({ subject, isOpen, onClose }) => {
                                             <div className="mt-4">
                                                 <RiskBadge
                                                     level={subject.riskLevel}
+                                                    label={subject.riskLabel}
                                                 />
                                             </div>
                                         </div>
@@ -778,7 +788,12 @@ const SubjectRisk = ({ subjects = [], stats = {} }) => {
     // Filter subjects
     const filteredSubjects = subjects.filter((subject) => {
         if (filter === "all") return true;
-        return subject.riskLevel === filter;
+
+        if (["high", "medium", "low"].includes(filter)) {
+            return subject.riskLevel === filter;
+        }
+
+        return subject.riskKey === filter;
     });
 
     return (
@@ -799,7 +814,7 @@ const SubjectRisk = ({ subjects = [], stats = {} }) => {
                 </div>
 
                 {/* Summary Stats */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
                     <StatCard
                         icon={BookOpen}
                         label="Total Subjects"
@@ -808,20 +823,26 @@ const SubjectRisk = ({ subjects = [], stats = {} }) => {
                     />
                     <StatCard
                         icon={XCircle}
-                        label="High Risk"
-                        value={stats.highRisk || 0}
+                        label="At Risk"
+                        value={stats.atRisk || stats.highRisk || 0}
                         color="red"
                     />
                     <StatCard
                         icon={AlertTriangle}
-                        label="Medium Risk"
-                        value={stats.mediumRisk || 0}
+                        label="Needs Attention"
+                        value={stats.needsAttention || stats.mediumRisk || 0}
                         color="yellow"
                     />
                     <StatCard
+                        icon={TrendingDown}
+                        label="Recent Decline"
+                        value={stats.recentDecline || 0}
+                        color="gray"
+                    />
+                    <StatCard
                         icon={CheckCircle}
-                        label="Low Risk"
-                        value={stats.lowRisk || 0}
+                        label="On Track"
+                        value={stats.onTrack || stats.lowRisk || 0}
                         color="green"
                     />
                 </div>
@@ -832,15 +853,25 @@ const SubjectRisk = ({ subjects = [], stats = {} }) => {
                         { key: "all", label: "All", count: subjects.length },
                         {
                             key: "high",
-                            label: "High",
-                            count: stats.highRisk || 0,
+                            label: "At Risk",
+                            count: stats.atRisk || stats.highRisk || 0,
                         },
                         {
                             key: "medium",
-                            label: "Medium",
-                            count: stats.mediumRisk || 0,
+                            label: "Needs Attention",
+                            count:
+                                stats.needsAttention || stats.mediumRisk || 0,
                         },
-                        { key: "low", label: "Low", count: stats.lowRisk || 0 },
+                        {
+                            key: "recent_decline",
+                            label: "Recent Decline",
+                            count: stats.recentDecline || 0,
+                        },
+                        {
+                            key: "low",
+                            label: "On Track",
+                            count: stats.onTrack || stats.lowRisk || 0,
+                        },
                     ].map((tab) => (
                         <button
                             key={tab.key}
@@ -896,22 +927,31 @@ const SubjectRisk = ({ subjects = [], stats = {} }) => {
                             <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
                                 <p>
                                     <span className="font-medium text-red-600">
-                                        High Risk:
+                                        At Risk:
                                     </span>{" "}
-                                    Grade below 70% or attendance below 80%
+                                    Current performance has crossed
+                                    high-priority thresholds.
                                 </p>
                                 <p>
                                     <span className="font-medium text-yellow-600">
-                                        Medium Risk:
+                                        Needs Attention:
                                     </span>{" "}
-                                    Grade between 70-75%, declining trend, or
-                                    missing work
+                                    Watch indicators suggest intervention is
+                                    needed soon.
+                                </p>
+                                <p>
+                                    <span className="font-medium text-blue-600">
+                                        Recent Decline:
+                                    </span>{" "}
+                                    Performance is non-failing but trending
+                                    downward.
                                 </p>
                                 <p>
                                     <span className="font-medium text-green-600">
-                                        Low Risk:
+                                        On Track:
                                     </span>{" "}
-                                    Grade above 75% with good attendance
+                                    Current indicators are within acceptable
+                                    thresholds.
                                 </p>
                             </div>
                         </div>

@@ -108,9 +108,20 @@ class PredictionService
      */
     public function predictFinalGrade(Enrollment $enrollment): array
     {
-        $grades = $enrollment->relationLoaded('grades')
+        $rawGrades = $enrollment->relationLoaded('grades')
             ? $enrollment->grades->sortBy('created_at')->values()
             : $enrollment->grades()->orderBy('created_at')->get();
+
+        // Only use graded activities for predictions.
+        $grades = $rawGrades
+            ->filter(function ($grade) {
+                $score = $grade->score;
+
+                return $score !== null
+                    && is_numeric($score)
+                    && (float) ($grade->total_score ?? 0) > 0;
+            })
+            ->values();
 
         if ($grades->isEmpty()) {
             return [
@@ -217,8 +228,13 @@ class PredictionService
 
         // Count completed assignments
         $completed = $enrollment->relationLoaded('grades')
-            ? $enrollment->grades->count()
-            : $enrollment->grades()->count();
+            ? $enrollment->grades
+            ->filter(fn($grade) => $grade->score !== null && is_numeric($grade->score) && (float) ($grade->total_score ?? 0) > 0)
+            ->count()
+            : $enrollment->grades()
+            ->whereNotNull('score')
+            ->where('total_score', '>', 0)
+            ->count();
 
         // Estimate remaining (minimum 3 for prediction purposes)
         return max(3, $totalExpected - $completed);
@@ -296,7 +312,8 @@ class PredictionService
         }
 
         // Missing assignments
-        $missingCount = $grades->filter(fn($g) => $g->score === null || $g->score === 0)->count();
+        // Only explicit zero scores are treated as missing/incomplete work.
+        $missingCount = $grades->filter(fn($g) => $g->score !== null && (float) $g->score === 0.0)->count();
         if ($missingCount > 0) {
             $suggestions[] = [
                 'type' => 'missing_work',
@@ -465,7 +482,7 @@ class PredictionService
         $presentDays = $attendance->whereIn('status', ['present', 'excused'])->count();
         $attendanceRate = $totalDays > 0 ? ($presentDays / $totalDays) * 100 : 100;
 
-        $missingCount = $grades->filter(fn($g) => $g->score === null || $g->score === 0)->count();
+        $missingCount = $grades->filter(fn($g) => $g->score !== null && (float) $g->score === 0.0)->count();
 
         // Get predictions and suggestions
         $prediction = $this->predictFinalGrade($enrollment);

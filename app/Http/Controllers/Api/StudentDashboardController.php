@@ -7,10 +7,14 @@ use App\Models\Enrollment;
 use App\Models\Intervention;
 use App\Models\StudentNotification;
 use App\Models\SystemSetting;
+use App\Services\WatchlistRuleService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class StudentDashboardController extends Controller
 {
+    public function __construct(private WatchlistRuleService $watchlistRuleService) {}
+
     /**
      * Return JSON dashboard data for the authenticated student.
      */
@@ -79,12 +83,15 @@ class StudentDashboardController extends Controller
 
         $totalSubjects = $enrollments->count();
 
-        $subjectGrades = $enrollments->map(function ($enrollment) {
-            $grades = $enrollment->grades;
-            $totalScore = $grades->sum('score');
-            $totalPossible = $grades->sum('total_score');
-            return $totalPossible > 0 ? ($totalScore / $totalPossible) * 100 : null;
-        })->filter()->values();
+        $subjectGrades = $enrollments
+            ->map(function ($enrollment) {
+                return $this->calculatePercentageFromGrades(
+                    $this->scoreableGrades($enrollment->grades),
+                    1,
+                );
+            })
+            ->filter(fn($grade) => $grade !== null)
+            ->values();
 
         $overallGrade = $subjectGrades->count() > 0
             ? round($subjectGrades->avg(), 1)
@@ -95,13 +102,9 @@ class StudentDashboardController extends Controller
         $presentDays = $allAttendance->where('status', 'present')->count();
         $overallAttendance = $totalDays > 0 ? round(($presentDays / $totalDays) * 100) : 100;
 
-        $subjectsAtRisk = $enrollments->filter(function ($enrollment) {
-            $grades = $enrollment->grades;
-            $totalScore = $grades->sum('score');
-            $totalPossible = $grades->sum('total_score');
-            $percentage = $totalPossible > 0 ? ($totalScore / $totalPossible) * 100 : null;
-            return $percentage !== null && $percentage < 75;
-        })->count();
+        $subjectsAtRisk = $enrollments
+            ->filter(fn($enrollment) => ($this->watchlistRuleService->evaluateEnrollment($enrollment)['risk_key'] ?? 'on_track') === 'at_risk')
+            ->count();
 
         $activeInterventions = $enrollments
             ->filter(fn($e) => $e->intervention && $e->intervention->status === 'active')
@@ -144,21 +147,22 @@ class StudentDashboardController extends Controller
             $teacher = $class?->teacher;
 
             $grades = $enrollment->grades;
-            $totalScore = $grades->sum('score');
-            $totalPossible = $grades->sum('total_score');
-            $percentage = $totalPossible > 0 ? round(($totalScore / $totalPossible) * 100) : null;
+            $scoredGrades = $this->scoreableGrades($grades);
+            $percentage = $this->calculatePercentageFromGrades($scoredGrades);
 
             $attendance = $enrollment->attendanceRecords;
             $totalDays = $attendance->count();
             $presentDays = $attendance->where('status', 'present')->count();
             $attendanceRate = $totalDays > 0 ? round(($presentDays / $totalDays) * 100) : 100;
 
-            $status = 'good';
-            if ($percentage !== null && $percentage < 70) {
-                $status = 'critical';
-            } elseif ($percentage !== null && $percentage < 75) {
-                $status = 'warning';
-            }
+            $risk = $this->watchlistRuleService->evaluateEnrollment($enrollment);
+            $riskKey = (string) ($risk['risk_key'] ?? 'on_track');
+            $riskLabel = (string) ($risk['risk_label'] ?? 'On Track');
+            $status = match ($riskKey) {
+                'at_risk' => 'critical',
+                'needs_attention', 'recent_decline' => 'warning',
+                default => 'good',
+            };
 
             return [
                 'id' => $enrollment->id,
@@ -173,10 +177,18 @@ class StudentDashboardController extends Controller
                 'gradeDisplay' => $percentage !== null ? "{$percentage}%" : 'N/A',
                 'attendance' => $attendanceRate,
                 'status' => $status,
+                'riskCategory' => $riskKey,
+                'riskLabel' => $riskLabel,
+                'riskColor' => $this->riskColorHex((string) ($risk['risk_color'] ?? 'green')),
                 'hasIntervention' => $enrollment->intervention !== null,
                 'interventionType' => $enrollment->intervention?->type,
             ];
-        })->sortBy('grade')->values();
+        })->sortBy(function ($subject) {
+            $priority = $this->riskSortOrder((string) ($subject['riskCategory'] ?? 'on_track'));
+            $gradeRank = (int) round($subject['grade'] ?? 101);
+
+            return ($priority * 1000) + $gradeRank;
+        })->values();
 
         $upcomingTasks = $activeInterventions
             ->flatMap(function ($intervention) use ($enrollments) {
@@ -199,8 +211,8 @@ class StudentDashboardController extends Controller
         // Build grade trend: use the last-updated subject's individual grade items
         // grouped by category, each converted to a percentage for accurate plotting
         $lastUpdatedEnrollment = $enrollments
-            ->filter(fn($e) => $e->grades->isNotEmpty())
-            ->sortByDesc(fn($e) => $e->grades->max('updated_at'))
+            ->filter(fn($e) => $this->scoreableGrades($e->grades)->isNotEmpty())
+            ->sortByDesc(fn($e) => $this->scoreableGrades($e->grades)->max('updated_at'))
             ->first();
 
         $gradeTrendData = [
@@ -213,12 +225,12 @@ class StudentDashboardController extends Controller
             $trendSubject = $trendClass?->subject ?? $lastUpdatedEnrollment->subject;
             $gradeTrendData['subjectName'] = $trendSubject?->subject_name ?? 'Unknown Subject';
 
-            $gradeTrendData['items'] = $lastUpdatedEnrollment->grades
+            $gradeTrendData['items'] = $this->scoreableGrades($lastUpdatedEnrollment->grades)
                 ->sortBy('created_at')
                 ->values()
                 ->map(function ($grade) {
-                    $percentage = $grade->total_score > 0
-                        ? round(($grade->score / $grade->total_score) * 100)
+                    $percentage = (float) $grade->total_score > 0
+                        ? round(((float) $grade->score / (float) $grade->total_score) * 100)
                         : null;
                     return [
                         'id' => $grade->id,
@@ -269,5 +281,54 @@ class StudentDashboardController extends Controller
                 'semester2Count' => $semester2Count,
             ],
         ]);
+    }
+
+    private function scoreableGrades(Collection $grades): Collection
+    {
+        return $grades
+            ->filter(function ($grade) {
+                $score = $grade->score;
+
+                return $score !== null
+                    && is_numeric($score)
+                    && (float) ($grade->total_score ?? 0) > 0;
+            })
+            ->values();
+    }
+
+    private function calculatePercentageFromGrades(Collection $grades, int $precision = 0): ?float
+    {
+        if ($grades->isEmpty()) {
+            return null;
+        }
+
+        $totalScore = (float) $grades->sum('score');
+        $totalPossible = (float) $grades->sum('total_score');
+
+        if ($totalPossible <= 0) {
+            return null;
+        }
+
+        return round(($totalScore / $totalPossible) * 100, $precision);
+    }
+
+    private function riskSortOrder(string $riskKey): int
+    {
+        return match ($riskKey) {
+            'at_risk' => 0,
+            'needs_attention' => 1,
+            'recent_decline' => 2,
+            default => 3,
+        };
+    }
+
+    private function riskColorHex(string $riskColor): string
+    {
+        return match ($riskColor) {
+            'red' => '#EF4444',
+            'orange' => '#F59E0B',
+            'blue' => '#3B82F6',
+            default => '#10B981',
+        };
     }
 }

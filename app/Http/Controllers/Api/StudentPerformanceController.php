@@ -7,15 +7,19 @@ use App\Models\Enrollment;
 use App\Models\StudentNotification;
 use App\Models\SystemSetting;
 use App\Services\PredictionService;
+use App\Services\WatchlistRuleService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class StudentPerformanceController extends Controller
 {
     protected PredictionService $predictionService;
+    protected WatchlistRuleService $watchlistRuleService;
 
-    public function __construct(PredictionService $predictionService)
+    public function __construct(PredictionService $predictionService, WatchlistRuleService $watchlistRuleService)
     {
         $this->predictionService = $predictionService;
+        $this->watchlistRuleService = $watchlistRuleService;
     }
 
     public function index(Request $request)
@@ -70,12 +74,15 @@ class StudentPerformanceController extends Controller
 
         $totalSubjects = $enrollments->count();
 
-        $subjectGrades = $enrollments->map(function ($enrollment) {
-            $grades = $enrollment->grades;
-            $totalScore = $grades->sum('score');
-            $totalPossible = $grades->sum('total_score');
-            return $totalPossible > 0 ? ($totalScore / $totalPossible) * 100 : null;
-        })->filter()->values();
+        $subjectGrades = $enrollments
+            ->map(function ($enrollment) {
+                return $this->calculatePercentageFromGrades(
+                    $this->scoreableGrades($enrollment->grades),
+                    1,
+                );
+            })
+            ->filter(fn($grade) => $grade !== null)
+            ->values();
 
         $overallGrade = $subjectGrades->count() > 0
             ? round($subjectGrades->avg(), 1)
@@ -95,9 +102,8 @@ class StudentPerformanceController extends Controller
             $teacher = $class?->teacher;
 
             $grades = $enrollment->grades;
-            $totalScore = $grades->sum('score');
-            $totalPossible = $grades->sum('total_score');
-            $percentage = $totalPossible > 0 ? round(($totalScore / $totalPossible) * 100) : null;
+            $scoredGrades = $this->scoreableGrades($grades);
+            $percentage = $this->calculatePercentageFromGrades($scoredGrades);
 
             $attendance = $enrollment->attendanceRecords;
             $totalDays = $attendance->count();
@@ -107,18 +113,15 @@ class StudentPerformanceController extends Controller
                 ? round((($presentDays + ($lateDays * 0.5)) / $totalDays) * 100)
                 : 100;
 
-            $missingCount = $grades->filter(fn($grade) => $grade->score === null || $grade->score === 0)->count();
+            // Only explicit zero scores count as missing work.
+            $missingCount = $grades
+                ->filter(fn($grade) => $grade->score !== null && (float) $grade->score === 0.0)
+                ->count();
 
-            $riskCategory = $this->predictionService->determineRiskCategory(
-                $percentage,
-                $missingCount,
-                $attendanceRate,
-            );
-            $riskKey = $this->predictionService->getRiskCategoryKey(
-                $percentage,
-                $missingCount,
-                $attendanceRate,
-            );
+            $risk = $this->watchlistRuleService->evaluateEnrollment($enrollment);
+            $riskKey = (string) ($risk['risk_key'] ?? 'on_track');
+            $riskLabel = (string) ($risk['risk_label'] ?? 'On Track');
+            $riskColor = $this->riskColorHex((string) ($risk['risk_color'] ?? 'green'));
 
             $prediction = $this->predictionService->predictFinalGrade($enrollment);
 
@@ -147,29 +150,36 @@ class StudentPerformanceController extends Controller
                 'attendanceRate' => $attendanceRate,
                 'missingCount' => $missingCount,
                 'riskCategory' => $riskKey,
-                'riskLabel' => $riskCategory['label'],
-                'riskColor' => $riskCategory['color'],
+                'riskLabel' => $riskLabel,
+                'riskColor' => $riskColor,
                 'status' => match ($riskKey) {
-                    'on_track' => 'good',
-                    'needs_attention' => 'warning',
-                    'at_risk', 'critical' => 'critical',
+                    'at_risk' => 'critical',
+                    'needs_attention', 'recent_decline' => 'warning',
                     default => 'good',
                 },
                 'hasIntervention' => $enrollment->intervention !== null,
                 'interventionType' => $enrollment->intervention?->type,
-                'gradeCount' => $grades->count(),
+                'gradeCount' => $scoredGrades->count(),
                 'predictedGrade' => $prediction['predicted_grade'],
                 'gradeTrend' => $prediction['trend'],
                 'trendDirection' => $prediction['trend_direction'],
                 'semester' => $class?->semester,
             ];
-        })->sortByDesc('grade')->values();
+        })->sortBy(function ($subject) {
+            $priority = $this->riskSortOrder((string) ($subject['riskCategory'] ?? 'on_track'));
+            $gradeRank = (int) round($subject['grade'] ?? 101);
+
+            return ($priority * 1000) + $gradeRank;
+        })->values();
 
         $subjectsAtRisk = $subjectPerformance->filter(
-            fn($subject) => in_array($subject['riskCategory'], ['at_risk', 'critical'], true),
+            fn($subject) => $subject['riskCategory'] === 'at_risk',
         )->count();
         $subjectsNeedingAttention = $subjectPerformance->filter(
             fn($subject) => $subject['riskCategory'] === 'needs_attention',
+        )->count();
+        $subjectsRecentDecline = $subjectPerformance->filter(
+            fn($subject) => $subject['riskCategory'] === 'recent_decline',
         )->count();
         $subjectsOnTrack = $subjectPerformance->filter(
             fn($subject) => $subject['riskCategory'] === 'on_track',
@@ -179,7 +189,7 @@ class StudentPerformanceController extends Controller
         )->count();
 
         $recentGrades = $enrollments
-            ->flatMap(fn($e) => $e->grades)
+            ->flatMap(fn($e) => $this->scoreableGrades($e->grades))
             ->sortByDesc('created_at')
             ->take(20)
             ->groupBy(fn($g) => $g->created_at->format('W'))
@@ -230,6 +240,7 @@ class StudentPerformanceController extends Controller
                 'totalSubjects' => $totalSubjects,
                 'subjectsAtRisk' => $subjectsAtRisk,
                 'subjectsNeedingAttention' => $subjectsNeedingAttention,
+                'subjectsRecentDecline' => $subjectsRecentDecline,
                 'subjectsOnTrack' => $subjectsOnTrack,
                 'subjectsExcelling' => $subjectsExcelling,
             ],
@@ -257,6 +268,9 @@ class StudentPerformanceController extends Controller
         $enrollment = Enrollment::with([
             'subjectTeacher.subject',
             'subjectTeacher.teacher',
+            'schoolClass.subject',
+            'schoolClass.teacher',
+            'subject',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
@@ -265,13 +279,13 @@ class StudentPerformanceController extends Controller
             ->where('id', $enrollmentId)
             ->firstOrFail();
 
-        $subject = $enrollment->subjectTeacher?->subject;
+        $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+        $subject = $class?->subject ?? $enrollment->subject;
         $grades = $enrollment->grades;
+        $scoredGrades = $this->scoreableGrades($grades);
 
         // Calculate overall grade
-        $totalScore = $grades->sum('score');
-        $totalPossible = $grades->sum('total_score');
-        $overallGrade = $totalPossible > 0 ? round(($totalScore / $totalPossible) * 100) : null;
+        $overallGrade = $this->calculatePercentageFromGrades($scoredGrades);
 
         // Determine remarks
         $remarks = 'N/A';
@@ -289,9 +303,9 @@ class StudentPerformanceController extends Controller
 
         for ($q = 1; $q <= 2; $q++) {
             $quarterGrades = $grades->where('quarter', $q);
-            $qScore = $quarterGrades->sum('score');
-            $qTotal = $quarterGrades->sum('total_score');
-            $qGrade = $qTotal > 0 ? round(($qScore / $qTotal) * 100) : null;
+            $scoredQuarterGrades = $this->scoreableGrades($quarterGrades);
+            $hasStarted = $scoredQuarterGrades->isNotEmpty();
+            $qGrade = $this->calculatePercentageFromGrades($scoredQuarterGrades);
 
             // Attendance for this subject
             $attendance = $enrollment->attendanceRecords;
@@ -309,42 +323,17 @@ class StudentPerformanceController extends Controller
                 else $qRemarks = 'Needs Improvement';
             }
 
-            // Calculate expected grade with logical reasoning:
-            // 1. If this is Q1 and has grades, expected = current grade (baseline)
-            // 2. If this is Q2 and Q1 exists, use Q1 as baseline with attendance adjustment
-            // 3. Attendance below 90% typically reduces grade by proportional amount
-            // 4. If no grades yet, use 80 as target (passing with good standing)
-            $expectedGrade = 80; // Default target
+            $expectedGrade = null;
+            if ($hasStarted) {
+                $expectedGrade = match ($q) {
+                    1 => $enrollment->expected_grade_q1,
+                    2 => $enrollment->expected_grade_q2,
+                    default => null,
+                };
 
-            if ($q === 1 && $qGrade !== null) {
-                // Q1: Expected is slightly higher than current (room for improvement)
-                $expectedGrade = min(100, round($qGrade + 3));
-            } elseif ($q === 2) {
-                if ($previousQuarterGrade !== null) {
-                    // Q2: Base expected on Q1 performance
-                    $expectedGrade = $previousQuarterGrade;
-
-                    // Adjust based on attendance (poor attendance = lower expected)
-                    if ($attendanceRate !== null && $attendanceRate < 90) {
-                        // For every 10% drop in attendance below 90%, reduce expected by 5%
-                        $attendancePenalty = floor((90 - $attendanceRate) / 10) * 5;
-                        $expectedGrade = max(60, $expectedGrade - $attendancePenalty);
-                    }
-
-                    // If current Q2 grade exists and is lower than Q1, project the trend
-                    if ($qGrade !== null && $qGrade < $previousQuarterGrade) {
-                        // Declining trend - expected might be even lower
-                        $decline = $previousQuarterGrade - $qGrade;
-                        $expectedGrade = max(60, round($qGrade - ($decline * 0.5)));
-                    } elseif ($qGrade !== null && $qGrade > $previousQuarterGrade) {
-                        // Improving trend - project continued improvement
-                        $improvement = $qGrade - $previousQuarterGrade;
-                        $expectedGrade = min(100, round($qGrade + ($improvement * 0.5)));
-                    }
-                } elseif ($qGrade !== null) {
-                    // No Q1 data, use current Q2 as basis
-                    $expectedGrade = min(100, round($qGrade + 3));
-                }
+                $expectedGrade = $expectedGrade !== null
+                    ? round((float) $expectedGrade, 1)
+                    : null;
             }
 
             // Calculate trend BEFORE updating previousQuarterGrade
@@ -361,9 +350,11 @@ class StudentPerformanceController extends Controller
                 'grade' => $qGrade,
                 'remarks' => $qRemarks,
                 'attendance' => $attendanceRate,
-                'itemCount' => $quarterGrades->count(),
+                'itemCount' => $scoredQuarterGrades->count(),
+                'totalItemCount' => $quarterGrades->count(),
                 'expectedGrade' => $expectedGrade,
                 'trend' => $trend,
+                'hasStarted' => $hasStarted,
             ];
         }
 
@@ -393,7 +384,9 @@ class StudentPerformanceController extends Controller
                     'name' => $g->assignment_name,
                     'score' => $g->score,
                     'totalScore' => $g->total_score,
-                    'percentage' => $g->total_score > 0 ? round(($g->score / $g->total_score) * 100) : null,
+                    'percentage' => ($g->score !== null && (float) $g->total_score > 0)
+                        ? round(((float) $g->score / (float) $g->total_score) * 100)
+                        : null,
                     'quarter' => $g->quarter,
                     'date' => $g->created_at->format('M d, Y'),
                 ])->values(),
@@ -406,7 +399,9 @@ class StudentPerformanceController extends Controller
                     'name' => $g->assignment_name,
                     'score' => $g->score,
                     'totalScore' => $g->total_score,
-                    'percentage' => $g->total_score > 0 ? round(($g->score / $g->total_score) * 100) : null,
+                    'percentage' => ($g->score !== null && (float) $g->total_score > 0)
+                        ? round(((float) $g->score / (float) $g->total_score) * 100)
+                        : null,
                     'quarter' => $g->quarter,
                     'date' => $g->created_at->format('M d, Y'),
                 ])->values(),
@@ -419,7 +414,9 @@ class StudentPerformanceController extends Controller
                     'name' => $g->assignment_name,
                     'score' => $g->score,
                     'totalScore' => $g->total_score,
-                    'percentage' => $g->total_score > 0 ? round(($g->score / $g->total_score) * 100) : null,
+                    'percentage' => ($g->score !== null && (float) $g->total_score > 0)
+                        ? round(((float) $g->score / (float) $g->total_score) * 100)
+                        : null,
                     'quarter' => $g->quarter,
                     'date' => $g->created_at->format('M d, Y'),
                 ])->values(),
@@ -442,9 +439,7 @@ class StudentPerformanceController extends Controller
         $gradeTrend = [];
         for ($q = 1; $q <= 2; $q++) {
             $quarterGrades = $grades->where('quarter', $q);
-            $qScore = $quarterGrades->sum('score');
-            $qTotal = $quarterGrades->sum('total_score');
-            $qGrade = $qTotal > 0 ? round(($qScore / $qTotal) * 100) : 0;
+            $qGrade = $this->calculatePercentageFromGrades($this->scoreableGrades($quarterGrades)) ?? 0;
 
             $gradeTrend[] = [
                 'label' => "Q{$q}",
@@ -454,19 +449,18 @@ class StudentPerformanceController extends Controller
 
         // School year
         $schoolYear = $subject?->school_year ?? date('Y') . '-' . (date('Y') + 1);
+        $risk = $this->watchlistRuleService->evaluateEnrollment($enrollment);
 
         return response()->json([
             'enrollment' => [
                 'id' => $enrollment->id,
-                'subjectId' => $enrollment->subjectTeacher?->subject_id,
+                'subjectId' => $class?->subject_id ?? $subject?->id,
             ],
             'subject' => [
                 'id' => $subject?->id,
                 'name' => $subject?->subject_name ?? $subject?->name ?? 'Unknown Subject',
-                'teacher' => $enrollment->subjectTeacher?->teacher
-                    ? $enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name
-                    : 'N/A',
-                'section' => $subject?->section,
+                'teacher' => $class?->teacher?->name ?? 'N/A',
+                'section' => $class?->section ?? $subject?->section,
                 'schoolYear' => $schoolYear,
             ],
             'performance' => [
@@ -483,8 +477,63 @@ class StudentPerformanceController extends Controller
                 'lateDays' => $lateDays,
                 'excusedDays' => $excusedDays,
             ],
+            'risk' => [
+                'key' => (string) ($risk['risk_key'] ?? 'on_track'),
+                'label' => (string) ($risk['risk_label'] ?? 'On Track'),
+                'color' => $this->riskColorHex((string) ($risk['risk_color'] ?? 'green')),
+                'reasons' => (array) ($risk['reasons'] ?? []),
+            ],
             'gradeTrend' => $gradeTrend,
         ]);
+    }
+
+    private function scoreableGrades(Collection $grades): Collection
+    {
+        return $grades
+            ->filter(function ($grade) {
+                $score = $grade->score;
+
+                return $score !== null
+                    && is_numeric($score)
+                    && (float) ($grade->total_score ?? 0) > 0;
+            })
+            ->values();
+    }
+
+    private function calculatePercentageFromGrades(Collection $grades, int $precision = 0): ?float
+    {
+        if ($grades->isEmpty()) {
+            return null;
+        }
+
+        $totalScore = (float) $grades->sum('score');
+        $totalPossible = (float) $grades->sum('total_score');
+
+        if ($totalPossible <= 0) {
+            return null;
+        }
+
+        return round(($totalScore / $totalPossible) * 100, $precision);
+    }
+
+    private function riskSortOrder(string $riskKey): int
+    {
+        return match ($riskKey) {
+            'at_risk' => 0,
+            'needs_attention' => 1,
+            'recent_decline' => 2,
+            default => 3,
+        };
+    }
+
+    private function riskColorHex(string $riskColor): string
+    {
+        return match ($riskColor) {
+            'red' => '#EF4444',
+            'orange' => '#F59E0B',
+            'blue' => '#3B82F6',
+            default => '#10B981',
+        };
     }
 
     /**
@@ -546,16 +595,16 @@ class StudentPerformanceController extends Controller
 
         $subject = $enrollment->subject;
         $grades = $enrollment->grades;
+        $scoredGrades = $this->scoreableGrades($grades);
 
-        $totalScore = $grades->sum('score');
-        $totalPossible = $grades->sum('total_score');
-        $overallGrade = $totalPossible > 0 ? round(($totalScore / $totalPossible) * 100) : null;
+        $overallGrade = $this->calculatePercentageFromGrades($scoredGrades);
+        $risk = $this->watchlistRuleService->evaluateEnrollment($enrollment);
+        $riskKey = (string) ($risk['risk_key'] ?? 'on_track');
+        $riskLabel = (string) ($risk['risk_label'] ?? 'On Track');
 
         // Group grades by quarter
         $quarterlyData = $grades->groupBy('quarter')->map(function ($quarterGrades, $quarter) use ($enrollment) {
-            $qScore = $quarterGrades->sum('score');
-            $qTotal = $quarterGrades->sum('total_score');
-            $qGrade = $qTotal > 0 ? round(($qScore / $qTotal) * 100) : null;
+            $qGrade = $this->calculatePercentageFromGrades($this->scoreableGrades($quarterGrades));
 
             $attendance = $enrollment->attendanceRecords;
             $totalDays = $attendance->count();
@@ -566,13 +615,13 @@ class StudentPerformanceController extends Controller
                 'quarterNum' => $quarter,
                 'grade' => $qGrade,
                 'attendance' => "{$attendanceRate}%",
-                'assignmentCount' => $quarterGrades->count(),
+                'assignmentCount' => $this->scoreableGrades($quarterGrades)->count(),
             ];
         })->sortBy('quarterNum')->values();
 
         $gradeBreakdown = $grades->map(function ($grade) {
-            $percentage = $grade->total_score > 0
-                ? round(($grade->score / $grade->total_score) * 100)
+            $percentage = ($grade->score !== null && (float) $grade->total_score > 0)
+                ? round(((float) $grade->score / (float) $grade->total_score) * 100)
                 : null;
             return [
                 'name' => $grade->assignment_name,
@@ -593,23 +642,14 @@ class StudentPerformanceController extends Controller
             ? round((($presentDays + $excusedDays + ($lateDays * 0.5)) / $totalDays) * 100)
             : 100;
 
-        // Determine risk level
-        $riskLabel = 'On Track';
-        if ($overallGrade !== null) {
-            if ($overallGrade < 70) {
-                $riskLabel = 'Critical';
-            } elseif ($overallGrade < 75) {
-                $riskLabel = 'At Risk';
-            } elseif ($overallGrade < 80) {
-                $riskLabel = 'Needs Attention';
-            }
-        }
-
         // Generate suggestions based on performance
         $suggestions = [];
-        if ($overallGrade !== null && $overallGrade < 75) {
+        if ($riskKey === 'at_risk') {
             $suggestions[] = 'Focus on completing all assignments on time';
             $suggestions[] = 'Consider seeking help from the teacher during office hours';
+        }
+        if ($riskKey === 'needs_attention' || $riskKey === 'recent_decline') {
+            $suggestions[] = 'Review the latest feedback and prioritize weaker activities this week';
         }
         if ($attendanceRate < 90) {
             $suggestions[] = 'Improve attendance to avoid missing important lessons';
@@ -638,11 +678,11 @@ class StudentPerformanceController extends Controller
                 'strand' => $enrollment->user->student->strand ?? null,
             ],
             'subject' => [
-                'name' => $subject->name,
-                'section' => $subject->section,
-                'grade_level' => $subject->grade_level,
-                'teacher' => $subject->teacher?->name ?? 'N/A',
-                'current_quarter' => $subject->current_quarter ?? 1,
+                'name' => $subject?->subject_name ?? $subject?->name ?? 'Unknown Subject',
+                'section' => $subject?->section,
+                'grade_level' => $subject?->grade_level,
+                'teacher' => $subject?->teacher?->name ?? 'N/A',
+                'current_quarter' => $subject?->current_quarter ?? 1,
             ],
             'performance' => [
                 'overallGrade' => $overallGrade,

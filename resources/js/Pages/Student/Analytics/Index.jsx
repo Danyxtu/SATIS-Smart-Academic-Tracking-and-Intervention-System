@@ -159,30 +159,22 @@ const AnalyticsIndex = ({
     semesters = {},
     activeRiskFilter = "all",
 }) => {
+    const normalizeRiskFilter = (value) =>
+        value === "at-risk" ? "at_risk" : value;
+
     const hasSubjects = Array.isArray(subjects) && subjects.length > 0;
     const [riskFilter, setRiskFilter] = React.useState(
-        activeRiskFilter || "all",
+        normalizeRiskFilter(activeRiskFilter || "all"),
     );
 
     React.useEffect(() => {
-        setRiskFilter(activeRiskFilter || "all");
+        setRiskFilter(normalizeRiskFilter(activeRiskFilter || "all"));
     }, [activeRiskFilter]);
-
-    const criticalCount = React.useMemo(
-        () =>
-            subjects.filter((item) => item.riskCategory === "critical").length,
-        [subjects],
-    );
 
     const filteredSubjects = React.useMemo(() => {
         if (!hasSubjects) return [];
 
         if (riskFilter === "all") return subjects;
-        if (riskFilter === "at-risk") {
-            return subjects.filter((item) =>
-                ["at_risk", "critical"].includes(item.riskCategory),
-            );
-        }
 
         return subjects.filter((item) => item.riskCategory === riskFilter);
     }, [hasSubjects, riskFilter, subjects]);
@@ -190,7 +182,7 @@ const AnalyticsIndex = ({
     const riskTabs = [
         { key: "all", label: "All", count: subjects.length },
         {
-            key: "at-risk",
+            key: "at_risk",
             label: "At Risk",
             count: stats.subjectsAtRisk || 0,
         },
@@ -200,9 +192,9 @@ const AnalyticsIndex = ({
             count: stats.subjectsNeedingAttention || 0,
         },
         {
-            key: "critical",
-            label: "Critical",
-            count: criticalCount,
+            key: "recent_decline",
+            label: "Recent Decline",
+            count: stats.subjectsRecentDecline || 0,
         },
         {
             key: "on_track",

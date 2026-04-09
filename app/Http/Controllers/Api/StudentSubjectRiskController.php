@@ -5,10 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\Intervention;
+use App\Services\WatchlistRuleService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class StudentSubjectRiskController extends Controller
 {
+    public function __construct(private WatchlistRuleService $watchlistRuleService) {}
+
     /**
      * Display subjects at risk for the student (JSON API).
      */
@@ -20,6 +24,9 @@ class StudentSubjectRiskController extends Controller
         $enrollments = Enrollment::with([
             'subjectTeacher.subject',
             'subjectTeacher.teacher',
+            'schoolClass.subject',
+            'schoolClass.teacher',
+            'subject',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
@@ -27,27 +34,31 @@ class StudentSubjectRiskController extends Controller
             ->where('user_id', $user->id)
             ->get();
 
-        // Process each enrollment to determine risk status
-        $subjects = $enrollments->map(function ($enrollment) {
-            $subject = $enrollment->subjectTeacher?->subject;
+        // Process each enrollment using the shared global watchlist rules.
+        $subjects = $enrollments->map(function (Enrollment $enrollment) {
+            $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+            $subject = $class?->subject ?? $enrollment->subject;
+            $teacher = $class?->teacher;
+
             $grades = $enrollment->grades;
+            $scoredGrades = $this->scoreableGrades($grades);
             $attendance = $enrollment->attendanceRecords;
             $intervention = $enrollment->intervention;
 
-            // Calculate overall grade
-            $totalScore = $grades->sum('score');
-            $totalPossible = $grades->sum('total_score');
-            $currentGrade = $totalPossible > 0
-                ? round(($totalScore / $totalPossible) * 100, 1)
-                : null;
+            $risk = $this->watchlistRuleService->evaluateEnrollment($enrollment);
+            $riskKey = (string) ($risk['risk_key'] ?? 'on_track');
+            $riskLabel = (string) ($risk['risk_label'] ?? 'On Track');
+
+            $currentGrade = $this->calculateCurrentGrade($scoredGrades);
+            $expectedGrade = $this->resolveExpectedGrade($enrollment, $scoredGrades);
 
             // Calculate attendance rate
             $totalDays = $attendance->count();
-            $presentDays = $attendance->where('status', 'present')->count();
+            $presentDays = $attendance->whereIn('status', ['present', 'excused'])->count();
             $absentDays = $attendance->where('status', 'absent')->count();
             $lateDays = $attendance->where('status', 'late')->count();
             $attendanceRate = $totalDays > 0
-                ? round(($presentDays / $totalDays) * 100, 1)
+                ? round((($presentDays + ($lateDays * 0.5)) / $totalDays) * 100, 1)
                 : 100;
 
             // Group grades by category/type for breakdown
@@ -64,21 +75,24 @@ class StudentSubjectRiskController extends Controller
                     return 'quarterly_exam';
                 }
                 return 'other';
-            })->map(function ($categoryGrades) {
-                $score = $categoryGrades->sum('score');
-                $possible = $categoryGrades->sum('total_score');
+            })->map(function (Collection $categoryGrades) {
+                $scoredCategoryGrades = $this->scoreableGrades($categoryGrades);
+                $score = (float) $scoredCategoryGrades->sum('score');
+                $possible = (float) $scoredCategoryGrades->sum('total_score');
+
                 return [
                     'score' => $score,
                     'total' => $possible,
                     'percentage' => $possible > 0 ? round(($score / $possible) * 100, 1) : null,
                     'count' => $categoryGrades->count(),
+                    'gradedCount' => $scoredCategoryGrades->count(),
                 ];
             });
 
             // Group grades by quarter
-            $gradesByQuarter = $grades->groupBy('quarter')->map(function ($quarterGrades) {
-                $score = $quarterGrades->sum('score');
-                $possible = $quarterGrades->sum('total_score');
+            $gradesByQuarter = $scoredGrades->groupBy('quarter')->map(function (Collection $quarterGrades) {
+                $score = (float) $quarterGrades->sum('score');
+                $possible = (float) $quarterGrades->sum('total_score');
                 return [
                     'score' => $score,
                     'total' => $possible,
@@ -86,100 +100,27 @@ class StudentSubjectRiskController extends Controller
                 ];
             });
 
-            // Calculate grade trend by comparing quarterly performance (same as Performance Analytics)
-            // Group grades by quarter and compare Q1 to Q2
-            $q1Grades = $grades->where('quarter', 1);
-            $q2Grades = $grades->where('quarter', 2);
+            $trend = $scoredGrades->isEmpty()
+                ? 'new'
+                : strtolower((string) data_get($risk, 'metrics.trend', 'stable'));
 
-            $q1Score = $q1Grades->sum('score');
-            $q1Total = $q1Grades->sum('total_score');
-            $q1Grade = $q1Total > 0 ? ($q1Score / $q1Total) * 100 : null;
-
-            $q2Score = $q2Grades->sum('score');
-            $q2Total = $q2Grades->sum('total_score');
-            $q2Grade = $q2Total > 0 ? ($q2Score / $q2Total) * 100 : null;
-
-            // Calculate trend using the same logic as StudentPerformanceController
-            $trend = 'new'; // Default for first quarter or no data
-
-            if ($q2Grade !== null && $q1Grade !== null) {
-                // We have both quarters - compare them
-                $difference = $q2Grade - $q1Grade;
-
-                // Consider stable if within 3% variance (same threshold as PerformanceController)
-                if (abs($difference) <= 3) {
-                    $trend = 'stable';
-                } elseif ($difference > 0) {
-                    $trend = 'improving';
-                } else {
-                    $trend = 'declining';
-                }
-            } elseif ($q1Grade !== null && $q2Grade === null) {
-                // Only Q1 exists - this is the baseline
-                $trend = 'new';
-            } elseif ($q2Grade !== null && $q1Grade === null) {
-                // Only Q2 exists (unusual) - treat as new baseline
-                $trend = 'new';
-            }
-            // If no grades at all, trend stays 'new'
-
-            // Determine risk level
-            $riskLevel = 'low';
-            $riskReasons = [];
-
-            if ($currentGrade !== null) {
-                if ($currentGrade < 70) {
-                    $riskLevel = 'high';
-                    $riskReasons[] = 'Grade below 70%';
-                } elseif ($currentGrade < 75) {
-                    $riskLevel = 'medium';
-                    $riskReasons[] = 'Grade below passing (75%)';
-                }
+            if (! in_array($trend, ['new', 'stable', 'improving', 'declining'], true)) {
+                $trend = 'stable';
             }
 
-            if ($attendanceRate < 80) {
-                if ($riskLevel !== 'high') $riskLevel = 'high';
-                $riskReasons[] = 'Attendance below 80%';
-            } elseif ($attendanceRate < 90) {
-                if ($riskLevel === 'low') $riskLevel = 'medium';
-                $riskReasons[] = 'Attendance needs improvement';
-            }
+            $riskLevel = $this->toRiskLevel($riskKey);
+            $riskReasons = (array) ($risk['reasons'] ?? []);
 
-            // Check for low category scores
-            foreach ($gradesByCategory as $category => $data) {
-                if ($data['percentage'] !== null && $data['percentage'] < 70) {
-                    if ($riskLevel === 'low') $riskLevel = 'medium';
-                    $riskReasons[] = ucfirst(str_replace('_', ' ', $category)) . ' score is low (' . $data['percentage'] . '%)';
-                }
-            }
+            // Only explicit zero scores are treated as missing work; null means not graded yet.
+            $missingWork = $grades
+                ->filter(fn($grade) => $grade->score !== null && (float) $grade->score === 0.0)
+                ->count();
 
-            // Check for missing work (0 scores)
-            $missingWork = $grades->where('score', 0)->count();
-            if ($missingWork > 0) {
-                if ($riskLevel === 'low') $riskLevel = 'medium';
-                $riskReasons[] = $missingWork . ' missing assignment(s)';
-            }
+            $courseProgress = $grades->count() > 0
+                ? round(($scoredGrades->count() / $grades->count()) * 100, 1)
+                : 0;
 
-            if ($trend === 'declining') {
-                if ($riskLevel === 'low') $riskLevel = 'medium';
-                $riskReasons[] = 'Grade trend is declining';
-            }
-
-            // Calculate expected/projected grade
-            $expectedGrade = $currentGrade;
-            if ($trend === 'declining' && $currentGrade !== null) {
-                $expectedGrade = max(0, $currentGrade - 5);
-            } elseif ($trend === 'improving' && $currentGrade !== null) {
-                $expectedGrade = min(100, $currentGrade + 5);
-            }
-
-            // Generate advice based on risk
-            $advice = 'Keep up the great work!';
-            if ($riskLevel === 'high') {
-                $advice = 'Immediate action required. Consider meeting with your teacher.';
-            } elseif ($riskLevel === 'medium') {
-                $advice = 'Focus on improving weak areas and maintain consistent study habits.';
-            }
+            $advice = $this->buildAdvice($riskKey);
 
             // Get recent grade entries
             $recentGradeEntries = $grades->sortByDesc('created_at')->take(5)->map(fn($g) => [
@@ -187,29 +128,21 @@ class StudentSubjectRiskController extends Controller
                 'name' => $g->assignment_name,
                 'score' => $g->score,
                 'totalScore' => $g->total_score,
-                'percentage' => $g->total_score > 0 ? round(($g->score / $g->total_score) * 100, 1) : 0,
+                'percentage' => ($g->score !== null && (float) $g->total_score > 0)
+                    ? round(((float) $g->score / (float) $g->total_score) * 100, 1)
+                    : null,
                 'quarter' => $g->quarter,
                 'date' => $g->created_at->format('M d'),
             ])->values();
 
-            // Calculate course progress (% of graded items vs expected)
-            $courseProgress = $currentGrade ?? 0;
-
-            // Get risk label text
-            $riskLabel = match ($riskLevel) {
-                'high' => 'High Risk',
-                'medium' => 'Medium Risk',
-                default => 'Low Risk',
-            };
-
             return [
                 'id' => $enrollment->id,
-                'subjectId' => $enrollment->subjectTeacher?->subject_id,
-                'name' => $subject?->name ?? 'Unknown Subject',
-                'instructor' => $enrollment->subjectTeacher?->teacher?->name ?? 'N/A',
-                'section' => $subject?->section,
+                'subjectId' => $class?->subject_id ?? $subject?->id,
+                'name' => $subject?->subject_name ?? $subject?->name ?? 'Unknown Subject',
+                'instructor' => $teacher?->name ?? 'N/A',
+                'section' => $class?->section ?? $subject?->section,
                 'grade' => $currentGrade,
-                'expectedGrade' => $expectedGrade !== null ? round($expectedGrade, 1) : null,
+                'expectedGrade' => $expectedGrade,
                 'attendanceRate' => $attendanceRate,
                 'totalClasses' => $totalDays,
                 'presentDays' => $presentDays,
@@ -217,6 +150,8 @@ class StudentSubjectRiskController extends Controller
                 'lateDays' => $lateDays,
                 'trend' => $trend,
                 'risk' => $riskLabel,
+                'riskLabel' => $riskLabel,
+                'riskKey' => $riskKey,
                 'riskLevel' => $riskLevel,
                 'riskReasons' => $riskReasons,
                 'missingWork' => $missingWork,
@@ -242,26 +177,107 @@ class StudentSubjectRiskController extends Controller
             ];
         })
             ->sortBy(function ($subject) {
-                // Sort by risk level (high first)
-                $order = ['high' => 0, 'medium' => 1, 'low' => 2];
-                return $order[$subject['riskLevel']] ?? 3;
+                return $this->riskSortOrder((string) ($subject['riskKey'] ?? 'on_track'));
             })
             ->values();
 
         // Calculate summary stats
-        $highRiskCount = $subjects->where('riskLevel', 'high')->count();
-        $mediumRiskCount = $subjects->where('riskLevel', 'medium')->count();
-        $lowRiskCount = $subjects->where('riskLevel', 'low')->count();
+        $atRiskCount = $subjects->where('riskKey', 'at_risk')->count();
+        $needsAttentionCount = $subjects->where('riskKey', 'needs_attention')->count();
+        $recentDeclineCount = $subjects->where('riskKey', 'recent_decline')->count();
+        $onTrackCount = $subjects->where('riskKey', 'on_track')->count();
 
         return response()->json([
             'subjects' => $subjects,
             'stats' => [
                 'total' => $subjects->count(),
-                'highRisk' => $highRiskCount,
-                'mediumRisk' => $mediumRiskCount,
-                'lowRisk' => $lowRiskCount,
-                'atRiskCount' => $highRiskCount + $mediumRiskCount,
+                'atRisk' => $atRiskCount,
+                'needsAttention' => $needsAttentionCount,
+                'recentDecline' => $recentDeclineCount,
+                'onTrack' => $onTrackCount,
+                // Backwards-compatible aliases used by older app builds.
+                'highRisk' => $atRiskCount,
+                'mediumRisk' => $needsAttentionCount,
+                'lowRisk' => $recentDeclineCount + $onTrackCount,
+                'atRiskCount' => $atRiskCount + $needsAttentionCount + $recentDeclineCount,
             ],
         ]);
+    }
+
+    private function scoreableGrades(Collection $grades): Collection
+    {
+        return $grades
+            ->filter(function ($grade) {
+                $score = $grade->score;
+
+                return $score !== null
+                    && is_numeric($score)
+                    && (float) ($grade->total_score ?? 0) > 0;
+            })
+            ->values();
+    }
+
+    private function calculateCurrentGrade(Collection $scoredGrades): ?float
+    {
+        if ($scoredGrades->isEmpty()) {
+            return null;
+        }
+
+        $totalScore = (float) $scoredGrades->sum('score');
+        $totalPossible = (float) $scoredGrades->sum('total_score');
+
+        if ($totalPossible <= 0) {
+            return null;
+        }
+
+        return round(($totalScore / $totalPossible) * 100, 1);
+    }
+
+    private function resolveExpectedGrade(Enrollment $enrollment, Collection $scoredGrades): ?float
+    {
+        if ($scoredGrades->isEmpty()) {
+            return null;
+        }
+
+        $latestQuarter = (int) ($scoredGrades->max(fn($grade) => (int) ($grade->quarter ?? 0)) ?? 0);
+
+        if ($latestQuarter >= 2) {
+            return $enrollment->expected_grade_q2 !== null
+                ? round((float) $enrollment->expected_grade_q2, 1)
+                : null;
+        }
+
+        return $enrollment->expected_grade_q1 !== null
+            ? round((float) $enrollment->expected_grade_q1, 1)
+            : null;
+    }
+
+    private function toRiskLevel(string $riskKey): string
+    {
+        return match ($riskKey) {
+            'at_risk' => 'high',
+            'needs_attention' => 'medium',
+            default => 'low',
+        };
+    }
+
+    private function riskSortOrder(string $riskKey): int
+    {
+        return match ($riskKey) {
+            'at_risk' => 0,
+            'needs_attention' => 1,
+            'recent_decline' => 2,
+            default => 3,
+        };
+    }
+
+    private function buildAdvice(string $riskKey): string
+    {
+        return match ($riskKey) {
+            'at_risk' => 'Immediate action required. Coordinate with your teacher and complete priority tasks first.',
+            'needs_attention' => 'Stay consistent this week and address your weakest activities before the next grading update.',
+            'recent_decline' => 'Your performance is slipping recently. Review feedback early to recover momentum.',
+            default => 'Keep up the great work and maintain your current habits.',
+        };
     }
 }
