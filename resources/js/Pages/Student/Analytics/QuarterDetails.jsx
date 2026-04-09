@@ -33,6 +33,44 @@ const buildRemarks = (overallFinal = {}) => {
     return remarkText !== "" ? remarkText : "N/A";
 };
 
+const getQuarterMetadata = (quarterValue) => {
+    const quarterNum = Number(quarterValue);
+
+    if (!Number.isFinite(quarterNum) || quarterNum <= 0) {
+        return {
+            quarterNum: null,
+            shortLabel: "",
+            title: "",
+            fullLabel: "",
+        };
+    }
+
+    if (quarterNum === 1) {
+        return {
+            quarterNum,
+            shortLabel: "Q1",
+            title: "Midterm Quarter",
+            fullLabel: "Midterm Quarter (Q1)",
+        };
+    }
+
+    if (quarterNum === 2) {
+        return {
+            quarterNum,
+            shortLabel: "Q2",
+            title: "Final Quarter",
+            fullLabel: "Final Quarter (Q2)",
+        };
+    }
+
+    return {
+        quarterNum,
+        shortLabel: `Q${quarterNum}`,
+        title: `Quarter ${quarterNum}`,
+        fullLabel: `Quarter ${quarterNum}`,
+    };
+};
+
 const remarksClasses = (remarks) => {
     const normalized = String(remarks || "")
         .trim()
@@ -264,13 +302,18 @@ const AnalyticsQuarterDetails = ({
             ),
         [quarters],
     );
+    const selectedQuarterLabel =
+        getQuarterMetadata(selectedQuarter).fullLabel ||
+        `Quarter ${selectedQuarter}`;
 
     const remarks = buildRemarks(overallFinal);
     const remarkStyle = remarksClasses(remarks);
 
     return (
         <>
-            <Head title={`${subject.name || "Subject"} Quarter Details`} />
+            <Head
+                title={`${subject.name || "Subject"} ${selectedQuarterLabel} Details`}
+            />
 
             <div className="max-w-7xl mx-auto space-y-5">
                 <div className="text-sm font-medium text-gray-500 flex items-center gap-2">
@@ -291,7 +334,7 @@ const AnalyticsQuarterDetails = ({
                     </Link>
                     <ChevronRight size={16} />
                     <span className="text-gray-900">
-                        Quarter {selectedQuarter} Details
+                        {selectedQuarterLabel} Details
                     </span>
                 </div>
 
@@ -334,7 +377,9 @@ const AnalyticsQuarterDetails = ({
                                             : "bg-white text-gray-700 border-gray-300 hover:border-pink-400 hover:text-pink-700"
                                     }`}
                                 >
-                                    Q{quarter.quarter}
+                                    {quarter.label ||
+                                        getQuarterMetadata(quarter.quarter)
+                                            .fullLabel}
                                 </Link>
                             );
                         })}
@@ -367,7 +412,7 @@ const AnalyticsQuarterDetails = ({
                     <div className="p-5 grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
                             <p className="text-xs uppercase tracking-wider text-blue-700 font-semibold">
-                                Q1 Grade
+                                Midterm Grade
                             </p>
                             <p className="text-2xl font-bold text-blue-900 mt-1">
                                 {formatGrade(overallFinal.midtermQuarterGrade)}
@@ -376,7 +421,7 @@ const AnalyticsQuarterDetails = ({
 
                         <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
                             <p className="text-xs uppercase tracking-wider text-indigo-700 font-semibold">
-                                Q2 Grade
+                                Final Quarter Grade
                             </p>
                             <p className="text-2xl font-bold text-indigo-900 mt-1">
                                 {formatGrade(overallFinal.finalQuarterGrade)}

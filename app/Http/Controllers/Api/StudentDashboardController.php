@@ -20,33 +20,62 @@ class StudentDashboardController extends Controller
         $student = $user->student;
 
         // Get current and selected semester
-        $currentSemester = SystemSetting::getCurrentSemester();
-        $selectedSemester = $request->query('semester', $currentSemester);
+        $currentSemester = (string) SystemSetting::getCurrentSemester();
+        $requestedSemester = $request->query('semester');
+        $selectedSemester = (string) ($requestedSemester ?? $currentSemester);
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
 
+        $resolveSemester = static function ($enrollment): string {
+            return (string) (
+                $enrollment->subjectTeacher?->semester
+                ?? $enrollment->schoolClass?->semester
+                ?? $enrollment->subject?->semester
+                ?? '1'
+            );
+        };
+
         // Get all enrollments for this student with related data
-        $allEnrollments = Enrollment::with([
+        $allEnrollmentsQuery = Enrollment::with([
             'subjectTeacher.subject',
             'subjectTeacher.teacher',
+            'schoolClass.subject',
+            'schoolClass.teacher',
+            'subject',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
         ])
-            ->where('user_id', $user->id)
+            ->where('user_id', $user->id);
+
+        $allEnrollments = (clone $allEnrollmentsQuery)
             ->whereHas('subjectTeacher', function ($query) use ($currentSchoolYear) {
                 $query->where('school_year', $currentSchoolYear);
             })
             ->get();
 
-        // Filter enrollments by semester
-        $enrollments = $allEnrollments->filter(function ($enrollment) use ($selectedSemester) {
-            $subjectSemester = $enrollment->subjectTeacher?->subject?->semester;
-            return $subjectSemester == $selectedSemester;
-        });
+        // If no classes match the current school year, fall back to any enrollment
+        // so students still see their subjects instead of an empty dashboard.
+        if ($allEnrollments->isEmpty()) {
+            $allEnrollments = $allEnrollmentsQuery->get();
+        }
 
         // Count enrollments per semester for navigation
-        $semester1Count = $allEnrollments->filter(fn($e) => ($e->subjectTeacher?->subject?->semester ?? '1') == '1')->count();
-        $semester2Count = $allEnrollments->filter(fn($e) => ($e->subjectTeacher?->subject?->semester ?? '1') == '2')->count();
+        $semester1Count = $allEnrollments->filter(fn($e) => $resolveSemester($e) === '1')->count();
+        $semester2Count = $allEnrollments->filter(fn($e) => $resolveSemester($e) === '2')->count();
+
+        $enrollments = $allEnrollments->filter(fn($enrollment) => $resolveSemester($enrollment) === $selectedSemester);
+
+        // On initial load, if the current semester has no subjects but another semester does,
+        // auto-select the populated semester so subject cards are visible immediately.
+        if ($enrollments->isEmpty() && $requestedSemester === null) {
+            if ($semester1Count > 0) {
+                $selectedSemester = '1';
+            } elseif ($semester2Count > 0) {
+                $selectedSemester = '2';
+            }
+
+            $enrollments = $allEnrollments->filter(fn($enrollment) => $resolveSemester($enrollment) === $selectedSemester);
+        }
 
         $totalSubjects = $enrollments->count();
 
@@ -110,6 +139,10 @@ class StudentDashboardController extends Controller
             ->count();
 
         $subjectPerformance = $enrollments->map(function ($enrollment) {
+            $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+            $subject = $class?->subject ?? $enrollment->subject;
+            $teacher = $class?->teacher;
+
             $grades = $enrollment->grades;
             $totalScore = $grades->sum('score');
             $totalPossible = $grades->sum('total_score');
@@ -129,14 +162,13 @@ class StudentDashboardController extends Controller
 
             return [
                 'id' => $enrollment->id,
-                'subjectId' => $enrollment->subjectTeacher?->subject_id,
-                // Keep existing `subject_name` but also provide `name` to match mobile/front-end expectations
-                'subject_name' => $enrollment->subjectTeacher?->subject?->subject_name ?? 'Unknown Subject',
-                'name' => $enrollment->subjectTeacher?->subject?->subject_name ?? 'Unknown Subject',
-                'section' => $enrollment->subjectTeacher?->subject?->section,
-                'teacher_name' => $enrollment->subjectTeacher?->teacher
-                    ? $enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name
-                    : 'N/A',
+                'subjectId' => $class?->subject_id ?? $subject?->id,
+                // Keep both keys for backwards compatibility across app screens/components
+                'subject_name' => $subject?->subject_name ?? 'Unknown Subject',
+                'name' => $subject?->subject_name ?? 'Unknown Subject',
+                'section' => $class?->section ?? $subject?->section,
+                'teacher_name' => $teacher?->name ?? 'N/A',
+                'teacher' => $teacher?->name ?? 'N/A',
                 'grade' => $percentage,
                 'gradeDisplay' => $percentage !== null ? "{$percentage}%" : 'N/A',
                 'attendance' => $attendanceRate,
@@ -149,11 +181,14 @@ class StudentDashboardController extends Controller
         $upcomingTasks = $activeInterventions
             ->flatMap(function ($intervention) use ($enrollments) {
                 $enrollment = $enrollments->firstWhere('id', $intervention->enrollment_id);
+                $class = $enrollment?->subjectTeacher ?? $enrollment?->schoolClass;
+                $subject = $class?->subject ?? $enrollment?->subject;
+
                 return ($intervention->tasks ?? collect())->map(fn($task) => [
                     'id' => $task->id,
                     'description' => $task->description,
                     'isCompleted' => $task->is_completed,
-                    'subject' => $enrollment?->subjectTeacher?->subject?->subject_name ?? 'Unknown',
+                    'subject' => $subject?->subject_name ?? 'Unknown Subject',
                     'interventionId' => $intervention->id,
                 ]);
             })
@@ -174,7 +209,8 @@ class StudentDashboardController extends Controller
         ];
 
         if ($lastUpdatedEnrollment) {
-            $trendSubject = $lastUpdatedEnrollment->subjectTeacher?->subject;
+            $trendClass = $lastUpdatedEnrollment->subjectTeacher ?? $lastUpdatedEnrollment->schoolClass;
+            $trendSubject = $trendClass?->subject ?? $lastUpdatedEnrollment->subject;
             $gradeTrendData['subjectName'] = $trendSubject?->subject_name ?? 'Unknown Subject';
 
             $gradeTrendData['items'] = $lastUpdatedEnrollment->grades
@@ -200,9 +236,10 @@ class StudentDashboardController extends Controller
         return response()->json([
             'student' => [
                 'id' => $student?->id,
-                'firstName' => $student?->first_name ?? (explode(' ', $user->name)[0] ?? 'Student'),
-                'lastName' => $student?->last_name ?? (explode(' ', $user->name)[1] ?? ''),
-                'fullName' => $user->name,
+                'firstName' => $user->first_name ?: ($student?->student_name ? explode(' ', trim($student->student_name))[0] : 'Student'),
+                'lastName' => $user->last_name ?: '',
+                'fullName' => $user->name ?: ($student?->student_name ?? null),
+                'displayName' => $student?->student_name ?: $user->name,
                 'email' => $user->email,
                 'gradeLevel' => $student?->grade_level,
                 'section' => $student?->section,

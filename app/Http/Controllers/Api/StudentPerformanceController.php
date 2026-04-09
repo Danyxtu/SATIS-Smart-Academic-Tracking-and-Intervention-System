@@ -6,10 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\StudentNotification;
 use App\Models\SystemSetting;
+use App\Services\PredictionService;
 use Illuminate\Http\Request;
 
 class StudentPerformanceController extends Controller
 {
+    protected PredictionService $predictionService;
+
+    public function __construct(PredictionService $predictionService)
+    {
+        $this->predictionService = $predictionService;
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -21,19 +29,44 @@ class StudentPerformanceController extends Controller
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
 
         // Get all enrollments for this student with related data
-        $allEnrollments = Enrollment::with(['subjectTeacher.subject', 'subjectTeacher.teacher', 'grades', 'attendanceRecords', 'intervention'])
+        $allEnrollments = Enrollment::with([
+            'subjectTeacher.subject',
+            'subjectTeacher.teacher',
+            'schoolClass.subject',
+            'schoolClass.teacher',
+            'subject',
+            'grades',
+            'attendanceRecords',
+            'intervention',
+        ])
             ->where('user_id', $user->id)
             ->get();
 
-        // Filter enrollments by semester
+        // Filter enrollments by semester (if no semester on class, include in all)
         $enrollments = $allEnrollments->filter(function ($enrollment) use ($selectedSemester) {
-            $subjectSemester = $enrollment->subjectTeacher?->semester;
-            return $subjectSemester == $selectedSemester;
+            $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+            $semester = $class?->semester;
+
+            if (!$semester) {
+                return true;
+            }
+
+            return $semester == $selectedSemester;
         });
 
         // Count enrollments per semester for navigation
-        $semester1Count = $allEnrollments->filter(fn($e) => ($e->subjectTeacher?->semester ?? '1') == '1')->count();
-        $semester2Count = $allEnrollments->filter(fn($e) => ($e->subjectTeacher?->semester ?? '1') == '2')->count();
+        $semester1Count = $allEnrollments->filter(function ($enrollment) {
+            $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+            $semester = $class?->semester;
+
+            return $semester === 1 || $semester === '1' || $semester === null;
+        })->count();
+        $semester2Count = $allEnrollments->filter(function ($enrollment) {
+            $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+            $semester = $class?->semester;
+
+            return $semester === 2 || $semester === '2';
+        })->count();
 
         $totalSubjects = $enrollments->count();
 
@@ -50,26 +83,17 @@ class StudentPerformanceController extends Controller
 
         $allAttendance = $enrollments->flatMap(fn($e) => $e->attendanceRecords);
         $totalDays = $allAttendance->count();
-        $presentDays = $allAttendance->where('status', 'present')->count();
-        $overallAttendance = $totalDays > 0 ? round(($presentDays / $totalDays) * 100) : 100;
-
-        $subjectsAtRisk = $enrollments->filter(function ($enrollment) {
-            $grades = $enrollment->grades;
-            $totalScore = $grades->sum('score');
-            $totalPossible = $grades->sum('total_score');
-            $percentage = $totalPossible > 0 ? ($totalScore / $totalPossible) * 100 : null;
-            return $percentage !== null && $percentage < 75;
-        })->count();
-
-        $subjectsExcelling = $enrollments->filter(function ($enrollment) {
-            $grades = $enrollment->grades;
-            $totalScore = $grades->sum('score');
-            $totalPossible = $grades->sum('total_score');
-            $percentage = $totalPossible > 0 ? ($totalScore / $totalPossible) * 100 : null;
-            return $percentage !== null && $percentage >= 90;
-        })->count();
+        $presentDays = $allAttendance->whereIn('status', ['present', 'excused'])->count();
+        $lateDays = $allAttendance->where('status', 'late')->count();
+        $overallAttendance = $totalDays > 0
+            ? round((($presentDays + ($lateDays * 0.5)) / $totalDays) * 100)
+            : 100;
 
         $subjectPerformance = $enrollments->map(function ($enrollment) {
+            $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+            $subject = $class?->subject ?? $enrollment->subject;
+            $teacher = $class?->teacher;
+
             $grades = $enrollment->grades;
             $totalScore = $grades->sum('score');
             $totalPossible = $grades->sum('total_score');
@@ -77,12 +101,26 @@ class StudentPerformanceController extends Controller
 
             $attendance = $enrollment->attendanceRecords;
             $totalDays = $attendance->count();
-            $presentDays = $attendance->where('status', 'present')->count();
-            $attendanceRate = $totalDays > 0 ? round(($presentDays / $totalDays) * 100) : 100;
+            $presentDays = $attendance->whereIn('status', ['present', 'excused'])->count();
+            $lateDays = $attendance->where('status', 'late')->count();
+            $attendanceRate = $totalDays > 0
+                ? round((($presentDays + ($lateDays * 0.5)) / $totalDays) * 100)
+                : 100;
 
-            $status = 'good';
-            if ($percentage !== null && $percentage < 70) $status = 'critical';
-            elseif ($percentage !== null && $percentage < 75) $status = 'warning';
+            $missingCount = $grades->filter(fn($grade) => $grade->score === null || $grade->score === 0)->count();
+
+            $riskCategory = $this->predictionService->determineRiskCategory(
+                $percentage,
+                $missingCount,
+                $attendanceRate,
+            );
+            $riskKey = $this->predictionService->getRiskCategoryKey(
+                $percentage,
+                $missingCount,
+                $attendanceRate,
+            );
+
+            $prediction = $this->predictionService->predictFinalGrade($enrollment);
 
             // Determine remarks
             $remarks = 'N/A';
@@ -96,24 +134,49 @@ class StudentPerformanceController extends Controller
 
             return [
                 'id' => $enrollment->id,
-                'subjectId' => $enrollment->subjectTeacher?->subject_id,
-                // Provide both `subject_name` (existing) and `name` for front-end compatibility
-                'subject_name' => $enrollment->subjectTeacher?->subject?->subject_name ?? 'Unknown Subject',
-                'name' => $enrollment->subjectTeacher?->subject?->subject_name ?? 'Unknown Subject',
-                'section' => $enrollment->subjectTeacher?->section,
-                'teacher' => $enrollment->subjectTeacher?->teacher
-                    ? $enrollment->subjectTeacher->teacher->first_name . ' ' . $enrollment->subjectTeacher->teacher->last_name
-                    : 'N/A',
+                'subjectId' => $class?->subject_id ?? $subject?->id,
+                'subject' => $subject?->subject_name ?? 'Unknown Subject',
+                'subject_name' => $subject?->subject_name ?? 'Unknown Subject',
+                'name' => $subject?->subject_name ?? 'Unknown Subject',
+                'section' => $class?->section,
+                'teacher' => $teacher?->name ?? 'N/A',
                 'grade' => $percentage,
                 'gradeDisplay' => $percentage !== null ? "{$percentage}%" : 'N/A',
                 'remarks' => $remarks,
                 'attendance' => $attendanceRate,
-                'status' => $status,
+                'attendanceRate' => $attendanceRate,
+                'missingCount' => $missingCount,
+                'riskCategory' => $riskKey,
+                'riskLabel' => $riskCategory['label'],
+                'riskColor' => $riskCategory['color'],
+                'status' => match ($riskKey) {
+                    'on_track' => 'good',
+                    'needs_attention' => 'warning',
+                    'at_risk', 'critical' => 'critical',
+                    default => 'good',
+                },
                 'hasIntervention' => $enrollment->intervention !== null,
                 'interventionType' => $enrollment->intervention?->type,
                 'gradeCount' => $grades->count(),
+                'predictedGrade' => $prediction['predicted_grade'],
+                'gradeTrend' => $prediction['trend'],
+                'trendDirection' => $prediction['trend_direction'],
+                'semester' => $class?->semester,
             ];
         })->sortByDesc('grade')->values();
+
+        $subjectsAtRisk = $subjectPerformance->filter(
+            fn($subject) => in_array($subject['riskCategory'], ['at_risk', 'critical'], true),
+        )->count();
+        $subjectsNeedingAttention = $subjectPerformance->filter(
+            fn($subject) => $subject['riskCategory'] === 'needs_attention',
+        )->count();
+        $subjectsOnTrack = $subjectPerformance->filter(
+            fn($subject) => $subject['riskCategory'] === 'on_track',
+        )->count();
+        $subjectsExcelling = $subjectPerformance->filter(
+            fn($subject) => $subject['grade'] !== null && $subject['grade'] >= 90,
+        )->count();
 
         $recentGrades = $enrollments
             ->flatMap(fn($e) => $e->grades)
@@ -166,6 +229,8 @@ class StudentPerformanceController extends Controller
                 'overallAttendance' => $overallAttendance,
                 'totalSubjects' => $totalSubjects,
                 'subjectsAtRisk' => $subjectsAtRisk,
+                'subjectsNeedingAttention' => $subjectsNeedingAttention,
+                'subjectsOnTrack' => $subjectsOnTrack,
                 'subjectsExcelling' => $subjectsExcelling,
             ],
             'subjectPerformance' => $subjectPerformance,
@@ -292,7 +357,7 @@ class StudentPerformanceController extends Controller
 
             $quarterlyData[] = [
                 'quarter' => $q,
-                'label' => "Quarter {$q}",
+                'label' => $this->quarterLabel($q),
                 'grade' => $qGrade,
                 'remarks' => $qRemarks,
                 'attendance' => $attendanceRate,
@@ -450,6 +515,15 @@ class StudentPerformanceController extends Controller
         }
 
         return $difference > 0 ? 'improving' : 'declining';
+    }
+
+    private function quarterLabel(int $quarter): string
+    {
+        return match ($quarter) {
+            1 => 'Midterm Quarter (Q1)',
+            2 => 'Final Quarter (Q2)',
+            default => "Quarter {$quarter}",
+        };
     }
 
     /**

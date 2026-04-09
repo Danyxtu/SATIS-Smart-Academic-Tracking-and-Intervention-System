@@ -193,8 +193,9 @@ class AnalyticsController extends Controller
         // Get comprehensive analytics from PredictionService
         $analytics = $this->predictionService->getStudentAnalytics($enrollment);
 
-        // Group grades by quarter
-        $quarterlyData = $grades->groupBy('quarter')->map(function ($quarterGrades, $quarter) use ($enrollment) {
+        // Group grades by quarter (Q1 Midterm, Q2 Final)
+        $quarterlyData = collect([1, 2])->map(function ($quarter) use ($grades, $enrollment) {
+            $quarterGrades = $grades->where('quarter', (int) $quarter);
             $qScore = $quarterGrades->sum('score');
             $qTotal = $quarterGrades->sum('total_score');
             $qGrade = $qTotal > 0 ? round(($qScore / $qTotal) * 100) : null;
@@ -218,12 +219,13 @@ class AnalyticsController extends Controller
             return [
                 'quarter' => "Q{$quarter}",
                 'quarterNum' => $quarter,
+                'label' => $this->quarterLabel((int) $quarter),
                 'grade' => $qGrade,
                 'remarks' => $remarks,
                 'attendance' => "{$attendanceRate}%",
                 'assignmentCount' => $quarterGrades->count(),
             ];
-        })->sortBy('quarterNum')->values();
+        })->values();
 
         // Build grade breakdown by category/assignment
         $gradeBreakdown = $grades->map(function ($grade) {
@@ -320,7 +322,7 @@ class AnalyticsController extends Controller
         $user = $request->user();
         $selectedQuarter = (int) $quarter;
 
-        if ($selectedQuarter < 1 || $selectedQuarter > 4) {
+        if ($selectedQuarter < 1 || $selectedQuarter > 2) {
             abort(404);
         }
 
@@ -342,7 +344,7 @@ class AnalyticsController extends Controller
         $storedCategories = $class?->grade_categories ?? [];
 
         $quarterNumbers = collect([1, 2, $selectedQuarter])
-            ->filter(fn($q) => $q >= 1 && $q <= 4)
+            ->filter(fn($q) => $q >= 1 && $q <= 2)
             ->unique()
             ->values();
 
@@ -614,8 +616,9 @@ class AnalyticsController extends Controller
 
         $analytics = $this->predictionService->getStudentAnalytics($enrollment);
 
-        // Group grades by quarter
-        $quarterlyData = $grades->groupBy('quarter')->map(function ($quarterGrades, $quarter) use ($enrollment) {
+        // Group grades by quarter (Q1 Midterm, Q2 Final)
+        $quarterlyData = collect([1, 2])->map(function ($quarter) use ($grades, $enrollment) {
+            $quarterGrades = $grades->where('quarter', (int) $quarter);
             $qScore = $quarterGrades->sum('score');
             $qTotal = $quarterGrades->sum('total_score');
             $qGrade = $qTotal > 0 ? round(($qScore / $qTotal) * 100) : null;
@@ -628,11 +631,12 @@ class AnalyticsController extends Controller
 
             return [
                 'quarterNum' => $quarter,
+                'label' => $this->quarterLabel((int) $quarter),
                 'grade' => $qGrade,
                 'attendance' => "{$attendanceRate}%",
                 'assignmentCount' => $quarterGrades->count(),
             ];
-        })->sortBy('quarterNum')->values();
+        })->values();
 
         $gradeBreakdown = $grades->map(function ($grade) {
             $percentage = $grade->total_score > 0

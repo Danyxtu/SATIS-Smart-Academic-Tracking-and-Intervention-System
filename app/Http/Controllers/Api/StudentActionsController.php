@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Intervention;
 use App\Models\StudentNotification;
 use App\Models\InterventionTask;
 use Illuminate\Http\Request;
@@ -60,5 +61,53 @@ class StudentActionsController extends Controller
         $notification->markAsRead();
 
         return response()->json(['success' => true]);
+    }
+
+    public function requestInterventionCompletion(Request $request, $interventionId)
+    {
+        $intervention = Intervention::query()
+            ->whereHas('enrollment', function ($query) use ($request) {
+                $query->where('user_id', $request->user()->id);
+            })
+            ->with('enrollment.subjectTeacher.teacher')
+            ->findOrFail($interventionId);
+
+        if (! $intervention->canRequestCompletion()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot request completion for this intervention.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $intervention->update([
+            'completion_requested_at' => now(),
+            'completion_request_notes' => $validated['notes'] ?? null,
+            'rejected_at' => null,
+            'rejection_reason' => null,
+        ]);
+
+        $enrollment = $intervention->enrollment;
+        $class = $enrollment?->subjectTeacher ?? $enrollment?->schoolClass;
+        $teacher = $class?->teacher;
+
+        if ($teacher) {
+            StudentNotification::create([
+                'user_id' => $teacher->id,
+                'sender_id' => $request->user()->id,
+                'intervention_id' => $intervention->id,
+                'type' => 'alert',
+                'title' => 'Completion Request',
+                'message' => $request->user()->name . ' has requested to mark their intervention as complete.',
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Completion request submitted! Your teacher will review it.',
+        ]);
     }
 }

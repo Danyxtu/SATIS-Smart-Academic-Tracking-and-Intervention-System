@@ -22,22 +22,29 @@ Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1
 
 // Force password change for new accounts
 Route::middleware('auth:sanctum')->post('force-change-password', [AuthController::class, 'forceChangePassword']);
+Route::middleware('auth:sanctum')->post('logout', [AuthController::class, 'logout']);
 
 Route::middleware('auth:sanctum')->get('student/dashboard', [\App\Http\Controllers\Api\StudentDashboardController::class, 'index']);
 Route::middleware('auth:sanctum')->get('student/performance', [\App\Http\Controllers\Api\StudentPerformanceController::class, 'index']);
 Route::middleware('auth:sanctum')->get('student/performance/{enrollment}', [\App\Http\Controllers\Api\StudentPerformanceController::class, 'show']);
 Route::middleware('auth:sanctum')->get('student/interventions', [\App\Http\Controllers\Api\StudentInterventionController::class, 'index']);
 Route::middleware('auth:sanctum')->get('student/attendance', [\App\Http\Controllers\Api\StudentAttendanceController::class, 'index']);
+Route::middleware('auth:sanctum')->get('student/attendance/{enrollment}', [\App\Http\Controllers\Api\StudentAttendanceController::class, 'show']);
 Route::middleware('auth:sanctum')->get('student/subjects-at-risk', [\App\Http\Controllers\Api\StudentSubjectRiskController::class, 'index']);
 
 // Action endpoints used by mobile app for interactivity
 Route::middleware('auth:sanctum')->post('student/notifications/{notification}/read', [\App\Http\Controllers\Api\StudentActionsController::class, 'markNotificationRead']);
 Route::middleware('auth:sanctum')->post('student/notifications/read-all', [\App\Http\Controllers\Api\StudentActionsController::class, 'markAllNotificationsRead']);
 Route::middleware('auth:sanctum')->post('student/interventions/tasks/{task}/complete', [\App\Http\Controllers\Api\StudentActionsController::class, 'completeInterventionTask']);
+Route::middleware('auth:sanctum')->post('student/interventions/{intervention}/request-completion', [\App\Http\Controllers\Api\StudentActionsController::class, 'requestInterventionCompletion']);
 Route::middleware('auth:sanctum')->post('student/feedback/{notification}/read', [\App\Http\Controllers\Api\StudentActionsController::class, 'markFeedbackRead']);
 
 // Profile endpoints
 Route::middleware('auth:sanctum')->get('student/profile', [\App\Http\Controllers\Api\StudentProfileController::class, 'index']);
+Route::middleware('auth:sanctum')->put('student/profile', [\App\Http\Controllers\Api\StudentProfileController::class, 'update']);
+Route::middleware('auth:sanctum')->delete('student/profile', [\App\Http\Controllers\Api\StudentProfileController::class, 'destroy']);
+Route::middleware('auth:sanctum')->post('student/profile/request-password-reset', [\App\Http\Controllers\Api\StudentProfileController::class, 'requestPasswordReset']);
+Route::middleware('auth:sanctum')->delete('student/profile/cancel-password-reset', [\App\Http\Controllers\Api\StudentProfileController::class, 'cancelPasswordResetRequest']);
 Route::middleware('auth:sanctum')->put('student/password', [\App\Http\Controllers\Api\StudentProfileController::class, 'updatePassword']);
 
 // Export PDF endpoint for mobile app

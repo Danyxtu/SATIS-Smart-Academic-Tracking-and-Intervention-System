@@ -17,6 +17,9 @@ class StudentInterventionController extends Controller
         $enrollments = Enrollment::with([
             'subjectTeacher.subject',
             'subjectTeacher.teacher',
+            'schoolClass.subject',
+            'schoolClass.teacher',
+            'subject',
             'grades',
             'attendanceRecords',
             'intervention.tasks',
@@ -28,8 +31,9 @@ class StudentInterventionController extends Controller
             ->filter(fn($e) => $e->intervention !== null)
             ->map(function ($enrollment) {
                 $intervention = $enrollment->intervention;
-                $subject = $enrollment->subjectTeacher?->subject;
-                $teacher = $enrollment->subjectTeacher?->teacher;
+                $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+                $subject = $class?->subject ?? $enrollment->subject;
+                $teacher = $class?->teacher;
 
                 $grades = $enrollment->grades;
                 $totalScore = $grades->sum('score');
@@ -67,12 +71,23 @@ class StudentInterventionController extends Controller
                 return [
                     'id' => $intervention->id,
                     'enrollmentId' => $enrollment->id,
-                    'subjectName' => $subject?->name ?? 'Unknown Subject',
-                    'subjectSection' => $subject?->section,
+                    'subjectName' => $subject?->subject_name ?? 'Unknown Subject',
+                    'subjectSection' => $class?->section ?? $subject?->section,
                     'teacherName' => $teacher?->name ?? 'N/A',
                     'type' => $intervention->type,
                     'typeLabel' => Intervention::getTypes()[$intervention->type] ?? $intervention->type,
                     'status' => $intervention->status,
+                    'isTier3' => $intervention->isTier3(),
+                    'canRequestCompletion' => $intervention->canRequestCompletion(),
+                    'hasCompletionRequest' => $intervention->hasCompletionRequest(),
+                    'isPendingApproval' => $intervention->isPendingApproval(),
+                    'isPendingCompletionApproval' => $intervention->isPendingApproval(),
+                    'completionRequestedAt' => $intervention->completion_requested_at?->toIso8601String(),
+                    'completionRequestedAtLabel' => $intervention->completion_requested_at?->format('M d, Y h:i A'),
+                    'completionRequestNotes' => $intervention->completion_request_notes,
+                    'approvedAt' => $intervention->approved_at?->format('M d, Y'),
+                    'rejectedAt' => $intervention->rejected_at?->format('M d, Y'),
+                    'rejectionReason' => $intervention->rejection_reason,
                     'notes' => $intervention->notes,
                     'deadlineAt' => $intervention->deadline_at?->toIso8601String(),
                     'deadlineLabel' => $intervention->deadline_at?->format('M d, Y h:i A'),
@@ -105,24 +120,35 @@ class StudentInterventionController extends Controller
             : 0;
 
         $recentFeedback = StudentNotification::where('user_id', $user->id)
-            ->with(['sender', 'intervention.enrollment.subject'])
+            ->with([
+                'sender',
+                'intervention.enrollment.subjectTeacher.subject',
+                'intervention.enrollment.schoolClass.subject',
+                'intervention.enrollment.subject',
+            ])
             ->whereIn('type', ['feedback', 'nudge', 'task', 'alert', 'extension'])
             ->orderBy('created_at', 'desc')
             ->limit(10)
             ->get()
-            ->map(fn($notification) => [
-                'id' => $notification->id,
-                'type' => $notification->type,
-                'typeLabel' => StudentNotification::getTypes()[$notification->type] ?? $notification->type,
-                'title' => $notification->title,
-                'message' => $notification->message,
-                'senderName' => $notification->sender?->name ?? 'System',
-                'subjectName' => $notification->intervention?->enrollment?->subject?->name ?? null,
-                'deadlineLabel' => $notification->intervention?->deadline_at?->format('M d, Y h:i A'),
-                'isRead' => $notification->is_read,
-                'time' => $notification->created_at->diffForHumans(),
-                'timeFull' => $notification->created_at->format('M d, Y h:i A'),
-            ]);
+            ->map(function ($notification) {
+                $feedbackEnrollment = $notification->intervention?->enrollment;
+                $feedbackClass = $feedbackEnrollment?->subjectTeacher ?? $feedbackEnrollment?->schoolClass;
+                $feedbackSubject = $feedbackClass?->subject ?? $feedbackEnrollment?->subject;
+
+                return [
+                    'id' => $notification->id,
+                    'type' => $notification->type,
+                    'typeLabel' => StudentNotification::getTypes()[$notification->type] ?? $notification->type,
+                    'title' => $notification->title,
+                    'message' => $notification->message,
+                    'senderName' => $notification->sender?->name ?? 'System',
+                    'subjectName' => $feedbackSubject?->subject_name,
+                    'deadlineLabel' => $notification->intervention?->deadline_at?->format('M d, Y h:i A'),
+                    'isRead' => $notification->is_read,
+                    'time' => $notification->created_at->diffForHumans(),
+                    'timeFull' => $notification->created_at->format('M d, Y h:i A'),
+                ];
+            });
 
         $unreadFeedbackCount = StudentNotification::where('user_id', $user->id)
             ->where('is_read', false)
