@@ -70,19 +70,25 @@ const FilterTab = ({ label, count, isActive, onClick }) => (
 );
 
 // Approve Modal - Server generates 8-char password
-const ApproveModal = ({ isOpen, onClose, request }) => {
+const ApproveModal = ({ isOpen, onClose, request, routePrefix }) => {
     const { data, setData, post, processing, errors, reset } = useForm({
         admin_notes: "",
     });
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        post(route("admin.password-reset-requests.approve", request?.id), {
-            onSuccess: () => {
-                reset();
-                onClose();
+        post(
+            route(
+                `${routePrefix}.password-reset-requests.approve`,
+                request?.id,
+            ),
+            {
+                onSuccess: () => {
+                    reset();
+                    onClose();
+                },
             },
-        });
+        );
     };
 
     return (
@@ -208,19 +214,22 @@ const ApproveModal = ({ isOpen, onClose, request }) => {
 };
 
 // Reject Modal
-const RejectModal = ({ isOpen, onClose, request }) => {
+const RejectModal = ({ isOpen, onClose, request, routePrefix }) => {
     const { data, setData, post, processing, errors, reset } = useForm({
         admin_notes: "",
     });
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        post(route("admin.password-reset-requests.reject", request?.id), {
-            onSuccess: () => {
-                reset();
-                onClose();
+        post(
+            route(`${routePrefix}.password-reset-requests.reject`, request?.id),
+            {
+                onSuccess: () => {
+                    reset();
+                    onClose();
+                },
             },
-        });
+        );
     };
 
     return (
@@ -320,10 +329,12 @@ const RejectModal = ({ isOpen, onClose, request }) => {
 };
 
 // Main Component
-export default function PasswordResetRequests({
+export function PasswordResetRequestsPage({
     requests,
     counts,
     currentStatus,
+    routePrefix = "admin",
+    subtitle = "Review and process password reset requests from users",
 }) {
     const [approveModal, setApproveModal] = useState({
         isOpen: false,
@@ -336,7 +347,7 @@ export default function PasswordResetRequests({
 
     const handleStatusFilter = (status) => {
         router.get(
-            route("admin.password-reset-requests"),
+            route(`${routePrefix}.password-reset-requests`),
             { status },
             { preserveState: true },
         );
@@ -354,7 +365,7 @@ export default function PasswordResetRequests({
                         Password Reset Requests
                     </h1>
                     <p className="text-gray-600 dark:text-gray-400 mt-1">
-                        Review and process password reset requests from users
+                        {subtitle}
                     </p>
                 </div>
                 {counts.pending > 0 && (
@@ -566,14 +577,20 @@ export default function PasswordResetRequests({
                     setApproveModal({ isOpen: false, request: null })
                 }
                 request={approveModal.request}
+                routePrefix={routePrefix}
             />
             <RejectModal
                 isOpen={rejectModal.isOpen}
                 onClose={() => setRejectModal({ isOpen: false, request: null })}
                 request={rejectModal.request}
+                routePrefix={routePrefix}
             />
         </>
     );
+}
+
+export default function PasswordResetRequests(props) {
+    return <PasswordResetRequestsPage {...props} routePrefix="admin" />;
 }
 
 PasswordResetRequests.layout = (page) => <SchoolStaffLayout children={page} />;

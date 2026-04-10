@@ -84,7 +84,7 @@ class PasswordResetLinkController extends Controller
             ->first();
 
         if ($existingRequest) {
-            return back()->with('status', 'You already have a pending password reset request. Please wait for your department admin to process it.');
+            return back()->with('status', 'You already have a pending password reset request. Please wait for an administrator to process it.');
         }
 
         // Create the password reset request
@@ -94,6 +94,6 @@ class PasswordResetLinkController extends Controller
             'status' => PasswordResetRequest::STATUS_PENDING,
         ]);
 
-        return back()->with('status', 'Your password reset request has been sent to your department admin. Please visit your admin in person to receive your new password.');
+        return back()->with('status', 'Your password reset request has been sent for administrator review. Please coordinate in person with your school administrator to receive your new password.');
     }
 }

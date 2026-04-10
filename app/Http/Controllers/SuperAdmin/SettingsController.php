@@ -79,22 +79,10 @@ class SettingsController extends Controller
     public function updateAcademic(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'current_school_year' => ['required', 'string', 'regex:/^\d{4}-\d{4}$/'],
             'current_semester' => ['required', 'in:1,2'],
         ]);
 
         $userId = Auth::id();
-
-        SystemSetting::updateOrCreate(
-            ['key' => 'current_school_year'],
-            [
-                'value' => $validated['current_school_year'],
-                'type' => 'string',
-                'group' => 'academic',
-                'description' => 'Current school year',
-                'updated_by' => $userId,
-            ]
-        );
 
         SystemSetting::updateOrCreate(
             ['key' => 'current_semester'],
@@ -108,10 +96,9 @@ class SettingsController extends Controller
         );
 
         // Clear cache
-        cache()->forget('system_setting_current_school_year');
         cache()->forget('system_setting_current_semester');
 
-        return back()->with('success', 'Academic settings updated successfully.');
+        return back()->with('success', 'Semester updated successfully.');
     }
 
     /**

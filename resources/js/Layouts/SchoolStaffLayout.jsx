@@ -58,7 +58,7 @@ const ROLE_SECTIONS = [
 ];
 
 // ── Nav item ─────────────────────────────────────────────────────
-function NavItem({ item, section, onLinkClick }) {
+function NavItem({ item, section, onLinkClick, collapsed = false }) {
     const label = item.label ?? item.name;
     const dest = item.destination ?? item.path;
     const activeCheck = item.activeCheck ?? dest;
@@ -71,9 +71,12 @@ function NavItem({ item, section, onLinkClick }) {
         <Link
             href={routeExists ? route(dest) : "#"}
             onClick={onLinkClick}
+            title={collapsed ? label : undefined}
+            aria-label={label}
             className={`
-                group relative flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium
+                group relative flex items-center rounded-lg text-xs font-medium
                 transition-all duration-150
+                ${collapsed ? "justify-center px-1.5 py-2" : "gap-2 px-2 py-1.5"}
                 ${
                     isActive
                         ? `bg-gradient-to-r ${section.activeGradient} text-white ring-1 ${section.activeRing}`
@@ -91,7 +94,9 @@ function NavItem({ item, section, onLinkClick }) {
 
             {/* Icon */}
             <div
-                className={`flex h-5 w-5 items-center justify-center rounded-lg transition-colors flex-shrink-0 ${
+                className={`flex items-center justify-center rounded-lg transition-colors flex-shrink-0 ${
+                    collapsed ? "h-7 w-7" : "h-5 w-5"
+                } ${
                     isActive
                         ? section.activeIcon
                         : "bg-slate-700/50 text-slate-400 group-hover:bg-slate-600/50 group-hover:text-slate-200"
@@ -100,9 +105,11 @@ function NavItem({ item, section, onLinkClick }) {
                 <Icon size={12} />
             </div>
 
-            <span className="truncate">{label}</span>
+            <span className={collapsed ? "sr-only" : "text-left leading-snug"}>
+                {label}
+            </span>
 
-            {isActive && (
+            {isActive && !collapsed && (
                 <ChevronRight
                     size={14}
                     className={`ml-auto flex-shrink-0 ${section.activeChevron}`}
@@ -138,7 +145,13 @@ const dashboardRoleConfig = {
 
 // ── Sidebar content ───────────────────────────────────────────────
 
-function SidebarContent({ initials, fullName, onLinkClick, onLogout }) {
+function SidebarContent({
+    initials,
+    fullName,
+    onLinkClick,
+    onLogout,
+    collapsed = false,
+}) {
     const { auth } = usePage().props;
     const userRoles = auth.user.roles?.map((r) => r.name) || [];
     const visibleSections = ROLE_SECTIONS.filter((section) =>
@@ -232,101 +245,122 @@ function SidebarContent({ initials, fullName, onLinkClick, onLogout }) {
     return (
         <div className="flex flex-col h-full text-xs">
             {/* Brand / User */}
-            <div className="flex flex-col gap-2 px-4 py-3 border-b border-slate-700/60">
+            <div
+                className={`flex gap-2 border-b border-slate-700/60 ${
+                    collapsed
+                        ? "flex-col items-center px-2 py-3"
+                        : "flex-col px-4 py-3"
+                }`}
+            >
                 <Link
                     href={
                         profileLinkRoute && route().has(profileLinkRoute)
                             ? route(profileLinkRoute)
                             : "#"
                     }
-                    className="flex items-center gap-3 min-w-0"
+                    className={`flex min-w-0 items-center ${
+                        collapsed ? "justify-center" : "gap-3"
+                    }`}
                     onClick={onLinkClick}
+                    title={collapsed ? fullName : undefined}
                 >
                     <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/30">
                         <span className="text-white font-bold text-xs uppercase">
                             {initials}
                         </span>
                     </div>
-                    <div className="min-w-0">
-                        <p className="text-xs font-bold text-white tracking-tight leading-none truncate">
-                            {fullName}
-                        </p>
-                    </div>
+                    {!collapsed && (
+                        <div className="min-w-0">
+                            <p className="text-xs font-bold text-white tracking-tight leading-none truncate">
+                                {fullName}
+                            </p>
+                        </div>
+                    )}
                 </Link>
 
                 {/* Role badges + dashboard switcher */}
-                <div className="space-y-2 pl-0.5">
-                    <div className="flex flex-wrap gap-1">
-                        {userRoles.map((role) => {
-                            const config = roleConfig[role];
-                            if (!config) return null;
+                {!collapsed && (
+                    <div className="space-y-2 pl-0.5">
+                        <div className="flex flex-wrap gap-1">
+                            {userRoles.map((role) => {
+                                const config = roleConfig[role];
+                                if (!config) return null;
 
-                            return (
-                                <span
-                                    key={role}
-                                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-semibold uppercase tracking-wide ring-1 ${config.color}`}
-                                >
-                                    {config.label}
-                                </span>
-                            );
-                        })}
-                    </div>
+                                return (
+                                    <span
+                                        key={role}
+                                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-semibold uppercase tracking-wide ring-1 ${config.color}`}
+                                    >
+                                        {config.label}
+                                    </span>
+                                );
+                            })}
+                        </div>
 
-                    {availableDashboardRoles.length > 1 &&
-                        !shouldMoveDashboardSwitcherToPage && (
-                            <div className="inline-flex w-full rounded-md border border-slate-700/80 bg-slate-800/60 p-0.5">
-                                {availableDashboardRoles.map(
-                                    (dashboardRole) => {
-                                        const isActiveRole = route().current(
-                                            dashboardRole.routeName,
-                                        );
-
-                                        return (
-                                            <Link
-                                                key={dashboardRole.routeName}
-                                                href={route(
+                        {availableDashboardRoles.length > 1 &&
+                            !shouldMoveDashboardSwitcherToPage && (
+                                <div className="inline-flex w-full rounded-md border border-slate-700/80 bg-slate-800/60 p-0.5">
+                                    {availableDashboardRoles.map(
+                                        (dashboardRole) => {
+                                            const isActiveRole =
+                                                route().current(
                                                     dashboardRole.routeName,
-                                                )}
-                                                onClick={onLinkClick}
-                                                className={`flex-1 rounded px-2 py-1 text-center text-[10px] font-semibold transition-colors ${
-                                                    isActiveRole
-                                                        ? "bg-blue-600 text-white"
-                                                        : "text-slate-300 hover:bg-slate-700/70"
-                                                }`}
-                                            >
-                                                {dashboardRole.label}
-                                            </Link>
-                                        );
-                                    },
-                                )}
-                            </div>
-                        )}
-                </div>
+                                                );
+
+                                            return (
+                                                <Link
+                                                    key={
+                                                        dashboardRole.routeName
+                                                    }
+                                                    href={route(
+                                                        dashboardRole.routeName,
+                                                    )}
+                                                    onClick={onLinkClick}
+                                                    className={`flex-1 rounded px-2 py-1 text-center text-[10px] font-semibold transition-colors ${
+                                                        isActiveRole
+                                                            ? "bg-blue-600 text-white"
+                                                            : "text-slate-300 hover:bg-slate-700/70"
+                                                    }`}
+                                                >
+                                                    {dashboardRole.label}
+                                                </Link>
+                                            );
+                                        },
+                                    )}
+                                </div>
+                            )}
+                    </div>
+                )}
             </div>
 
             {/* Grouped nav items */}
             <nav className="flex-1 px-2 py-2 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
                 {!!dashboardEntry && (
                     <div>
-                        <p className="px-2 pb-1 text-[9px] font-bold uppercase tracking-widest text-slate-500">
-                            Main
-                        </p>
+                        {!collapsed && (
+                            <p className="px-2 pb-1 text-[9px] font-bold uppercase tracking-widest text-slate-500">
+                                Main
+                            </p>
+                        )}
                         <div className="space-y-0.5">
                             <NavItem
                                 key={`main-${dashboardEntry.section.key}-${dashboardEntry.item.label ?? dashboardEntry.item.name}`}
                                 item={dashboardEntry.item}
                                 section={dashboardEntry.section}
                                 onLinkClick={onLinkClick}
+                                collapsed={collapsed}
                             />
                         </div>
                     </div>
                 )}
 
                 {teachingEntries.length > 0 && (
-                    <div className="mt-3">
-                        <p className="px-2 pb-1 text-[9px] font-bold uppercase tracking-widest text-slate-500">
-                            Teaching
-                        </p>
+                    <div className={collapsed ? "mt-2" : "mt-3"}>
+                        {!collapsed && (
+                            <p className="px-2 pb-1 text-[9px] font-bold uppercase tracking-widest text-slate-500">
+                                Teaching
+                            </p>
+                        )}
                         <div className="space-y-0.5">
                             {teachingEntries.map(({ section, item }) => (
                                 <NavItem
@@ -334,6 +368,7 @@ function SidebarContent({ initials, fullName, onLinkClick, onLogout }) {
                                     item={item}
                                     section={section}
                                     onLinkClick={onLinkClick}
+                                    collapsed={collapsed}
                                 />
                             ))}
                         </div>
@@ -341,10 +376,12 @@ function SidebarContent({ initials, fullName, onLinkClick, onLogout }) {
                 )}
 
                 {administrationEntries.length > 0 && (
-                    <div className="mt-3">
-                        <p className="px-2 pb-1 text-[9px] font-bold uppercase tracking-widest text-slate-500">
-                            Administration
-                        </p>
+                    <div className={collapsed ? "mt-2" : "mt-3"}>
+                        {!collapsed && (
+                            <p className="px-2 pb-1 text-[9px] font-bold uppercase tracking-widest text-slate-500">
+                                Administration
+                            </p>
+                        )}
                         <div className="space-y-0.5">
                             {administrationEntries.map(({ section, item }) => (
                                 <NavItem
@@ -352,6 +389,7 @@ function SidebarContent({ initials, fullName, onLinkClick, onLogout }) {
                                     item={item}
                                     section={section}
                                     onLinkClick={onLinkClick}
+                                    collapsed={collapsed}
                                 />
                             ))}
                         </div>
@@ -363,12 +401,16 @@ function SidebarContent({ initials, fullName, onLinkClick, onLogout }) {
             <div className="p-2 border-t border-slate-700/60">
                 <button
                     onClick={onLogout}
-                    className="w-full flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-medium text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-colors group"
+                    title={collapsed ? "Log Out" : undefined}
+                    aria-label="Log Out"
+                    className={`w-full flex items-center rounded-lg py-2 text-xs font-medium text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-colors group ${
+                        collapsed ? "justify-center px-1" : "gap-2 px-2"
+                    }`}
                 >
                     <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-slate-700/50 group-hover:bg-rose-500/20 transition-colors">
                         <LogOut size={12} />
                     </div>
-                    Log Out
+                    {!collapsed && "Log Out"}
                 </button>
             </div>
         </div>
@@ -491,17 +533,12 @@ export default function SchoolStaffLayout({ children }) {
             {/* ── Desktop Sidebar ── */}
             <aside
                 className={`relative hidden shrink-0 overflow-hidden bg-slate-900 transition-all duration-300 ease-in-out lg:flex lg:flex-col ${
-                    isDesktopSidebarCollapsed
-                        ? "w-0 -translate-x-3 opacity-0"
-                        : "w-56 translate-x-0 opacity-100"
+                    isDesktopSidebarCollapsed ? "w-20" : "w-60"
                 }`}
-                aria-hidden={isDesktopSidebarCollapsed}
             >
                 <div
-                    className={`h-full w-56 transition-opacity duration-200 ${
-                        isDesktopSidebarCollapsed
-                            ? "pointer-events-none opacity-0"
-                            : "opacity-100 delay-100"
+                    className={`h-full transition-all duration-300 ${
+                        isDesktopSidebarCollapsed ? "w-20" : "w-60"
                     }`}
                 >
                     <SidebarContent
@@ -509,6 +546,7 @@ export default function SchoolStaffLayout({ children }) {
                         fullName={fullName}
                         onLinkClick={undefined}
                         onLogout={handleLogoutClick}
+                        collapsed={isDesktopSidebarCollapsed}
                     />
                 </div>
             </aside>

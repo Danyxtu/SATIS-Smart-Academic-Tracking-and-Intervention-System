@@ -168,7 +168,7 @@ class ProfileController extends Controller
             'status' => 'pending',
         ]);
 
-        return back()->with('success', 'Your password reset request has been submitted. An admin will review it shortly.');
+        return back()->with('success', 'Your password reset request has been submitted. An admin or super admin will review it shortly.');
     }
 
     /**

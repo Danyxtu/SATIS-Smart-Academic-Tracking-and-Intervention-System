@@ -92,6 +92,17 @@ export default function Dashboard({
             shadowColor: "shadow-amber-500/20",
             href: route("superadmin.users.index", { role: "student" }),
         },
+        {
+            name: "Pending Password Requests",
+            value: stats.pending_password_reset_requests,
+            subtext: "Teacher and student requests",
+            icon: AlertCircle,
+            gradient: "from-rose-500 to-red-600",
+            bgLight: "bg-rose-50",
+            textColor: "text-rose-600",
+            shadowColor: "shadow-rose-500/20",
+            href: route("superadmin.password-reset-requests"),
+        },
     ];
 
     const quickActions = [
@@ -327,7 +338,7 @@ export default function Dashboard({
                 {activeTab === "overview" ? (
                     <>
                         {/* ── Stat Cards ─────────────────────────────── */}
-                        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-5">
                             {statCards.map((stat) => {
                                 const Icon = stat.icon;
                                 return (

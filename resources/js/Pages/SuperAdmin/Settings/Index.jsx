@@ -1,4 +1,4 @@
-import { Head, useForm, router } from "@inertiajs/react";
+import { Head, useForm } from "@inertiajs/react";
 import axios from "axios";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import { useState } from "react";
@@ -6,7 +6,6 @@ import {
     Settings,
     Save,
     Calendar,
-    GraduationCap,
     Info,
     School,
     MapPin,
@@ -14,7 +13,6 @@ import {
     Sparkles,
     BookOpen,
     AlertCircle,
-    Zap,
     RotateCcw,
     AlertTriangle,
     X,
@@ -455,37 +453,56 @@ function NewSchoolYearModal({ currentSY, onClose }) {
     );
 }
 
-export default function Index({ settings, schoolYears }) {
+export default function Index({ settings }) {
     const [showNewSYModal, setShowNewSYModal] = useState(false);
+    const [isEditingSemester, setIsEditingSemester] = useState(false);
 
-    const { data, setData, post, processing, errors } = useForm({
-        current_school_year: settings?.current_school_year || "",
+    const currentSchoolYear = settings?.current_school_year || "";
+
+    const {
+        data: academicData,
+        setData: setAcademicData,
+        put: putAcademic,
+        processing: academicProcessing,
+        errors: academicErrors,
+        clearErrors: clearAcademicErrors,
+    } = useForm({
         current_semester: settings?.current_semester || "1",
-        enrollment_open: settings?.enrollment_open ?? true,
-        grade_submission_open: settings?.grade_submission_open ?? true,
+    });
+
+    const {
+        data: schoolInfoData,
+        setData: setSchoolInfoData,
+        put: putSchoolInfo,
+        processing: schoolInfoProcessing,
+        errors: schoolInfoErrors,
+    } = useForm({
         school_name: settings?.school_name || "",
         school_address: settings?.school_address || "",
     });
 
-    const currentYear = new Date().getFullYear();
-    const generatedSchoolYears = Array.from({ length: 5 }, (_, i) => {
-        const year = currentYear - 2 + i;
-        return `${year}-${year + 1}`;
-    });
-
-    const availableSchoolYears = schoolYears?.length
-        ? schoolYears
-        : generatedSchoolYears;
-
-    const handleSubmit = (e) => {
+    const handleSaveSemester = (e) => {
         e.preventDefault();
-        post(route("superadmin.settings.update"));
+        putAcademic(route("superadmin.settings.academic"), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setIsEditingSemester(false);
+            },
+        });
     };
 
-    const activeControls = [
-        data.enrollment_open,
-        data.grade_submission_open,
-    ].filter(Boolean).length;
+    const handleCancelSemesterEdit = () => {
+        setAcademicData("current_semester", settings?.current_semester || "1");
+        clearAcademicErrors();
+        setIsEditingSemester(false);
+    };
+
+    const handleSaveSchoolInfo = (e) => {
+        e.preventDefault();
+        putSchoolInfo(route("superadmin.settings.school-info"), {
+            preserveScroll: true,
+        });
+    };
 
     return (
         <>
@@ -513,134 +530,87 @@ export default function Index({ settings, schoolYears }) {
                             </div>
                         </div>
 
-                        {/* Status Pills */}
+                        {/* Current Academic Period */}
                         <div className="flex flex-wrap items-center gap-3">
-                            <div className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2 backdrop-blur-sm ring-1 ring-white/10">
-                                <div
-                                    className={`h-2 w-2 rounded-full ${data.enrollment_open ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`}
-                                />
-                                <span className="text-xs font-semibold text-white">
-                                    Enrollment{" "}
-                                    {data.enrollment_open ? "Open" : "Closed"}
+                            <div className="flex items-center gap-2 rounded-xl bg-blue-500/20 px-4 py-2 backdrop-blur-sm ring-1 ring-blue-400/30">
+                                <BookOpen size={12} className="text-blue-300" />
+                                <span className="text-xs font-semibold text-blue-200">
+                                    Current Academic Period:{" "}
+                                    {currentSchoolYear || "Not set"} · Sem{" "}
+                                    {academicData.current_semester}
                                 </span>
                             </div>
-                            <div className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2 backdrop-blur-sm ring-1 ring-white/10">
-                                <div
-                                    className={`h-2 w-2 rounded-full ${data.grade_submission_open ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`}
-                                />
-                                <span className="text-xs font-semibold text-white">
-                                    Grades{" "}
-                                    {data.grade_submission_open
-                                        ? "Open"
-                                        : "Closed"}
-                                </span>
-                            </div>
-                            {data.current_school_year && (
-                                <div className="flex items-center gap-2 rounded-xl bg-blue-500/20 px-4 py-2 backdrop-blur-sm ring-1 ring-blue-400/30">
-                                    <BookOpen
-                                        size={12}
-                                        className="text-blue-300"
-                                    />
-                                    <span className="text-xs font-semibold text-blue-200">
-                                        {data.current_school_year} · Sem{" "}
-                                        {data.current_semester}
-                                    </span>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                        {/* ── LEFT COLUMN (2/3 width) ───────────────────── */}
-                        <div className="xl:col-span-2 space-y-6">
-                            {/* Academic Period Card */}
-                            <div className="rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-slate-100 overflow-hidden">
-                                <div className="flex items-center gap-4 px-6 py-5 border-b border-slate-100">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                    {/* ── LEFT COLUMN (2/3 width) ───────────────────── */}
+                    <div className="xl:col-span-2 space-y-6">
+                        {/* Academic Period Card */}
+                        <div className="rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-slate-100 overflow-hidden">
+                            <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-slate-100">
+                                <div className="flex items-center gap-4">
                                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md shadow-blue-500/20">
                                         <Calendar className="h-5 w-5 text-white" />
                                     </div>
                                     <div>
                                         <h2 className="font-semibold text-slate-900">
-                                            Academic Period
+                                            Current Academic Period
                                         </h2>
                                         <p className="text-xs text-slate-500">
-                                            Current school year and semester
+                                            School year is read-only. Only
+                                            semester can be edited here.
                                         </p>
                                     </div>
                                 </div>
 
-                                <div className="p-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                        {/* School Year */}
-                                        <div>
-                                            <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
-                                                <Calendar size={12} />
-                                                School Year
-                                                <span className="text-rose-400">
-                                                    *
-                                                </span>
-                                            </label>
-                                            <select
-                                                value={data.current_school_year}
-                                                onChange={(e) =>
-                                                    setData(
-                                                        "current_school_year",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className={`w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm font-medium focus:border-blue-500 focus:ring-blue-500 focus:bg-white dark:bg-gray-900 transition-colors ${
-                                                    errors.current_school_year
-                                                        ? "border-rose-300 bg-rose-50/50"
-                                                        : ""
-                                                }`}
-                                            >
-                                                <option value="">
-                                                    Select school year
-                                                </option>
-                                                {availableSchoolYears.map(
-                                                    (year) => (
-                                                        <option
-                                                            key={year}
-                                                            value={year}
-                                                        >
-                                                            {year}
-                                                        </option>
-                                                    ),
-                                                )}
-                                            </select>
-                                            {errors.current_school_year && (
-                                                <p className="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
-                                                    <Info size={12} />
-                                                    {errors.current_school_year}
-                                                </p>
-                                            )}
-                                        </div>
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        isEditingSemester
+                                            ? handleCancelSemesterEdit()
+                                            : setIsEditingSemester(true)
+                                    }
+                                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                                >
+                                    <Sparkles size={12} />
+                                    {isEditingSemester
+                                        ? "Cancel"
+                                        : "Edit Semester"}
+                                </button>
+                            </div>
 
-                                        {/* Semester */}
-                                        <div>
-                                            <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
-                                                <Sparkles size={12} />
-                                                Semester
-                                                <span className="text-rose-400">
-                                                    *
-                                                </span>
-                                            </label>
-                                            {/* Custom toggle-style selector */}
+                            <div className="p-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                                            School Year
+                                        </p>
+                                        <p className="mt-1 text-sm font-semibold text-slate-800">
+                                            {currentSchoolYear || "Not set"}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                                            <Sparkles size={12} />
+                                            Semester
+                                        </label>
+                                        {isEditingSemester ? (
                                             <div className="flex rounded-xl border border-slate-200 bg-slate-50/50 p-1 gap-1">
                                                 {["1", "2"].map((sem) => (
                                                     <button
                                                         key={sem}
                                                         type="button"
                                                         onClick={() =>
-                                                            setData(
+                                                            setAcademicData(
                                                                 "current_semester",
                                                                 sem,
                                                             )
                                                         }
                                                         className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all ${
-                                                            data.current_semester ===
+                                                            academicData.current_semester ===
                                                             sem
                                                                 ? "bg-white dark:bg-gray-900 text-blue-600 shadow-sm ring-1 ring-slate-200"
                                                                 : "text-slate-500 hover:text-slate-700"
@@ -652,385 +622,259 @@ export default function Index({ settings, schoolYears }) {
                                                     </button>
                                                 ))}
                                             </div>
-                                            {errors.current_semester && (
-                                                <p className="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
-                                                    <Info size={12} />
-                                                    {errors.current_semester}
+                                        ) : (
+                                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                                <p className="text-sm font-semibold text-slate-800">
+                                                    {academicData.current_semester ===
+                                                    "1"
+                                                        ? "1st Semester"
+                                                        : "2nd Semester"}
                                                 </p>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Info banner */}
-                                    <div className="mt-5 flex gap-3 rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">
-                                        <AlertCircle
-                                            size={16}
-                                            className="text-amber-500 shrink-0 mt-0.5"
-                                        />
-                                        <p className="text-xs text-amber-700 leading-relaxed">
-                                            <span className="font-semibold">
-                                                Heads up:
-                                            </span>{" "}
-                                            Changing the academic period affects
-                                            enrollment records, grade
-                                            submissions, and attendance. Ensure
-                                            all grades are finalized before
-                                            switching periods.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* School Information Card */}
-                            <div className="rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-slate-100 overflow-hidden">
-                                <div className="flex items-center gap-4 px-6 py-5 border-b border-slate-100">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-md shadow-emerald-500/20">
-                                        <School className="h-5 w-5 text-white" />
-                                    </div>
-                                    <div>
-                                        <h2 className="font-semibold text-slate-900">
-                                            School Information
-                                        </h2>
-                                        <p className="text-xs text-slate-500">
-                                            Used in reports, documents, and
-                                            printed materials
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="p-6 space-y-5">
-                                    <div>
-                                        <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
-                                            <School size={12} />
-                                            School Name
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={data.school_name}
-                                            onChange={(e) =>
-                                                setData(
-                                                    "school_name",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="e.g., Sample Senior High School"
-                                            className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white dark:bg-gray-900 transition-colors"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
-                                            <MapPin size={12} />
-                                            School Address
-                                        </label>
-                                        <textarea
-                                            value={data.school_address}
-                                            onChange={(e) =>
-                                                setData(
-                                                    "school_address",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            rows={3}
-                                            placeholder="Full school address including barangay, city, and province..."
-                                            className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white dark:bg-gray-900 transition-colors resize-none"
-                                        />
-                                    </div>
-
-                                    {/* Preview */}
-                                    {(data.school_name ||
-                                        data.school_address) && (
-                                        <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
-                                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                                                Preview
-                                            </p>
-                                            <p className="font-semibold text-slate-800 text-sm">
-                                                {data.school_name || "—"}
-                                            </p>
-                                            <p className="text-xs text-slate-500 mt-0.5">
-                                                {data.school_address || "—"}
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* ── RIGHT COLUMN (1/3 width) ──────────────────── */}
-                        <div className="space-y-6">
-                            {/* System Controls Card */}
-                            <div className="rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-slate-100 overflow-hidden">
-                                <div className="flex items-center gap-4 px-6 py-5 border-b border-slate-100">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-md shadow-amber-500/20">
-                                        <Zap className="h-5 w-5 text-white" />
-                                    </div>
-                                    <div>
-                                        <h2 className="font-semibold text-slate-900">
-                                            System Controls
-                                        </h2>
-                                        <p className="text-xs text-slate-500">
-                                            Toggle system features
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="p-5 space-y-3">
-                                    {/* Enrollment Toggle */}
-                                    <div
-                                        className={`rounded-xl p-4 border transition-colors ${
-                                            data.enrollment_open
-                                                ? "bg-emerald-50 border-emerald-100"
-                                                : "bg-slate-50 border-slate-100"
-                                        }`}
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="flex items-center gap-3">
-                                                <div
-                                                    className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
-                                                        data.enrollment_open
-                                                            ? "bg-emerald-100"
-                                                            : "bg-slate-200"
-                                                    }`}
-                                                >
-                                                    <GraduationCap
-                                                        size={18}
-                                                        className={
-                                                            data.enrollment_open
-                                                                ? "text-emerald-600"
-                                                                : "text-slate-400"
-                                                        }
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-slate-900 text-sm">
-                                                        Enrollment
-                                                    </p>
-                                                    <p className="text-xs text-slate-500 mt-0.5">
-                                                        {data.enrollment_open
-                                                            ? "Students can enroll"
-                                                            : "Enrollment disabled"}
-                                                    </p>
-                                                </div>
                                             </div>
-                                            <label className="relative inline-flex cursor-pointer items-center shrink-0 mt-0.5">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={
-                                                        data.enrollment_open
-                                                    }
-                                                    onChange={(e) =>
-                                                        setData(
-                                                            "enrollment_open",
-                                                            e.target.checked,
-                                                        )
-                                                    }
-                                                    className="peer sr-only"
-                                                />
-                                                <div className="peer h-5 w-9 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-slate-300 after:bg-white dark:bg-gray-900 after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white" />
-                                            </label>
-                                        </div>
-                                    </div>
+                                        )}
 
-                                    {/* Grade Submission Toggle */}
-                                    <div
-                                        className={`rounded-xl p-4 border transition-colors ${
-                                            data.grade_submission_open
-                                                ? "bg-emerald-50 border-emerald-100"
-                                                : "bg-slate-50 border-slate-100"
-                                        }`}
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="flex items-center gap-3">
-                                                <div
-                                                    className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
-                                                        data.grade_submission_open
-                                                            ? "bg-emerald-100"
-                                                            : "bg-slate-200"
-                                                    }`}
-                                                >
-                                                    <CheckCircle
-                                                        size={18}
-                                                        className={
-                                                            data.grade_submission_open
-                                                                ? "text-emerald-600"
-                                                                : "text-slate-400"
-                                                        }
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-slate-900 text-sm">
-                                                        Grade Submission
-                                                    </p>
-                                                    <p className="text-xs text-slate-500 mt-0.5">
-                                                        {data.grade_submission_open
-                                                            ? "Teachers can submit"
-                                                            : "Submission disabled"}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <label className="relative inline-flex cursor-pointer items-center shrink-0 mt-0.5">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={
-                                                        data.grade_submission_open
-                                                    }
-                                                    onChange={(e) =>
-                                                        setData(
-                                                            "grade_submission_open",
-                                                            e.target.checked,
-                                                        )
-                                                    }
-                                                    className="peer sr-only"
-                                                />
-                                                <div className="peer h-5 w-9 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-slate-300 after:bg-white dark:bg-gray-900 after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white" />
-                                            </label>
-                                        </div>
+                                        {academicErrors.current_semester && (
+                                            <p className="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                                <Info size={12} />
+                                                {
+                                                    academicErrors.current_semester
+                                                }
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Summary Card */}
-                            <div className="rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-slate-100 overflow-hidden">
-                                <div className="px-6 py-5 border-b border-slate-100">
-                                    <h3 className="font-semibold text-slate-900 text-sm">
-                                        Configuration Summary
-                                    </h3>
-                                    <p className="text-xs text-slate-500 mt-0.5">
-                                        Current active settings
+                                {isEditingSemester && (
+                                    <div className="mt-4 flex gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveSemester}
+                                            disabled={academicProcessing}
+                                            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                                        >
+                                            <Save size={14} />
+                                            {academicProcessing
+                                                ? "Saving..."
+                                                : "Save Semester"}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleCancelSemesterEdit}
+                                            disabled={academicProcessing}
+                                            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Info banner */}
+                                <div className="mt-5 flex gap-3 rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">
+                                    <AlertCircle
+                                        size={16}
+                                        className="text-amber-500 shrink-0 mt-0.5"
+                                    />
+                                    <p className="text-xs text-amber-700 leading-relaxed">
+                                        <span className="font-semibold">
+                                            Heads up:
+                                        </span>{" "}
+                                        School year changes are handled via
+                                        Start New School Year in the Danger
+                                        Zone. This section only allows semester
+                                        switching.
                                     </p>
                                 </div>
-                                <div className="p-5 space-y-3">
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-slate-500 flex items-center gap-2">
-                                            <Calendar
-                                                size={13}
-                                                className="text-slate-400"
-                                            />
-                                            School Year
-                                        </span>
-                                        <span className="font-semibold text-slate-800">
-                                            {data.current_school_year || (
-                                                <span className="text-slate-300 font-normal">
-                                                    Not set
-                                                </span>
-                                            )}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-slate-500 flex items-center gap-2">
-                                            <BookOpen
-                                                size={13}
-                                                className="text-slate-400"
-                                            />
-                                            Semester
-                                        </span>
-                                        <span className="font-semibold text-slate-800">
-                                            {data.current_semester === "1"
-                                                ? "1st Semester"
-                                                : "2nd Semester"}
-                                        </span>
-                                    </div>
-                                    <div className="h-px bg-slate-100" />
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-slate-500 flex items-center gap-2">
-                                            <GraduationCap
-                                                size={13}
-                                                className="text-slate-400"
-                                            />
-                                            Enrollment
-                                        </span>
-                                        <span
-                                            className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                                                data.enrollment_open
-                                                    ? "bg-emerald-100 text-emerald-700"
-                                                    : "bg-slate-100 text-slate-500"
-                                            }`}
-                                        >
-                                            {data.enrollment_open
-                                                ? "OPEN"
-                                                : "CLOSED"}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-slate-500 flex items-center gap-2">
-                                            <CheckCircle
-                                                size={13}
-                                                className="text-slate-400"
-                                            />
-                                            Grades
-                                        </span>
-                                        <span
-                                            className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                                                data.grade_submission_open
-                                                    ? "bg-emerald-100 text-emerald-700"
-                                                    : "bg-slate-100 text-slate-500"
-                                            }`}
-                                        >
-                                            {data.grade_submission_open
-                                                ? "OPEN"
-                                                : "CLOSED"}
-                                        </span>
-                                    </div>
-                                    {data.school_name && (
-                                        <>
-                                            <div className="h-px bg-slate-100" />
-                                            <div className="flex items-start justify-between text-sm gap-3">
-                                                <span className="text-slate-500 flex items-center gap-2 shrink-0">
-                                                    <School
-                                                        size={13}
-                                                        className="text-slate-400"
-                                                    />
-                                                    School
-                                                </span>
-                                                <span className="font-semibold text-slate-800 text-right text-xs leading-snug">
-                                                    {data.school_name}
-                                                </span>
-                                            </div>
-                                        </>
-                                    )}
+                            </div>
+                        </div>
+
+                        {/* School Information Card */}
+                        <div className="rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-slate-100 overflow-hidden">
+                            <div className="flex items-center gap-4 px-6 py-5 border-b border-slate-100">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-md shadow-emerald-500/20">
+                                    <School className="h-5 w-5 text-white" />
+                                </div>
+                                <div>
+                                    <h2 className="font-semibold text-slate-900">
+                                        School Information
+                                    </h2>
+                                    <p className="text-xs text-slate-500">
+                                        Used in reports, documents, and printed
+                                        materials
+                                    </p>
                                 </div>
                             </div>
 
-                            {/* Save Button */}
-                            <button
-                                type="submit"
-                                disabled={processing}
-                                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-                            >
-                                {processing ? (
-                                    <>
-                                        <svg
-                                            className="animate-spin h-4 w-4 text-white"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <circle
-                                                className="opacity-25"
-                                                cx="12"
-                                                cy="12"
-                                                r="10"
-                                                stroke="currentColor"
-                                                strokeWidth="4"
-                                            />
-                                            <path
-                                                className="opacity-75"
-                                                fill="currentColor"
-                                                d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z"
-                                            />
-                                        </svg>
-                                        Saving Changes...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Save size={16} />
-                                        Save School Settings
-                                    </>
+                            <div className="p-6 space-y-5">
+                                <div>
+                                    <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                                        <School size={12} />
+                                        School Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={schoolInfoData.school_name}
+                                        onChange={(e) =>
+                                            setSchoolInfoData(
+                                                "school_name",
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="e.g., Sample Senior High School"
+                                        className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white dark:bg-gray-900 transition-colors"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                                        <MapPin size={12} />
+                                        School Address
+                                    </label>
+                                    <textarea
+                                        value={schoolInfoData.school_address}
+                                        onChange={(e) =>
+                                            setSchoolInfoData(
+                                                "school_address",
+                                                e.target.value,
+                                            )
+                                        }
+                                        rows={3}
+                                        placeholder="Full school address including barangay, city, and province..."
+                                        className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white dark:bg-gray-900 transition-colors resize-none"
+                                    />
+                                </div>
+
+                                {/* Preview */}
+                                {(schoolInfoData.school_name ||
+                                    schoolInfoData.school_address) && (
+                                    <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
+                                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                                            Preview
+                                        </p>
+                                        <p className="font-semibold text-slate-800 text-sm">
+                                            {schoolInfoData.school_name || "—"}
+                                        </p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            {schoolInfoData.school_address ||
+                                                "—"}
+                                        </p>
+                                    </div>
                                 )}
-                            </button>
+
+                                {(schoolInfoErrors.school_name ||
+                                    schoolInfoErrors.school_address) && (
+                                    <p className="text-xs text-rose-600 flex items-center gap-1">
+                                        <Info size={12} />
+                                        {schoolInfoErrors.school_name ||
+                                            schoolInfoErrors.school_address}
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </form>
+
+                    {/* ── RIGHT COLUMN (1/3 width) ──────────────────── */}
+                    <div className="space-y-6">
+                        {/* Summary Card */}
+                        <div className="rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-slate-100 overflow-hidden">
+                            <div className="px-6 py-5 border-b border-slate-100">
+                                <h3 className="font-semibold text-slate-900 text-sm">
+                                    Configuration Summary
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    Current active settings
+                                </p>
+                            </div>
+                            <div className="p-5 space-y-3">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-slate-500 flex items-center gap-2">
+                                        <Calendar
+                                            size={13}
+                                            className="text-slate-400"
+                                        />
+                                        School Year
+                                    </span>
+                                    <span className="font-semibold text-slate-800">
+                                        {currentSchoolYear || (
+                                            <span className="text-slate-300 font-normal">
+                                                Not set
+                                            </span>
+                                        )}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-slate-500 flex items-center gap-2">
+                                        <BookOpen
+                                            size={13}
+                                            className="text-slate-400"
+                                        />
+                                        Semester
+                                    </span>
+                                    <span className="font-semibold text-slate-800">
+                                        {academicData.current_semester === "1"
+                                            ? "1st Semester"
+                                            : "2nd Semester"}
+                                    </span>
+                                </div>
+                                {schoolInfoData.school_name && (
+                                    <>
+                                        <div className="h-px bg-slate-100" />
+                                        <div className="flex items-start justify-between text-sm gap-3">
+                                            <span className="text-slate-500 flex items-center gap-2 shrink-0">
+                                                <School
+                                                    size={13}
+                                                    className="text-slate-400"
+                                                />
+                                                School
+                                            </span>
+                                            <span className="font-semibold text-slate-800 text-right text-xs leading-snug">
+                                                {schoolInfoData.school_name}
+                                            </span>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Save Button */}
+                        <button
+                            type="button"
+                            onClick={handleSaveSchoolInfo}
+                            disabled={schoolInfoProcessing}
+                            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                        >
+                            {schoolInfoProcessing ? (
+                                <>
+                                    <svg
+                                        className="animate-spin h-4 w-4 text-white"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <circle
+                                            className="opacity-25"
+                                            cx="12"
+                                            cy="12"
+                                            r="10"
+                                            stroke="currentColor"
+                                            strokeWidth="4"
+                                        />
+                                        <path
+                                            className="opacity-75"
+                                            fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z"
+                                        />
+                                    </svg>
+                                    Saving School Info...
+                                </>
+                            ) : (
+                                <>
+                                    <Save size={16} />
+                                    Save School Information
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </div>
 
                 {/* ── Danger Zone ───────────────────────────────────── */}
                 <div className="rounded-2xl border-2 border-rose-200 bg-rose-50/50 overflow-hidden">
@@ -1056,7 +900,7 @@ export default function Index({ settings, schoolYears }) {
                                 <p className="text-xs text-slate-500 mt-0.5 max-w-md">
                                     Ends{" "}
                                     <span className="font-semibold">
-                                        {data.current_school_year}
+                                        {currentSchoolYear}
                                     </span>{" "}
                                     and archives current school year data —
                                     enrollments, grades, attendance,
@@ -1078,7 +922,7 @@ export default function Index({ settings, schoolYears }) {
 
                 {showNewSYModal && (
                     <NewSchoolYearModal
-                        currentSY={data.current_school_year}
+                        currentSY={currentSchoolYear}
                         onClose={() => setShowNewSYModal(false)}
                     />
                 )}

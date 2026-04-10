@@ -3,15 +3,18 @@
 namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\TemporaryCredentials;
+use App\Models\PasswordResetRequest;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 class UserManagementController extends Controller
 {
@@ -258,5 +261,169 @@ class UserManagementController extends Controller
 
         return redirect()->route('superadmin.users.index')
             ->with('success', 'User updated successfully.');
+    }
+
+    /**
+     * Display teacher and student password reset requests.
+     */
+    public function passwordResetRequests(Request $request)
+    {
+        $status = $request->input('status', PasswordResetRequest::STATUS_PENDING);
+        $allowedStatuses = [
+            PasswordResetRequest::STATUS_PENDING,
+            PasswordResetRequest::STATUS_APPROVED,
+            PasswordResetRequest::STATUS_REJECTED,
+            'all',
+        ];
+
+        if (!in_array($status, $allowedStatuses, true)) {
+            $status = PasswordResetRequest::STATUS_PENDING;
+        }
+
+        $requestsQuery = $this->teacherAndStudentPasswordResetRequestsQuery()->with([
+            'user.roles:id,name',
+            'user.department:id,department_name',
+            'processedBy',
+        ]);
+
+        if ($status !== 'all') {
+            $requestsQuery->where('status', $status);
+        }
+
+        $requests = $requestsQuery
+            ->latest()
+            ->paginate(15)
+            ->withQueryString();
+
+        $requests->getCollection()->transform(function (PasswordResetRequest $passwordResetRequest) {
+            if ($passwordResetRequest->relationLoaded('user') && $passwordResetRequest->user) {
+                $passwordResetRequest->user->setAttribute(
+                    'role',
+                    $passwordResetRequest->user->roles->pluck('name')->first()
+                );
+            }
+
+            return $passwordResetRequest;
+        });
+
+        $counts = [
+            'pending' => (clone $this->teacherAndStudentPasswordResetRequestsQuery())
+                ->where('status', PasswordResetRequest::STATUS_PENDING)
+                ->count(),
+            'approved' => (clone $this->teacherAndStudentPasswordResetRequestsQuery())
+                ->where('status', PasswordResetRequest::STATUS_APPROVED)
+                ->count(),
+            'rejected' => (clone $this->teacherAndStudentPasswordResetRequestsQuery())
+                ->where('status', PasswordResetRequest::STATUS_REJECTED)
+                ->count(),
+            'all' => (clone $this->teacherAndStudentPasswordResetRequestsQuery())->count(),
+        ];
+
+        return Inertia::render('SuperAdmin/PasswordResetRequests', [
+            'requests' => $requests,
+            'counts' => $counts,
+            'currentStatus' => $status,
+        ]);
+    }
+
+    /**
+     * Approve a teacher/student password reset request.
+     */
+    public function approvePasswordResetRequest(Request $request, PasswordResetRequest $passwordResetRequest)
+    {
+        if (!$this->canManagePasswordResetRequest($passwordResetRequest)) {
+            abort(403, 'This password reset request is outside your allowed scope.');
+        }
+
+        if (!$passwordResetRequest->isPending()) {
+            return back()->withErrors([
+                'request' => 'This password reset request has already been processed.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'admin_notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        if (blank($passwordResetRequest->user->email)) {
+            return back()->withErrors([
+                'email' => 'Cannot approve this reset request because the user has no email on file.',
+            ]);
+        }
+
+        // Generate a random 8-character password.
+        $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+        $tempPassword = '';
+        for ($i = 0; $i < 8; $i++) {
+            $tempPassword .= $chars[random_int(0, strlen($chars) - 1)];
+        }
+
+        $passwordResetRequest->user->update([
+            'password' => Hash::make($tempPassword),
+            'must_change_password' => true,
+            'password_changed_at' => null,
+        ]);
+
+        $passwordResetRequest->update([
+            'status' => PasswordResetRequest::STATUS_APPROVED,
+            'admin_notes' => $validated['admin_notes'] ?? null,
+            'processed_by' => Auth::id(),
+            'processed_at' => now(),
+        ]);
+
+        Mail::to($passwordResetRequest->user->email)->send(new TemporaryCredentials(
+            user: $passwordResetRequest->user,
+            plainPassword: $tempPassword,
+            issuedBy: Auth::user(),
+            context: 'password reset',
+        ));
+
+        return back()->with('success', 'Password reset approved. Temporary credentials were sent via email.');
+    }
+
+    /**
+     * Reject a teacher/student password reset request.
+     */
+    public function rejectPasswordResetRequest(Request $request, PasswordResetRequest $passwordResetRequest)
+    {
+        if (!$this->canManagePasswordResetRequest($passwordResetRequest)) {
+            abort(403, 'This password reset request is outside your allowed scope.');
+        }
+
+        if (!$passwordResetRequest->isPending()) {
+            return back()->withErrors([
+                'request' => 'This password reset request has already been processed.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'admin_notes' => ['required', 'string', 'max:500'],
+        ]);
+
+        $passwordResetRequest->update([
+            'status' => PasswordResetRequest::STATUS_REJECTED,
+            'admin_notes' => $validated['admin_notes'],
+            'processed_by' => Auth::id(),
+            'processed_at' => now(),
+        ]);
+
+        return back()->with('success', 'Password reset request rejected.');
+    }
+
+    private function teacherAndStudentPasswordResetRequestsQuery()
+    {
+        return PasswordResetRequest::query()
+            ->whereHas('user.roles', function ($roleQuery) {
+                $roleQuery->whereIn('name', ['teacher', 'student']);
+            });
+    }
+
+    private function canManagePasswordResetRequest(PasswordResetRequest $passwordResetRequest): bool
+    {
+        return $passwordResetRequest->user()
+            ->whereHas('roles', function ($roleQuery) {
+                $roleQuery->whereIn('name', ['teacher', 'student']);
+            })
+            ->exists();
     }
 }

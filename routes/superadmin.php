@@ -55,7 +55,7 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
         Route::resource('subjects', SubjectController::class)
             ->only(['index', 'store', 'update', 'destroy']);
 
-        // Academic Management (Sections + Classes)
+        // Section & Class Management
         Route::get('/academic-management', [AcademicManagementController::class, 'index'])
             ->name('academic-management.index');
         Route::post('/academic-management/sections', [AcademicManagementController::class, 'storeSection'])
@@ -74,6 +74,15 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
         // User Management
         Route::resource('users', UserManagementController::class)
             ->only(['index', 'store', 'update', 'destroy']);
+
+        // Password Reset Requests Management (Teacher + Student)
+        Route::get('/password-reset-requests', [UserManagementController::class, 'passwordResetRequests'])
+            ->name('password-reset-requests');
+        Route::post('/password-reset-requests/{passwordResetRequest}/approve', [UserManagementController::class, 'approvePasswordResetRequest'])
+            ->name('password-reset-requests.approve');
+        Route::post('/password-reset-requests/{passwordResetRequest}/reject', [UserManagementController::class, 'rejectPasswordResetRequest'])
+            ->name('password-reset-requests.reject');
+
         // Admin Management
         Route::resource('admins', SuperAdminAdminController::class);
         Route::post('/admins/{admin}/reset-password', [SuperAdminAdminController::class, 'resetPassword'])

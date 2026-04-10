@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SuperAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\Department;
 use App\Models\Enrollment;
+use App\Models\PasswordResetRequest;
 use App\Models\Subject;
 use App\Models\SubjectTeacher;
 use App\Models\SystemSetting;
@@ -35,6 +36,12 @@ class DashboardController extends Controller
             'total_students' => User::whereHas('roles', function ($q) {
                 $q->where('name', 'student');
             })->count(),
+            'pending_password_reset_requests' => PasswordResetRequest::query()
+                ->where('status', PasswordResetRequest::STATUS_PENDING)
+                ->whereHas('user.roles', function ($q) {
+                    $q->whereIn('name', ['teacher', 'student']);
+                })
+                ->count(),
             'total_subjects' => Subject::count(),
             'active_subjects' => Subject::count(), // All subjects are considered active
         ];
