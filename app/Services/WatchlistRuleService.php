@@ -42,11 +42,11 @@ class WatchlistRuleService
      * This keeps teacher dashboard/watchlist logic in one place and is
      * intentionally config-driven so per-class customization can be added later.
      */
-    public function evaluateEnrollment(Enrollment $enrollment): array
+    public function evaluateEnrollment(Enrollment $enrollment, ?array $ruleOverrides = null): array
     {
         $enrollment->loadMissing(['grades', 'attendanceRecords']);
 
-        $rules = config('watchlist', []);
+        $rules = array_replace_recursive(config('watchlist', []), $ruleOverrides ?? []);
         $passingGrade = (float) data_get($rules, 'passing_grade', 75.0);
 
         $highRiskAbsenceThreshold = (int) data_get($rules, 'high_risk.absence_threshold', 5);
@@ -57,14 +57,15 @@ class WatchlistRuleService
             3,
         );
 
-        $declineMidtermBaseline = (float) data_get($rules, 'recent_decline.midterm_baseline_grade', 85.0);
-        $declineMinDropPoints = (float) data_get($rules, 'recent_decline.minimum_drop_points', 10.0);
-        $declineMassiveDropPercent = (float) data_get($rules, 'recent_decline.massive_drop_percent', 20.0);
-        $declineNonFailingFloor = (float) data_get($rules, 'recent_decline.non_failing_floor', 75.0);
-        $declineFinalQuarterFailingThreshold = (int) data_get(
+        $declineMinimumDropPercent = (float) data_get(
             $rules,
-            'recent_decline.final_quarter_failing_activities_threshold',
-            3,
+            'recent_decline.minimum_drop_percent',
+            data_get($rules, 'recent_decline.massive_drop_percent', 20.0),
+        );
+        $declineRequiresFailingFinalQuarter = (bool) data_get(
+            $rules,
+            'recent_decline.require_final_quarter_failing',
+            true,
         );
 
         $grades = $enrollment->grades;
@@ -98,8 +99,10 @@ class WatchlistRuleService
         $trendDirection = (int) data_get($prediction, 'trend_direction', 0);
         $trendLabel = (string) data_get($prediction, 'trend', 'Stable');
 
-        $dropPoints = $midtermGrade !== null && $predictedGrade !== null
-            ? round($midtermGrade - $predictedGrade, 2)
+        $declineReferenceGrade = $finalQuarterGrade ?? $predictedGrade;
+
+        $dropPoints = $midtermGrade !== null && $declineReferenceGrade !== null
+            ? round($midtermGrade - $declineReferenceGrade, 2)
             : null;
         $dropPercent = $dropPoints !== null && $midtermGrade > 0
             ? round(($dropPoints / $midtermGrade) * 100, 2)
@@ -116,25 +119,25 @@ class WatchlistRuleService
                 || $failingActivitiesTotal > $needsAttentionFailingActivitiesThreshold
             );
 
-        $hasHighMidtermBaseline = $midtermGrade !== null
-            && $midtermGrade >= $declineMidtermBaseline;
         $hasDownTrend = ($dropPoints !== null && $dropPoints > 0)
             || $trendDirection < 0;
-        $meetsDropThreshold = ($dropPoints !== null && $dropPoints >= $declineMinDropPoints)
-            || ($dropPercent !== null && $dropPercent >= $declineMassiveDropPercent);
-        $hitsDeclineFloor = $predictedGrade !== null
-            && $predictedGrade <= $declineNonFailingFloor
-            && $predictedGrade >= $passingGrade;
-        $hasFinalQuarterSignal = $finalQuarterFailingActivities >= $declineFinalQuarterFailingThreshold;
-        $isNonFailing = $predictedGrade === null || $predictedGrade >= $passingGrade;
+        $hasQuarterDrop = $midtermGrade !== null
+            && $finalQuarterGrade !== null
+            && $finalQuarterGrade < $midtermGrade;
+        $meetsDropPercent = $dropPercent !== null
+            && $dropPercent >= $declineMinimumDropPercent;
+        $finalQuarterIsFailing = $finalQuarterGrade !== null
+            && $finalQuarterGrade < $passingGrade;
+        $meetsFinalQuarterRequirement = ! $declineRequiresFailingFinalQuarter
+            || $finalQuarterIsFailing;
 
-        // Low risk: clear decline signal without crossing into failing/high-risk state.
+        // Low risk: decline trend from midterm to final quarter using percentage threshold.
         $recentDecline = ! $atRisk
             && ! $needsAttention
-            && $isNonFailing
-            && $hasHighMidtermBaseline
             && $hasDownTrend
-            && ($meetsDropThreshold || $hitsDeclineFloor || $hasFinalQuarterSignal);
+            && $hasQuarterDrop
+            && $meetsDropPercent
+            && $meetsFinalQuarterRequirement;
 
         $riskKey = match (true) {
             $atRisk => 'at_risk',
@@ -160,10 +163,10 @@ class WatchlistRuleService
                 $absences,
                 $failingActivitiesTotal,
                 $midtermGrade,
-                $predictedGrade,
+                $finalQuarterGrade,
                 $dropPoints,
                 $dropPercent,
-                $finalQuarterFailingActivities,
+                $passingGrade,
             ),
             'metrics' => [
                 'has_grades' => $hasGrades,
@@ -281,15 +284,15 @@ class WatchlistRuleService
         int $absences,
         int $failingActivitiesTotal,
         ?float $midtermGrade,
-        ?float $predictedGrade,
+        ?float $finalQuarterGrade,
         ?float $dropPoints,
         ?float $dropPercent,
-        int $finalQuarterFailingActivities,
+        float $passingGrade,
     ): array {
         return match ($riskKey) {
             'at_risk' => array_values(array_filter([
                 $overallGrade !== null
-                    ? sprintf('Current grade %.2f%% is below 75%%.', $overallGrade)
+                    ? sprintf('Current grade %.2f%% is below %.2f%%.', $overallGrade, $passingGrade)
                     : null,
                 $absences > 0
                     ? sprintf('%d absence(s) reached the high-risk threshold.', $absences)
@@ -300,14 +303,14 @@ class WatchlistRuleService
                 sprintf('%d failing activity score(s) detected.', $failingActivitiesTotal),
             ],
             'recent_decline' => array_values(array_filter([
-                $midtermGrade !== null && $predictedGrade !== null
-                    ? sprintf('Midterm %.2f%% to predicted %.2f%%.', $midtermGrade, $predictedGrade)
+                $midtermGrade !== null && $finalQuarterGrade !== null
+                    ? sprintf('Midterm %.2f%% to final quarter %.2f%%.', $midtermGrade, $finalQuarterGrade)
                     : null,
                 $dropPoints !== null
-                    ? sprintf('Estimated drop %.2f point(s) (%.2f%%).', $dropPoints, (float) ($dropPercent ?? 0.0))
+                    ? sprintf('Decline of %.2f point(s) (%.2f%%).', $dropPoints, (float) ($dropPercent ?? 0.0))
                     : null,
-                $finalQuarterFailingActivities > 0
-                    ? sprintf('%d failing activity score(s) in final quarter.', $finalQuarterFailingActivities)
+                $finalQuarterGrade !== null && $finalQuarterGrade < $passingGrade
+                    ? sprintf('Final quarter %.2f%% is below the passing score %.2f%%.', $finalQuarterGrade, $passingGrade)
                     : null,
             ])),
             default => ['Performance is currently within watchlist thresholds.'],

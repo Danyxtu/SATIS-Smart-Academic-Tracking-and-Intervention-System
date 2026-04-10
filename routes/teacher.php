@@ -3,6 +3,7 @@
 // Teacher Controllers
 use App\Http\Controllers\Teacher\AttendanceController;
 use App\Http\Controllers\Teacher\ClassController;
+use App\Http\Controllers\Teacher\ClassSettingsController;
 use App\Http\Controllers\Teacher\GradeController;
 use App\Http\Controllers\Teacher\GradeCalculationController;
 use App\Http\Controllers\Teacher\DashboardController;
@@ -129,4 +130,12 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
             ->name('interventions.tasks.toggle');
         Route::delete('/interventions/{intervention}/tasks/{task}', [InterventionController::class, 'destroyTask'])
             ->name('interventions.tasks.destroy');
+
+        /**
+         * Class Settings Routes
+         */
+        Route::get('/class-settings', [ClassSettingsController::class, 'index'])
+            ->name('class-settings.index');
+        Route::put('/class-settings', [ClassSettingsController::class, 'update'])
+            ->name('class-settings.update');
     });

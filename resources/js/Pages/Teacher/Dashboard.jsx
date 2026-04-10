@@ -76,6 +76,8 @@ const Dashboard = ({
     department,
     allSubjects,
     attentionStudents = [],
+    watchlistRuleConfig = {},
+    watchlistObservedCategories = {},
 }) => {
     const [showTutorial, setShowTutorial] = useState(false);
     const [studentFilter, setStudentFilter] = useState("all");
@@ -89,13 +91,46 @@ const Dashboard = ({
         day: "numeric",
     });
 
+    const observeAtRisk =
+        watchlistObservedCategories?.at_risk !== undefined
+            ? Boolean(watchlistObservedCategories.at_risk)
+            : true;
+    const observeNeedsAttention =
+        watchlistObservedCategories?.needs_attention !== undefined
+            ? Boolean(watchlistObservedCategories.needs_attention)
+            : true;
+    const observeRecentDecline =
+        watchlistObservedCategories?.recent_decline !== undefined
+            ? Boolean(watchlistObservedCategories.recent_decline)
+            : true;
+
+    const passingGrade = Number(watchlistRuleConfig?.passing_grade ?? 75);
+    const atRiskAbsenceThreshold = Number(
+        watchlistRuleConfig?.high_risk?.absence_threshold ?? 5,
+    );
+    const needsAttentionAbsenceThreshold = Number(
+        watchlistRuleConfig?.needs_attention?.absence_threshold ?? 3,
+    );
+    const needsAttentionFailingActivitiesThreshold = Number(
+        watchlistRuleConfig?.needs_attention?.failing_activities_threshold ?? 3,
+    );
+    const recentDeclineMinimumDropPercent = Number(
+        watchlistRuleConfig?.recent_decline?.minimum_drop_percent ?? 20,
+    );
+    const recentDeclineRequiresFailingFinalQuarter = Boolean(
+        watchlistRuleConfig?.recent_decline?.require_final_quarter_failing ??
+        true,
+    );
+
     const statCards = [
         {
             title: "At Risk",
             value: stats?.studentsAtRisk || 0,
             icon: AlertTriangle,
             iconBgColor: "bg-red-500",
-            label: "students that are below 75",
+            label: observeAtRisk
+                ? `grade < ${passingGrade}% or absences >= ${atRiskAbsenceThreshold}`
+                : "hidden in Class Settings",
             gradient: "from-red-500 to-red-600",
         },
         {
@@ -103,7 +138,9 @@ const Dashboard = ({
             value: stats?.needsAttention || 0,
             icon: ClipboardList,
             iconBgColor: "bg-amber-500",
-            label: "students absent more than 5",
+            label: observeNeedsAttention
+                ? `absences > ${needsAttentionAbsenceThreshold} or failing activities > ${needsAttentionFailingActivitiesThreshold}`
+                : "hidden in Class Settings",
             gradient: "from-amber-500 to-amber-600",
         },
         {
@@ -111,7 +148,11 @@ const Dashboard = ({
             value: stats?.recentDeclines || 0,
             icon: TrendingDown,
             iconBgColor: "bg-blue-500",
-            label: ">75 down to 75 or below",
+            label: observeRecentDecline
+                ? recentDeclineRequiresFailingFinalQuarter
+                    ? `decline >= ${recentDeclineMinimumDropPercent}% and final quarter failing`
+                    : `decline >= ${recentDeclineMinimumDropPercent}% from midterm`
+                : "hidden in Class Settings",
             gradient: "from-blue-500 to-blue-600",
         },
     ];

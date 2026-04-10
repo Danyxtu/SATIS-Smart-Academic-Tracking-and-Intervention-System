@@ -15,13 +15,10 @@ return [
         'failing_activities_threshold' => 3,
     ],
 
-    // Low risk (Recent Decline): high midterm baseline, downward trend,
-    // and decline signals that are currently static defaults.
+    // Low risk (Recent Decline): decline from midterm to final quarter using
+    // percentage drop, with optional requirement that final quarter is failing.
     'recent_decline' => [
-        'midterm_baseline_grade' => 85.0,
-        'minimum_drop_points' => 10.0,
-        'massive_drop_percent' => 20.0,
-        'non_failing_floor' => 75.0,
-        'final_quarter_failing_activities_threshold' => 3,
+        'minimum_drop_percent' => 20.0,
+        'require_final_quarter_failing' => true,
     ],
 ];

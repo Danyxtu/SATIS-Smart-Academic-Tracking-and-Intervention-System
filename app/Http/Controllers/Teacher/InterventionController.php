@@ -8,6 +8,7 @@ use App\Models\Enrollment;
 use App\Models\Intervention;
 use App\Models\InterventionTask;
 use App\Models\StudentNotification;
+use App\Services\Teacher\WatchlistSettingsService;
 use App\Services\WatchlistRuleService;
 use App\Support\StudentNameFormatter;
 use Illuminate\Http\Request;
@@ -22,10 +23,14 @@ use Inertia\Response;
 class InterventionController extends Controller
 {
     protected WatchlistRuleService $watchlistRuleService;
+    protected WatchlistSettingsService $watchlistSettingsService;
 
-    public function __construct(WatchlistRuleService $watchlistRuleService)
-    {
+    public function __construct(
+        WatchlistRuleService $watchlistRuleService,
+        WatchlistSettingsService $watchlistSettingsService,
+    ) {
         $this->watchlistRuleService = $watchlistRuleService;
+        $this->watchlistSettingsService = $watchlistSettingsService;
     }
 
     /**
@@ -34,6 +39,8 @@ class InterventionController extends Controller
     public function index(Request $request): Response
     {
         $teacher = $request->user();
+        $watchlistRules = $this->watchlistSettingsService->getEvaluationRulesForTeacher($teacher);
+        $observedCategories = $this->watchlistSettingsService->getObservedCategoriesForTeacher($teacher);
 
         // Get enrollments with students who might need intervention
         // Include their grades, attendance, and any existing interventions
@@ -57,7 +64,7 @@ class InterventionController extends Controller
             ->get();
 
         // Build the student watchlist based on risk factors
-        $watchlist = $enrollments->map(function ($enrollment) {
+        $watchlist = $enrollments->map(function ($enrollment) use ($watchlistRules) {
             $user = $enrollment->user;
             $student = $user?->student;
             $displayName = StudentNameFormatter::format($user, $student);
@@ -67,7 +74,7 @@ class InterventionController extends Controller
             $subjectName = $subject?->subject_name ?? 'N/A';
             $classSection = $classAssignment?->section;
 
-            $risk = $this->watchlistRuleService->evaluateEnrollment($enrollment);
+            $risk = $this->watchlistRuleService->evaluateEnrollment($enrollment, $watchlistRules);
             $metrics = $risk['metrics'] ?? [];
 
             // Calculate current grade percentage
@@ -132,12 +139,20 @@ class InterventionController extends Controller
             ];
         })
             // Only include students who are NOT on_track or have active intervention
-            ->filter(fn($s) => $s['riskCategory'] !== 'on_track' || $s['hasActiveIntervention'])
+            ->filter(function ($student) use ($observedCategories) {
+                if (!empty($student['hasActiveIntervention'])) {
+                    return true;
+                }
+
+                $riskCategory = (string) ($student['riskCategory'] ?? 'on_track');
+
+                return $this->isRiskCategoryObserved($riskCategory, $observedCategories);
+            })
             ->sortBy('sort_key', SORT_NATURAL | SORT_FLAG_CASE)
             ->values();
 
         // Build detailed student data for the profile view
-        $studentDetails = $enrollments->mapWithKeys(function ($enrollment) {
+        $studentDetails = $enrollments->mapWithKeys(function ($enrollment) use ($watchlistRules) {
             $user = $enrollment->user;
             $student = $user?->student;
             $displayName = StudentNameFormatter::format($user, $student);
@@ -175,7 +190,7 @@ class InterventionController extends Controller
             }
 
             // Use shared global watchlist rules for profile priority as well.
-            $risk = $this->watchlistRuleService->evaluateEnrollment($enrollment);
+            $risk = $this->watchlistRuleService->evaluateEnrollment($enrollment, $watchlistRules);
             $priority = $risk['priority'] ?? 'Low';
 
             // Build pending completion request data
@@ -213,7 +228,18 @@ class InterventionController extends Controller
         return Inertia::render('Teacher/Interventions', [
             'watchlist' => $watchlist->toArray(),
             'studentDetails' => $studentDetails,
+            'watchlistObservedCategories' => $observedCategories,
         ]);
+    }
+
+    private function isRiskCategoryObserved(string $riskCategory, array $observedCategories): bool
+    {
+        return match ($riskCategory) {
+            'at_risk' => (bool) data_get($observedCategories, 'at_risk', true),
+            'needs_attention' => (bool) data_get($observedCategories, 'needs_attention', true),
+            'recent_decline' => (bool) data_get($observedCategories, 'recent_decline', true),
+            default => false,
+        };
     }
 
     /**

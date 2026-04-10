@@ -9,6 +9,7 @@ use App\Http\Controllers\SuperAdmin\NewSchoolYearController;
 use App\Http\Controllers\SuperAdmin\SettingsController;
 use App\Http\Controllers\SuperAdmin\SubjectController;
 use App\Http\Controllers\SuperAdmin\AcademicManagementController;
+use App\Http\Controllers\SuperAdmin\AuditLogController;
 use App\Http\Controllers\SuperAdmin\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
@@ -30,6 +31,10 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
         // Super Admin Dashboard
         Route::get('/dashboard', [SuperAdminDashboardController::class, 'index'])
             ->name('dashboard');
+
+        // Audit Logs
+        Route::get('/audit-logs', [AuditLogController::class, 'index'])
+            ->name('audit-logs.index');
 
         // Department Management
         Route::get('/departments', [DepartmentController::class, 'index'])

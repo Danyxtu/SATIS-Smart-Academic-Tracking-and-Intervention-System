@@ -60,6 +60,8 @@ class DashboardController extends Controller
 
         $allSubjects = $dashboardData['allSubjects'];
         $attentionStudents = $dashboardData['attentionStudents'];
+        $watchlistRuleConfig = $dashboardData['watchlistRuleConfig'] ?? [];
+        $watchlistObservedCategories = $dashboardData['watchlistObservedCategories'] ?? [];
 
         return Inertia::render('Teacher/Dashboard', compact(
             'stats',
@@ -69,7 +71,9 @@ class DashboardController extends Controller
             'academicPeriod',
             'department',
             'allSubjects',
-            'attentionStudents'
+            'attentionStudents',
+            'watchlistRuleConfig',
+            'watchlistObservedCategories',
         ));
     }
 

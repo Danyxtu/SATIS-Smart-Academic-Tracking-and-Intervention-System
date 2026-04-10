@@ -11,18 +11,54 @@ use App\Models\Enrollment;
 class DashboardServices
 {
     protected WatchlistRuleService $watchlistRuleService;
+    protected WatchlistSettingsService $watchlistSettingsService;
 
     /**
      * Create a new class instance.
      */
-    public function __construct(WatchlistRuleService $watchlistRuleService)
-    {
+    public function __construct(
+        WatchlistRuleService $watchlistRuleService,
+        WatchlistSettingsService $watchlistSettingsService,
+    ) {
         $this->watchlistRuleService = $watchlistRuleService;
+        $this->watchlistSettingsService = $watchlistSettingsService;
     }
 
     public function getDashboardData(): array
     {
         $teacher = Auth::user(); // For the name of the teacher
+        $watchlistRules = $this->watchlistSettingsService->getEvaluationRulesForTeacher($teacher);
+        $observedCategories = $this->watchlistSettingsService->getObservedCategoriesForTeacher($teacher);
+        $observeAtRisk = (bool) data_get($observedCategories, 'at_risk', true);
+        $observeNeedsAttention = (bool) data_get($observedCategories, 'needs_attention', true);
+        $observeRecentDecline = (bool) data_get($observedCategories, 'recent_decline', true);
+        $ruleConfig = [
+            'passing_grade' => (float) data_get($watchlistRules, 'passing_grade', 75.0),
+            'high_risk' => [
+                'absence_threshold' => (int) data_get($watchlistRules, 'high_risk.absence_threshold', 5),
+            ],
+            'needs_attention' => [
+                'absence_threshold' => (int) data_get($watchlistRules, 'needs_attention.absence_threshold', 3),
+                'failing_activities_threshold' => (int) data_get(
+                    $watchlistRules,
+                    'needs_attention.failing_activities_threshold',
+                    3,
+                ),
+            ],
+            'recent_decline' => [
+                'minimum_drop_percent' => (float) data_get(
+                    $watchlistRules,
+                    'recent_decline.minimum_drop_percent',
+                    20.0,
+                ),
+                'require_final_quarter_failing' => (bool) data_get(
+                    $watchlistRules,
+                    'recent_decline.require_final_quarter_failing',
+                    true,
+                ),
+            ],
+        ];
+
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
         $currentSemester = SystemSetting::getCurrentSemester();
 
@@ -42,9 +78,9 @@ class DashboardServices
 
         $allSubjects = $this->getAllTeacherSubjects();
 
-        $students = $enrollments->map(function ($enrollment) {
+        $students = $enrollments->map(function ($enrollment) use ($watchlistRules) {
             $studentProfile = $enrollment->student;
-            $risk = $this->watchlistRuleService->evaluateEnrollment($enrollment);
+            $risk = $this->watchlistRuleService->evaluateEnrollment($enrollment, $watchlistRules);
             $metrics = $risk['metrics'] ?? [];
 
             $currentGrade = data_get($metrics, 'current_grade');
@@ -79,7 +115,9 @@ class DashboardServices
                 'rule_reasons' => $risk['reasons'] ?? [],
                 'predicted_grade' => data_get($metrics, 'predicted_grade'),
                 'midterm_grade' => data_get($metrics, 'midterm_grade'),
+                'final_quarter_grade' => data_get($metrics, 'final_quarter_grade'),
                 'drop_points' => data_get($metrics, 'drop_points'),
+                'drop_percent' => data_get($metrics, 'drop_percent'),
                 'enrollment_id' => $enrollment->id,
                 'intervention' => $enrollment->intervention ? [
                     'id' => $enrollment->intervention->id,
@@ -94,20 +132,28 @@ class DashboardServices
         $studentsWithGrades = $students->filter(fn($s) => $s['has_grades'] === true);
 
         // 1. Students at Risk (only those with grades below 75)
-        $studentsAtRiskCount = $students->filter(fn($s) => $s['at_risk'] === true)->count();
+        $studentsAtRiskCount = $observeAtRisk
+            ? $students->filter(fn($s) => $s['at_risk'] === true)->count()
+            : 0;
 
         // 2. Needs Attention (shared policy: absences > 3 or failing activities > 3)
-        $needsAttentionCount = $students->filter(fn($s) => $s['needs_attention'] === true)->count();
+        $needsAttentionCount = $observeNeedsAttention
+            ? $students->filter(fn($s) => $s['needs_attention'] === true)->count()
+            : 0;
 
         // 3. Recent Declines (shared policy via WatchlistRuleService)
-        $recentDeclinesCount = $students->filter(fn($s) => $s['recent_decline'] === true)->count();
+        $recentDeclinesCount = $observeRecentDecline
+            ? $students->filter(fn($s) => $s['recent_decline'] === true)->count()
+            : 0;
 
         // Flat list used by the Students Needing Attention table in the dashboard.
         $attentionStudents = $students
-            ->filter(function ($student) {
-                return $student['at_risk'] || $student['needs_attention'] || $student['recent_decline'];
+            ->filter(function ($student) use ($observeAtRisk, $observeNeedsAttention, $observeRecentDecline) {
+                return ($observeAtRisk && $student['at_risk'])
+                    || ($observeNeedsAttention && $student['needs_attention'])
+                    || ($observeRecentDecline && $student['recent_decline']);
             })
-            ->map(function ($student) {
+            ->map(function ($student) use ($ruleConfig) {
                 return [
                     'id' => $student['id'],
                     'enrollment_id' => $student['enrollment_id'],
@@ -117,7 +163,7 @@ class DashboardServices
                     'grade' => $student['grade'],
                     'absences' => $student['absences'],
                     'status' => strtolower((string) ($student['priority'] ?? 'low')),
-                    'reason' => $this->buildDashboardAttentionReason($student),
+                    'reason' => $this->buildDashboardAttentionReason($student, $ruleConfig),
                     'at_risk' => $student['at_risk'],
                     'needs_attention' => $student['needs_attention'],
                     'recent_decline' => $student['recent_decline'],
@@ -127,9 +173,15 @@ class DashboardServices
             ->values();
 
         // 4. Priority groups aligned with the shared global rule set.
-        $criticalStudents = $students->filter(fn($s) => $s['at_risk'] === true)->values();
-        $warningStudents = $students->filter(fn($s) => $s['needs_attention'] === true)->values();
-        $watchListStudents = $students->filter(fn($s) => $s['recent_decline'] === true)->values();
+        $criticalStudents = $observeAtRisk
+            ? $students->filter(fn($s) => $s['at_risk'] === true)->values()
+            : collect();
+        $warningStudents = $observeNeedsAttention
+            ? $students->filter(fn($s) => $s['needs_attention'] === true)->values()
+            : collect();
+        $watchListStudents = $observeRecentDecline
+            ? $students->filter(fn($s) => $s['recent_decline'] === true)->values()
+            : collect();
 
         // 5. Grade Distribution (only students with grades)
         $gradeDistribution = [
@@ -170,27 +222,55 @@ class DashboardServices
             'department' => $department,
             'allSubjects' => $allSubjects,
             'attentionStudents' => $attentionStudents,
+            'watchlistRuleConfig' => $ruleConfig,
+            'watchlistObservedCategories' => [
+                'at_risk' => $observeAtRisk,
+                'needs_attention' => $observeNeedsAttention,
+                'recent_decline' => $observeRecentDecline,
+            ],
         ];
     }
 
-    private function buildDashboardAttentionReason(array $student): string
+    private function buildDashboardAttentionReason(array $student, array $ruleConfig): string
     {
+        $ruleReasons = array_values(array_filter((array) ($student['rule_reasons'] ?? []), function ($reason) {
+            return is_string($reason) && trim($reason) !== '';
+        }));
+
+        if (!empty($ruleReasons)) {
+            return implode(' ', $ruleReasons);
+        }
+
         $status = strtolower((string) ($student['priority'] ?? 'low'));
         $grade = $student['grade'];
         $absences = (int) ($student['absences'] ?? 0);
         $missingActivities = (int) ($student['missing_activities'] ?? 0);
         $failingActivities = (int) ($student['failing_activities'] ?? 0);
-        $dropPoints = $student['drop_points'] ?? null;
+        $dropPercent = $student['drop_percent'] ?? null;
+
+        $passingGrade = (float) data_get($ruleConfig, 'passing_grade', 75.0);
+        $highRiskAbsenceThreshold = (int) data_get($ruleConfig, 'high_risk.absence_threshold', 5);
+        $needsAttentionAbsenceThreshold = (int) data_get($ruleConfig, 'needs_attention.absence_threshold', 3);
+        $needsAttentionFailingActivitiesThreshold = (int) data_get(
+            $ruleConfig,
+            'needs_attention.failing_activities_threshold',
+            3,
+        );
+        $recentDeclineMinDropPercent = (float) data_get(
+            $ruleConfig,
+            'recent_decline.minimum_drop_percent',
+            20.0,
+        );
 
         if ($status === 'high') {
             $parts = [];
 
-            if ($grade !== null && (int) $grade < 75) {
-                $parts[] = sprintf('failing grade of %d', (int) $grade);
+            if ($grade !== null && (float) $grade < $passingGrade) {
+                $parts[] = sprintf('grade %.2f%% below %.2f%%', (float) $grade, $passingGrade);
             }
 
-            if ($absences >= 5) {
-                $parts[] = sprintf('absent of %d', $absences);
+            if ($absences >= $highRiskAbsenceThreshold) {
+                $parts[] = sprintf('absences %d reached threshold %d', $absences, $highRiskAbsenceThreshold);
             }
 
             return !empty($parts)
@@ -201,16 +281,20 @@ class DashboardServices
         if ($status === 'medium') {
             $parts = [];
 
-            if ($absences > 3) {
-                $parts[] = sprintf('absent of %d', $absences);
+            if ($absences > $needsAttentionAbsenceThreshold) {
+                $parts[] = sprintf('absences %d exceeded threshold %d', $absences, $needsAttentionAbsenceThreshold);
             }
 
             if ($missingActivities > 0) {
                 $parts[] = sprintf('missed %d activities', $missingActivities);
             }
 
-            if ($failingActivities > 3) {
-                $parts[] = sprintf('failed %d activities', $failingActivities);
+            if ($failingActivities > $needsAttentionFailingActivitiesThreshold) {
+                $parts[] = sprintf(
+                    'failed %d activities (threshold %d)',
+                    $failingActivities,
+                    $needsAttentionFailingActivitiesThreshold,
+                );
             }
 
             return !empty($parts)
@@ -218,8 +302,12 @@ class DashboardServices
                 : 'needs attention indicators detected';
         }
 
-        if (is_numeric($dropPoints) && (float) $dropPoints > 0) {
-            return sprintf('recent decline with %.0f-point drop', (float) $dropPoints);
+        if (is_numeric($dropPercent) && (float) $dropPercent > 0) {
+            return sprintf(
+                'recent decline %.2f%% (threshold %.2f%%)',
+                (float) $dropPercent,
+                $recentDeclineMinDropPercent,
+            );
         }
 
         return 'recent decline detected';

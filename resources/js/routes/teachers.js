@@ -1,4 +1,10 @@
-import { House, BookOpen, CalendarCheck, ClipboardList } from "lucide-react";
+import {
+    House,
+    BookOpen,
+    CalendarCheck,
+    ClipboardList,
+    SlidersHorizontal,
+} from "lucide-react";
 
 export const teachersRoutes = [
     {
@@ -20,5 +26,10 @@ export const teachersRoutes = [
         name: "Interventions",
         path: "teacher.interventions.index",
         icon: ClipboardList,
+    },
+    {
+        name: "Class Settings",
+        path: "teacher.class-settings.index",
+        icon: SlidersHorizontal,
     },
 ];

@@ -6,6 +6,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
+use App\Http\Middleware\AuditUserActivity;
 use App\Http\Middleware\EnsurePasswordChanged;
 use App\Http\Middleware\EnsureTeacherApproved;
 use App\Http\Middleware\EnsureAdmin;
@@ -29,7 +30,13 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
             EnsurePasswordChanged::class,
             EnsureTeacherApproved::class,
+            AuditUserActivity::class,
         ]);
+
+        $middleware->api(append: [
+            AuditUserActivity::class,
+        ]);
+
         $middleware->alias(
             [
                 'staff'      => EnsureStaff::class,

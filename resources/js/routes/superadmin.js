@@ -7,6 +7,7 @@ import {
     BookOpen,
     Layers,
     Key,
+    ClipboardList,
 } from "lucide-react";
 
 export const superAdminRoutes = [
@@ -42,14 +43,19 @@ export const superAdminRoutes = [
         icon: Key,
     },
     {
+        label: "School Settings",
+        path: "superadmin.settings.index",
+        icon: Settings,
+    },
+    {
+        label: "Audit Logs",
+        path: "superadmin.audit-logs.index",
+        icon: ClipboardList,
+    },
+    {
         label: "Archive",
         path: "superadmin.archive.index",
         activeCheck: "superadmin.archive.*",
         icon: Archive,
-    },
-    {
-        label: "School Settings",
-        path: "superadmin.settings.index",
-        icon: Settings,
     },
 ];
