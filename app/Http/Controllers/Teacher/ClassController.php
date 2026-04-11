@@ -20,6 +20,8 @@ use App\Support\Concerns\HasDefaultAssignments;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +55,7 @@ class ClassController extends Controller
     }
 
     private const COLOR_OPTIONS = ['indigo', 'blue', 'red', 'green', 'amber', 'purple', 'teal'];
+    private const DUPLICATE_CLASS_ERROR_MESSAGE = 'Duplicate class detected. A class with the same grade level, subject, and section already exists. Please edit the class details or cancel.';
     private const REQUIRED_ROW_FIELDS = ['student_name', 'lrn', 'grade_level'];
     private const COLUMN_ALIASES = [
         'student_name' => [
@@ -504,6 +507,13 @@ class ClassController extends Controller
         $sectionSuffix = strtoupper(trim($data['section']));
         $normalizedStrand = strtoupper(trim($data['strand']));
         $sectionCombined = $normalizedStrand . '-' . $sectionSuffix;
+        $normalizedSubjectName = preg_replace('/\s+/', ' ', trim((string) $data['subject_name'])) ?? '';
+
+        if ($normalizedSubjectName === '') {
+            throw ValidationException::withMessages([
+                'subject_name' => 'Subject is required.',
+            ]);
+        }
 
         $sectionId = $this->resolveSectionRecordId(
             (int) $teacher->id,
@@ -514,33 +524,64 @@ class ClassController extends Controller
             $data['track'] ?? null,
         );
 
-        $duplicateSectionCount = SchoolClass::query()
-            ->where('teacher_id', $teacher->id)
-            ->where('grade_level', $data['grade_level'])
-            ->where('section', $sectionCombined)
-            ->count();
-
         // First, find or create the subject
-        $subjectCode = Str::slug($data['subject_name'], '_') . '_' . Str::random(6);
-        $subject = Subject::firstOrCreate(
-            ['subject_name' => $data['subject_name']],
-            ['subject_code' => $subjectCode]
+        $subject = Subject::query()
+            ->whereRaw('LOWER(TRIM(subject_name)) = ?', [mb_strtolower($normalizedSubjectName)])
+            ->first();
+
+        if (! $subject) {
+            $subjectCode = Str::slug($normalizedSubjectName, '_') . '_' . Str::random(6);
+            $subject = Subject::create([
+                'subject_name' => $normalizedSubjectName,
+                'subject_code' => $subjectCode,
+            ]);
+        }
+
+        $classLock = Cache::lock(
+            $this->buildTeacherClassAssignmentLockKey(
+                (int) $teacher->id,
+                (int) $subject->id,
+                (string) $data['grade_level'],
+                $sectionCombined,
+                $currentSchoolYear,
+                (string) $currentSemester,
+            ),
+            10,
         );
 
-        // Create the SubjectTeacher (teacher's class assignment)
-        $subjectTeacher = SchoolClass::create([
-            'subject_id' => $subject->id,
-            'section_id' => $sectionId,
-            'teacher_id' => $teacher->id,
-            'grade_level' => $data['grade_level'],
-            'section' => $sectionCombined,
-            'strand' => $normalizedStrand,
-            'track' => $data['track'] ?? null,
-            'color' => $data['color'],
-            'school_year' => $currentSchoolYear,
-            'semester' => (string) $currentSemester,
-            'grade_categories' => $this->defaultGradeCategories(),
-        ]);
+        try {
+            $classLock->block(3);
+
+            $this->ensureTeacherClassAssignmentIsUnique(
+                (int) $teacher->id,
+                (int) $subject->id,
+                (string) $data['grade_level'],
+                $sectionCombined,
+                $currentSchoolYear,
+                (string) $currentSemester,
+            );
+
+            // Create the SubjectTeacher (teacher's class assignment)
+            $subjectTeacher = SchoolClass::create([
+                'subject_id' => $subject->id,
+                'section_id' => $sectionId,
+                'teacher_id' => $teacher->id,
+                'grade_level' => $data['grade_level'],
+                'section' => $sectionCombined,
+                'strand' => $normalizedStrand,
+                'track' => $data['track'] ?? null,
+                'color' => $data['color'],
+                'school_year' => $currentSchoolYear,
+                'semester' => (string) $currentSemester,
+                'grade_categories' => $this->defaultGradeCategories(),
+            ]);
+        } catch (LockTimeoutException $exception) {
+            throw ValidationException::withMessages([
+                'class_duplicate' => self::DUPLICATE_CLASS_ERROR_MESSAGE,
+            ]);
+        } finally {
+            optional($classLock)->release();
+        }
 
         $summary = null;
 
@@ -570,14 +611,12 @@ class ClassController extends Controller
                 'strand' => strtoupper(trim($data['strand'])),
                 'section_suffix' => $sectionSuffix,
                 'section' => $sectionCombined,
-                'subject_name' => $data['subject_name'],
+                'subject_name' => $normalizedSubjectName,
                 'color' => $data['color'],
                 'track' => $data['track'] ?? null,
                 'school_year' => $currentSchoolYear,
                 'semester' => (string) $currentSemester,
-                'duplicate_basis' => 'grade_section',
-                'duplicate_section' => $duplicateSectionCount > 0,
-                'duplicate_count' => $duplicateSectionCount,
+                'duplicate_section' => false,
             ])
             ->with('import_summary', $summary);
     }
@@ -601,6 +640,13 @@ class ClassController extends Controller
         $sectionSuffix = strtoupper(trim($data['section']));
         $normalizedStrand = strtoupper(trim($data['strand']));
         $sectionCombined = $normalizedStrand . '-' . $sectionSuffix;
+        $normalizedSubjectName = preg_replace('/\s+/', ' ', trim((string) $data['subject_name'])) ?? '';
+
+        if ($normalizedSubjectName === '') {
+            throw ValidationException::withMessages([
+                'subject_name' => 'Subject is required.',
+            ]);
+        }
 
         $sectionId = $this->resolveSectionRecordId(
             (int) $request->user()->id,
@@ -611,22 +657,62 @@ class ClassController extends Controller
             $data['track'] ?? null,
         );
 
-        $subjectCode = Str::slug($data['subject_name'], '_') . '_' . Str::random(6);
-        $subject = Subject::firstOrCreate(
-            ['subject_name' => $data['subject_name']],
-            ['subject_code' => $subjectCode]
+        $subject = Subject::query()
+            ->whereRaw('LOWER(TRIM(subject_name)) = ?', [mb_strtolower($normalizedSubjectName)])
+            ->first();
+
+        if (! $subject) {
+            $subjectCode = Str::slug($normalizedSubjectName, '_') . '_' . Str::random(6);
+            $subject = Subject::create([
+                'subject_name' => $normalizedSubjectName,
+                'subject_code' => $subjectCode,
+            ]);
+        }
+
+        $targetSemester = (string) ($subjectTeacher->semester ?? SystemSetting::getCurrentSemester());
+
+        $classLock = Cache::lock(
+            $this->buildTeacherClassAssignmentLockKey(
+                (int) $request->user()->id,
+                (int) $subject->id,
+                (string) $data['grade_level'],
+                $sectionCombined,
+                $currentSchoolYear,
+                $targetSemester,
+            ),
+            10,
         );
 
-        $subjectTeacher->update([
-            'subject_id' => $subject->id,
-            'section_id' => $sectionId,
-            'grade_level' => $data['grade_level'],
-            'section' => $sectionCombined,
-            'strand' => $normalizedStrand,
-            'track' => $data['track'] ?? null,
-            'color' => $data['color'],
-            'school_year' => $currentSchoolYear,
-        ]);
+        try {
+            $classLock->block(3);
+
+            $this->ensureTeacherClassAssignmentIsUnique(
+                (int) $request->user()->id,
+                (int) $subject->id,
+                (string) $data['grade_level'],
+                $sectionCombined,
+                $currentSchoolYear,
+                $targetSemester,
+                (int) $subjectTeacher->id,
+            );
+
+            $subjectTeacher->update([
+                'subject_id' => $subject->id,
+                'section_id' => $sectionId,
+                'grade_level' => $data['grade_level'],
+                'section' => $sectionCombined,
+                'strand' => $normalizedStrand,
+                'track' => $data['track'] ?? null,
+                'color' => $data['color'],
+                'school_year' => $currentSchoolYear,
+            ]);
+        } catch (LockTimeoutException $exception) {
+            throw ValidationException::withMessages([
+                'class_duplicate' => self::DUPLICATE_CLASS_ERROR_MESSAGE,
+            ]);
+        } finally {
+            optional($classLock)->release();
+        }
 
         return redirect()
             ->route('teacher.classes.index')
@@ -1404,6 +1490,59 @@ class ClassController extends Controller
             $subjectId,
             mb_strtolower(trim($gradeLevel)),
             mb_strtolower(trim($section)),
+        ]);
+    }
+
+    private function buildTeacherClassAssignmentLockKey(
+        int $teacherId,
+        int $subjectId,
+        string $gradeLevel,
+        string $section,
+        string $schoolYear,
+        string $semester,
+    ): string {
+        $signature = implode('|', [
+            $teacherId,
+            $subjectId,
+            mb_strtolower(trim($gradeLevel)),
+            mb_strtolower(trim($section)),
+            trim($schoolYear),
+            trim($semester),
+        ]);
+
+        return 'teacher_class_assignment:' . sha1($signature);
+    }
+
+    /**
+     * Prevent duplicate grade level + subject + section assignments per teacher, school year, and semester.
+     */
+    private function ensureTeacherClassAssignmentIsUnique(
+        int $teacherId,
+        int $subjectId,
+        string $gradeLevel,
+        string $section,
+        string $schoolYear,
+        string $semester,
+        ?int $ignoreClassId = null,
+    ): void {
+        $query = SchoolClass::query()
+            ->where('teacher_id', $teacherId)
+            ->where('subject_id', $subjectId)
+            ->where('grade_level', $gradeLevel)
+            ->where('section', $section)
+            ->where('school_year', $schoolYear)
+            ->where('semester', $semester);
+
+        if ($ignoreClassId !== null) {
+            $query->where('id', '!=', $ignoreClassId);
+        }
+
+        if (! $query->exists()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'class_duplicate' => self::DUPLICATE_CLASS_ERROR_MESSAGE,
         ]);
     }
 

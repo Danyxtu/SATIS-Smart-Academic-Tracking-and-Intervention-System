@@ -4,10 +4,14 @@ use App\Models\User;
 use App\Models\Student;
 use App\Models\SchoolClass;
 use App\Models\Subject;
+use App\Models\Department;
+use App\Models\SystemSetting;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use function Pest\Laravel\actingAs;
 use function Pest\Laravel\post;
+use function Pest\Laravel\put;
+use function Pest\Laravel\assertDatabaseHas;
 
 test('teacher can add a student and receives the generated password in session', function () {
     /** @var User $teacher */
@@ -91,4 +95,228 @@ test('teacher can start quarter 2 for a class', function () {
 
     $response->assertSessionHas('success');
     $this->assertEquals(2, $class->fresh()->current_quarter);
+});
+
+test('teacher cannot create a duplicate class assignment', function () {
+    /** @var User $teacher */
+    $teacher = User::factory()->create();
+    $teacher->syncRolesByName(['teacher']);
+
+    Department::query()->create([
+        'department_name' => 'STEM Department',
+        'department_code' => 'STEM',
+        'is_active' => true,
+    ]);
+
+    $schoolYear = SystemSetting::getCurrentSchoolYear();
+
+    $payload = [
+        'grade_level' => 'Grade 11',
+        'section' => 'A',
+        'subject_name' => 'General Mathematics',
+        'color' => 'indigo',
+        'school_year' => $schoolYear,
+        'strand' => 'STEM',
+        'track' => 'Academic',
+    ];
+
+    actingAs($teacher);
+
+    post(route('teacher.classes.store'), $payload)
+        ->assertSessionHas('success');
+
+    assertDatabaseHas('classes', [
+        'teacher_id' => $teacher->id,
+        'grade_level' => 'Grade 11',
+        'section' => 'STEM-A',
+        'school_year' => $schoolYear,
+        'semester' => (string) SystemSetting::getCurrentSemester(),
+    ]);
+
+    $duplicateResponse = post(route('teacher.classes.store'), $payload);
+
+    $duplicateResponse->assertSessionHasErrors('class_duplicate');
+
+    $subjectId = Subject::query()
+        ->where('subject_name', 'General Mathematics')
+        ->value('id');
+
+    expect($subjectId)->not()->toBeNull();
+
+    $duplicateCount = SchoolClass::query()
+        ->where('teacher_id', $teacher->id)
+        ->where('subject_id', $subjectId)
+        ->where('grade_level', 'Grade 11')
+        ->where('section', 'STEM-A')
+        ->where('school_year', $schoolYear)
+        ->where('semester', (string) SystemSetting::getCurrentSemester())
+        ->count();
+
+    expect($duplicateCount)->toBe(1);
+});
+
+test('teacher can create a second class with the same grade and section when subject differs', function () {
+    /** @var User $teacher */
+    $teacher = User::factory()->create();
+    $teacher->syncRolesByName(['teacher']);
+
+    Department::query()->create([
+        'department_name' => 'STEM Department',
+        'department_code' => 'STEM',
+        'is_active' => true,
+    ]);
+
+    $schoolYear = SystemSetting::getCurrentSchoolYear();
+    $semester = (string) SystemSetting::getCurrentSemester();
+
+    actingAs($teacher);
+
+    post(route('teacher.classes.store'), [
+        'grade_level' => 'Grade 11',
+        'section' => 'A',
+        'subject_name' => 'General Mathematics',
+        'color' => 'indigo',
+        'school_year' => $schoolYear,
+        'strand' => 'STEM',
+        'track' => 'Academic',
+    ])->assertSessionHas('success');
+
+    $secondClassResponse = post(route('teacher.classes.store'), [
+        'grade_level' => 'Grade 11',
+        'section' => 'A',
+        'subject_name' => 'Earth Science',
+        'color' => 'blue',
+        'school_year' => $schoolYear,
+        'strand' => 'STEM',
+        'track' => 'Academic',
+    ]);
+
+    $secondClassResponse->assertSessionHas('success');
+
+    $count = SchoolClass::query()
+        ->where('teacher_id', $teacher->id)
+        ->where('grade_level', 'Grade 11')
+        ->where('section', 'STEM-A')
+        ->where('school_year', $schoolYear)
+        ->where('semester', $semester)
+        ->count();
+
+    expect($count)->toBe(2);
+});
+
+test('teacher duplicate check treats subject casing and spacing as the same subject', function () {
+    /** @var User $teacher */
+    $teacher = User::factory()->create();
+    $teacher->syncRolesByName(['teacher']);
+
+    Department::query()->create([
+        'department_name' => 'STEM Department',
+        'department_code' => 'STEM',
+        'is_active' => true,
+    ]);
+
+    $schoolYear = SystemSetting::getCurrentSchoolYear();
+
+    actingAs($teacher);
+
+    post(route('teacher.classes.store'), [
+        'grade_level' => 'Grade 11',
+        'section' => 'A',
+        'subject_name' => 'General Mathematics',
+        'color' => 'indigo',
+        'school_year' => $schoolYear,
+        'strand' => 'STEM',
+        'track' => 'Academic',
+    ])->assertSessionHas('success');
+
+    $duplicateResponse = post(route('teacher.classes.store'), [
+        'grade_level' => 'Grade 11',
+        'section' => 'A',
+        'subject_name' => '  general   mathematics  ',
+        'color' => 'blue',
+        'school_year' => $schoolYear,
+        'strand' => 'STEM',
+        'track' => 'Academic',
+    ]);
+
+    $duplicateResponse->assertSessionHasErrors('class_duplicate');
+
+    $count = SchoolClass::query()
+        ->where('teacher_id', $teacher->id)
+        ->where('grade_level', 'Grade 11')
+        ->where('section', 'STEM-A')
+        ->where('school_year', $schoolYear)
+        ->where('semester', (string) SystemSetting::getCurrentSemester())
+        ->count();
+
+    expect($count)->toBe(1);
+});
+
+test('teacher cannot update a class into a duplicate assignment', function () {
+    /** @var User $teacher */
+    $teacher = User::factory()->create();
+    $teacher->syncRolesByName(['teacher']);
+
+    Department::query()->create([
+        'department_name' => 'STEM Department',
+        'department_code' => 'STEM',
+        'is_active' => true,
+    ]);
+
+    $schoolYear = SystemSetting::getCurrentSchoolYear();
+    $semester = (string) SystemSetting::getCurrentSemester();
+
+    $mathSubject = Subject::factory()->create([
+        'subject_name' => 'General Mathematics',
+    ]);
+
+    $scienceSubject = Subject::factory()->create([
+        'subject_name' => 'Earth Science',
+    ]);
+
+    $existingClass = SchoolClass::factory()->create([
+        'teacher_id' => $teacher->id,
+        'subject_id' => $mathSubject->id,
+        'grade_level' => 'Grade 11',
+        'section' => 'STEM-A',
+        'strand' => 'STEM',
+        'school_year' => $schoolYear,
+        'semester' => $semester,
+    ]);
+
+    $classToEdit = SchoolClass::factory()->create([
+        'teacher_id' => $teacher->id,
+        'subject_id' => $scienceSubject->id,
+        'grade_level' => 'Grade 11',
+        'section' => 'STEM-B',
+        'strand' => 'STEM',
+        'school_year' => $schoolYear,
+        'semester' => $semester,
+    ]);
+
+    actingAs($teacher);
+
+    $response = put(route('teacher.classes.update', $classToEdit->id), [
+        'grade_level' => 'Grade 11',
+        'section' => 'A',
+        'subject_name' => $mathSubject->subject_name,
+        'color' => 'indigo',
+        'school_year' => $schoolYear,
+        'strand' => 'STEM',
+        'track' => 'Academic',
+    ]);
+
+    $response->assertSessionHasErrors('class_duplicate');
+
+    assertDatabaseHas('classes', [
+        'id' => $existingClass->id,
+        'subject_id' => $mathSubject->id,
+        'section' => 'STEM-A',
+    ]);
+
+    assertDatabaseHas('classes', [
+        'id' => $classToEdit->id,
+        'subject_id' => $scienceSubject->id,
+        'section' => 'STEM-B',
+    ]);
 });

@@ -9,7 +9,7 @@ import {
     Users,
     X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "@inertiajs/react";
 
 const COLOR_OPTIONS = [
@@ -96,6 +96,7 @@ const sanitizeSectionName = (value) =>
 const normalizeSearchValue = (value) =>
     String(value ?? "")
         .toLowerCase()
+        .replace(/\s+/g, " ")
         .trim();
 
 const StepBadge = ({ step, currentStep }) => {
@@ -136,6 +137,7 @@ const AddNewClassModal = ({
     departments = [],
     availableSubjects = [],
     availableSections = [],
+    existingClasses = [],
 }) => {
     const isEditMode = mode === "edit";
     const [step, setStep] = useState(1);
@@ -155,19 +157,30 @@ const AddNewClassModal = ({
     const [studentDraftError, setStudentDraftError] = useState("");
     const [bulkRows, setBulkRows] = useState("");
     const [bulkErrors, setBulkErrors] = useState([]);
+    const submitLockRef = useRef(false);
 
-    const { data, setData, post, put, processing, errors, reset, progress } =
-        useForm({
-            grade_level: classData?.name ?? "",
-            section: parseSectionSuffix(classData?.section, classData?.strand),
-            subject_name: classData?.subject_name ?? classData?.subject ?? "",
-            color: classData?.color ?? "indigo",
-            school_year: classData?.school_year ?? defaultSchoolYear,
-            strand: classData?.strand ?? "",
-            track: classData?.track ?? "",
-            classlist: null,
-            manual_students: [],
-        });
+    const {
+        data,
+        setData,
+        post,
+        put,
+        processing,
+        errors,
+        reset,
+        progress,
+        clearErrors,
+        setError,
+    } = useForm({
+        grade_level: classData?.name ?? "",
+        section: parseSectionSuffix(classData?.section, classData?.strand),
+        subject_name: classData?.subject_name ?? classData?.subject ?? "",
+        color: classData?.color ?? "indigo",
+        school_year: classData?.school_year ?? defaultSchoolYear,
+        strand: classData?.strand ?? "",
+        track: classData?.track ?? "",
+        classlist: null,
+        manual_students: [],
+    });
 
     const departmentOptions = useMemo(() => {
         return departments
@@ -309,6 +322,59 @@ const AddNewClassModal = ({
         hasValidStrand,
         sectionMode,
         selectedExistingSectionId,
+    ]);
+
+    const combinedSectionValue = useMemo(() => {
+        const sectionSuffix = sanitizeSectionName(data.section);
+
+        if (!normalizedStrand || !sectionSuffix) {
+            return "";
+        }
+
+        return `${normalizedStrand}-${sectionSuffix}`;
+    }, [data.section, normalizedStrand]);
+
+    const hasLocalDuplicateClass = useMemo(() => {
+        if (!data.grade_level || !data.subject_name || !combinedSectionValue) {
+            return false;
+        }
+
+        const gradeLevelKey = normalizeSearchValue(data.grade_level);
+        const subjectKey = normalizeSearchValue(data.subject_name);
+        const sectionKey = normalizeSearchValue(combinedSectionValue);
+
+        return existingClasses.some((existingClass) => {
+            if (
+                isEditMode &&
+                classData?.id &&
+                String(existingClass?.id) === String(classData.id)
+            ) {
+                return false;
+            }
+
+            const existingGradeLevel = normalizeSearchValue(
+                existingClass?.name ?? existingClass?.grade_level,
+            );
+            const existingSubject = normalizeSearchValue(
+                existingClass?.subject_name ?? existingClass?.subject,
+            );
+            const existingSection = normalizeSearchValue(
+                existingClass?.section,
+            );
+
+            return (
+                existingGradeLevel === gradeLevelKey &&
+                existingSubject === subjectKey &&
+                existingSection === sectionKey
+            );
+        });
+    }, [
+        data.grade_level,
+        data.subject_name,
+        combinedSectionValue,
+        existingClasses,
+        isEditMode,
+        classData?.id,
     ]);
 
     const selectedColor = useMemo(() => {
@@ -491,7 +557,9 @@ const AddNewClassModal = ({
     }, [manualStudents, setData]);
 
     const handleClose = () => {
+        submitLockRef.current = false;
         reset();
+        clearErrors();
         resetWizardState();
 
         if (!isEditMode) {
@@ -514,6 +582,8 @@ const AddNewClassModal = ({
     const handleChange = (e) => {
         const { name, value } = e.target;
 
+        clearErrors("class_duplicate");
+
         if (name === "section") {
             setData("section", sanitizeSectionName(value));
             return;
@@ -535,11 +605,13 @@ const AddNewClassModal = ({
     };
 
     const handleSubjectSelect = (subjectName) => {
+        clearErrors("class_duplicate");
         setData("subject_name", subjectName);
         setIsSubjectMenuOpen(false);
     };
 
     const handleDepartmentSelect = (departmentCode) => {
+        clearErrors("class_duplicate");
         const normalizedCode = normalizeDepartmentCode(departmentCode);
 
         setData("strand", normalizedCode);
@@ -553,6 +625,7 @@ const AddNewClassModal = ({
     };
 
     const handleSectionModeChange = (mode) => {
+        clearErrors("class_duplicate");
         setSectionMode(mode);
 
         if (mode === "manual") {
@@ -567,6 +640,7 @@ const AddNewClassModal = ({
     };
 
     const handleExistingSectionSelect = (section) => {
+        clearErrors("class_duplicate");
         setSectionMode("existing");
         setSelectedExistingSectionId(section.id);
         setData("strand", section.strand);
@@ -696,9 +770,28 @@ const AddNewClassModal = ({
     const handleSubmit = (e) => {
         e.preventDefault();
 
+        if (submitLockRef.current || processing) {
+            return;
+        }
+
         if (!isEditMode && (!isStepThreeSubmitReady || step !== 3)) {
             return;
         }
+
+        if (hasLocalDuplicateClass) {
+            if (!isEditMode) {
+                setStep(3);
+            }
+
+            setError(
+                "class_duplicate",
+                "Duplicate class detected. A class with the same grade level, subject, and section already exists. Please edit the class details or cancel.",
+            );
+
+            return;
+        }
+
+        submitLockRef.current = true;
 
         if (isEditMode && classData?.id) {
             put(route("teacher.classes.update", classData.id), {
@@ -707,6 +800,9 @@ const AddNewClassModal = ({
                 replace: true,
                 onSuccess: () => {
                     handleClose();
+                },
+                onFinish: () => {
+                    submitLockRef.current = false;
                 },
             });
             return;
@@ -717,8 +813,16 @@ const AddNewClassModal = ({
             preserveState: true,
             preserveScroll: true,
             replace: true,
+            onError: (formErrors) => {
+                if (formErrors?.class_duplicate) {
+                    setStep(3);
+                }
+            },
             onSuccess: () => {
                 handleClose();
+            },
+            onFinish: () => {
+                submitLockRef.current = false;
             },
         });
     };
@@ -1574,6 +1678,14 @@ const AddNewClassModal = ({
 
                     {/* Modal Footer */}
                     <div className="flex flex-col space-y-2 p-6 border-t bg-gray-50">
+                        {errors.class_duplicate && (
+                            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                                <p className="font-semibold">
+                                    Duplicate class detected
+                                </p>
+                                <p className="mt-1">{errors.class_duplicate}</p>
+                            </div>
+                        )}
                         {(errors.grade_level ||
                             errors.section ||
                             errors.subject_name ||
@@ -1581,7 +1693,8 @@ const AddNewClassModal = ({
                             errors.school_year ||
                             errors.strand ||
                             errors.track ||
-                            errors.manual_students) && (
+                            errors.manual_students ||
+                            errors.class_duplicate) && (
                             <div className="text-sm text-red-600">
                                 Please fix the highlighted errors before
                                 submitting.

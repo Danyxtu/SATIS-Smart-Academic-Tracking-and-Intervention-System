@@ -1795,6 +1795,7 @@ const MyClasses = ({
                     departments={departments}
                     availableSubjects={availableSubjects}
                     availableSections={availableSections}
+                    existingClasses={classes}
                 />
             )}
 
@@ -1810,6 +1811,7 @@ const MyClasses = ({
                     departments={departments}
                     availableSubjects={availableSubjects}
                     availableSections={availableSections}
+                    existingClasses={classes}
                 />
             )}
 
