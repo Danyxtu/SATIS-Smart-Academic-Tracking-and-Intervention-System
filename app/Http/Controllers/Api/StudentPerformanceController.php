@@ -662,9 +662,7 @@ class StudentPerformanceController extends Controller
             $suggestions[] = 'Continue maintaining your study habits';
         }
 
-        // Check if PDF package is present
-        $pdfClass = 'Barryvdh\\DomPDF\\Facade\\Pdf';
-        if (!class_exists($pdfClass)) {
+        if (! app()->bound('dompdf.wrapper')) {
             return response()->json([
                 'message' => 'PDF export not available. Please install barryvdh/laravel-dompdf.',
             ], 501);
@@ -704,7 +702,7 @@ class StudentPerformanceController extends Controller
             'generatedAt' => now()->format('F d, Y h:i A'),
         ];
 
-        $pdf = $pdfClass::loadView('pdf.mobile_student_analytics', $dataForView);
+        $pdf = app('dompdf.wrapper')->loadView('pdf.mobile_student_analytics', $dataForView);
         $filename = sprintf('analytics_%s_%s.pdf', $enrollment->id, now()->format('Y-m-d'));
 
         return $pdf->download($filename);

@@ -684,13 +684,17 @@ class AnalyticsController extends Controller
             ? round((($presentDays + $excusedDays + ($lateDays * 0.5)) / $totalDays) * 100)
             : 100;
 
-        // Check if PDF package present
-        $pdfClass = 'Barryvdh\\DomPDF\\Facade\\Pdf';
-        if (! class_exists($pdfClass)) {
+        if (! app()->bound('dompdf.wrapper')) {
             return response()->json([
                 'message' => 'PDF export not available. Please install barryvdh/laravel-dompdf via Composer: composer require barryvdh/laravel-dompdf',
             ], 501);
         }
+
+        $prediction = data_get($analytics, 'prediction', []);
+        $riskPayload = data_get($analytics, 'risk', []);
+        $normalizedSuggestions = $this->normalizeSuggestionsForPdf(
+            data_get($analytics, 'suggestions', [])
+        );
 
         $dataForView = [
             'student' => [
@@ -716,15 +720,45 @@ class AnalyticsController extends Controller
                 'lateDays' => $lateDays,
                 'excusedDays' => $excusedDays,
             ],
-            'prediction' => $analytics['prediction'],
-            'risk' => $analytics['risk'],
-            'suggestions' => $analytics['suggestions'],
+            'prediction' => $prediction,
+            'risk' => $riskPayload,
+            'suggestions' => $normalizedSuggestions,
         ];
 
-        $pdf = $pdfClass::loadView('pdf.student_analytics', $dataForView);
+        $pdf = app('dompdf.wrapper')->loadView('pdf.student_analytics', $dataForView);
         $filename = sprintf('analytics_%s_%s.pdf', $enrollment->id, now()->format('Y-m-d'));
 
         return $pdf->download($filename);
+    }
+
+    private function normalizeSuggestionsForPdf(mixed $suggestions): array
+    {
+        if (!is_iterable($suggestions)) {
+            return [];
+        }
+
+        return collect($suggestions)
+            ->map(function ($suggestion) {
+                if (is_string($suggestion)) {
+                    return trim($suggestion);
+                }
+
+                if (!is_array($suggestion)) {
+                    return null;
+                }
+
+                $title = trim((string) data_get($suggestion, 'title', ''));
+                $message = trim((string) data_get($suggestion, 'message', ''));
+
+                if ($title !== '' && $message !== '') {
+                    return $title . ': ' . $message;
+                }
+
+                return $title !== '' ? $title : ($message !== '' ? $message : null);
+            })
+            ->filter(fn($item) => is_string($item) && $item !== '')
+            ->values()
+            ->all();
     }
 
     private function scoreableGrades(Collection $grades): Collection

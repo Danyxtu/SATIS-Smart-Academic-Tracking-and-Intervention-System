@@ -365,7 +365,7 @@
 <body>
     @php
         $logoPath = resource_path('assets/satis-logo.png');
-        $logoData = file_exists($logoPath)
+        $logoData = extension_loaded('gd') && file_exists($logoPath)
             ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath))
             : null;
     @endphp

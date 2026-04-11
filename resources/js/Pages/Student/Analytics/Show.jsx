@@ -2527,28 +2527,14 @@ const AnalyticsShow = ({
         return { color: "text-red-600", label: "Needs Improvement" };
     }, [overallGrade]);
 
-    const handleExportPdf = async () => {
+    const handleExportPdf = () => {
         if (!enrollment?.id) return;
+
         const url = route("analytics.show.pdf", { enrollment: enrollment.id });
-        try {
-            const resp = await fetch(url, {
-                method: "GET",
-                credentials: "same-origin",
-                headers: { Accept: "application/pdf" },
-            });
-            if (
-                resp.ok &&
-                resp.headers.get("Content-Type")?.includes("application/pdf")
-            ) {
-                const blob = await resp.blob();
-                const blobUrl = URL.createObjectURL(blob);
-                window.open(blobUrl, "_blank");
-                setTimeout(() => URL.revokeObjectURL(blobUrl), 20000);
-                return;
-            }
-        } catch (e) {
-            // fallback to printing
-            window.print();
+
+        const openedWindow = window.open(url, "_blank", "noopener,noreferrer");
+        if (!openedWindow) {
+            window.location.href = url;
         }
     };
 

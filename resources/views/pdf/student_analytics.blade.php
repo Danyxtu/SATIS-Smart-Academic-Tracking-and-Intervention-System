@@ -105,10 +105,26 @@
             <tr>
                 <th>Suggestions</th>
                 <td>
-                    @if(is_array($suggestions))
+                    @if(is_iterable($suggestions))
                         <ul>
                             @foreach($suggestions as $s)
-                                <li>{{ $s }}</li>
+                                @php
+                                    $suggestionText = '';
+
+                                    if (is_string($s)) {
+                                        $suggestionText = trim($s);
+                                    } elseif (is_array($s)) {
+                                        $title = trim((string) data_get($s, 'title', ''));
+                                        $message = trim((string) data_get($s, 'message', ''));
+                                        $suggestionText = $title !== '' && $message !== ''
+                                            ? $title . ': ' . $message
+                                            : ($title !== '' ? $title : $message);
+                                    }
+                                @endphp
+
+                                @if($suggestionText !== '')
+                                    <li>{{ $suggestionText }}</li>
+                                @endif
                             @endforeach
                         </ul>
                     @else

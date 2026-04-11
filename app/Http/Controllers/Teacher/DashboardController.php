@@ -85,8 +85,7 @@ class DashboardController extends Controller
         $teacher = Auth::user();
         $teacher->load('department');
 
-        // Check if dompdf is available
-        if (! class_exists('Barryvdh\\DomPDF\\Facade\\Pdf')) {
+        if (! app()->bound('dompdf.wrapper')) {
             return response()->json([
                 'message' => 'PDF export not available. Please install barryvdh/laravel-dompdf via Composer: composer require barryvdh/laravel-dompdf',
             ], 501);

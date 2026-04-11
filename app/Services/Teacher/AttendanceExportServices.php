@@ -40,9 +40,7 @@ class AttendanceExportServices
 
     public function exportPDF(SchoolClass $subjectTeacher)
     {
-        // Try to use Dompdf via barryvdh/laravel-dompdf (use string to avoid static analysis error when package is not installed)
-        if (! class_exists('Barryvdh\\DomPDF\\Facade\\Pdf')) {
-            // Return a 501 Not Implemented with instructions
+        if (! app()->bound('dompdf.wrapper')) {
             return response()->json([
                 'message' => 'PDF export not available. Please install barryvdh/laravel-dompdf via Composer: composer require barryvdh/laravel-dompdf',
             ], 501);
