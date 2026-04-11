@@ -24,7 +24,7 @@ class SubjectController extends Controller
     /**
      * @var array<int, string>
      */
-    private const GRADE_LEVEL_OPTIONS = ['Grade 11', 'Grade 12'];
+    private const GRADE_LEVEL_OPTIONS = ['11', '12'];
 
     /**
      * Display a listing of subjects.

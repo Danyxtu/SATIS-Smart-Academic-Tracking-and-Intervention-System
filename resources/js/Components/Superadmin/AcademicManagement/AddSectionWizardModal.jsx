@@ -34,7 +34,7 @@ const WIZARD_STEPS = [
     },
 ];
 
-const GRADE_LEVEL_OPTIONS = ["Grade 11", "Grade 12"];
+const GRADE_LEVEL_OPTIONS = ["11", "12"];
 const TRACK_OPTIONS = ["Academic", "TVL"];
 
 const normalizeDepartmentSearch = (value = "") =>
@@ -1202,7 +1202,7 @@ export default function AddSectionWizardModal({
                                                         key={grade}
                                                         value={grade}
                                                     >
-                                                        {grade}
+                                                        {`Grade ${grade}`}
                                                     </option>
                                                 ),
                                             )}

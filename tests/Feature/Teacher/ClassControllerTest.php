@@ -55,7 +55,7 @@ test('teacher can upload a classlist and import summary contains generated passw
         'subject_id' => $subject->id,
     ]);
 
-    $csv = "Student Name,LRN\nNew Student,123456789012\nAnother Student,987654321098\n";
+    $csv = "Student Name,LRN,Grade Level\nNew Student,123456789012,11\nAnother Student,987654321098,11\n";
     $file = UploadedFile::fake()->createWithContent('classlist.csv', $csv);
 
     actingAs($teacher);
@@ -79,7 +79,9 @@ test('teacher can upload a classlist and import summary contains generated passw
 
 test('teacher can start quarter 2 for a class', function () {
     /** @var User $teacher */
-    $teacher = User::factory()->create();
+    $teacher = User::factory()->create([
+        'password' => Hash::make('password'),
+    ]);
     $teacher->syncRolesByName(['teacher']);
     $subject = Subject::factory()->create();
     $class = SchoolClass::factory()->create([
@@ -92,6 +94,7 @@ test('teacher can start quarter 2 for a class', function () {
 
     $response = post(route('teacher.classes.quarter.start', $class->id), [
         'quarter' => 2,
+        'password' => 'password',
     ]);
 
     $response->assertSessionHas('success');
@@ -112,7 +115,7 @@ test('teacher cannot create a duplicate class assignment', function () {
     $schoolYear = SystemSetting::getCurrentSchoolYear();
 
     $payload = [
-        'grade_level' => 'Grade 11',
+        'grade_level' => '11',
         'section' => 'A',
         'subject_name' => 'General Mathematics',
         'color' => 'indigo',
@@ -128,7 +131,7 @@ test('teacher cannot create a duplicate class assignment', function () {
 
     assertDatabaseHas('classes', [
         'teacher_id' => $teacher->id,
-        'grade_level' => 'Grade 11',
+        'grade_level' => '11',
         'section' => 'STEM-A',
         'school_year' => $schoolYear,
         'semester' => (string) SystemSetting::getCurrentSemester(),
@@ -147,7 +150,7 @@ test('teacher cannot create a duplicate class assignment', function () {
     $duplicateCount = SchoolClass::query()
         ->where('teacher_id', $teacher->id)
         ->where('subject_id', $subjectId)
-        ->where('grade_level', 'Grade 11')
+        ->where('grade_level', '11')
         ->where('section', 'STEM-A')
         ->where('school_year', $schoolYear)
         ->where('semester', (string) SystemSetting::getCurrentSemester())
@@ -173,7 +176,7 @@ test('teacher can create a second class with the same grade and section when sub
     actingAs($teacher);
 
     post(route('teacher.classes.store'), [
-        'grade_level' => 'Grade 11',
+        'grade_level' => '11',
         'section' => 'A',
         'subject_name' => 'General Mathematics',
         'color' => 'indigo',
@@ -183,7 +186,7 @@ test('teacher can create a second class with the same grade and section when sub
     ])->assertSessionHas('success');
 
     $secondClassResponse = post(route('teacher.classes.store'), [
-        'grade_level' => 'Grade 11',
+        'grade_level' => '11',
         'section' => 'A',
         'subject_name' => 'Earth Science',
         'color' => 'blue',
@@ -196,7 +199,7 @@ test('teacher can create a second class with the same grade and section when sub
 
     $count = SchoolClass::query()
         ->where('teacher_id', $teacher->id)
-        ->where('grade_level', 'Grade 11')
+        ->where('grade_level', '11')
         ->where('section', 'STEM-A')
         ->where('school_year', $schoolYear)
         ->where('semester', $semester)
@@ -221,7 +224,7 @@ test('teacher duplicate check treats subject casing and spacing as the same subj
     actingAs($teacher);
 
     post(route('teacher.classes.store'), [
-        'grade_level' => 'Grade 11',
+        'grade_level' => '11',
         'section' => 'A',
         'subject_name' => 'General Mathematics',
         'color' => 'indigo',
@@ -231,7 +234,7 @@ test('teacher duplicate check treats subject casing and spacing as the same subj
     ])->assertSessionHas('success');
 
     $duplicateResponse = post(route('teacher.classes.store'), [
-        'grade_level' => 'Grade 11',
+        'grade_level' => '11',
         'section' => 'A',
         'subject_name' => '  general   mathematics  ',
         'color' => 'blue',
@@ -244,7 +247,7 @@ test('teacher duplicate check treats subject casing and spacing as the same subj
 
     $count = SchoolClass::query()
         ->where('teacher_id', $teacher->id)
-        ->where('grade_level', 'Grade 11')
+        ->where('grade_level', '11')
         ->where('section', 'STEM-A')
         ->where('school_year', $schoolYear)
         ->where('semester', (string) SystemSetting::getCurrentSemester())
@@ -269,7 +272,7 @@ test('students from selected section are auto-assigned to a newly created class'
     actingAs($teacher);
 
     post(route('teacher.classes.store'), [
-        'grade_level' => 'Grade 11',
+        'grade_level' => '11',
         'section' => 'A',
         'subject_name' => 'General Mathematics',
         'color' => 'indigo',
@@ -287,7 +290,7 @@ test('students from selected section are auto-assigned to a newly created class'
     $sourceClass = SchoolClass::query()
         ->where('teacher_id', $teacher->id)
         ->where('subject_id', $sourceSubject->id)
-        ->where('grade_level', 'Grade 11')
+        ->where('grade_level', '11')
         ->where('section', 'STEM-A')
         ->first();
 
@@ -300,7 +303,7 @@ test('students from selected section are auto-assigned to a newly created class'
         'student_name' => 'Sample Student',
         'lrn' => '123123123123',
         'user_id' => $studentUser->id,
-        'grade_level' => 'Grade 11',
+        'grade_level' => '11',
         'section' => 'STEM-A',
         'section_id' => $sourceClass->section_id,
         'strand' => 'STEM',
@@ -314,7 +317,7 @@ test('students from selected section are auto-assigned to a newly created class'
     ]);
 
     $response = post(route('teacher.classes.store'), [
-        'grade_level' => 'Grade 11',
+        'grade_level' => '11',
         'section' => 'A',
         'subject_name' => 'Earth Science',
         'color' => 'blue',
@@ -335,7 +338,7 @@ test('students from selected section are auto-assigned to a newly created class'
     $targetClass = SchoolClass::query()
         ->where('teacher_id', $teacher->id)
         ->where('subject_id', $targetSubject->id)
-        ->where('grade_level', 'Grade 11')
+        ->where('grade_level', '11')
         ->where('section', 'STEM-A')
         ->latest('id')
         ->first();
@@ -376,7 +379,7 @@ test('teacher cannot update a class into a duplicate assignment', function () {
     $existingClass = SchoolClass::factory()->create([
         'teacher_id' => $teacher->id,
         'subject_id' => $mathSubject->id,
-        'grade_level' => 'Grade 11',
+        'grade_level' => '11',
         'section' => 'STEM-A',
         'strand' => 'STEM',
         'school_year' => $schoolYear,
@@ -386,7 +389,7 @@ test('teacher cannot update a class into a duplicate assignment', function () {
     $classToEdit = SchoolClass::factory()->create([
         'teacher_id' => $teacher->id,
         'subject_id' => $scienceSubject->id,
-        'grade_level' => 'Grade 11',
+        'grade_level' => '11',
         'section' => 'STEM-B',
         'strand' => 'STEM',
         'school_year' => $schoolYear,
@@ -396,7 +399,7 @@ test('teacher cannot update a class into a duplicate assignment', function () {
     actingAs($teacher);
 
     $response = put(route('teacher.classes.update', $classToEdit->id), [
-        'grade_level' => 'Grade 11',
+        'grade_level' => '11',
         'section' => 'A',
         'subject_name' => $mathSubject->subject_name,
         'color' => 'indigo',

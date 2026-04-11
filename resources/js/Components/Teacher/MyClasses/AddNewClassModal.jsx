@@ -57,7 +57,13 @@ const COLOR_OPTIONS = [
     },
 ];
 
-const GRADE_LEVEL_OPTIONS = ["Grade 11", "Grade 12"];
+const GRADE_LEVEL_OPTIONS = ["11", "12"];
+
+const normalizeGradeLevel = (value) => {
+    const match = String(value ?? "").match(/(^|\D)(11|12)(\D|$)/);
+
+    return match?.[2] ?? "";
+};
 
 const WIZARD_STEPS = [
     { id: 1, title: "Subject" },
@@ -98,6 +104,16 @@ const normalizeSearchValue = (value) =>
         .toLowerCase()
         .replace(/\s+/g, " ")
         .trim();
+
+const buildSectionFullLabel = (gradeLevel, specialization, sectionName) => {
+    const parts = [
+        normalizeGradeLevel(gradeLevel),
+        String(specialization ?? "").trim(),
+        String(sectionName ?? "").trim(),
+    ].filter((part) => part !== "");
+
+    return parts.join(" - ");
+};
 
 const StepBadge = ({ step, currentStep }) => {
     const isActive = currentStep === step.id;
@@ -171,7 +187,9 @@ const AddNewClassModal = ({
         clearErrors,
         setError,
     } = useForm({
-        grade_level: classData?.name ?? "",
+        grade_level: normalizeGradeLevel(
+            classData?.name ?? classData?.grade_level,
+        ),
         section: parseSectionSuffix(classData?.section, classData?.strand),
         subject_name: classData?.subject_name ?? classData?.subject ?? "",
         color: classData?.color ?? "indigo",
@@ -210,21 +228,49 @@ const AddNewClassModal = ({
                     section?.strand ?? section?.department_code,
                 );
                 const sectionSource =
-                    section?.section_code ?? section?.section_name ?? "";
+                    section?.section_name ??
+                    section?.section ??
+                    section?.section_code ??
+                    "";
                 const sectionName = sanitizeSectionName(
                     parseSectionSuffix(sectionSource, strand),
                 );
+                const gradeLevel = normalizeGradeLevel(section?.grade_level);
+                const track = String(section?.track ?? "").trim();
+                const specialization =
+                    [
+                        section?.specialization,
+                        track,
+                        section?.strand,
+                        section?.department_code,
+                    ]
+                        .map((value) => String(value ?? "").trim())
+                        .find((value) => value !== "") ?? "";
+                const sectionFullLabel = String(
+                    section?.section_full_label ??
+                        buildSectionFullLabel(
+                            gradeLevel,
+                            specialization,
+                            sectionName,
+                        ),
+                ).trim();
 
                 return {
                     id: section?.id ?? `section-${index}`,
                     key: `${section?.id ?? `section-${index}`}::${strand}::${sectionName}`,
                     strand,
                     section: sectionName,
-                    grade_level: String(section?.grade_level ?? "").trim(),
-                    track: String(section?.track ?? "").trim(),
-                    section_label: String(
-                        section?.section_name ?? section?.section_code ?? "",
-                    ).trim(),
+                    grade_level: gradeLevel,
+                    track,
+                    specialization,
+                    section_label:
+                        sectionFullLabel ||
+                        String(
+                            section?.section_name ??
+                                section?.section_code ??
+                                "",
+                        ).trim(),
+                    section_full_label: sectionFullLabel,
                 };
             })
             .filter(
@@ -282,17 +328,21 @@ const AddNewClassModal = ({
         return sectionsByStrand
             .filter((section) => {
                 const sectionLabel = normalizeSearchValue(
-                    section.section_label,
+                    section.section_full_label || section.section_label,
                 );
                 const gradeLevel = normalizeSearchValue(section.grade_level);
                 const sectionName = normalizeSearchValue(section.section);
                 const track = normalizeSearchValue(section.track);
+                const specialization = normalizeSearchValue(
+                    section.specialization,
+                );
 
                 return (
                     sectionLabel.includes(query) ||
                     gradeLevel.includes(query) ||
                     sectionName.includes(query) ||
-                    track.includes(query)
+                    track.includes(query) ||
+                    specialization.includes(query)
                 );
             })
             .slice(0, 20);
@@ -353,7 +403,9 @@ const AddNewClassModal = ({
             }
 
             const existingGradeLevel = normalizeSearchValue(
-                existingClass?.name ?? existingClass?.grade_level,
+                normalizeGradeLevel(
+                    existingClass?.name ?? existingClass?.grade_level,
+                ),
             );
             const existingSubject = normalizeSearchValue(
                 existingClass?.subject_name ?? existingClass?.subject,
@@ -471,7 +523,9 @@ const AddNewClassModal = ({
         if (isEditMode && classData) {
             resetWizardState();
             setData({
-                grade_level: classData?.name ?? "",
+                grade_level: normalizeGradeLevel(
+                    classData?.name ?? classData?.grade_level,
+                ),
                 section: sanitizeSectionName(
                     parseSectionSuffix(classData?.section, classData?.strand),
                 ),
@@ -1174,7 +1228,7 @@ const AddNewClassModal = ({
                                                 }
                                                 disabled={!hasValidStrand}
                                                 className="w-full rounded-lg border-gray-300 text-sm disabled:bg-gray-100 disabled:text-gray-500"
-                                                placeholder="Filter section by name, grade level, or track"
+                                                placeholder="Filter section by full label, grade level, or specialization"
                                             />
 
                                             {!hasValidStrand ? (
@@ -1211,13 +1265,8 @@ const AddNewClassModal = ({
                                                                 }`}
                                                             >
                                                                 <p className="text-sm font-semibold text-gray-800">
-                                                                    {
-                                                                        section.grade_level
-                                                                    }
-                                                                    {" - "}
-                                                                    {
-                                                                        section.section_label
-                                                                    }
+                                                                    {section.section_full_label ||
+                                                                        section.section_label}
                                                                 </p>
                                                                 <p className="text-xs text-gray-500">
                                                                     Section key:{" "}
@@ -1228,8 +1277,8 @@ const AddNewClassModal = ({
                                                                     {
                                                                         section.section
                                                                     }
-                                                                    {section.track
-                                                                        ? ` • Track: ${section.track}`
+                                                                    {section.specialization
+                                                                        ? ` • Specialization: ${section.specialization}`
                                                                         : ""}
                                                                 </p>
                                                             </button>
@@ -1268,7 +1317,7 @@ const AddNewClassModal = ({
                                                                 key={option}
                                                                 value={option}
                                                             >
-                                                                {option}
+                                                                {`Grade ${option}`}
                                                             </option>
                                                         ),
                                                     )}
@@ -1312,13 +1361,8 @@ const AddNewClassModal = ({
                                         selectedExistingSection && (
                                             <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
                                                 Selected section:{" "}
-                                                {
-                                                    selectedExistingSection.grade_level
-                                                }
-                                                {" - "}
-                                                {
-                                                    selectedExistingSection.section_label
-                                                }
+                                                {selectedExistingSection.section_full_label ||
+                                                    selectedExistingSection.section_label}
                                             </div>
                                         )}
 

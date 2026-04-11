@@ -257,13 +257,13 @@ class SettingsController extends Controller
 
             $grade11Sections = Section::query()
                 ->where('school_year', $oldSY)
-                ->where('grade_level', 'Grade 11')
+                ->where('grade_level', '11')
                 ->get();
 
             $grade11Templates = $grade11Sections
                 ->map(fn(Section $section) => [
                     'department_id' => (int) $section->department_id,
-                    'section_name' => $section->section_name,
+                    'section_name' => satis_extract_section_base_name($section->section_name) ?? $section->section_name,
                     'section_code' => $section->section_code,
                     'strand' => $section->strand,
                     'track' => $section->track,
@@ -285,8 +285,8 @@ class SettingsController extends Controller
                     [
                         'advisor_teacher_id' => $grade11Section->advisor_teacher_id,
                         'created_by' => $userId,
-                        'section_name' => $grade11Section->section_name,
-                        'grade_level' => 'Grade 12',
+                        'section_name' => satis_extract_section_base_name($grade11Section->section_name) ?? $grade11Section->section_name,
+                        'grade_level' => '12',
                         'strand' => $grade11Section->strand,
                         'track' => $grade11Section->track,
                         'school_year' => $newSY,
@@ -317,7 +317,7 @@ class SettingsController extends Controller
                     }
 
                     $student->update([
-                        'grade_level' => 'Grade 12',
+                        'grade_level' => '12',
                         'section_id' => $newSectionId,
                     ]);
 
@@ -327,7 +327,7 @@ class SettingsController extends Controller
 
             $grade12SectionIds = Section::query()
                 ->where('school_year', $oldSY)
-                ->where('grade_level', 'Grade 12')
+                ->where('grade_level', '12')
                 ->pluck('id');
 
             $grade12Students = Student::query()

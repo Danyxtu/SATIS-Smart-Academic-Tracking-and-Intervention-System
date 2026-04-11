@@ -38,6 +38,8 @@ const STEPS = [
     },
 ];
 
+const GRADE_LEVEL_OPTIONS = ["11", "12"];
+
 function WizardStep({ step, currentStep }) {
     const isActive = currentStep === step.id;
     const isComplete = currentStep > step.id;
@@ -664,7 +666,8 @@ export default function Index({
                                     >
                                         <div className="col-span-3 min-w-0">
                                             <p className="truncate text-sm font-semibold text-slate-900">
-                                                {section.section_name}
+                                                {section.section_full_label ||
+                                                    section.section_name}
                                             </p>
                                             <p className="mt-0.5 text-xs text-slate-500">
                                                 Code: {section.section_code}
@@ -870,8 +873,7 @@ export default function Index({
                                                 <label className="mb-1.5 block text-sm font-medium text-slate-800">
                                                     Grade Level
                                                 </label>
-                                                <input
-                                                    type="text"
+                                                <select
                                                     value={data.grade_level}
                                                     onChange={(event) =>
                                                         setData(
@@ -879,9 +881,24 @@ export default function Index({
                                                             event.target.value,
                                                         )
                                                     }
-                                                    placeholder="e.g., Grade 11"
                                                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:border-indigo-500 focus:bg-white focus:ring-indigo-500"
-                                                />
+                                                >
+                                                    <option value="">
+                                                        Select Grade Level
+                                                    </option>
+                                                    {GRADE_LEVEL_OPTIONS.map(
+                                                        (gradeLevel) => (
+                                                            <option
+                                                                key={gradeLevel}
+                                                                value={
+                                                                    gradeLevel
+                                                                }
+                                                            >
+                                                                {`Grade ${gradeLevel}`}
+                                                            </option>
+                                                        ),
+                                                    )}
+                                                </select>
                                                 <FieldError
                                                     message={errors.grade_level}
                                                 />

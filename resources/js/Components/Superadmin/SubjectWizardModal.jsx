@@ -16,7 +16,7 @@ const STEP_SELECT_TYPE = 1;
 const STEP_QUEUE_SUBJECTS = 2;
 const STEP_SUMMARY = 3;
 const DEFAULT_SEMESTER_OPTIONS = ["1", "2"];
-const DEFAULT_GRADE_LEVEL_OPTIONS = ["Grade 11", "Grade 12"];
+const DEFAULT_GRADE_LEVEL_OPTIONS = ["11", "12"];
 
 const initialDraft = {
     subject_name: "",
@@ -286,10 +286,10 @@ export default function SubjectWizardModal({
                                 </p>
                                 <p className="mt-1 text-sm text-slate-500">
                                     First pick 1st or 2nd semester, then Grade
-                                    11 or Grade 12. After that, pick the subject
-                                    classification. If you select specialized,
-                                    choose whether it belongs to Academic Track
-                                    or TVL Track.
+                                    11 or Grade 12 (stored as 11 or 12). After
+                                    that, pick the subject classification. If
+                                    you select specialized, choose whether it
+                                    belongs to Academic Track or TVL Track.
                                 </p>
                             </div>
 
@@ -349,7 +349,7 @@ export default function SubjectWizardModal({
                                                     : "border-slate-300 bg-white text-slate-700 hover:border-slate-400"
                                             }`}
                                         >
-                                            {option}
+                                            {`Grade ${option}`}
                                         </button>
                                     ))}
                                 </div>
@@ -490,7 +490,7 @@ export default function SubjectWizardModal({
                                     Note: Add {resolvedTypeLabel.toLowerCase()}{" "}
                                     (e.g., {subjectTypeExample}) subjects to{" "}
                                     {selectedSemesterLabel.toLowerCase()} for{" "}
-                                    {gradeLevel || "Grade 11 or Grade 12"}.
+                                    {gradeLevel || "11 or 12"}.
                                 </p>
                             </div>
 

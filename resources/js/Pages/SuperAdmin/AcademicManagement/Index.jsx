@@ -2099,7 +2099,8 @@ export default function Index({
                                             <div className="hidden grid-cols-12 items-center gap-4 px-5 py-4 hover:bg-slate-50/70 md:grid">
                                                 <div className="col-span-3 min-w-0">
                                                     <p className="truncate text-sm font-semibold text-slate-900">
-                                                        {section.section_name ||
+                                                        {section.section_full_label ||
+                                                            section.section_name ||
                                                             "N/A"}
                                                     </p>
                                                     <p className="mt-0.5 text-xs text-slate-500">
@@ -2189,7 +2190,8 @@ export default function Index({
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div className="min-w-0">
                                                         <p className="truncate text-sm font-semibold text-slate-900">
-                                                            {section.section_name ||
+                                                            {section.section_full_label ||
+                                                                section.section_name ||
                                                                 "N/A"}
                                                         </p>
                                                         <p className="mt-0.5 text-xs text-slate-500">

@@ -67,10 +67,10 @@ class SchoolYearRolloverFlowTest extends TestCase
             'department_id' => $department->id,
             'advisor_teacher_id' => $grade11Adviser->id,
             'created_by' => $superAdmin->id,
-            'section_name' => '11 Einstein',
+            'section_name' => 'Einstein',
             'section_code' => 'STEM-11-EIN',
             'cohort' => '2025',
-            'grade_level' => 'Grade 11',
+            'grade_level' => '11',
             'strand' => 'STEM',
             'track' => 'Academic',
             'school_year' => $oldSchoolYear,
@@ -81,10 +81,10 @@ class SchoolYearRolloverFlowTest extends TestCase
             'department_id' => $department->id,
             'advisor_teacher_id' => null,
             'created_by' => $superAdmin->id,
-            'section_name' => '12 Newton',
+            'section_name' => 'Newton',
             'section_code' => 'STEM-12-NEW',
             'cohort' => '2025',
-            'grade_level' => 'Grade 12',
+            'grade_level' => '12',
             'strand' => 'STEM',
             'track' => 'Academic',
             'school_year' => $oldSchoolYear,
@@ -115,7 +115,7 @@ class SchoolYearRolloverFlowTest extends TestCase
             'user_id' => $grade11StudentUser->id,
             'student_name' => 'Grade11 Student',
             'lrn' => '100000000001',
-            'grade_level' => 'Grade 11',
+            'grade_level' => '11',
             'section' => $grade11Section->section_name,
             'section_id' => $grade11Section->id,
             'strand' => 'STEM',
@@ -126,7 +126,7 @@ class SchoolYearRolloverFlowTest extends TestCase
             'user_id' => $grade12PassedUser->id,
             'student_name' => 'Grade12 Passed',
             'lrn' => '100000000002',
-            'grade_level' => 'Grade 12',
+            'grade_level' => '12',
             'section' => $grade12Section->section_name,
             'section_id' => $grade12Section->id,
             'strand' => 'STEM',
@@ -137,7 +137,7 @@ class SchoolYearRolloverFlowTest extends TestCase
             'user_id' => $grade12FailedUser->id,
             'student_name' => 'Grade12 Failed',
             'lrn' => '100000000003',
-            'grade_level' => 'Grade 12',
+            'grade_level' => '12',
             'section' => $grade12Section->section_name,
             'section_id' => $grade12Section->id,
             'strand' => 'STEM',
@@ -148,7 +148,7 @@ class SchoolYearRolloverFlowTest extends TestCase
             'user_id' => $grade12NoEnrollmentUser->id,
             'student_name' => 'Grade12 No Enrollment',
             'lrn' => '100000000004',
-            'grade_level' => 'Grade 12',
+            'grade_level' => '12',
             'section' => $grade12Section->section_name,
             'section_id' => $grade12Section->id,
             'strand' => 'STEM',
@@ -165,7 +165,7 @@ class SchoolYearRolloverFlowTest extends TestCase
             'section_id' => $grade12Section->id,
             'teacher_id' => $grade12Teacher->id,
             'school_year' => $oldSchoolYear,
-            'grade_level' => 'Grade 12',
+            'grade_level' => '12',
             'section' => $grade12Section->section_name,
             'strand' => 'STEM',
             'track' => 'Academic',
@@ -196,14 +196,14 @@ class SchoolYearRolloverFlowTest extends TestCase
 
         $promotedSection = Section::query()
             ->where('school_year', $newSchoolYear)
-            ->where('grade_level', 'Grade 12')
+            ->where('grade_level', '12')
             ->where('section_code', 'STEM-11-EIN')
             ->first();
 
         $this->assertNotNull($promotedSection);
 
         $grade11Student->refresh();
-        $this->assertSame('Grade 12', $grade11Student->grade_level);
+        $this->assertSame('12', $grade11Student->grade_level);
         $this->assertSame((int) $promotedSection->id, (int) $grade11Student->section_id);
 
         $grade12PassedUser->refresh();
@@ -233,7 +233,7 @@ class SchoolYearRolloverFlowTest extends TestCase
                 ->component('SuperAdmin/AcademicManagement/Index')
                 ->has('sections.data', 1)
                 ->where('sections.data.0.school_year', $newSchoolYear)
-                ->where('sections.data.0.grade_level', 'Grade 12')
+                ->where('sections.data.0.grade_level', '12')
                 ->where('sections.data.0.section_code', 'STEM-11-EIN')
         );
     }
@@ -266,7 +266,7 @@ class SchoolYearRolloverFlowTest extends TestCase
                     'grade11_templates' => [
                         [
                             'department_id' => $department->id,
-                            'section_name' => '11 Rizal',
+                            'section_name' => 'Rizal',
                             'section_code' => 'ABM-11-RIZ',
                             'strand' => 'ABM',
                             'track' => 'Academic',
@@ -287,9 +287,9 @@ class SchoolYearRolloverFlowTest extends TestCase
 
         $this->assertDatabaseHas('sections', [
             'department_id' => $department->id,
-            'section_name' => '11 Rizal',
+            'section_name' => 'Rizal',
             'section_code' => 'ABM-11-RIZ',
-            'grade_level' => 'Grade 11',
+            'grade_level' => '11',
             'school_year' => $currentSchoolYear,
             'advisor_teacher_id' => null,
         ]);
@@ -319,10 +319,10 @@ class SchoolYearRolloverFlowTest extends TestCase
             'department_id' => $department->id,
             'advisor_teacher_id' => null,
             'created_by' => $superAdmin->id,
-            'section_name' => '11 Mabini',
+            'section_name' => 'Mabini',
             'section_code' => 'HUM-11-MAB',
             'cohort' => '2026',
-            'grade_level' => 'Grade 11',
+            'grade_level' => '11',
             'strand' => 'HUMSS',
             'track' => 'Academic',
             'school_year' => $currentSchoolYear,

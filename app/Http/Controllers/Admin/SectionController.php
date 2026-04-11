@@ -26,6 +26,7 @@ class SectionController extends Controller
     {
         $admin = $request->user();
         $departmentId = $admin?->department_id;
+        $departmentCode = $admin?->department?->department_code;
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
 
         $sectionsQuery = Section::query()
@@ -49,10 +50,17 @@ class SectionController extends Controller
             ->withQueryString();
 
         $sections->setCollection(
-            $sections->getCollection()->map(function (Section $section) {
+            $sections->getCollection()->map(function (Section $section) use ($departmentCode) {
+                $specialization = $section->track ?: ($section->strand ?: $departmentCode);
+
                 return [
                     'id' => $section->id,
                     'section_name' => $section->section_name,
+                    'section_full_label' => satis_section_full_label(
+                        $section->grade_level,
+                        $specialization,
+                        $section->section_name,
+                    ),
                     'section_code' => $section->section_code,
                     'cohort' => $section->cohort,
                     'grade_level' => $section->grade_level,
@@ -150,7 +158,7 @@ class SectionController extends Controller
             'section_name' => ['required', 'string', 'max:255'],
             'section_code' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9\s\-]+$/'],
             'cohort' => ['required', 'string', 'max:120'],
-            'grade_level' => ['nullable', 'string', 'max:100'],
+            'grade_level' => ['nullable', 'string', Rule::in(satis_grade_level_options())],
             'strand' => ['nullable', 'string', 'max:100'],
             'track' => ['nullable', 'string', 'max:100'],
             'description' => ['nullable', 'string', 'max:1000'],
@@ -193,8 +201,10 @@ class SectionController extends Controller
             $advisorTeacherId = null;
         }
 
-        $sectionName = $this->normalizeText($validated['section_name']);
+        $sectionName = satis_extract_section_base_name($validated['section_name'])
+            ?? $this->normalizeText($validated['section_name']);
         $cohort = $this->normalizeText($validated['cohort']);
+        $gradeLevel = satis_normalize_grade_level($validated['grade_level'] ?? null);
 
         $sectionCode = $this->normalizeNullableText($validated['section_code'] ?? null);
         $sectionCode = $sectionCode !== null
@@ -246,6 +256,7 @@ class SectionController extends Controller
             $sectionName,
             $sectionCode,
             $cohort,
+            $gradeLevel,
             $validated,
             $assignedStudentIds,
             $newStudents,
@@ -253,7 +264,13 @@ class SectionController extends Controller
             $currentSchoolYear
         ) {
             $section = Section::create([
-                'grade_level' => $this->normalizeNullableText($validated['grade_level'] ?? null),
+                'department_id' => $departmentId,
+                'advisor_teacher_id' => $advisorTeacherId,
+                'created_by' => $admin->id,
+                'section_name' => $sectionName,
+                'section_code' => $sectionCode,
+                'cohort' => $cohort,
+                'grade_level' => $gradeLevel,
                 'strand' => $this->normalizeNullableText($validated['strand'] ?? null),
                 'track' => $this->normalizeNullableText($validated['track'] ?? null),
                 'school_year' => $currentSchoolYear,
@@ -328,6 +345,11 @@ class SectionController extends Controller
 
             return [
                 'section_name' => $section->section_name,
+                'section_full_label' => satis_section_full_label(
+                    $section->grade_level,
+                    $section->strand,
+                    $section->section_name,
+                ),
                 'section_code' => $section->section_code,
                 'cohort' => $section->cohort,
                 'school_year' => $section->school_year,

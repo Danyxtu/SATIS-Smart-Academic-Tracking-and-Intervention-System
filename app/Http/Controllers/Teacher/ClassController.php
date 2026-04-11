@@ -136,16 +136,27 @@ class ClassController extends Controller
                 'track',
                 'cohort',
             ])
-            ->map(fn(Section $section) => [
-                'id' => (int) $section->id,
-                'section_name' => $section->section_name,
-                'section_code' => $section->section_code,
-                'grade_level' => $section->grade_level,
-                'strand' => $section->strand,
-                'track' => $section->track,
-                'department_code' => $section->department?->department_code,
-                'department_name' => $section->department?->department_name,
-            ])
+            ->map(function (Section $section) {
+                $specialization = $section->track
+                    ?: ($section->strand ?: $section->department?->department_code);
+
+                return [
+                    'id' => (int) $section->id,
+                    'section_name' => $section->section_name,
+                    'section_code' => $section->section_code,
+                    'grade_level' => $section->grade_level,
+                    'strand' => $section->strand,
+                    'track' => $section->track,
+                    'specialization' => $specialization,
+                    'section_full_label' => satis_section_full_label(
+                        $section->grade_level,
+                        $specialization,
+                        $section->section_name,
+                    ),
+                    'department_code' => $section->department?->department_code,
+                    'department_name' => $section->department?->department_name,
+                ];
+            })
             ->values();
 
         $classes = $classesData['classes'];
@@ -492,7 +503,7 @@ class ClassController extends Controller
         ]);
 
         $data = $request->validate([
-            'grade_level' => 'required|string|max:255',
+            'grade_level' => ['required', 'string', Rule::in(satis_grade_level_options())],
             'section' => ['required', 'string', 'max:20', 'regex:/^[A-Za-z]+$/'],
             'subject_name' => 'required|string|max:255',
             'color' => 'required|string|in:' . implode(',', self::COLOR_OPTIONS),
@@ -628,7 +639,7 @@ class ClassController extends Controller
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
 
         $data = $request->validate([
-            'grade_level' => 'required|string|max:255',
+            'grade_level' => ['required', 'string', Rule::in(satis_grade_level_options())],
             'section' => ['required', 'string', 'max:20', 'regex:/^[A-Za-z]+$/'],
             'subject_name' => 'required|string|max:255',
             'color' => 'required|string|in:' . implode(',', self::COLOR_OPTIONS),
@@ -1701,6 +1712,23 @@ class ClassController extends Controller
     ): int {
         $normalizedSection = strtoupper(trim($sectionCombined));
         $normalizedStrand = strtoupper(trim((string) $strand));
+        $normalizedGradeLevel = satis_normalize_grade_level($gradeLevel);
+
+        if ($normalizedGradeLevel === null) {
+            throw ValidationException::withMessages([
+                'grade_level' => 'Grade level must be one of: 11, 12.',
+            ]);
+        }
+
+        $sectionBaseName = strtoupper(
+            trim((string) (satis_extract_section_base_name((string) Str::after($normalizedSection, '-')) ?? '')),
+        );
+
+        if ($sectionBaseName === '') {
+            throw ValidationException::withMessages([
+                'section' => 'Section name is required.',
+            ]);
+        }
 
         if ($normalizedStrand === '' && str_contains($normalizedSection, '-')) {
             $normalizedStrand = strtoupper((string) Str::before($normalizedSection, '-'));
@@ -1733,10 +1761,18 @@ class ClassController extends Controller
         $sectionRecord = Section::query()
             ->where('department_id', $department->id)
             ->where('cohort', $cohort)
-            ->where(function ($query) use ($normalizedSection) {
+            ->where('grade_level', $normalizedGradeLevel)
+            ->where(function ($query) use ($sectionBaseName, $normalizedSection) {
                 $query
-                    ->whereRaw('UPPER(section_name) = ?', [$normalizedSection])
+                    ->whereRaw('UPPER(section_name) = ?', [$sectionBaseName])
                     ->orWhereRaw('UPPER(section_code) = ?', [$normalizedSection]);
+            })
+            ->when($normalizedStrand !== '', function ($query) use ($normalizedStrand) {
+                $query->where(function ($strandQuery) use ($normalizedStrand) {
+                    $strandQuery
+                        ->whereNull('strand')
+                        ->orWhereRaw('UPPER(strand) = ?', [$normalizedStrand]);
+                });
             })
             ->first();
 
@@ -1744,15 +1780,17 @@ class ClassController extends Controller
             return (int) $sectionRecord->id;
         }
 
+        $sectionCode = $normalizedGradeLevel . '-' . $normalizedSection;
+
         $sectionRecord = Section::create([
             'department_id' => $department->id,
             'created_by' => $teacherId,
-            'section_name' => $normalizedSection,
-            'section_code' => $normalizedSection,
+            'section_name' => $sectionBaseName,
+            'section_code' => $sectionCode,
             'cohort' => $cohort,
-            'grade_level' => $gradeLevel,
+            'grade_level' => $normalizedGradeLevel,
             'strand' => $normalizedStrand !== '' ? $normalizedStrand : $department->department_code,
-            'track' => $track,
+            'track' => satis_normalize_whitespace($track),
             'school_year' => $schoolYear,
             'description' => 'Auto-created from teacher class workflow.',
             'is_active' => true,

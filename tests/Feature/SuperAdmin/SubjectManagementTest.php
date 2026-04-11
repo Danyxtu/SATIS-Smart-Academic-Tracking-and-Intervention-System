@@ -41,7 +41,7 @@ class SubjectManagementTest extends TestCase
                 'subject_name' => 'Earth and Life Science',
                 'subject_code' => 'ELS',
                 'semester' => '1',
-                'grade_level' => 'Grade 11',
+                'grade_level' => '11',
             ]);
 
         $response->assertRedirect(route('superadmin.subjects.index'));
@@ -50,7 +50,7 @@ class SubjectManagementTest extends TestCase
             'subject_name' => 'Earth and Life Science',
             'subject_code' => 'ELS',
             'semester' => '1',
-            'grade_level' => 'Grade 11',
+            'grade_level' => '11',
         ]);
     }
 
@@ -63,7 +63,7 @@ class SubjectManagementTest extends TestCase
             ->post(route('superadmin.subjects.store'), [
                 'type_key' => SubjectType::SPECIALIZED_TVL,
                 'semester' => '2',
-                'grade_level' => 'Grade 12',
+                'grade_level' => '12',
                 'subjects' => [
                     [
                         'subject_name' => 'Computer Systems Servicing',
@@ -85,7 +85,7 @@ class SubjectManagementTest extends TestCase
             'subject_code' => 'ICT-CSS',
             'total_hours' => 160,
             'semester' => '2',
-            'grade_level' => 'Grade 12',
+            'grade_level' => '12',
         ]);
 
         $this->assertDatabaseHas('subjects', [
@@ -93,7 +93,7 @@ class SubjectManagementTest extends TestCase
             'subject_code' => 'TVL-COOKERY',
             'total_hours' => 160,
             'semester' => '2',
-            'grade_level' => 'Grade 12',
+            'grade_level' => '12',
         ]);
 
         $tvlType = SubjectType::query()
@@ -125,7 +125,7 @@ class SubjectManagementTest extends TestCase
                 'subject_name' => 'Advanced Physical Science',
                 'subject_code' => 'APS',
                 'semester' => '2',
-                'grade_level' => 'Grade 12',
+                'grade_level' => '12',
             ]);
 
         $response->assertRedirect(route('superadmin.subjects.index'));
@@ -135,7 +135,7 @@ class SubjectManagementTest extends TestCase
             'subject_name' => 'Advanced Physical Science',
             'subject_code' => 'APS',
             'semester' => '2',
-            'grade_level' => 'Grade 12',
+            'grade_level' => '12',
         ]);
     }
 
@@ -174,7 +174,7 @@ class SubjectManagementTest extends TestCase
         SubjectTeacher::create([
             'subject_id' => $subject->id,
             'teacher_id' => $teacher->id,
-            'grade_level' => 'Grade 11',
+            'grade_level' => '11',
             'section' => 'STEM-A',
             'color' => 'indigo',
             'strand' => 'STEM',
@@ -255,25 +255,25 @@ class SubjectManagementTest extends TestCase
         Subject::create([
             'subject_name' => 'Earth Science Grade 11',
             'subject_code' => 'EARTH-11',
-            'grade_level' => 'Grade 11',
+            'grade_level' => '11',
         ]);
 
         Subject::create([
             'subject_name' => 'Earth Science Grade 12',
             'subject_code' => 'EARTH-12',
-            'grade_level' => 'Grade 12',
+            'grade_level' => '12',
         ]);
 
         $response = $this->actingAs($superAdmin)
             ->get(route('superadmin.subjects.index', [
-                'grade_level' => 'Grade 12',
+                'grade_level' => '12',
             ]));
 
         $response->assertOk();
         $response->assertInertia(
             fn($page) => $page
                 ->component('SuperAdmin/Subjects/Index')
-                ->where('filters.grade_level', 'Grade 12')
+                ->where('filters.grade_level', '12')
                 ->has('subjects.data', 1)
                 ->where('subjects.data.0.subject_code', 'EARTH-12')
         );
@@ -288,14 +288,14 @@ class SubjectManagementTest extends TestCase
             'subject_name' => 'Reading and Writing 1st',
             'subject_code' => 'READ-1',
             'semester' => '1',
-            'grade_level' => 'Grade 11',
+            'grade_level' => '11',
         ]);
 
         Subject::create([
             'subject_name' => 'Reading and Writing 2nd',
             'subject_code' => 'READ-2',
             'semester' => '2',
-            'grade_level' => 'Grade 11',
+            'grade_level' => '11',
         ]);
 
         $response = $this->actingAs($superAdmin)

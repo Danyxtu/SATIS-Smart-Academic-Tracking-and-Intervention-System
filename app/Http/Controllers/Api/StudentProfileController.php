@@ -54,7 +54,7 @@ class StudentProfileController extends Controller
             ],
             'student_name' => ['nullable', 'string', 'max:255'],
             'lrn' => ['nullable', 'string', 'max:20'],
-            'grade_level' => ['nullable', 'string', 'max:50'],
+            'grade_level' => ['nullable', 'string', Rule::in(satis_grade_level_options())],
             'section' => ['nullable', 'string', 'max:50'],
             'strand' => ['nullable', 'string', 'max:100'],
             'track' => ['nullable', 'string', 'max:100'],

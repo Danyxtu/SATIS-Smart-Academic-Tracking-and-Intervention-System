@@ -120,10 +120,18 @@ class AcademicManagementController extends Controller
 
         $sections->setCollection(
             $sections->getCollection()->map(function (Section $section) {
+                $specialization = $section->track
+                    ?: ($section->strand ?: $section->department?->department_code);
+
                 return [
                     'id' => (int) $section->id,
                     'department_id' => (int) $section->department_id,
                     'section_name' => $section->section_name,
+                    'section_full_label' => satis_section_full_label(
+                        $section->grade_level,
+                        $specialization,
+                        $section->section_name,
+                    ),
                     'section_code' => $section->section_code,
                     'cohort' => $section->cohort,
                     'grade_level' => $section->grade_level,
@@ -161,6 +169,14 @@ class AcademicManagementController extends Controller
                     'subject_code' => $schoolClass->subject?->subject_code,
                     'teacher_name' => $schoolClass->teacher?->name,
                     'section_name' => $schoolClass->sectionRecord?->section_name,
+                    'section_full_label' => $schoolClass->sectionRecord
+                        ? satis_section_full_label(
+                            $schoolClass->sectionRecord->grade_level,
+                            $schoolClass->sectionRecord->strand
+                                ?: $schoolClass->sectionRecord->department?->department_code,
+                            $schoolClass->sectionRecord->section_name,
+                        )
+                        : null,
                     'section_code' => $schoolClass->sectionRecord?->section_code,
                     'cohort' => $schoolClass->sectionRecord?->cohort,
                     'grade_level' => $schoolClass->sectionRecord?->grade_level,
@@ -197,6 +213,11 @@ class AcademicManagementController extends Controller
                 'id' => (int) $section->id,
                 'department_id' => (int) $section->department_id,
                 'section_name' => $section->section_name,
+                'section_full_label' => satis_section_full_label(
+                    $section->grade_level,
+                    $section->strand ?: $section->department?->department_code,
+                    $section->section_name,
+                ),
                 'section_code' => $section->section_code,
                 'cohort' => $section->cohort,
                 'grade_level' => $section->grade_level,
@@ -244,7 +265,7 @@ class AcademicManagementController extends Controller
         $availableStudents = Student::query()
             ->with([
                 'user:id,first_name,middle_name,last_name,personal_email,department_id',
-                'sectionRecord:id,department_id,section_name',
+                'sectionRecord:id,department_id,section_name,grade_level,strand',
             ])
             ->whereHas('user.roles', function ($query) {
                 $query->where('name', 'student');
@@ -263,7 +284,13 @@ class AcademicManagementController extends Controller
                     'personal_email' => $student->user?->personal_email,
                     'department_id' => $student->user?->department_id ? (int) $student->user->department_id : null,
                     'section_id' => $student->section_id ? (int) $student->section_id : null,
-                    'section_name' => $student->sectionRecord?->section_name ?? $student->section,
+                    'section_name' => $student->sectionRecord
+                        ? satis_section_full_label(
+                            $student->sectionRecord->grade_level,
+                            $student->sectionRecord->strand,
+                            $student->sectionRecord->section_name,
+                        )
+                        : $student->section,
                 ];
             })
             ->values();
@@ -290,7 +317,9 @@ class AcademicManagementController extends Controller
                 ->filter(fn($template) => is_array($template))
                 ->map(function (array $template) {
                     $departmentId = (int) ($template['department_id'] ?? 0);
-                    $sectionName = $this->normalizeNullableText($template['section_name'] ?? null);
+                    $sectionName = satis_extract_section_base_name(
+                        $this->normalizeNullableText($template['section_name'] ?? null),
+                    );
 
                     if ($departmentId <= 0 || $sectionName === null) {
                         return null;
@@ -312,7 +341,7 @@ class AcademicManagementController extends Controller
         $unassignedGrade11Sections = Section::query()
             ->with('department:id,department_name,department_code')
             ->where('school_year', $currentSchoolYear)
-            ->where('grade_level', 'Grade 11')
+            ->where('grade_level', '11')
             ->whereNull('advisor_teacher_id')
             ->where('is_active', true)
             ->orderBy('section_name')
@@ -330,6 +359,11 @@ class AcademicManagementController extends Controller
                 'id' => (int) $section->id,
                 'department_id' => (int) $section->department_id,
                 'section_name' => $section->section_name,
+                'section_full_label' => satis_section_full_label(
+                    $section->grade_level,
+                    $section->strand ?: $section->department?->department_code,
+                    $section->section_name,
+                ),
                 'section_code' => $section->section_code,
                 'grade_level' => $section->grade_level,
                 'strand' => $section->strand,
@@ -398,7 +432,9 @@ class AcademicManagementController extends Controller
 
             foreach ($templates as $template) {
                 $departmentId = (int) ($template['department_id'] ?? 0);
-                $sectionName = $this->normalizeNullableText($template['section_name'] ?? null);
+                $sectionName = satis_extract_section_base_name(
+                    $this->normalizeNullableText($template['section_name'] ?? null),
+                );
 
                 if ($departmentId <= 0 || $sectionName === null) {
                     continue;
@@ -413,7 +449,7 @@ class AcademicManagementController extends Controller
                 $existingSection = Section::query()
                     ->where('department_id', $departmentId)
                     ->where('school_year', $currentSchoolYear)
-                    ->where('grade_level', 'Grade 11')
+                    ->where('grade_level', '11')
                     ->where('section_name', $sectionName)
                     ->exists();
 
@@ -439,7 +475,7 @@ class AcademicManagementController extends Controller
                     'section_name' => $sectionName,
                     'section_code' => $sectionCode,
                     'cohort' => $cohort,
-                    'grade_level' => 'Grade 11',
+                    'grade_level' => '11',
                     'strand' => $this->normalizeNullableText($template['strand'] ?? null) ?? $department->department_code,
                     'track' => $this->normalizeNullableText($template['track'] ?? null) ?? ($department->track ?: 'Academic'),
                     'school_year' => $currentSchoolYear,
@@ -499,7 +535,7 @@ class AcademicManagementController extends Controller
         $sections = Section::query()
             ->whereIn('id', $sectionIds)
             ->where('school_year', $currentSchoolYear)
-            ->where('grade_level', 'Grade 11')
+            ->where('grade_level', '11')
             ->whereNull('advisor_teacher_id')
             ->where('is_active', true)
             ->get(['id', 'department_id']);
@@ -560,15 +596,17 @@ class AcademicManagementController extends Controller
         $schoolYear = SystemSetting::getCurrentSchoolYear();
         $cohort = $this->resolveCohortFromSchoolYear($schoolYear);
 
-        $sectionBaseName = $this->normalizeText($validated['section_name']);
-        $gradeLevel = $this->normalizeGradeLevel($validated['grade_level']);
-        $formattedSectionName = $this->formatSectionName(
-            $gradeLevel,
-            $department->department_code,
-            $sectionBaseName,
-        );
+        $sectionBaseName = satis_extract_section_base_name($validated['section_name'])
+            ?? $this->normalizeText($validated['section_name']);
+        $gradeLevel = satis_normalize_grade_level($validated['grade_level']);
 
-        $sectionCode = $this->generateSectionCode($formattedSectionName);
+        if ($gradeLevel === null) {
+            throw ValidationException::withMessages([
+                'grade_level' => 'Grade level must be either 11 or 12.',
+            ]);
+        }
+
+        $sectionCode = $this->generateSectionCode($sectionBaseName);
 
         $advisorTeacherId = isset($validated['advisor_teacher_id'])
             ? (int) $validated['advisor_teacher_id']
@@ -580,7 +618,7 @@ class AcademicManagementController extends Controller
             $advisorTeacherId = null;
         }
 
-        $this->ensureUniqueSectionName((int) $department->id, $cohort, $formattedSectionName);
+        $this->ensureUniqueSectionName((int) $department->id, $cohort, $sectionBaseName);
         $sectionCode = $this->ensureUniqueSectionCode((int) $department->id, $cohort, $sectionCode);
 
         $assignedStudentIds = collect($validated['assigned_student_ids'] ?? [])
@@ -607,7 +645,7 @@ class AcademicManagementController extends Controller
             $schoolYear,
             $cohort,
             $gradeLevel,
-            $formattedSectionName,
+            $sectionBaseName,
             $sectionCode,
             $selectedTrack,
             $advisorTeacherId,
@@ -618,7 +656,7 @@ class AcademicManagementController extends Controller
                 'department_id' => (int) $department->id,
                 'created_by' => $request->user()?->id,
                 'advisor_teacher_id' => $advisorTeacherId,
-                'section_name' => $formattedSectionName,
+                'section_name' => $sectionBaseName,
                 'section_code' => $sectionCode,
                 'cohort' => $cohort,
                 'grade_level' => $gradeLevel,
@@ -711,6 +749,11 @@ class AcademicManagementController extends Controller
             return [
                 'section_id' => (int) $section->id,
                 'section_name' => $section->section_name,
+                'section_full_label' => satis_section_full_label(
+                    $section->grade_level,
+                    $section->strand ?: $department->department_code,
+                    $section->section_name,
+                ),
                 'section_code' => $section->section_code,
                 'department_name' => $department->department_name,
                 'department_code' => $department->department_code,
@@ -738,8 +781,10 @@ class AcademicManagementController extends Controller
         $validated = $request->validate($this->sectionValidationRules());
 
         $department = Department::query()->findOrFail((int) $validated['department_id']);
-        $sectionName = $this->normalizeText($validated['section_name']);
+        $sectionName = satis_extract_section_base_name($validated['section_name'])
+            ?? $this->normalizeText($validated['section_name']);
         $cohort = $this->normalizeText($validated['cohort']);
+        $gradeLevel = satis_normalize_grade_level($validated['grade_level'] ?? null);
 
         $sectionCode = $this->normalizeNullableText($validated['section_code'] ?? null);
         $sectionCode = $sectionCode !== null
@@ -765,7 +810,7 @@ class AcademicManagementController extends Controller
             'section_name' => $sectionName,
             'section_code' => $sectionCode,
             'cohort' => $cohort,
-            'grade_level' => $this->normalizeNullableText($validated['grade_level'] ?? null),
+            'grade_level' => $gradeLevel,
             'strand' => $this->normalizeNullableText($validated['strand'] ?? null) ?? $department->department_code,
             'track' => $this->normalizeNullableText($validated['track'] ?? null),
             'school_year' => $this->normalizeNullableText($validated['school_year'] ?? null) ?? SystemSetting::getCurrentSchoolYear(),
@@ -787,7 +832,7 @@ class AcademicManagementController extends Controller
             'track' => ['required', 'string', Rule::in(['Academic', 'TVL'])],
             'department_id' => ['required', 'integer', Rule::exists('departments', 'id')],
             'section_name' => ['required', 'string', 'max:255'],
-            'grade_level' => ['required', 'string', 'max:100'],
+            'grade_level' => ['required', 'string', Rule::in(satis_grade_level_options())],
             'school_year' => ['nullable', 'string', 'max:20'],
             'advisor_teacher_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'assigned_student_ids' => ['nullable', 'array'],
@@ -881,7 +926,7 @@ class AcademicManagementController extends Controller
                         'section_id' => (int) $item['section_id'],
                         'teacher_id' => (int) $item['teacher_id'],
                         'school_year' => $item['school_year'],
-                        'grade_level' => $section->grade_level ?? 'Grade 12',
+                        'grade_level' => $section->grade_level ?? '12',
                         'section' => $section->section_code ?: $section->section_name,
                         'strand' => $section->strand,
                         'track' => $section->track,
@@ -916,7 +961,7 @@ class AcademicManagementController extends Controller
             'section_id' => (int) $validated['section_id'],
             'teacher_id' => (int) $validated['teacher_id'],
             'school_year' => $this->normalizeText($validated['school_year']),
-            'grade_level' => $section->grade_level ?? 'Grade 12',
+            'grade_level' => $section->grade_level ?? '12',
             'section' => $section->section_code ?: $section->section_name,
             'strand' => $section->strand,
             'track' => $section->track,
@@ -983,7 +1028,7 @@ class AcademicManagementController extends Controller
             'section_name' => ['required', 'string', 'max:255'],
             'section_code' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9\s\-]+$/'],
             'cohort' => ['required', 'string', 'max:120'],
-            'grade_level' => ['nullable', 'string', 'max:100'],
+            'grade_level' => ['nullable', 'string', Rule::in(satis_grade_level_options())],
             'strand' => ['nullable', 'string', 'max:100'],
             'track' => ['nullable', 'string', 'max:100'],
             'school_year' => ['nullable', 'string', 'max:20'],
@@ -1087,40 +1132,6 @@ class AcademicManagementController extends Controller
         $normalized = $this->normalizeNullableText($value);
 
         return $normalized !== null ? Str::lower($normalized) : null;
-    }
-
-    private function normalizeGradeLevel(string $value): string
-    {
-        $normalized = $this->normalizeText($value);
-
-        if (preg_match('/(\d{1,2})/', $normalized, $matches) === 1) {
-            return 'Grade ' . $matches[1];
-        }
-
-        return $normalized;
-    }
-
-    private function extractGradeToken(string $gradeLevel): string
-    {
-        if (preg_match('/(\d{1,2})/', $gradeLevel, $matches) === 1) {
-            return $matches[1];
-        }
-
-        return $gradeLevel;
-    }
-
-    private function formatSectionName(string $gradeLevel, string $departmentCode, string $baseSectionName): string
-    {
-        $gradeToken = $this->extractGradeToken($gradeLevel);
-        $normalizedDepartmentCode = Str::upper($this->normalizeText($departmentCode));
-        $normalizedSectionName = $this->normalizeText($baseSectionName);
-
-        return sprintf(
-            '%s - %s - %s',
-            $gradeToken,
-            $normalizedDepartmentCode,
-            $normalizedSectionName,
-        );
     }
 
     private function resolveCohortFromSchoolYear(string $schoolYear): string
