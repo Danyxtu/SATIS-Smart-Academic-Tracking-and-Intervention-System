@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Modal from "@/Components/Modal";
 import {
     X,
@@ -16,9 +16,42 @@ export default function PriorityStudentsReportModal({
     attentionStudents = [],
     academicPeriod,
     department,
+    watchlistRuleConfig = {},
+    watchlistObservedCategories = {},
 }) {
     const [isGenerating, setIsGenerating] = useState(false);
     const students = Array.isArray(attentionStudents) ? attentionStudents : [];
+
+    const observeAtRisk =
+        watchlistObservedCategories?.at_risk !== undefined
+            ? Boolean(watchlistObservedCategories.at_risk)
+            : true;
+    const observeNeedsAttention =
+        watchlistObservedCategories?.needs_attention !== undefined
+            ? Boolean(watchlistObservedCategories.needs_attention)
+            : true;
+    const observeRecentDecline =
+        watchlistObservedCategories?.recent_decline !== undefined
+            ? Boolean(watchlistObservedCategories.recent_decline)
+            : true;
+
+    const passingGrade = Number(watchlistRuleConfig?.passing_grade ?? 75);
+    const atRiskAbsenceThreshold = Number(
+        watchlistRuleConfig?.high_risk?.absence_threshold ?? 5,
+    );
+    const needsAttentionAbsenceThreshold = Number(
+        watchlistRuleConfig?.needs_attention?.absence_threshold ?? 3,
+    );
+    const needsAttentionFailingActivitiesThreshold = Number(
+        watchlistRuleConfig?.needs_attention?.failing_activities_threshold ?? 3,
+    );
+    const recentDeclineMinimumDropPercent = Number(
+        watchlistRuleConfig?.recent_decline?.minimum_drop_percent ?? 20,
+    );
+    const recentDeclineRequiresFailingFinalQuarter = Boolean(
+        watchlistRuleConfig?.recent_decline?.require_final_quarter_failing ??
+            true,
+    );
 
     const atRiskCount = students.filter((student) => student.at_risk).length;
     const needsAttentionCount = students.filter(
@@ -28,13 +61,35 @@ export default function PriorityStudentsReportModal({
         (student) => student.recent_decline,
     ).length;
 
-    const [filters, setFilters] = useState({
-        at_risk: true,
-        needs_attention: true,
-        recent_decline: true,
-    });
+    const defaultFilters = useMemo(
+        () => ({
+            at_risk: observeAtRisk,
+            needs_attention: observeNeedsAttention,
+            recent_decline: observeRecentDecline,
+        }),
+        [observeAtRisk, observeNeedsAttention, observeRecentDecline],
+    );
+
+    const [filters, setFilters] = useState(defaultFilters);
+
+    useEffect(() => {
+        if (!show) return;
+
+        // Keep export defaults aligned with Class Settings whenever the modal opens.
+        setFilters(defaultFilters);
+    }, [show, defaultFilters]);
 
     const toggleFilter = (key) => {
+        const enabledBySettings = {
+            at_risk: observeAtRisk,
+            needs_attention: observeNeedsAttention,
+            recent_decline: observeRecentDecline,
+        }[key];
+
+        if (!enabledBySettings) {
+            return;
+        }
+
         setFilters((prev) => ({
             ...prev,
             [key]: !prev[key],
@@ -43,9 +98,9 @@ export default function PriorityStudentsReportModal({
 
     const selectAll = () => {
         setFilters({
-            at_risk: true,
-            needs_attention: true,
-            recent_decline: true,
+            at_risk: observeAtRisk,
+            needs_attention: observeNeedsAttention,
+            recent_decline: observeRecentDecline,
         });
     };
 
@@ -104,7 +159,8 @@ export default function PriorityStudentsReportModal({
         {
             key: "at_risk",
             label: "At Risks",
-            description: "Students with grades below 75",
+            description: `Grade below ${passingGrade}% or absences >= ${atRiskAbsenceThreshold}`,
+            enabled: observeAtRisk,
             count: atRiskCount,
             icon: AlertTriangle,
             color: "red",
@@ -117,7 +173,8 @@ export default function PriorityStudentsReportModal({
         {
             key: "needs_attention",
             label: "Needs Attention",
-            description: "Students absent more than 5",
+            description: `Absences > ${needsAttentionAbsenceThreshold} or failing activities > ${needsAttentionFailingActivitiesThreshold}`,
+            enabled: observeNeedsAttention,
             count: needsAttentionCount,
             icon: ClipboardList,
             color: "amber",
@@ -130,7 +187,10 @@ export default function PriorityStudentsReportModal({
         {
             key: "recent_decline",
             label: "Recent Declines",
-            description: "Grades dropped from >75 to 75 or below",
+            description: recentDeclineRequiresFailingFinalQuarter
+                ? `Decline >= ${recentDeclineMinimumDropPercent}% and final quarter failing`
+                : `Decline >= ${recentDeclineMinimumDropPercent}% from midterm`,
+            enabled: observeRecentDecline,
             count: recentDeclineCount,
             icon: TrendingDown,
             color: "blue",
@@ -241,12 +301,18 @@ export default function PriorityStudentsReportModal({
                         {filterOptions.map((option) => {
                             const Icon = option.icon;
                             const isChecked = filters[option.key];
+                            const isLocked = !option.enabled;
 
                             return (
                                 <button
                                     key={option.key}
                                     onClick={() => toggleFilter(option.key)}
+                                    disabled={isLocked}
                                     className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
+                                        isLocked
+                                            ? "cursor-not-allowed opacity-70"
+                                            : "cursor-pointer"
+                                    } ${
                                         isChecked
                                             ? `${option.bgColor} ${option.borderColor}`
                                             : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
@@ -298,6 +364,12 @@ export default function PriorityStudentsReportModal({
                                                     }`}
                                                 >
                                                     {option.label}
+                                                    {isLocked && (
+                                                        <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
+                                                            (hidden in Class
+                                                            Settings)
+                                                        </span>
+                                                    )}
                                                 </span>
                                                 <span
                                                     className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
@@ -313,7 +385,9 @@ export default function PriorityStudentsReportModal({
                                                 </span>
                                             </div>
                                             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                                {option.description}
+                                                {isLocked
+                                                    ? "This category is disabled in Class Settings and cannot be included in this report."
+                                                    : option.description}
                                             </p>
                                         </div>
                                     </div>
@@ -345,7 +419,7 @@ export default function PriorityStudentsReportModal({
                 <div className="shrink-0 border-t border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-800/50 sm:px-6 sm:py-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                            The report will include a summary section at the end
+                            The report will follow your Class Settings and include a formal summary section.
                         </p>
                         <div className="flex w-full gap-2 sm:w-auto sm:gap-3">
                             <button

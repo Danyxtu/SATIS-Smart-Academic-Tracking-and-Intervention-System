@@ -6,11 +6,11 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Attendance Report</title>
         <style>
-            body { font-family: Arial, sans-serif; font-size: 12px; color: #000; margin: 0; padding: 20px; }
-            .header { text-align: center; margin-bottom: 20px; }
-            .title { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
-            .subtitle { font-size: 14px; color: #333; margin-bottom: 5px; }
-            .month-year { font-size: 16px; font-weight: bold; color: #000; margin-top: 10px; }
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 12px; color: #000; margin: 0; padding: 20px; }
+            .header { text-align: left; margin-bottom: 20px; }
+            .title { font-size: 18px; font-weight: 800; margin-bottom: 5px; color: #111827; }
+            .subtitle { font-size: 14px; color: #374151; margin-bottom: 5px; }
+            .month-year { font-size: 16px; font-weight: 700; color: #4f46e5; margin-top: 10px; }
             table { width: 100%; border-collapse: collapse; margin-top: 15px; }
             th, td { border: 1px solid #000; padding: 8px 12px; text-align: center; }
             th { background: #e0e0e0; font-weight: bold; font-size: 11px; }
@@ -26,9 +26,10 @@
     </head>
     <body>
         <div class="header">
+            @include('pdf.partials.standard_header')
             <div class="title">Monthly Attendance Report</div>
             <div class="subtitle">{{ $section['grade_level'] }} - {{ $section['section'] }} | {{ $section['subject_name'] ?? $section['label'] ?? 'N/A' }}</div>
-            <div class="month-year">{{ \Carbon\Carbon::now()->format('F Y') }}</div>
+            <div class="month-year">{{ \Illuminate\Support\Carbon::now('Asia/Manila')->format('F Y') }}</div>
         </div>
 
         <table>
@@ -59,7 +60,7 @@
         </table>
 
         <div class="summary">
-            <strong>Report Generated:</strong> {{ \Carbon\Carbon::now()->format('F d, Y h:i A') }}
+            <strong>Report Generated:</strong> {{ \Illuminate\Support\Carbon::now('Asia/Manila')->format('F d, Y h:i A') }}
         </div>
     </body>
 </html>

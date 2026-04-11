@@ -27,15 +27,15 @@
         
         /* Header Styles */
         .header {
-            text-align: center;
-            border-bottom: 3px solid #DB2777;
+            text-align: left;
+            border-bottom: 3px solid #5b21b6;
             padding-bottom: 15px;
             margin-bottom: 20px;
         }
         
         .header h1 {
             font-size: 20px;
-            color: #DB2777;
+            color: #111827;
             margin-bottom: 5px;
             font-weight: 700;
         }
@@ -56,18 +56,18 @@
         .logo-text {
             font-size: 24px;
             font-weight: 800;
-            color: #DB2777;
+            color: #5b21b6;
             letter-spacing: -1px;
             margin-bottom: 10px;
         }
         
         /* Student Info Card */
         .student-info {
-            background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%);
+            background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
             border-radius: 12px;
             padding: 15px 20px;
             margin-bottom: 20px;
-            border-left: 4px solid #DB2777;
+            border-left: 4px solid #5b21b6;
         }
         
         .student-info h2 {
@@ -159,10 +159,10 @@
         .section-title {
             font-size: 13px;
             font-weight: 700;
-            color: #DB2777;
+            color: #5b21b6;
             margin-bottom: 10px;
             padding-bottom: 5px;
-            border-bottom: 2px solid #fce7f3;
+            border-bottom: 2px solid #e0e7ff;
             display: flex;
             align-items: center;
         }
@@ -171,7 +171,7 @@
             content: '';
             width: 4px;
             height: 16px;
-            background: #DB2777;
+            background: #5b21b6;
             margin-right: 8px;
             border-radius: 2px;
         }
@@ -204,7 +204,7 @@
         }
         
         tr:hover {
-            background: #fdf2f8;
+            background: #eef2ff;
         }
         
         /* Stats Grid */
@@ -289,12 +289,12 @@
         
         .suggestions-list li {
             padding: 8px 12px;
-            background: #fdf2f8;
+            background: #eef2ff;
             border-radius: 6px;
             margin-bottom: 6px;
             font-size: 10px;
-            color: #831843;
-            border-left: 3px solid #DB2777;
+            color: #312e81;
+            border-left: 3px solid #5b21b6;
         }
         
         .suggestions-list li::before {
@@ -363,23 +363,11 @@
     </style>
 </head>
 <body>
-    @php
-        $logoPath = resource_path('assets/satis-logo.png');
-        $logoData = extension_loaded('gd') && file_exists($logoPath)
-            ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath))
-            : null;
-    @endphp
-
     <div class="container">
         <!-- Header -->
         <div class="header">
-            @if($logoData)
-                <img src="{{ $logoData }}" alt="SATIS Logo" class="logo-image">
-            @else
-                <div class="logo-text">SATIS</div>
-            @endif
+            @include('pdf.partials.standard_header')
             <h1>Student Analytics Report</h1>
-            <p class="subtitle">Smart Academic Tracking and Intervention System</p>
         </div>
         
         <!-- Student Information -->
@@ -409,7 +397,7 @@
                 <h3>{{ $subject['name'] }}</h3>
                 <p class="teacher">
                     {{ $subject['teacher'] }} • {{ $subject['section'] ?? '' }}
-                    @if($subject['grade_level'])
+                    @if(!empty($subject['grade_level']))
                     • Grade {{ $subject['grade_level'] }}
                     @endif
                 </p>
@@ -574,7 +562,7 @@
         
         <!-- Footer -->
         <div class="footer">
-            <p class="generated-at">Generated on {{ $generatedAt ?? now()->format('F d, Y h:i A') }}</p>
+            <p class="generated-at">Generated on {{ $generatedAt ?? \Illuminate\Support\Carbon::now('Asia/Manila')->format('F d, Y h:i A') }}</p>
             <p>SATIS - Smart Academic Tracking and Intervention System</p>
             <p>This report was automatically generated from SATIS Mobile App</p>
         </div>

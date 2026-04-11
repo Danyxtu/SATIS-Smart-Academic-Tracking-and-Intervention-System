@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Student Analytics - {{ $student['name'] }}</title>
     <style>
-        body { font-family: Arial, sans-serif; color: #111; font-size: 12px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #111; font-size: 12px; }
         h1 { margin: 0; font-size: 18px; }
         h2 { margin: 0 0 8px 0; font-size: 13px; color: #666; }
         .section { margin-top: 10px; }
@@ -17,9 +17,13 @@
     </style>
 </head>
 <body>
+    <div style="border-bottom: 2px solid #e5e7eb; margin-bottom: 12px; padding-bottom: 10px;">
+        @include('pdf.partials.standard_header')
+    </div>
+
     <h1>{{ $student['name'] }}</h1>
     <h2>{{ $subject['grade_level'] }} - {{ $subject['section'] }} | {{ $subject['name'] }}</h2>
-    <div class="meta">Generated: {{ now()->format('Y-m-d') }}</div>
+    <div class="meta">Generated: {{ \Illuminate\Support\Carbon::now('Asia/Manila')->format('F d, Y h:i A') }}</div>
 
     <div class="section">
         <h3>Overall Performance</h3>

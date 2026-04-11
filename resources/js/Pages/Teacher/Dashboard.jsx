@@ -690,6 +690,8 @@ const Dashboard = ({
                 attentionStudents={attentionStudents}
                 academicPeriod={academicPeriod}
                 department={department}
+                watchlistRuleConfig={watchlistRuleConfig}
+                watchlistObservedCategories={watchlistObservedCategories}
             />
 
             <UploadGradesModal

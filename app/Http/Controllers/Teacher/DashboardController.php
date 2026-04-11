@@ -91,30 +91,32 @@ class DashboardController extends Controller
             ], 501);
         }
 
-        // Get filter options from request (supports legacy params for backward compatibility)
-        $includeAtRisk = $request->boolean('at_risk', $request->boolean('critical', true));
-        $includeNeedsAttention = $request->boolean('needs_attention', $request->boolean('warning', true));
-        $includeRecentDecline = $request->boolean('recent_decline', $request->boolean('watchlist', true));
-
         // Reuse dashboard service data so export stays aligned with dashboard logic.
         $dashboardData = $this->dashboardServices->getDashboardData();
-        $attentionStudents = collect($dashboardData['attentionStudents'] ?? []);
+        $observedCategories = (array) ($dashboardData['watchlistObservedCategories'] ?? []);
+        $observeAtRisk = (bool) data_get($observedCategories, 'at_risk', true);
+        $observeNeedsAttention = (bool) data_get($observedCategories, 'needs_attention', true);
+        $observeRecentDecline = (bool) data_get($observedCategories, 'recent_decline', true);
 
-        // Three real categories used in the teacher dashboard.
-        $atRiskStudents = $attentionStudents
-            ->filter(fn($student) => !empty($student['at_risk']))
-            ->values()
-            ->toArray();
+        // Request filters can narrow categories, but cannot override hidden Class Settings categories.
+        $requestIncludeAtRisk = $request->has('at_risk')
+            ? $request->boolean('at_risk')
+            : $request->boolean('critical', $observeAtRisk);
+        $requestIncludeNeedsAttention = $request->has('needs_attention')
+            ? $request->boolean('needs_attention')
+            : $request->boolean('warning', $observeNeedsAttention);
+        $requestIncludeRecentDecline = $request->has('recent_decline')
+            ? $request->boolean('recent_decline')
+            : $request->boolean('watchlist', $observeRecentDecline);
 
-        $needsAttentionStudents = $attentionStudents
-            ->filter(fn($student) => !empty($student['needs_attention']))
-            ->values()
-            ->toArray();
+        $includeAtRisk = $observeAtRisk && $requestIncludeAtRisk;
+        $includeNeedsAttention = $observeNeedsAttention && $requestIncludeNeedsAttention;
+        $includeRecentDecline = $observeRecentDecline && $requestIncludeRecentDecline;
 
-        $recentDeclineStudents = $attentionStudents
-            ->filter(fn($student) => !empty($student['recent_decline']))
-            ->values()
-            ->toArray();
+        // Use grouped dashboard data (already aligned with teacher-specific class settings rules).
+        $atRiskStudents = collect($dashboardData['criticalStudents'] ?? [])->values()->toArray();
+        $needsAttentionStudents = collect($dashboardData['warningStudents'] ?? [])->values()->toArray();
+        $recentDeclineStudents = collect($dashboardData['watchlistsStudents'] ?? [])->values()->toArray();
 
         // Prepare view data
         $viewData = [
@@ -136,6 +138,12 @@ class DashboardController extends Controller
             'includeAtRisk' => $includeAtRisk,
             'includeNeedsAttention' => $includeNeedsAttention,
             'includeRecentDecline' => $includeRecentDecline,
+            'watchlistRuleConfig' => $dashboardData['watchlistRuleConfig'] ?? [],
+            'watchlistObservedCategories' => [
+                'at_risk' => $observeAtRisk,
+                'needs_attention' => $observeNeedsAttention,
+                'recent_decline' => $observeRecentDecline,
+            ],
         ];
 
         /** @var \Barryvdh\DomPDF\PDF $pdf */
