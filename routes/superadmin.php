@@ -65,14 +65,14 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
             ->name('academic-management.index');
         Route::post('/academic-management/sections', [AcademicManagementController::class, 'storeSection'])
             ->name('academic-management.sections.store');
-        Route::put('/academic-management/sections/{section}', [AcademicManagementController::class, 'updateSection'])
-            ->name('academic-management.sections.update');
-        Route::delete('/academic-management/sections/{section}', [AcademicManagementController::class, 'destroySection'])
-            ->name('academic-management.sections.destroy');
         Route::post('/academic-management/sections/recreate-grade11', [AcademicManagementController::class, 'recreateGrade11Sections'])
             ->name('academic-management.sections.recreate-grade11');
         Route::post('/academic-management/sections/assign-adviser', [AcademicManagementController::class, 'assignAdviserToSections'])
             ->name('academic-management.sections.assign-adviser');
+        Route::put('/academic-management/sections/{section}', [AcademicManagementController::class, 'updateSection'])
+            ->name('academic-management.sections.update');
+        Route::delete('/academic-management/sections/{section}', [AcademicManagementController::class, 'destroySection'])
+            ->name('academic-management.sections.destroy');
         Route::post('/academic-management/classes', [AcademicManagementController::class, 'storeClass'])
             ->name('academic-management.classes.store');
         Route::put('/academic-management/classes/{schoolClass}', [AcademicManagementController::class, 'updateClass'])

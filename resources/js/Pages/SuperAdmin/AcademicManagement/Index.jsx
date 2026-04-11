@@ -9,7 +9,6 @@ import {
     Layers,
     Search,
     School,
-    UserCheck,
     Users,
     X,
     Plus,
@@ -731,85 +730,27 @@ function ClassFormModal({
 
 function AssignAdviserModal({
     isOpen,
-    data,
-    setData,
-    errors,
     processing,
+    errors,
+    teachers = [],
+    selectedTeacherId,
+    onTeacherChange,
+    sections = [],
+    selectedSectionIds = [],
+    onToggleSection,
+    onSelectAllSections,
     onClose,
     onSubmit,
-    teachers = [],
-    sections = [],
 }) {
     if (!isOpen) {
         return null;
     }
 
-    const selectedTeacher =
-        teachers.find(
-            (teacher) => String(teacher.id) === String(data.teacher_id),
-        ) || null;
-
-    const selectableTeachers = teachers.filter((teacher) => {
-        if (!teacher.department_id) {
-            return false;
-        }
-
-        return sections.some(
-            (section) =>
-                Number(section.department_id) === Number(teacher.department_id),
-        );
-    });
-
-    const selectableSections = selectedTeacher
-        ? sections.filter(
-              (section) =>
-                  Number(section.department_id) ===
-                  Number(selectedTeacher.department_id),
-          )
-        : [];
-
-    const selectedSectionIds = Array.isArray(data.section_ids)
-        ? data.section_ids.map((id) => Number(id))
-        : [];
-
+    const selectedSet = new Set(
+        selectedSectionIds.map((sectionId) => Number(sectionId)),
+    );
     const allSelected =
-        selectableSections.length > 0 &&
-        selectableSections.every((section) =>
-            selectedSectionIds.includes(Number(section.id)),
-        );
-
-    const sectionError = errors.section_ids || errors["section_ids.0"];
-
-    const handleTeacherChange = (event) => {
-        setData("teacher_id", event.target.value);
-        setData("section_ids", []);
-    };
-
-    const toggleSectionSelection = (sectionId) => {
-        const normalizedSectionId = Number(sectionId);
-
-        if (selectedSectionIds.includes(normalizedSectionId)) {
-            setData(
-                "section_ids",
-                selectedSectionIds.filter((id) => id !== normalizedSectionId),
-            );
-            return;
-        }
-
-        setData("section_ids", [...selectedSectionIds, normalizedSectionId]);
-    };
-
-    const toggleAllSections = () => {
-        if (allSelected) {
-            setData("section_ids", []);
-            return;
-        }
-
-        setData(
-            "section_ids",
-            selectableSections.map((section) => Number(section.id)),
-        );
-    };
+        sections.length > 0 && selectedSet.size === sections.length;
 
     return (
         <div className="fixed inset-0 z-50 flex items-end justify-center p-2 sm:items-center sm:p-4">
@@ -818,27 +759,28 @@ function AssignAdviserModal({
                 onClick={onClose}
             />
 
-            <div className="relative max-h-[calc(100vh-1rem)] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-slate-200 sm:max-h-[90vh]">
+            <div className="relative max-h-[calc(100vh-1rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-slate-200 sm:max-h-[90vh]">
                 <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-6 sm:py-5">
                     <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 ring-1 ring-indigo-200">
-                            <UserCheck size={16} className="text-indigo-600" />
+                            <Users size={16} className="text-indigo-600" />
                         </div>
                         <div>
                             <h2 className="text-base font-semibold text-slate-900">
-                                Assign Adviser
+                                Assign Adviser to Grade 11
                             </h2>
                             <p className="text-xs text-slate-500">
-                                Choose a teacher first, then pick unassigned
-                                Grade 11 sections.
+                                Pick one teacher, then select unassigned Grade
+                                11 sections.
                             </p>
                         </div>
                     </div>
+
                     <button
                         type="button"
                         onClick={onClose}
                         disabled={processing}
-                        className="z-10 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+                        className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
                     >
                         <X size={16} />
                     </button>
@@ -848,11 +790,13 @@ function AssignAdviserModal({
                     <div className="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
                         <div>
                             <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                Teacher <span className="text-rose-500">*</span>
+                                Adviser Teacher
                             </label>
                             <select
-                                value={data.teacher_id}
-                                onChange={handleTeacherChange}
+                                value={selectedTeacherId}
+                                onChange={(event) =>
+                                    onTeacherChange(event.target.value)
+                                }
                                 className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
                                     errors.teacher_id
                                         ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
@@ -860,91 +804,77 @@ function AssignAdviserModal({
                                 }`}
                             >
                                 <option value="">Select teacher</option>
-                                {selectableTeachers.map((teacher) => (
+                                {teachers.map((teacher) => (
                                     <option key={teacher.id} value={teacher.id}>
-                                        {teacher.name} -{" "}
-                                        {teacher.department_code || "N/A"}
+                                        {teacher.name} (
+                                        {teacher.department?.department_code ||
+                                            "N/A"}
+                                        )
                                     </option>
                                 ))}
                             </select>
                             <FieldError message={errors.teacher_id} />
                         </div>
 
-                        <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <div className="mb-2 flex items-center justify-between gap-2">
                                 <p className="text-sm font-medium text-slate-700">
-                                    Unassigned Grade 11 Sections
+                                    Eligible Sections ({sections.length})
                                 </p>
-                                <button
-                                    type="button"
-                                    onClick={toggleAllSections}
-                                    disabled={
-                                        !data.teacher_id ||
-                                        selectableSections.length === 0
-                                    }
-                                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    {allSelected ? "Clear all" : "Select all"}
-                                </button>
+                                {sections.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={onSelectAllSections}
+                                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                                    >
+                                        {allSelected
+                                            ? "Clear Selection"
+                                            : "Select All"}
+                                    </button>
+                                )}
                             </div>
 
-                            {!data.teacher_id ? (
-                                <p className="mt-2 text-xs text-slate-500">
-                                    Select a teacher first to show eligible
-                                    sections.
-                                </p>
-                            ) : selectableSections.length === 0 ? (
-                                <p className="mt-2 text-xs text-slate-500">
-                                    No unassigned Grade 11 sections are
-                                    available for this teacher's department.
-                                </p>
+                            {sections.length === 0 ? (
+                                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                                    Select a teacher to load unassigned Grade 11
+                                    sections from that department.
+                                </div>
                             ) : (
-                                <div className="mt-3 max-h-60 space-y-2 overflow-y-auto pr-1">
-                                    {selectableSections.map((section) => {
-                                        const sectionId = Number(section.id);
-                                        const isChecked =
-                                            selectedSectionIds.includes(
-                                                sectionId,
-                                            );
-
-                                        return (
-                                            <label
-                                                key={`assign-section-${section.id}`}
-                                                className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2"
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isChecked}
-                                                    onChange={() =>
-                                                        toggleSectionSelection(
-                                                            sectionId,
-                                                        )
-                                                    }
-                                                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                                />
-                                                <span className="text-xs text-slate-700">
-                                                    <span className="font-semibold text-slate-900">
-                                                        {section.section_name}
-                                                    </span>{" "}
-                                                    (
-                                                    {section.section_code ||
-                                                        "-"}
-                                                    )
-                                                    <br />
-                                                    {[
-                                                        section.grade_level,
-                                                        section.strand,
-                                                        section.track,
-                                                    ]
-                                                        .filter(Boolean)
-                                                        .join(" • ") || "-"}
+                                <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-slate-200 p-3">
+                                    {sections.map((section) => (
+                                        <label
+                                            key={section.id}
+                                            className="flex items-start gap-2 rounded-lg border border-slate-200 px-2.5 py-2 text-sm text-slate-700"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedSet.has(
+                                                    Number(section.id),
+                                                )}
+                                                onChange={() =>
+                                                    onToggleSection(section.id)
+                                                }
+                                                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                            <span className="min-w-0">
+                                                <span className="block font-medium text-slate-900">
+                                                    {section.section_name}
                                                 </span>
-                                            </label>
-                                        );
-                                    })}
+                                                <span className="text-xs text-slate-500">
+                                                    {section.section_code ||
+                                                        "-"}{" "}
+                                                    •{" "}
+                                                    {section.department
+                                                        ?.department_code ||
+                                                        "N/A"}
+                                                </span>
+                                            </span>
+                                        </label>
+                                    ))}
                                 </div>
                             )}
-                            <FieldError message={sectionError} />
+
+                            <FieldError message={errors.section_ids} />
                         </div>
                     </div>
 
@@ -959,11 +889,7 @@ function AssignAdviserModal({
                         </button>
                         <button
                             type="submit"
-                            disabled={
-                                processing ||
-                                !data.teacher_id ||
-                                selectedSectionIds.length === 0
-                            }
+                            disabled={processing}
                             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-indigo-700 disabled:opacity-60 sm:w-auto"
                         >
                             {processing && (
@@ -1067,10 +993,10 @@ export default function Index({
     subjects = [],
     teachers = [],
     currentSchoolYear = "",
-    colorOptions = [],
     rolloverNotice = null,
-    grade11TemplateSections = [],
+    grade11SectionTemplates = [],
     unassignedGrade11Sections = [],
+    colorOptions = [],
     filters,
     stats,
 }) {
@@ -1123,6 +1049,8 @@ export default function Index({
     const [showSectionWizard, setShowSectionWizard] = useState(false);
     const [showSectionModal, setShowSectionModal] = useState(false);
     const [sectionToEdit, setSectionToEdit] = useState(null);
+    const [showRestorePrompt, setShowRestorePrompt] = useState(false);
+    const [restoreProcessing, setRestoreProcessing] = useState(false);
 
     const [showClassModal, setShowClassModal] = useState(false);
     const [classModalMode, setClassModalMode] = useState("create");
@@ -1132,12 +1060,10 @@ export default function Index({
     const [classQueueProcessing, setClassQueueProcessing] = useState(false);
     const [classQueueErrors, setClassQueueErrors] = useState({});
 
-    const [recreateGrade11Processing, setRecreateGrade11Processing] =
-        useState(false);
-    const [showAssignAdviserModal, setShowAssignAdviserModal] = useState(false);
-
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleteProcessing, setDeleteProcessing] = useState(false);
+
+    const [showAssignAdviserModal, setShowAssignAdviserModal] = useState(false);
 
     const {
         data: sectionData,
@@ -1174,30 +1100,6 @@ export default function Index({
     const sectionRows = sections?.data || [];
     const classRows = classes?.data || [];
 
-    const normalizedRolloverNotice =
-        rolloverNotice && typeof rolloverNotice === "object"
-            ? rolloverNotice
-            : null;
-
-    const normalizedGrade11Templates = useMemo(
-        () =>
-            Array.isArray(grade11TemplateSections)
-                ? grade11TemplateSections
-                : [],
-        [grade11TemplateSections],
-    );
-
-    const normalizedUnassignedGrade11Sections = useMemo(
-        () =>
-            Array.isArray(unassignedGrade11Sections)
-                ? unassignedGrade11Sections
-                : [],
-        [unassignedGrade11Sections],
-    );
-
-    const hasUnassignedGrade11Sections =
-        normalizedUnassignedGrade11Sections.length > 0;
-
     const currentStats = useMemo(
         () => ({
             departmentsCount: Number(stats?.departments_count || 0),
@@ -1206,6 +1108,28 @@ export default function Index({
         }),
         [stats],
     );
+
+    const normalizedGrade11Templates = useMemo(
+        () =>
+            Array.isArray(grade11SectionTemplates)
+                ? grade11SectionTemplates
+                : [],
+        [grade11SectionTemplates],
+    );
+
+    const unassignedGrade11Rows = useMemo(
+        () =>
+            Array.isArray(unassignedGrade11Sections)
+                ? unassignedGrade11Sections
+                : [],
+        [unassignedGrade11Sections],
+    );
+
+    const canShowRestorePrompt =
+        Boolean(rolloverNotice?.new_school_year) &&
+        String(rolloverNotice.new_school_year) ===
+            String(currentSchoolYear || "") &&
+        normalizedGrade11Templates.length > 0;
 
     useEffect(() => {
         setActiveTab(filters?.tab || tab || "sections");
@@ -1217,6 +1141,10 @@ export default function Index({
             filters?.department_id ? String(filters.department_id) : "",
         );
     }, [filters?.search, filters?.department_id]);
+
+    useEffect(() => {
+        setShowRestorePrompt(canShowRestorePrompt);
+    }, [canShowRestorePrompt]);
 
     useEffect(() => {
         if (!classData.section_id || !classData.teacher_id) {
@@ -1467,46 +1395,6 @@ export default function Index({
         goToIndex(activeTab, "", "");
     };
 
-    const handleRecreateGrade11Sections = () => {
-        if (recreateGrade11Processing) {
-            return;
-        }
-
-        router.post(
-            route("superadmin.academic-management.sections.recreate-grade11"),
-            {},
-            {
-                preserveScroll: true,
-                onStart: () => setRecreateGrade11Processing(true),
-                onFinish: () => setRecreateGrade11Processing(false),
-            },
-        );
-    };
-
-    const openAssignAdviserModal = () => {
-        resetAssignAdviser();
-        clearAssignAdviserErrors();
-        setShowAssignAdviserModal(true);
-    };
-
-    const closeAssignAdviserModal = () => {
-        setShowAssignAdviserModal(false);
-        resetAssignAdviser();
-        clearAssignAdviserErrors();
-    };
-
-    const handleAssignAdviserSubmit = (event) => {
-        event.preventDefault();
-
-        postAssignAdviser(
-            route("superadmin.academic-management.sections.assign-adviser"),
-            {
-                preserveScroll: true,
-                onSuccess: closeAssignAdviserModal,
-            },
-        );
-    };
-
     const openCreateSectionWizard = () => {
         setShowSectionWizard(true);
     };
@@ -1736,6 +1624,121 @@ export default function Index({
         deleteTarget?.type === "section"
             ? "This will permanently remove the section record. If students or classes are still linked, deletion will be blocked."
             : "This will permanently remove the class record. Classes with enrollments cannot be deleted.";
+
+    const selectedAssignTeacher = useMemo(
+        () =>
+            teachers.find(
+                (teacher) =>
+                    String(teacher.id) === String(assignAdviserData.teacher_id),
+            ) || null,
+        [teachers, assignAdviserData.teacher_id],
+    );
+
+    const assignableSections = useMemo(() => {
+        if (!selectedAssignTeacher?.department_id) {
+            return [];
+        }
+
+        return unassignedGrade11Rows.filter(
+            (section) =>
+                Number(section.department_id) ===
+                Number(selectedAssignTeacher.department_id),
+        );
+    }, [unassignedGrade11Rows, selectedAssignTeacher]);
+
+    useEffect(() => {
+        const currentIds = (assignAdviserData.section_ids || []).map((id) =>
+            Number(id),
+        );
+        const assignableIdSet = new Set(
+            assignableSections.map((section) => Number(section.id)),
+        );
+        const filteredIds = currentIds.filter((id) => assignableIdSet.has(id));
+
+        if (filteredIds.length !== currentIds.length) {
+            setAssignAdviserData("section_ids", filteredIds);
+        }
+    }, [
+        assignableSections,
+        assignAdviserData.section_ids,
+        setAssignAdviserData,
+    ]);
+
+    const openAssignAdviserModal = () => {
+        clearAssignAdviserErrors();
+        setShowAssignAdviserModal(true);
+    };
+
+    const closeAssignAdviserModal = () => {
+        if (assignAdviserProcessing) {
+            return;
+        }
+
+        setShowAssignAdviserModal(false);
+        resetAssignAdviser();
+        clearAssignAdviserErrors();
+    };
+
+    const handleAssignTeacherChange = (teacherId) => {
+        setAssignAdviserData("teacher_id", teacherId);
+        setAssignAdviserData("section_ids", []);
+        clearAssignAdviserErrors("teacher_id", "section_ids");
+    };
+
+    const toggleAssignSection = (sectionId) => {
+        const numericSectionId = Number(sectionId);
+        const currentIds = (assignAdviserData.section_ids || []).map((id) =>
+            Number(id),
+        );
+        const hasSection = currentIds.includes(numericSectionId);
+
+        setAssignAdviserData(
+            "section_ids",
+            hasSection
+                ? currentIds.filter((id) => id !== numericSectionId)
+                : [...currentIds, numericSectionId],
+        );
+    };
+
+    const handleSelectAllAssignSections = () => {
+        const allIds = assignableSections.map((section) => Number(section.id));
+        const selectedSet = new Set(
+            (assignAdviserData.section_ids || []).map((id) => Number(id)),
+        );
+        const allSelected =
+            allIds.length > 0 && allIds.every((id) => selectedSet.has(id));
+
+        setAssignAdviserData("section_ids", allSelected ? [] : allIds);
+    };
+
+    const handleAssignAdviserSubmit = (event) => {
+        event.preventDefault();
+
+        postAssignAdviser(
+            route("superadmin.academic-management.sections.assign-adviser"),
+            {
+                preserveScroll: true,
+                onSuccess: closeAssignAdviserModal,
+            },
+        );
+    };
+
+    const handleRestoreGrade11Sections = () => {
+        if (restoreProcessing) {
+            return;
+        }
+
+        router.post(
+            route("superadmin.academic-management.sections.recreate-grade11"),
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setRestoreProcessing(true),
+                onSuccess: () => setShowRestorePrompt(false),
+                onFinish: () => setRestoreProcessing(false),
+            },
+        );
+    };
 
     const classModalErrors =
         classModalMode === "edit" ? classErrors : classQueueErrors;
@@ -1985,138 +1988,116 @@ export default function Index({
                 </div>
 
                 {activeTab === "sections" ? (
-                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                        <div className="hidden grid-cols-12 gap-4 border-b border-slate-200 bg-slate-50 px-5 py-3 md:grid">
-                            <div className="col-span-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                Section
-                            </div>
-                            <div className="col-span-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                Department
-                            </div>
-                            <div className="col-span-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                Cohort
-                            </div>
-                            <div className="col-span-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                Details
-                            </div>
-                            <div className="col-span-1 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                Students
-                            </div>
-                            <div className="col-span-1 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                Actions
-                            </div>
-                        </div>
+                    <div className="space-y-4">
+                        {canShowRestorePrompt && showRestorePrompt && (
+                            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                                <p className="text-sm font-semibold text-blue-900">
+                                    School year updated to{" "}
+                                    {rolloverNotice?.new_school_year ||
+                                        currentSchoolYear}
+                                </p>
+                                <p className="mt-1 text-xs text-blue-800">
+                                    Grade 11 sections were promoted to Grade 12.
+                                    Do you want to restore the previous Grade 11
+                                    section list for this school year? Restored
+                                    sections will have no adviser assigned.
+                                </p>
+                                <p className="mt-1 text-xs text-blue-700">
+                                    Promoted sections:{" "}
+                                    {rolloverNotice?.promoted_sections_count ||
+                                        0}{" "}
+                                    | Promoted students:{" "}
+                                    {rolloverNotice?.promoted_students_count ||
+                                        0}{" "}
+                                    | Graduated students:{" "}
+                                    {rolloverNotice?.graduated_students_count ||
+                                        0}{" "}
+                                    | Failed students retained:{" "}
+                                    {rolloverNotice?.failed_students_count || 0}
+                                </p>
 
-                        {sectionRows.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-                                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100">
-                                    <School
-                                        size={22}
-                                        className="text-slate-400"
-                                    />
+                                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                                    <button
+                                        type="button"
+                                        onClick={handleRestoreGrade11Sections}
+                                        disabled={restoreProcessing}
+                                        className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+                                    >
+                                        {restoreProcessing
+                                            ? "Restoring..."
+                                            : "Restore Grade 11 Sections"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setShowRestorePrompt(false)
+                                        }
+                                        disabled={restoreProcessing}
+                                        className="inline-flex items-center justify-center rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-60"
+                                    >
+                                        Dismiss
+                                    </button>
                                 </div>
-                                <p className="text-sm font-semibold text-slate-700">
-                                    No sections found.
-                                </p>
-                                <p className="mt-1 text-xs text-slate-500">
-                                    Try adjusting search or department filter.
-                                </p>
                             </div>
-                        ) : (
-                            <div className="divide-y divide-slate-100">
-                                {sectionRows.map((section) => (
-                                    <div key={section.id}>
-                                        <div className="hidden grid-cols-12 items-center gap-4 px-5 py-4 hover:bg-slate-50/70 md:grid">
-                                            <div className="col-span-3 min-w-0">
-                                                <p className="truncate text-sm font-semibold text-slate-900">
-                                                    {section.section_name ||
-                                                        "N/A"}
-                                                </p>
-                                                <p className="mt-0.5 text-xs text-slate-500">
-                                                    {section.section_code ||
-                                                        "-"}
-                                                </p>
-                                            </div>
+                        )}
 
-                                            <div className="col-span-3 min-w-0">
-                                                <p className="truncate text-sm text-slate-800">
-                                                    {section.department
-                                                        ?.department_name ||
-                                                        "N/A"}
-                                                </p>
-                                                <p className="mt-0.5 text-xs text-slate-500">
-                                                    {section.department
-                                                        ?.department_code ||
-                                                        "-"}
-                                                </p>
-                                            </div>
+                        {unassignedGrade11Rows.length > 0 && (
+                            <div className="flex justify-end">
+                                <button
+                                    type="button"
+                                    onClick={openAssignAdviserModal}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-sm font-semibold text-indigo-700 transition-colors hover:bg-indigo-100"
+                                >
+                                    <Users size={15} />
+                                    Assign Adviser
+                                </button>
+                            </div>
+                        )}
 
-                                            <div className="col-span-2 text-sm text-slate-700">
-                                                {section.cohort || "-"}
-                                            </div>
+                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                            <div className="hidden grid-cols-12 gap-4 border-b border-slate-200 bg-slate-50 px-5 py-3 md:grid">
+                                <div className="col-span-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    Section
+                                </div>
+                                <div className="col-span-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    Department
+                                </div>
+                                <div className="col-span-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    Cohort
+                                </div>
+                                <div className="col-span-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    Details
+                                </div>
+                                <div className="col-span-1 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    Students
+                                </div>
+                                <div className="col-span-1 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    Actions
+                                </div>
+                            </div>
 
-                                            <div className="col-span-2 min-w-0">
-                                                <p className="truncate text-xs text-slate-700">
-                                                    {section.grade_level || "-"}
-                                                </p>
-                                                <p className="mt-0.5 truncate text-xs text-slate-500">
-                                                    {[
-                                                        section.strand,
-                                                        section.track,
-                                                    ]
-                                                        .filter(Boolean)
-                                                        .join(" • ") || "-"}
-                                                </p>
-                                                <p className="mt-0.5 truncate text-xs text-slate-500">
-                                                    Adviser:{" "}
-                                                    {section.advisor_teacher_name ||
-                                                        "N/A"}
-                                                </p>
-                                            </div>
-
-                                            <div className="col-span-1 text-right">
-                                                <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
-                                                    <Users
-                                                        size={12}
-                                                        className="mr-1"
-                                                    />
-                                                    {section.students_count ||
-                                                        0}
-                                                </span>
-                                            </div>
-
-                                            <div className="col-span-1 flex justify-end gap-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        openEditSectionModal(
-                                                            section,
-                                                        )
-                                                    }
-                                                    className="rounded-lg border border-slate-200 p-1.5 text-slate-600 transition hover:bg-slate-100"
-                                                    title="Edit section"
-                                                >
-                                                    <Pencil size={14} />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        openDeleteModal(
-                                                            "section",
-                                                            section,
-                                                        )
-                                                    }
-                                                    className="rounded-lg border border-rose-200 p-1.5 text-rose-600 transition hover:bg-rose-50"
-                                                    title="Delete section"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-3 px-4 py-4 md:hidden">
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0">
+                            {sectionRows.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+                                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100">
+                                        <School
+                                            size={22}
+                                            className="text-slate-400"
+                                        />
+                                    </div>
+                                    <p className="text-sm font-semibold text-slate-700">
+                                        No sections found.
+                                    </p>
+                                    <p className="mt-1 text-xs text-slate-500">
+                                        Try adjusting search or department
+                                        filter.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-slate-100">
+                                    {sectionRows.map((section) => (
+                                        <div key={section.id}>
+                                            <div className="hidden grid-cols-12 items-center gap-4 px-5 py-4 hover:bg-slate-50/70 md:grid">
+                                                <div className="col-span-3 min-w-0">
                                                     <p className="truncate text-sm font-semibold text-slate-900">
                                                         {section.section_name ||
                                                             "N/A"}
@@ -2126,7 +2107,56 @@ export default function Index({
                                                             "-"}
                                                     </p>
                                                 </div>
-                                                <div className="flex shrink-0 gap-1">
+
+                                                <div className="col-span-3 min-w-0">
+                                                    <p className="truncate text-sm text-slate-800">
+                                                        {section.department
+                                                            ?.department_name ||
+                                                            "N/A"}
+                                                    </p>
+                                                    <p className="mt-0.5 text-xs text-slate-500">
+                                                        {section.department
+                                                            ?.department_code ||
+                                                            "-"}
+                                                    </p>
+                                                </div>
+
+                                                <div className="col-span-2 text-sm text-slate-700">
+                                                    {section.cohort || "-"}
+                                                </div>
+
+                                                <div className="col-span-2 min-w-0">
+                                                    <p className="truncate text-xs text-slate-700">
+                                                        {section.grade_level ||
+                                                            "-"}
+                                                    </p>
+                                                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                                                        {[
+                                                            section.strand,
+                                                            section.track,
+                                                        ]
+                                                            .filter(Boolean)
+                                                            .join(" • ") || "-"}
+                                                    </p>
+                                                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                                                        Adviser:{" "}
+                                                        {section.advisor_teacher_name ||
+                                                            "Not yet assigned"}
+                                                    </p>
+                                                </div>
+
+                                                <div className="col-span-1 text-right">
+                                                    <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                                                        <Users
+                                                            size={12}
+                                                            className="mr-1"
+                                                        />
+                                                        {section.students_count ||
+                                                            0}
+                                                    </span>
+                                                </div>
+
+                                                <div className="col-span-1 flex justify-end gap-1">
                                                     <button
                                                         type="button"
                                                         onClick={() =>
@@ -2155,60 +2185,102 @@ export default function Index({
                                                 </div>
                                             </div>
 
-                                            <div>
-                                                <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
-                                                    Department
-                                                </p>
-                                                <p className="mt-1 text-sm text-slate-700">
-                                                    {section.department
-                                                        ?.department_name ||
-                                                        "N/A"}
-                                                    <span className="ml-1 text-xs text-slate-500">
-                                                        (
+                                            <div className="space-y-3 px-4 py-4 md:hidden">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <p className="truncate text-sm font-semibold text-slate-900">
+                                                            {section.section_name ||
+                                                                "N/A"}
+                                                        </p>
+                                                        <p className="mt-0.5 text-xs text-slate-500">
+                                                            {section.section_code ||
+                                                                "-"}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex shrink-0 gap-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                openEditSectionModal(
+                                                                    section,
+                                                                )
+                                                            }
+                                                            className="rounded-lg border border-slate-200 p-1.5 text-slate-600 transition hover:bg-slate-100"
+                                                            title="Edit section"
+                                                        >
+                                                            <Pencil size={14} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                openDeleteModal(
+                                                                    "section",
+                                                                    section,
+                                                                )
+                                                            }
+                                                            className="rounded-lg border border-rose-200 p-1.5 text-rose-600 transition hover:bg-rose-50"
+                                                            title="Delete section"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                                                        Department
+                                                    </p>
+                                                    <p className="mt-1 text-sm text-slate-700">
                                                         {section.department
-                                                            ?.department_code ||
-                                                            "-"}
-                                                        )
+                                                            ?.department_name ||
+                                                            "N/A"}
+                                                        <span className="ml-1 text-xs text-slate-500">
+                                                            (
+                                                            {section.department
+                                                                ?.department_code ||
+                                                                "-"}
+                                                            )
+                                                        </span>
+                                                    </p>
+                                                </div>
+
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                                        Cohort:{" "}
+                                                        {section.cohort || "-"}
                                                     </span>
+                                                    <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                                                        <Users
+                                                            size={12}
+                                                            className="mr-1"
+                                                        />
+                                                        {section.students_count ||
+                                                            0}
+                                                    </span>
+                                                </div>
+
+                                                <p className="text-xs text-slate-500">
+                                                    {[
+                                                        section.grade_level,
+                                                        section.strand,
+                                                        section.track,
+                                                    ]
+                                                        .filter(Boolean)
+                                                        .join(" • ") || "-"}
+                                                </p>
+                                                <p className="text-xs text-slate-500">
+                                                    Adviser:{" "}
+                                                    {section.advisor_teacher_name ||
+                                                        "Not yet assigned"}
                                                 </p>
                                             </div>
-
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-                                                    Cohort:{" "}
-                                                    {section.cohort || "-"}
-                                                </span>
-                                                <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
-                                                    <Users
-                                                        size={12}
-                                                        className="mr-1"
-                                                    />
-                                                    {section.students_count ||
-                                                        0}
-                                                </span>
-                                            </div>
-
-                                            <p className="text-xs text-slate-500">
-                                                {[
-                                                    section.grade_level,
-                                                    section.strand,
-                                                    section.track,
-                                                ]
-                                                    .filter(Boolean)
-                                                    .join(" • ") || "-"}
-                                            </p>
-                                            <p className="text-xs text-slate-500">
-                                                Adviser:{" "}
-                                                {section.advisor_teacher_name ||
-                                                    "N/A"}
-                                            </p>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                                    ))}
+                                </div>
+                            )}
 
-                        <Pagination links={sections?.links || []} />
+                            <Pagination links={sections?.links || []} />
+                        </div>
                     </div>
                 ) : (
                     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -2497,6 +2569,21 @@ export default function Index({
                     colorOptions={resolvedColorOptions}
                 />
             )}
+
+            <AssignAdviserModal
+                isOpen={showAssignAdviserModal}
+                processing={assignAdviserProcessing}
+                errors={assignAdviserErrors}
+                teachers={teachers}
+                selectedTeacherId={assignAdviserData.teacher_id}
+                onTeacherChange={handleAssignTeacherChange}
+                sections={assignableSections}
+                selectedSectionIds={assignAdviserData.section_ids || []}
+                onToggleSection={toggleAssignSection}
+                onSelectAllSections={handleSelectAllAssignSections}
+                onClose={closeAssignAdviserModal}
+                onSubmit={handleAssignAdviserSubmit}
+            />
 
             <DeleteConfirmModal
                 isOpen={Boolean(deleteTarget)}
