@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Department extends Model
 {
@@ -14,6 +15,7 @@ class Department extends Model
     protected $fillable = [
         'department_name',
         'department_code',
+        'track',
         'description',
         'is_active',
     ];
@@ -77,6 +79,15 @@ class Department extends Model
     public function sections(): HasMany
     {
         return $this->hasMany(Section::class);
+    }
+
+    /**
+     * Get all specializations assigned to this department.
+     */
+    public function specializations(): BelongsToMany
+    {
+        return $this->belongsToMany(Specialization::class, 'department_specialization')
+            ->withTimestamps();
     }
 
     /**

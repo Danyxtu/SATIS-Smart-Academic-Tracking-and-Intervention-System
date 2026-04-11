@@ -10,6 +10,8 @@ use App\Models\Grade;
 use App\Models\Intervention;
 use App\Models\InterventionTask;
 use App\Models\SchoolClass;
+use App\Models\Section;
+use App\Models\Student;
 use App\Models\StudentNotification;
 use App\Models\SystemSetting;
 use App\Models\User;
@@ -239,6 +241,7 @@ class SettingsController extends Controller
         $newSY              = $validated['new_school_year'];
         $userId             = Auth::id();
         $providedArchiveKey = $validated['archive_key'] ?? null;
+        $rolloverSummary    = null;
 
         if ($providedArchiveKey && !SystemSetting::where('key', $providedArchiveKey)->exists()) {
             return back()->withErrors([
@@ -246,7 +249,7 @@ class SettingsController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($newSY, $userId, $providedArchiveKey) {
+        DB::transaction(function () use ($newSY, $userId, $providedArchiveKey, &$rolloverSummary) {
             $oldSY   = SystemSetting::getCurrentSchoolYear();
             $oldSem  = SystemSetting::getCurrentSemester();
             $lockKey = "grades_locked_{$oldSY}_{$oldSem}";
@@ -254,6 +257,8 @@ class SettingsController extends Controller
             if (!$providedArchiveKey) {
                 $this->createArchiveSnapshot($oldSY, $newSY, $userId);
             }
+
+            $rolloverSummary = $this->processSchoolYearTransition($oldSY, $newSY, $userId);
 
             // Lock grades for the outgoing period
             SystemSetting::updateOrCreate(
@@ -276,9 +281,247 @@ class SettingsController extends Controller
                 );
                 cache()->forget("system_setting_{$s['key']}");
             }
+
+            if (is_array($rolloverSummary)) {
+                SystemSetting::updateOrCreate(
+                    ['key' => 'rollover_last_transition'],
+                    [
+                        'value' => json_encode($rolloverSummary),
+                        'type' => 'json',
+                        'group' => 'academic',
+                        'description' => 'Last school year rollover transition summary',
+                        'updated_by' => $userId,
+                    ]
+                );
+
+                cache()->forget('system_setting_rollover_last_transition');
+            }
         });
 
-        return back()->with('success', "Rolled over to {$newSY}. Previous data is archived.");
+        return back()
+            ->with('success', "Rolled over to {$newSY}. Previous data is archived.")
+            ->with('rollover_summary', $rolloverSummary);
+    }
+
+    /**
+     * Promote Grade 11 -> Grade 12 sections/students and process Grade 12 graduates.
+     *
+     * @return array<string, mixed>
+     */
+    private function processSchoolYearTransition(string $oldSY, string $newSY, ?int $userId): array
+    {
+        $oldSections = Section::query()
+            ->where('school_year', $oldSY)
+            ->get([
+                'id',
+                'department_id',
+                'advisor_teacher_id',
+                'section_name',
+                'section_code',
+                'cohort',
+                'grade_level',
+                'strand',
+                'track',
+                'description',
+                'is_active',
+            ]);
+
+        $grade11Sections = $oldSections
+            ->filter(fn(Section $section): bool => $this->isGradeLevel($section->grade_level, 11))
+            ->values();
+
+        $grade12Sections = $oldSections
+            ->filter(fn(Section $section): bool => $this->isGradeLevel($section->grade_level, 12))
+            ->values();
+
+        $newCohort = $this->resolveCohortFromSchoolYear($newSY);
+
+        $promotedSectionMap = [];
+        $grade11Templates = [];
+
+        foreach ($grade11Sections as $grade11Section) {
+            $promotedSection = Section::create([
+                'department_id' => (int) $grade11Section->department_id,
+                'advisor_teacher_id' => $grade11Section->advisor_teacher_id ? (int) $grade11Section->advisor_teacher_id : null,
+                'created_by' => $userId,
+                'section_name' => $grade11Section->section_name,
+                'section_code' => $grade11Section->section_code,
+                'cohort' => $newCohort,
+                'grade_level' => 'Grade 12',
+                'strand' => $grade11Section->strand,
+                'track' => $grade11Section->track,
+                'school_year' => $newSY,
+                'description' => $grade11Section->description,
+                'is_active' => true,
+            ]);
+
+            $promotedSectionMap[(int) $grade11Section->id] = $promotedSection;
+
+            $grade11Templates[] = [
+                'department_id' => (int) $grade11Section->department_id,
+                'section_name' => $grade11Section->section_name,
+                'section_code' => $grade11Section->section_code,
+                'strand' => $grade11Section->strand,
+                'track' => $grade11Section->track,
+                'description' => $grade11Section->description,
+            ];
+        }
+
+        $promotedStudentsCount = 0;
+
+        if (!empty($promotedSectionMap)) {
+            $grade11Students = Student::query()
+                ->with('user:id,status')
+                ->whereIn('section_id', array_keys($promotedSectionMap))
+                ->get();
+
+            foreach ($grade11Students as $student) {
+                $targetSection = $promotedSectionMap[(int) $student->section_id] ?? null;
+
+                if (!$targetSection) {
+                    continue;
+                }
+
+                $student->update([
+                    'grade_level' => 'Grade 12',
+                    'section_id' => (int) $targetSection->id,
+                    'section' => $targetSection->section_name,
+                    'strand' => $targetSection->strand,
+                    'track' => $targetSection->track,
+                ]);
+
+                if ($student->user && $student->user->status !== 'active') {
+                    $student->user->update(['status' => 'active']);
+                }
+
+                $promotedStudentsCount++;
+            }
+        }
+
+        $grade12StudentSectionIds = $grade12Sections->pluck('id')->map(fn($id) => (int) $id)->all();
+
+        $graduatedCount = 0;
+        $failedCount = 0;
+
+        if (!empty($grade12StudentSectionIds)) {
+            $grade12Students = Student::query()
+                ->with('user:id,status')
+                ->whereIn('section_id', $grade12StudentSectionIds)
+                ->get();
+
+            $grade12UserIds = $grade12Students
+                ->pluck('user_id')
+                ->filter(fn($id) => $id !== null)
+                ->map(fn($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            $grade12Enrollments = Enrollment::query()
+                ->whereIn('user_id', $grade12UserIds)
+                ->whereHas('schoolClass', function ($query) use ($oldSY) {
+                    $query->where('school_year', $oldSY);
+                })
+                ->get(['user_id', 'final_grade', 'remarks']);
+
+            $usersWithEnrollments = $grade12Enrollments
+                ->pluck('user_id')
+                ->map(fn($id) => (int) $id)
+                ->unique()
+                ->flip();
+
+            $failedUserIds = $grade12Enrollments
+                ->filter(fn(Enrollment $enrollment): bool => $this->isFailedEnrollment($enrollment))
+                ->pluck('user_id')
+                ->map(fn($id) => (int) $id)
+                ->unique()
+                ->flip();
+
+            foreach ($grade12Students as $student) {
+                $studentUserId = $student->user_id ? (int) $student->user_id : null;
+
+                if ($studentUserId === null) {
+                    continue;
+                }
+
+                $student->update([
+                    'section_id' => null,
+                    'section' => null,
+                ]);
+
+                if (!$student->user) {
+                    continue;
+                }
+
+                $hasEnrollment = $usersWithEnrollments->has($studentUserId);
+                $hasFailedEnrollment = $failedUserIds->has($studentUserId);
+
+                if ($hasFailedEnrollment || !$hasEnrollment) {
+                    if ($student->user->status !== 'active') {
+                        $student->user->update(['status' => 'active']);
+                    }
+
+                    if ($hasFailedEnrollment) {
+                        $failedCount++;
+                    }
+
+                    continue;
+                }
+
+                if ($student->user->status !== 'inactive') {
+                    $student->user->update(['status' => 'inactive']);
+                }
+
+                $graduatedCount++;
+            }
+        }
+
+        return [
+            'old_school_year' => $oldSY,
+            'new_school_year' => $newSY,
+            'promoted_sections_count' => count($promotedSectionMap),
+            'promoted_students_count' => $promotedStudentsCount,
+            'graduated_students_count' => $graduatedCount,
+            'failed_students_count' => $failedCount,
+            'grade11_templates' => array_values($grade11Templates),
+            'processed_at' => now()->toIso8601String(),
+        ];
+    }
+
+    private function isGradeLevel(?string $gradeLevel, int $targetGrade): bool
+    {
+        if (!is_string($gradeLevel) || trim($gradeLevel) === '') {
+            return false;
+        }
+
+        return preg_match('/\b' . preg_quote((string) $targetGrade, '/') . '\b/', $gradeLevel) === 1;
+    }
+
+    private function resolveCohortFromSchoolYear(string $schoolYear): string
+    {
+        if (preg_match('/^(\d{4})-\d{4}$/', $schoolYear, $matches) === 1) {
+            return $matches[1];
+        }
+
+        if (preg_match('/(\d{4})/', $schoolYear, $matches) === 1) {
+            return $matches[1];
+        }
+
+        return (string) now()->year;
+    }
+
+    private function isFailedEnrollment(Enrollment $enrollment): bool
+    {
+        $remarks = Str::lower(trim((string) ($enrollment->remarks ?? '')));
+
+        if ($remarks === 'failed') {
+            return true;
+        }
+
+        if ($enrollment->final_grade === null) {
+            return false;
+        }
+
+        return (int) $enrollment->final_grade < 75;
     }
 
     private function createArchiveSnapshot(string $oldSY, string $newSY, ?int $userId): string

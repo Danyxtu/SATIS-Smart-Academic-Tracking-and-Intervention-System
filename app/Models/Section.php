@@ -13,6 +13,7 @@ class Section extends Model
 
     protected $fillable = [
         'department_id',
+        'advisor_teacher_id',
         'created_by',
         'section_name',
         'section_code',
@@ -37,6 +38,11 @@ class Section extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function advisorTeacher(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'advisor_teacher_id');
     }
 
     public function students(): HasMany

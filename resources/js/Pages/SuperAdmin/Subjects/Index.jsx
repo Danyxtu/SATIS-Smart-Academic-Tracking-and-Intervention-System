@@ -1,47 +1,51 @@
 import { Head, Link, router, useForm } from "@inertiajs/react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import DeleteConfirmModal from "@/Components/Superadmin/DeleteConfirmModal";
+import SubjectWizardModal from "@/Components/Superadmin/SubjectWizardModal";
 import {
     BookOpen,
     Plus,
     Search,
     X,
     Trash2,
-    Hash,
     GraduationCap,
     Calendar,
     Pencil,
     Layers,
     ChevronLeft,
     ChevronRight,
+    Sparkles,
+    Wrench,
+    ClipboardList,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-function SubjectFormModal({
+function toSemesterLabel(semester) {
+    return String(semester) === "2" ? "2nd Semester" : "1st Semester";
+}
+
+function SubjectEditModal({
     isOpen,
-    mode,
     data,
     setData,
     errors,
     processing,
     onClose,
     onSubmit,
+    typeOptions,
+    semesterOptions,
+    gradeLevelOptions,
 }) {
     if (!isOpen) return null;
 
-    const isEdit = mode === "edit";
-
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
                 onClick={onClose}
             />
 
-            {/* Modal */}
             <div className="relative w-full max-w-md rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
-                {/* Header */}
                 <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
                     <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 ring-1 ring-emerald-200">
@@ -49,12 +53,10 @@ function SubjectFormModal({
                         </div>
                         <div>
                             <h2 className="text-base font-semibold text-slate-900">
-                                {isEdit ? "Edit Subject" : "New Subject"}
+                                Edit Subject
                             </h2>
                             <p className="text-xs text-slate-500">
-                                {isEdit
-                                    ? "Update subject details"
-                                    : "Add to the subject catalog"}
+                                Update subject details and classification
                             </p>
                         </div>
                     </div>
@@ -68,7 +70,6 @@ function SubjectFormModal({
                     </button>
                 </div>
 
-                {/* Body */}
                 <form onSubmit={onSubmit}>
                     <div className="space-y-5 px-6 py-5">
                         <div>
@@ -126,9 +127,120 @@ function SubjectFormModal({
                                 Letters, numbers, spaces, or hyphens only.
                             </p>
                         </div>
+
+                        <div>
+                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                                Total Hours
+                            </label>
+                            <input
+                                type="number"
+                                min="1"
+                                value={data.total_hours ?? ""}
+                                onChange={(e) =>
+                                    setData("total_hours", e.target.value)
+                                }
+                                placeholder="e.g., 160"
+                                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:ring-2 focus:ring-offset-0 ${
+                                    errors.total_hours
+                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
+                                        : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
+                                }`}
+                            />
+                            {errors.total_hours && (
+                                <p className="mt-1.5 text-xs text-rose-600">
+                                    {errors.total_hours}
+                                </p>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                                Semester
+                            </label>
+                            <select
+                                value={data.semester ?? ""}
+                                onChange={(e) =>
+                                    setData("semester", e.target.value)
+                                }
+                                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 focus:ring-offset-0 ${
+                                    errors.semester
+                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
+                                        : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
+                                }`}
+                            >
+                                <option value="">Select semester</option>
+                                {semesterOptions.map((option) => (
+                                    <option key={option} value={option}>
+                                        {toSemesterLabel(option)}
+                                    </option>
+                                ))}
+                            </select>
+                            {errors.semester && (
+                                <p className="mt-1.5 text-xs text-rose-600">
+                                    {errors.semester}
+                                </p>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                                Grade Level
+                            </label>
+                            <select
+                                value={data.grade_level ?? ""}
+                                onChange={(e) =>
+                                    setData("grade_level", e.target.value)
+                                }
+                                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 focus:ring-offset-0 ${
+                                    errors.grade_level
+                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
+                                        : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
+                                }`}
+                            >
+                                <option value="">Select grade level</option>
+                                {gradeLevelOptions.map((option) => (
+                                    <option key={option} value={option}>
+                                        {option}
+                                    </option>
+                                ))}
+                            </select>
+                            {errors.grade_level && (
+                                <p className="mt-1.5 text-xs text-rose-600">
+                                    {errors.grade_level}
+                                </p>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                                Subject Type
+                            </label>
+                            <select
+                                value={data.type_key ?? ""}
+                                onChange={(e) =>
+                                    setData("type_key", e.target.value)
+                                }
+                                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 focus:ring-offset-0 ${
+                                    errors.type_key
+                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
+                                        : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
+                                }`}
+                            >
+                                <option value="">Select subject type</option>
+                                {typeOptions.map((option) => (
+                                    <option key={option.key} value={option.key}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                            {errors.type_key && (
+                                <p className="mt-1.5 text-xs text-rose-600">
+                                    {errors.type_key}
+                                </p>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Footer */}
                     <div className="flex items-center justify-end gap-2.5 border-t border-slate-100 px-6 py-4">
                         <button
                             type="button"
@@ -164,7 +276,7 @@ function SubjectFormModal({
                                     />
                                 </svg>
                             )}
-                            {isEdit ? "Save Changes" : "Create Subject"}
+                            Save Changes
                         </button>
                     </div>
                 </form>
@@ -173,14 +285,25 @@ function SubjectFormModal({
     );
 }
 
-function StatCard({ icon: Icon, label, value, accent }) {
+function StatCard({ icon: Icon, label, value, accent, active, onClick }) {
     const accents = {
         emerald: "bg-emerald-50 text-emerald-600 ring-emerald-200",
         blue: "bg-blue-50 text-blue-600 ring-blue-200",
         violet: "bg-violet-50 text-violet-600 ring-violet-200",
+        amber: "bg-amber-50 text-amber-600 ring-amber-200",
+        rose: "bg-rose-50 text-rose-600 ring-rose-200",
     };
+
     return (
-        <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4">
+        <button
+            type="button"
+            onClick={onClick}
+            className={`flex w-full items-center gap-4 rounded-xl border bg-white px-5 py-4 text-left transition ${
+                active
+                    ? "border-emerald-300 ring-2 ring-emerald-100"
+                    : "border-slate-200 hover:border-slate-300"
+            }`}
+        >
             <div
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ${accents[accent]}`}
             >
@@ -192,27 +315,33 @@ function StatCard({ icon: Icon, label, value, accent }) {
                     {value}
                 </p>
             </div>
-        </div>
+        </button>
     );
 }
 
-export default function Index({ subjects, filters }) {
+export default function Index({
+    subjects,
+    filters,
+    summary,
+    typeOptions,
+    semesterOptions,
+    gradeLevelOptions,
+}) {
     const [search, setSearch] = useState(filters.search || "");
+    const [typeFilter, setTypeFilter] = useState(filters.type || "all");
+    const [semesterFilter, setSemesterFilter] = useState(
+        filters.semester || "all",
+    );
+    const [gradeLevelFilter, setGradeLevelFilter] = useState(
+        filters.grade_level || "all",
+    );
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [subjectToEdit, setSubjectToEdit] = useState(null);
     const [subjectToDelete, setSubjectToDelete] = useState(null);
 
-    const {
-        data: createData,
-        setData: setCreateData,
-        post,
-        processing: createProcessing,
-        errors: createErrors,
-        reset: resetCreate,
-        clearErrors: clearCreateErrors,
-    } = useForm({ subject_name: "", subject_code: "" });
+    const createForm = useForm({ type_key: "", subjects: [] });
 
     const {
         data: editData,
@@ -222,23 +351,110 @@ export default function Index({ subjects, filters }) {
         errors: editErrors,
         reset: resetEdit,
         clearErrors: clearEditErrors,
-    } = useForm({ subject_name: "", subject_code: "" });
+    } = useForm({
+        subject_name: "",
+        subject_code: "",
+        total_hours: "",
+        type_key: "",
+        semester: "",
+        grade_level: "",
+    });
 
-    const summary = useMemo(() => {
-        const listed = subjects.data.length;
-        const assigned = subjects.data.filter(
-            (s) => s.classes_count > 0,
-        ).length;
-        const classLoad = subjects.data.reduce(
-            (sum, s) => sum + Number(s.classes_count || 0),
-            0,
+    useEffect(() => {
+        setSearch(filters.search || "");
+    }, [filters.search]);
+
+    useEffect(() => {
+        setTypeFilter(filters.type || "all");
+    }, [filters.type]);
+
+    useEffect(() => {
+        setSemesterFilter(filters.semester || "all");
+    }, [filters.semester]);
+
+    useEffect(() => {
+        setGradeLevelFilter(filters.grade_level || "all");
+    }, [filters.grade_level]);
+
+    const resolvedSummary = useMemo(
+        () => ({
+            all: Number(summary?.all || 0),
+            specialized_academic: Number(summary?.specialized_academic || 0),
+            specialized_tvl: Number(summary?.specialized_tvl || 0),
+            core: Number(summary?.core || 0),
+            applied: Number(summary?.applied || 0),
+        }),
+        [summary],
+    );
+
+    const availableTypeOptions = useMemo(
+        () => (Array.isArray(typeOptions) ? typeOptions : []),
+        [typeOptions],
+    );
+
+    const availableSemesterOptions = useMemo(
+        () =>
+            Array.isArray(semesterOptions) && semesterOptions.length > 0
+                ? semesterOptions.map((option) => String(option))
+                : ["1", "2"],
+        [semesterOptions],
+    );
+
+    const availableGradeLevelOptions = useMemo(
+        () =>
+            Array.isArray(gradeLevelOptions) && gradeLevelOptions.length > 0
+                ? gradeLevelOptions
+                : ["Grade 11", "Grade 12"],
+        [gradeLevelOptions],
+    );
+
+    const filterTabs = useMemo(
+        () => [
+            { key: "all", label: "All" },
+            ...availableTypeOptions.map((option) => ({
+                key: option.key,
+                label: option.label,
+            })),
+        ],
+        [availableTypeOptions],
+    );
+
+    const buildQuery = (nextSearch, nextType, nextSemester, nextGradeLevel) => {
+        const query = {};
+
+        if (nextSearch?.trim()) {
+            query.search = nextSearch.trim();
+        }
+
+        if (nextType && nextType !== "all") {
+            query.type = nextType;
+        }
+
+        if (nextSemester && nextSemester !== "all") {
+            query.semester = nextSemester;
+        }
+
+        if (nextGradeLevel && nextGradeLevel !== "all") {
+            query.grade_level = nextGradeLevel;
+        }
+
+        return query;
+    };
+
+    const visitIndex = (nextSearch, nextType, nextSemester, nextGradeLevel) => {
+        router.get(
+            route("superadmin.subjects.index"),
+            buildQuery(nextSearch, nextType, nextSemester, nextGradeLevel),
+            {
+                preserveState: true,
+                replace: true,
+            },
         );
-        return { listed, assigned, classLoad };
-    }, [subjects.data]);
+    };
 
     const closeCreateModal = () => {
-        clearCreateErrors();
-        resetCreate();
+        createForm.clearErrors();
+        createForm.reset();
         setShowCreateModal(false);
     };
 
@@ -251,20 +467,27 @@ export default function Index({ subjects, filters }) {
 
     const handleSearch = (e) => {
         e.preventDefault();
-        router.get(
-            route("superadmin.subjects.index"),
-            { search },
-            { preserveState: true, replace: true },
-        );
+        visitIndex(search, typeFilter, semesterFilter, gradeLevelFilter);
     };
 
     const clearSearch = () => {
         setSearch("");
-        router.get(
-            route("superadmin.subjects.index"),
-            {},
-            { preserveState: true, replace: true },
-        );
+        visitIndex("", typeFilter, semesterFilter, gradeLevelFilter);
+    };
+
+    const applyTypeFilter = (nextType) => {
+        setTypeFilter(nextType);
+        visitIndex(search, nextType, semesterFilter, gradeLevelFilter);
+    };
+
+    const applySemesterFilter = (nextSemester) => {
+        setSemesterFilter(nextSemester);
+        visitIndex(search, typeFilter, nextSemester, gradeLevelFilter);
+    };
+
+    const applyGradeLevelFilter = (nextGradeLevel) => {
+        setGradeLevelFilter(nextGradeLevel);
+        visitIndex(search, typeFilter, semesterFilter, nextGradeLevel);
     };
 
     const openEditModal = (subject) => {
@@ -272,16 +495,24 @@ export default function Index({ subjects, filters }) {
         setEditData({
             subject_name: subject.subject_name,
             subject_code: subject.subject_code,
+            total_hours: subject.total_hours ?? "",
+            type_key: subject.subject_type_key ?? "",
+            semester: String(subject.semester ?? "1"),
+            grade_level: subject.grade_level ?? "",
         });
         setShowEditModal(true);
     };
 
-    const handleCreate = (e) => {
-        e.preventDefault();
-        post(route("superadmin.subjects.store"), {
-            preserveScroll: true,
-            onSuccess: closeCreateModal,
-        });
+    const handleCreateFromWizard = (payload) => {
+        createForm
+            .transform(() => payload)
+            .post(route("superadmin.subjects.store"), {
+                preserveScroll: true,
+                onSuccess: closeCreateModal,
+                onFinish: () => {
+                    createForm.transform((data) => data);
+                },
+            });
     };
 
     const handleUpdate = (e) => {
@@ -305,6 +536,13 @@ export default function Index({ subjects, filters }) {
                 },
             },
         );
+    };
+
+    const subjectTypeBadgeStyles = {
+        core: "bg-blue-50 text-blue-700 border-blue-200",
+        applied: "bg-emerald-50 text-emerald-700 border-emerald-200",
+        specialized_academic: "bg-violet-50 text-violet-700 border-violet-200",
+        specialized_tvl: "bg-amber-50 text-amber-700 border-amber-200",
     };
 
     return (
@@ -332,29 +570,138 @@ export default function Index({ subjects, filters }) {
                     </button>
                 </div>
 
-                {/* ── Stats Row ── */}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="w-full rounded-xl border border-slate-200 bg-white p-2">
+                    <div className="mb-2 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Semester
+                    </div>
+                    <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
+                        <button
+                            type="button"
+                            onClick={() => applySemesterFilter("all")}
+                            className={`w-full rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                                semesterFilter === "all"
+                                    ? "bg-emerald-600 text-white"
+                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                            }`}
+                        >
+                            All Semesters
+                        </button>
+                        {availableSemesterOptions.map((semesterOption) => (
+                            <button
+                                key={semesterOption}
+                                type="button"
+                                onClick={() =>
+                                    applySemesterFilter(semesterOption)
+                                }
+                                className={`w-full rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                                    semesterFilter === semesterOption
+                                        ? "bg-emerald-600 text-white"
+                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                }`}
+                            >
+                                {toSemesterLabel(semesterOption)}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
                     <StatCard
                         icon={BookOpen}
                         label="Total Subjects"
-                        value={subjects.total}
+                        value={resolvedSummary.all}
                         accent="emerald"
+                        active={typeFilter === "all"}
+                        onClick={() => applyTypeFilter("all")}
+                    />
+                    <StatCard
+                        icon={Sparkles}
+                        label="Academic Track Specialized"
+                        value={resolvedSummary.specialized_academic}
+                        accent="violet"
+                        active={typeFilter === "specialized_academic"}
+                        onClick={() => applyTypeFilter("specialized_academic")}
+                    />
+                    <StatCard
+                        icon={Wrench}
+                        label="TVL Track Specialized"
+                        value={resolvedSummary.specialized_tvl}
+                        accent="amber"
+                        active={typeFilter === "specialized_tvl"}
+                        onClick={() => applyTypeFilter("specialized_tvl")}
                     />
                     <StatCard
                         icon={Layers}
-                        label="Assigned Subjects"
-                        value={summary.assigned}
+                        label="Core Subjects"
+                        value={resolvedSummary.core}
                         accent="blue"
+                        active={typeFilter === "core"}
+                        onClick={() => applyTypeFilter("core")}
                     />
                     <StatCard
-                        icon={GraduationCap}
-                        label="Total Class Load"
-                        value={summary.classLoad}
-                        accent="violet"
+                        icon={ClipboardList}
+                        label="Applied Subjects"
+                        value={resolvedSummary.applied}
+                        accent="rose"
+                        active={typeFilter === "applied"}
+                        onClick={() => applyTypeFilter("applied")}
                     />
                 </div>
 
-                {/* ── Search Bar ── */}
+                <div className="rounded-xl border border-slate-200 bg-white p-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Grade Level
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => applyGradeLevelFilter("all")}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                gradeLevelFilter === "all"
+                                    ? "bg-emerald-600 text-white"
+                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                            }`}
+                        >
+                            All Grade Levels
+                        </button>
+                        {availableGradeLevelOptions.map((gradeLevel) => (
+                            <button
+                                key={gradeLevel}
+                                type="button"
+                                onClick={() =>
+                                    applyGradeLevelFilter(gradeLevel)
+                                }
+                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                    gradeLevelFilter === gradeLevel
+                                        ? "bg-emerald-600 text-white"
+                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                }`}
+                            >
+                                {gradeLevel}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-2">
+                    <div className="flex flex-wrap gap-2">
+                        {filterTabs.map((tab) => (
+                            <button
+                                key={tab.key}
+                                type="button"
+                                onClick={() => applyTypeFilter(tab.key)}
+                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                    typeFilter === tab.key
+                                        ? "bg-emerald-600 text-white"
+                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
                 <form onSubmit={handleSearch} className="flex gap-2">
                     <div className="relative flex-1">
                         <Search
@@ -418,18 +765,29 @@ export default function Index({ subjects, filters }) {
                         </div>
                     ) : (
                         <>
-                            {/* Table head */}
                             <div className="grid grid-cols-12 gap-4 border-b border-slate-200 bg-slate-50 px-5 py-3">
-                                <div className="col-span-5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                <div className="col-span-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
                                     Subject
                                 </div>
                                 <div className="col-span-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
                                     Code
                                 </div>
-                                <div className="col-span-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                    Classes
+                                <div className="col-span-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    Semester
+                                </div>
+                                <div className="col-span-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    Grade
                                 </div>
                                 <div className="col-span-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    Type
+                                </div>
+                                <div className="col-span-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    Hours
+                                </div>
+                                <div className="col-span-1 text-center text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    Classes
+                                </div>
+                                <div className="col-span-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
                                     Updated
                                 </div>
                                 <div className="col-span-1 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -437,15 +795,13 @@ export default function Index({ subjects, filters }) {
                                 </div>
                             </div>
 
-                            {/* Table rows */}
                             <div className="divide-y divide-slate-100">
                                 {subjects.data.map((subject) => (
                                     <div
                                         key={subject.id}
                                         className="grid grid-cols-12 items-center gap-4 px-5 py-4 transition-colors hover:bg-slate-50/70"
                                     >
-                                        {/* Name + created date */}
-                                        <div className="col-span-5 min-w-0">
+                                        <div className="col-span-2 min-w-0">
                                             <p className="truncate text-sm font-semibold text-slate-900">
                                                 {subject.subject_name}
                                             </p>
@@ -461,15 +817,51 @@ export default function Index({ subjects, filters }) {
                                             </p>
                                         </div>
 
-                                        {/* Code badge */}
                                         <div className="col-span-2">
                                             <span className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1 font-mono text-[11px] font-bold text-slate-700">
                                                 {subject.subject_code}
                                             </span>
                                         </div>
 
-                                        {/* Classes count */}
-                                        <div className="col-span-2 flex justify-center">
+                                        <div className="col-span-1">
+                                            <span className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                                                {subject.semester
+                                                    ? toSemesterLabel(
+                                                          subject.semester,
+                                                      )
+                                                    : "-"}
+                                            </span>
+                                        </div>
+
+                                        <div className="col-span-1">
+                                            <span className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                                                {subject.grade_level || "-"}
+                                            </span>
+                                        </div>
+
+                                        <div className="col-span-2">
+                                            <span
+                                                className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${
+                                                    subjectTypeBadgeStyles[
+                                                        subject.subject_type_key
+                                                    ] ||
+                                                    "border-slate-200 bg-slate-100 text-slate-600"
+                                                }`}
+                                            >
+                                                {subject.subject_type_name ||
+                                                    "Uncategorized"}
+                                            </span>
+                                        </div>
+
+                                        <div className="col-span-1">
+                                            <span className="text-xs font-semibold text-slate-600">
+                                                {subject.total_hours
+                                                    ? `${subject.total_hours}h`
+                                                    : "-"}
+                                            </span>
+                                        </div>
+
+                                        <div className="col-span-1 flex justify-center">
                                             <span
                                                 className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
                                                     subject.classes_count > 0
@@ -482,8 +874,7 @@ export default function Index({ subjects, filters }) {
                                             </span>
                                         </div>
 
-                                        {/* Updated date */}
-                                        <div className="col-span-2">
+                                        <div className="col-span-1">
                                             <p className="text-xs text-slate-500">
                                                 {new Date(
                                                     subject.updated_at,
@@ -495,7 +886,6 @@ export default function Index({ subjects, filters }) {
                                             </p>
                                         </div>
 
-                                        {/* Actions */}
                                         <div className="col-span-1 flex items-center justify-end gap-1">
                                             <button
                                                 type="button"
@@ -523,7 +913,6 @@ export default function Index({ subjects, filters }) {
                                 ))}
                             </div>
 
-                            {/* Pagination */}
                             {subjects.last_page > 1 && (
                                 <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/60 px-5 py-3">
                                     <p className="text-xs text-slate-500">
@@ -586,24 +975,25 @@ export default function Index({ subjects, filters }) {
                 </div>
             </div>
 
-            {/* Modals */}
-            <SubjectFormModal
+            <SubjectWizardModal
                 isOpen={showCreateModal}
-                mode="create"
-                data={createData}
-                setData={setCreateData}
-                errors={createErrors}
-                processing={createProcessing}
+                processing={createForm.processing}
+                errors={createForm.errors}
+                typeOptions={availableTypeOptions}
+                semesterOptions={availableSemesterOptions}
+                gradeLevelOptions={availableGradeLevelOptions}
                 onClose={closeCreateModal}
-                onSubmit={handleCreate}
+                onSubmit={handleCreateFromWizard}
             />
-            <SubjectFormModal
+            <SubjectEditModal
                 isOpen={showEditModal}
-                mode="edit"
                 data={editData}
                 setData={setEditData}
                 errors={editErrors}
                 processing={editProcessing}
+                typeOptions={availableTypeOptions}
+                semesterOptions={availableSemesterOptions}
+                gradeLevelOptions={availableGradeLevelOptions}
                 onClose={closeEditModal}
                 onSubmit={handleUpdate}
             />

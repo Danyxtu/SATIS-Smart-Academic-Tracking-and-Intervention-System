@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Department;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -15,79 +16,159 @@ class TestUserSeeder extends Seeder
     public function run(): void
     {
         Role::firstOrCreate(
-            ['name' => 'super_admin'],
-            ['label' => 'Super Admin']
-        );
-
-        Role::firstOrCreate(
             ['name' => 'teacher'],
             ['label' => 'Teacher']
         );
 
-        $testUsers = [
+        Role::firstOrCreate(
+            ['name' => 'admin'],
+            ['label' => 'Admin']
+        );
+
+        Role::firstOrCreate(
+            ['name' => 'super_admin'],
+            ['label' => 'Super Admin']
+        );
+
+        $departmentCodeOrder = ['ABM', 'GAS', 'HUMMS', 'STEM', 'AFA', 'HE', 'IA', 'ICT'];
+
+        $departmentIdByCode = Department::query()
+            ->whereIn('department_code', $departmentCodeOrder)
+            ->get(['id', 'department_code'])
+            ->pluck('id', 'department_code');
+
+        $testerUsers = [
             [
                 'personal_email' => 'sheena@test.com',
                 'first_name' => 'Sheena',
                 'last_name' => 'DeGuzman',
                 'username' => 'sheena.test',
-                'roles' => ['super_admin', 'teacher'],
+                'department_code' => 'GAS',
             ],
             [
                 'personal_email' => 'danny@test.com',
                 'first_name' => 'Danny',
                 'last_name' => 'Dinglasa',
                 'username' => 'danny.test',
-                'roles' => ['super_admin', 'teacher'],
+                'department_code' => 'ABM',
             ],
             [
                 'personal_email' => 'benedict@test.com',
                 'first_name' => 'Benedict',
                 'last_name' => 'Jambre',
                 'username' => 'benedict.test',
-                'roles' => ['super_admin', 'teacher'],
+                'department_code' => 'ICT',
             ],
             [
-                'personal_email' => 'ameer@test.com',
+                'personal_email' => 'sabtal@test.com',
                 'first_name' => 'Ameer',
                 'last_name' => 'Sabtal',
-                'username' => 'ameer.test',
-                'roles' => ['super_admin', 'teacher'],
+                'username' => 'sabtal.test',
+                'department_code' => 'STEM',
             ],
             [
                 'personal_email' => 'charles@test.com',
                 'first_name' => 'Charles',
                 'last_name' => 'Gumondas',
                 'username' => 'charles.test',
-                'roles' => ['super_admin', 'teacher'],
+                'department_code' => 'HUMMS',
             ],
         ];
 
+        $teacherUsers = collect(range(1, 10))
+            ->map(function (int $index) use ($departmentCodeOrder): array {
+                $departmentCode = $departmentCodeOrder[($index - 1) % count($departmentCodeOrder)];
+
+                return [
+                    'personal_email' => "teach{$index}@test.com",
+                    'first_name' => "Teach{$index}",
+                    'last_name' => 'User',
+                    'username' => "teach{$index}",
+                    'department_code' => $departmentCode,
+                ];
+            })
+            ->values()
+            ->all();
+
         $seededRows = [];
 
-        foreach ($testUsers as $testUser) {
+        foreach ($testerUsers as $testUser) {
+            $departmentId = $departmentIdByCode->get($testUser['department_code']);
+
             $user = User::updateOrCreate(
                 ['personal_email' => $testUser['personal_email']],
                 [
                     'first_name' => $testUser['first_name'],
                     'last_name' => $testUser['last_name'],
                     'username' => $testUser['username'],
+                    'department_id' => $departmentId,
                     'password' => Hash::make('password'),
                 ]
             );
 
-            $user->syncRolesByName($testUser['roles']);
+            $user->syncRolesByName(['teacher', 'admin']);
 
             $seededRows[] = [
                 $testUser['personal_email'],
                 'password',
-                implode(', ', $testUser['roles']),
+                'teacher, admin',
+                $testUser['department_code'],
             ];
         }
 
-        $this->command->info('Test users created successfully!');
+        foreach ($teacherUsers as $teacherUser) {
+            $departmentId = $departmentIdByCode->get($teacherUser['department_code']);
+
+            $user = User::updateOrCreate(
+                ['personal_email' => $teacherUser['personal_email']],
+                [
+                    'first_name' => $teacherUser['first_name'],
+                    'last_name' => $teacherUser['last_name'],
+                    'username' => $teacherUser['username'],
+                    'department_id' => $departmentId,
+                    'password' => Hash::make('password'),
+                ]
+            );
+
+            $user->syncRolesByName(['teacher']);
+
+            $seededRows[] = [
+                $teacherUser['personal_email'],
+                'password',
+                'teacher',
+                $teacherUser['department_code'],
+            ];
+        }
+
+        $superAdminDepartmentCode = 'ABM';
+        $superAdminDepartmentId = $departmentIdByCode->get($superAdminDepartmentCode);
+
+        $superAdminUser = User::updateOrCreate(
+            ['personal_email' => 'superadmin@test.com'],
+            [
+                'first_name' => 'Super',
+                'last_name' => 'Admin',
+                'username' => 'superadmin.test',
+                'department_id' => $superAdminDepartmentId,
+                'password' => Hash::make('password'),
+            ]
+        );
+
+        $superAdminUser->syncRolesByName(['teacher', 'super_admin']);
+
+        $seededRows[] = [
+            'superadmin@test.com',
+            'password',
+            'teacher, super_admin',
+            $superAdminDepartmentCode,
+        ];
+
+        $this->command->info('Teacher users and tester admin-teacher users created successfully!');
         $this->command->table(
-            ['Email', 'Password', 'Roles'],
+            ['Email', 'Password', 'Roles', 'Department'],
             $seededRows
         );
+
+        $this->command->info('Total seeded users from TestUserSeeder: ' . count($seededRows));
     }
 }

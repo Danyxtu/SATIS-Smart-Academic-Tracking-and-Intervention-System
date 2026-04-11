@@ -40,16 +40,20 @@ class AcademicManagementController extends Controller
 
         $departments = Department::query()
             ->orderBy('department_code')
-            ->get(['id', 'department_name', 'department_code'])
+            ->get(['id', 'department_name', 'department_code', 'track'])
             ->map(fn(Department $department) => [
                 'id' => (int) $department->id,
                 'department_name' => $department->department_name,
                 'department_code' => $department->department_code,
+                'track' => $department->track ?: 'Academic',
             ])
             ->values();
 
         $sectionsQuery = Section::query()
-            ->with(['department:id,department_name,department_code'])
+            ->with([
+                'department:id,department_name,department_code',
+                'advisorTeacher:id,first_name,middle_name,last_name',
+            ])
             ->withCount('students');
 
         $classesQuery = SchoolClass::query()
@@ -124,6 +128,8 @@ class AcademicManagementController extends Controller
                     'strand' => $section->strand,
                     'track' => $section->track,
                     'school_year' => $section->school_year,
+                    'advisor_teacher_id' => $section->advisor_teacher_id ? (int) $section->advisor_teacher_id : null,
+                    'advisor_teacher_name' => $section->advisorTeacher?->name,
                     'description' => $section->description,
                     'students_count' => (int) ($section->students_count ?? 0),
                     'is_active' => (bool) $section->is_active,
@@ -262,6 +268,81 @@ class AcademicManagementController extends Controller
 
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
 
+        $rolloverState = SystemSetting::get('rollover_last_transition');
+
+        $grade11TemplateSections = [];
+        $rolloverNotice = null;
+
+        if (is_array($rolloverState) && (string) data_get($rolloverState, 'new_school_year') === $currentSchoolYear) {
+            $grade11TemplateSections = collect(data_get($rolloverState, 'grade11_templates', []))
+                ->filter(fn($template) => is_array($template) && isset($template['department_id']))
+                ->map(function (array $template): array {
+                    return [
+                        'department_id' => (int) ($template['department_id'] ?? 0),
+                        'section_name' => $this->normalizeText((string) ($template['section_name'] ?? '')),
+                        'section_code' => $this->normalizeText((string) ($template['section_code'] ?? '')),
+                        'strand' => $this->normalizeNullableText($template['strand'] ?? null),
+                        'track' => $this->normalizeNullableText($template['track'] ?? null),
+                        'description' => $this->normalizeNullableText($template['description'] ?? null),
+                    ];
+                })
+                ->filter(fn(array $template): bool => $template['department_id'] > 0 && $template['section_name'] !== '')
+                ->values()
+                ->all();
+
+            $hasCurrentGrade11Sections = Section::query()
+                ->where('school_year', $currentSchoolYear)
+                ->where('grade_level', 'like', '%11%')
+                ->exists();
+
+            $rolloverNotice = [
+                'old_school_year' => (string) data_get($rolloverState, 'old_school_year', ''),
+                'new_school_year' => (string) data_get($rolloverState, 'new_school_year', ''),
+                'promoted_sections_count' => (int) data_get($rolloverState, 'promoted_sections_count', 0),
+                'promoted_students_count' => (int) data_get($rolloverState, 'promoted_students_count', 0),
+                'graduated_students_count' => (int) data_get($rolloverState, 'graduated_students_count', 0),
+                'failed_students_count' => (int) data_get($rolloverState, 'failed_students_count', 0),
+                'can_recreate_grade11_sections' => !$hasCurrentGrade11Sections && !empty($grade11TemplateSections),
+            ];
+        }
+
+        $unassignedGrade11Sections = Section::query()
+            ->with('department:id,department_name,department_code')
+            ->where('school_year', $currentSchoolYear)
+            ->whereNull('advisor_teacher_id')
+            ->where('grade_level', 'like', '%11%')
+            ->orderBy('section_name')
+            ->get([
+                'id',
+                'department_id',
+                'section_name',
+                'section_code',
+                'cohort',
+                'grade_level',
+                'strand',
+                'track',
+                'school_year',
+            ])
+            ->map(function (Section $section): array {
+                return [
+                    'id' => (int) $section->id,
+                    'department_id' => (int) $section->department_id,
+                    'section_name' => $section->section_name,
+                    'section_code' => $section->section_code,
+                    'cohort' => $section->cohort,
+                    'grade_level' => $section->grade_level,
+                    'strand' => $section->strand,
+                    'track' => $section->track,
+                    'school_year' => $section->school_year,
+                    'department' => $section->department ? [
+                        'id' => (int) $section->department->id,
+                        'department_name' => $section->department->department_name,
+                        'department_code' => $section->department->department_code,
+                    ] : null,
+                ];
+            })
+            ->values();
+
         return Inertia::render('SuperAdmin/AcademicManagement/Index', [
             'tab' => $tab,
             'sections' => $sections,
@@ -272,6 +353,9 @@ class AcademicManagementController extends Controller
             'teachers' => $teachers,
             'availableStudents' => $availableStudents,
             'currentSchoolYear' => $currentSchoolYear,
+            'rolloverNotice' => $rolloverNotice,
+            'grade11TemplateSections' => $grade11TemplateSections,
+            'unassignedGrade11Sections' => $unassignedGrade11Sections,
             'colorOptions' => self::COLOR_OPTIONS,
             'filters' => [
                 'tab' => $tab,
@@ -286,11 +370,176 @@ class AcademicManagementController extends Controller
         ]);
     }
 
+    public function recreateGrade11Sections(Request $request): RedirectResponse
+    {
+        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
+        $rolloverState = SystemSetting::get('rollover_last_transition');
+
+        if (!is_array($rolloverState) || (string) data_get($rolloverState, 'new_school_year') !== $currentSchoolYear) {
+            return back()->with('error', 'No rollover context found for this school year.');
+        }
+
+        $templates = collect(data_get($rolloverState, 'grade11_templates', []))
+            ->filter(fn($template) => is_array($template) && isset($template['department_id']))
+            ->map(function (array $template): array {
+                return [
+                    'department_id' => (int) ($template['department_id'] ?? 0),
+                    'section_name' => $this->normalizeText((string) ($template['section_name'] ?? '')),
+                    'section_code' => $this->normalizeText((string) ($template['section_code'] ?? '')),
+                    'strand' => $this->normalizeNullableText($template['strand'] ?? null),
+                    'track' => $this->normalizeNullableText($template['track'] ?? null),
+                    'description' => $this->normalizeNullableText($template['description'] ?? null),
+                ];
+            })
+            ->filter(fn(array $template): bool => $template['department_id'] > 0 && $template['section_name'] !== '')
+            ->values();
+
+        if ($templates->isEmpty()) {
+            return back()->with('error', 'No Grade 11 templates are available from the previous school year.');
+        }
+
+        $hasCurrentGrade11Sections = Section::query()
+            ->where('school_year', $currentSchoolYear)
+            ->where('grade_level', 'like', '%11%')
+            ->exists();
+
+        if ($hasCurrentGrade11Sections) {
+            return back()->with('error', 'Grade 11 sections already exist for the current school year.');
+        }
+
+        $cohort = $this->resolveCohortFromSchoolYear($currentSchoolYear);
+        $createdCount = 0;
+
+        DB::transaction(function () use ($templates, $cohort, $currentSchoolYear, $request, &$createdCount): void {
+            foreach ($templates as $template) {
+                $departmentId = (int) $template['department_id'];
+                $sectionName = $this->normalizeText($template['section_name']);
+                $baseSectionCode = $template['section_code'] !== ''
+                    ? $this->normalizeSectionCode($template['section_code'])
+                    : $this->generateSectionCode($sectionName);
+
+                $resolvedSectionCode = $this->ensureUniqueSectionCode(
+                    $departmentId,
+                    $cohort,
+                    $baseSectionCode,
+                );
+
+                $resolvedSectionName = $sectionName;
+                $nameCounter = 1;
+
+                while (
+                    Section::query()
+                    ->where('department_id', $departmentId)
+                    ->where('cohort', $cohort)
+                    ->where('section_name', $resolvedSectionName)
+                    ->exists()
+                ) {
+                    $nameCounter++;
+                    $resolvedSectionName = $sectionName . ' (' . $nameCounter . ')';
+                }
+
+                Section::create([
+                    'department_id' => $departmentId,
+                    'advisor_teacher_id' => null,
+                    'created_by' => $request->user()?->id,
+                    'section_name' => $resolvedSectionName,
+                    'section_code' => $resolvedSectionCode,
+                    'cohort' => $cohort,
+                    'grade_level' => 'Grade 11',
+                    'strand' => $template['strand'] ?? null,
+                    'track' => $template['track'] ?? null,
+                    'school_year' => $currentSchoolYear,
+                    'description' => $template['description'] ?? null,
+                    'is_active' => true,
+                ]);
+
+                $createdCount++;
+            }
+        });
+
+        return redirect()
+            ->route('superadmin.academic-management.index', ['tab' => 'sections'])
+            ->with('success', $createdCount . ' Grade 11 section' . ($createdCount === 1 ? '' : 's') . ' recreated for ' . $currentSchoolYear . '.');
+    }
+
+    public function assignAdviserToSections(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'teacher_id' => ['required', 'integer', Rule::exists('users', 'id')],
+            'section_ids' => ['required', 'array', 'min:1'],
+            'section_ids.*' => ['integer', Rule::exists('sections', 'id')],
+        ]);
+
+        $teacher = User::query()
+            ->where('id', (int) $validated['teacher_id'])
+            ->whereHas('roles', fn($query) => $query->where('name', 'teacher'))
+            ->first();
+
+        if (!$teacher) {
+            throw ValidationException::withMessages([
+                'teacher_id' => 'Selected user is not a teacher.',
+            ]);
+        }
+
+        if (!$teacher->department_id) {
+            throw ValidationException::withMessages([
+                'teacher_id' => 'Selected teacher is not assigned to a department.',
+            ]);
+        }
+
+        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
+
+        $sections = Section::query()
+            ->whereIn('id', collect($validated['section_ids'])->map(fn($id) => (int) $id)->all())
+            ->where('school_year', $currentSchoolYear)
+            ->whereNull('advisor_teacher_id')
+            ->where('grade_level', 'like', '%11%')
+            ->get(['id', 'department_id']);
+
+        if ($sections->isEmpty()) {
+            throw ValidationException::withMessages([
+                'section_ids' => 'No eligible Grade 11 sections were selected for adviser assignment.',
+            ]);
+        }
+
+        $requestedCount = count($validated['section_ids']);
+        if ($sections->count() !== $requestedCount) {
+            throw ValidationException::withMessages([
+                'section_ids' => 'Some selected sections are invalid, already assigned, or not Grade 11 sections in the current school year.',
+            ]);
+        }
+
+        $invalidDepartmentSection = $sections
+            ->first(fn(Section $section): bool => (int) $section->department_id !== (int) $teacher->department_id);
+
+        if ($invalidDepartmentSection) {
+            throw ValidationException::withMessages([
+                'section_ids' => 'Teacher and selected sections must belong to the same department.',
+            ]);
+        }
+
+        Section::query()
+            ->whereIn('id', $sections->pluck('id')->all())
+            ->update([
+                'advisor_teacher_id' => (int) $teacher->id,
+            ]);
+
+        return back()->with('success', $sections->count() . ' section' . ($sections->count() === 1 ? '' : 's') . ' assigned to adviser ' . $teacher->name . '.');
+    }
+
     public function storeSection(Request $request): RedirectResponse
     {
         $validated = $request->validate($this->sectionCreateValidationRules());
 
         $department = Department::query()->findOrFail((int) $validated['department_id']);
+        $selectedTrack = (string) $validated['track'];
+
+        if (($department->track ?: 'Academic') !== $selectedTrack) {
+            throw ValidationException::withMessages([
+                'department_id' => 'Selected department is not part of the chosen track.',
+            ]);
+        }
+
         $schoolYear = SystemSetting::getCurrentSchoolYear();
         $cohort = $this->resolveCohortFromSchoolYear($schoolYear);
 
@@ -303,6 +552,16 @@ class AcademicManagementController extends Controller
         );
 
         $sectionCode = $this->generateSectionCode($formattedSectionName);
+
+        $advisorTeacherId = isset($validated['advisor_teacher_id'])
+            ? (int) $validated['advisor_teacher_id']
+            : null;
+
+        if ($advisorTeacherId !== null && $advisorTeacherId > 0) {
+            $this->ensureTeacherAssignable($advisorTeacherId, (int) $department->id, 'advisor_teacher_id');
+        } else {
+            $advisorTeacherId = null;
+        }
 
         $this->ensureUniqueSectionName((int) $department->id, $cohort, $formattedSectionName);
         $sectionCode = $this->ensureUniqueSectionCode((int) $department->id, $cohort, $sectionCode);
@@ -325,12 +584,6 @@ class AcademicManagementController extends Controller
             })
             ->values();
 
-        if ($assignedStudentIds->isEmpty() && $newStudents->isEmpty()) {
-            throw ValidationException::withMessages([
-                'student_assignment' => 'Add at least one student (assign existing or create new) before saving.',
-            ]);
-        }
-
         $summary = DB::transaction(function () use (
             $request,
             $department,
@@ -339,18 +592,21 @@ class AcademicManagementController extends Controller
             $gradeLevel,
             $formattedSectionName,
             $sectionCode,
+            $selectedTrack,
+            $advisorTeacherId,
             $assignedStudentIds,
             $newStudents
         ) {
             $section = Section::create([
                 'department_id' => (int) $department->id,
                 'created_by' => $request->user()?->id,
+                'advisor_teacher_id' => $advisorTeacherId,
                 'section_name' => $formattedSectionName,
                 'section_code' => $sectionCode,
                 'cohort' => $cohort,
                 'grade_level' => $gradeLevel,
                 'strand' => $department->department_code,
-                'track' => null,
+                'track' => $selectedTrack,
                 'school_year' => $schoolYear,
                 'description' => null,
                 'is_active' => true,
@@ -450,6 +706,7 @@ class AcademicManagementController extends Controller
                 'total_students' => count($assignedExistingStudents) + count($createdStudents),
                 'assigned_existing_students' => $assignedExistingStudents,
                 'created_students' => $createdStudents,
+                'advisor_teacher_name' => $section->advisorTeacher?->name,
             ];
         });
 
@@ -475,8 +732,19 @@ class AcademicManagementController extends Controller
         $this->ensureUniqueSectionName((int) $department->id, $cohort, $sectionName, (int) $section->id);
         $sectionCode = $this->ensureUniqueSectionCode((int) $department->id, $cohort, $sectionCode, (int) $section->id);
 
+        $advisorTeacherId = isset($validated['advisor_teacher_id'])
+            ? (int) $validated['advisor_teacher_id']
+            : null;
+
+        if ($advisorTeacherId !== null && $advisorTeacherId > 0) {
+            $this->ensureTeacherAssignable($advisorTeacherId, (int) $department->id, 'advisor_teacher_id');
+        } else {
+            $advisorTeacherId = null;
+        }
+
         $section->update([
             'department_id' => (int) $department->id,
+            'advisor_teacher_id' => $advisorTeacherId,
             'section_name' => $sectionName,
             'section_code' => $sectionCode,
             'cohort' => $cohort,
@@ -499,10 +767,12 @@ class AcademicManagementController extends Controller
     private function sectionCreateValidationRules(): array
     {
         return [
+            'track' => ['required', 'string', Rule::in(['Academic', 'TVL'])],
             'department_id' => ['required', 'integer', Rule::exists('departments', 'id')],
             'section_name' => ['required', 'string', 'max:255'],
             'grade_level' => ['required', 'string', 'max:100'],
             'school_year' => ['nullable', 'string', 'max:20'],
+            'advisor_teacher_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'assigned_student_ids' => ['nullable', 'array'],
             'assigned_student_ids.*' => ['integer', Rule::exists('students', 'id')],
             'new_students' => ['nullable', 'array'],
@@ -533,6 +803,86 @@ class AcademicManagementController extends Controller
 
     public function storeClass(Request $request): RedirectResponse
     {
+        if ($request->has('class_queue')) {
+            $validated = $request->validate($this->classQueueValidationRules());
+
+            $queueItems = collect($validated['class_queue'] ?? [])
+                ->map(function (array $item) {
+                    return [
+                        'subject_id' => (int) $item['subject_id'],
+                        'section_id' => (int) $item['section_id'],
+                        'teacher_id' => (int) $item['teacher_id'],
+                        'school_year' => $this->normalizeText($item['school_year']),
+                        'color' => $item['color'] ?? 'indigo',
+                    ];
+                })
+                ->values();
+
+            $duplicateQueueExists = $queueItems
+                ->groupBy(fn(array $item) => $item['section_id'] . '|' . $item['subject_id'] . '|' . $item['school_year'])
+                ->contains(fn($group) => $group->count() > 1);
+
+            if ($duplicateQueueExists) {
+                throw ValidationException::withMessages([
+                    'class_queue' => 'Duplicate queue entries found. A class can only appear once per section, subject, and school year.',
+                ]);
+            }
+
+            $createdCount = DB::transaction(function () use ($queueItems) {
+                $sectionLookup = Section::query()
+                    ->whereIn('id', $queueItems->pluck('section_id')->unique()->values())
+                    ->get()
+                    ->keyBy(fn(Section $section) => (int) $section->id);
+
+                $created = 0;
+
+                foreach ($queueItems as $index => $item) {
+                    $section = $sectionLookup->get((int) $item['section_id']);
+
+                    if (! $section || ! $section->is_active) {
+                        throw ValidationException::withMessages([
+                            "class_queue.{$index}.section_id" => 'Selected section is invalid or no longer active.',
+                        ]);
+                    }
+
+                    $this->ensureTeacherAssignable(
+                        (int) $item['teacher_id'],
+                        (int) $section->department_id,
+                        "class_queue.{$index}.teacher_id",
+                    );
+
+                    $this->ensureUniqueClassAssignment(
+                        (int) $item['subject_id'],
+                        (int) $item['section_id'],
+                        $item['school_year'],
+                        null,
+                        "class_queue.{$index}.section_id",
+                    );
+
+                    SchoolClass::create([
+                        'subject_id' => (int) $item['subject_id'],
+                        'section_id' => (int) $item['section_id'],
+                        'teacher_id' => (int) $item['teacher_id'],
+                        'school_year' => $item['school_year'],
+                        'grade_level' => $section->grade_level ?? 'Grade 12',
+                        'section' => $section->section_code ?: $section->section_name,
+                        'strand' => $section->strand,
+                        'track' => $section->track,
+                        'color' => $item['color'] ?? 'indigo',
+                        'semester' => (string) SystemSetting::getCurrentSemester(),
+                    ]);
+
+                    $created++;
+                }
+
+                return $created;
+            });
+
+            return redirect()
+                ->route('superadmin.academic-management.index', ['tab' => 'classes'])
+                ->with('success', $createdCount . ' class' . ($createdCount === 1 ? '' : 'es') . ' created successfully.');
+        }
+
         $validated = $request->validate($this->classValidationRules());
 
         $section = Section::query()->findOrFail((int) $validated['section_id']);
@@ -621,6 +971,7 @@ class AcademicManagementController extends Controller
             'track' => ['nullable', 'string', 'max:100'],
             'school_year' => ['nullable', 'string', 'max:20'],
             'description' => ['nullable', 'string', 'max:1000'],
+            'advisor_teacher_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'is_active' => ['nullable', 'boolean'],
         ];
     }
@@ -639,7 +990,22 @@ class AcademicManagementController extends Controller
         ];
     }
 
-    private function ensureTeacherAssignable(int $teacherId, int $departmentId): void
+    /**
+     * @return array<string, array<int, mixed>>
+     */
+    private function classQueueValidationRules(): array
+    {
+        return [
+            'class_queue' => ['required', 'array', 'min:1', 'max:100'],
+            'class_queue.*.subject_id' => ['required', 'integer', Rule::exists('subjects', 'id')],
+            'class_queue.*.section_id' => ['required', 'integer', Rule::exists('sections', 'id')->where(fn($query) => $query->where('is_active', true))],
+            'class_queue.*.teacher_id' => ['required', 'integer', Rule::exists('users', 'id')],
+            'class_queue.*.school_year' => ['required', 'string', 'max:9', 'regex:/^\d{4}-\d{4}$/'],
+            'class_queue.*.color' => ['nullable', 'string', Rule::in(self::COLOR_OPTIONS)],
+        ];
+    }
+
+    private function ensureTeacherAssignable(int $teacherId, int $departmentId, string $field = 'teacher_id'): void
     {
         $teacherIsAssignable = User::query()
             ->where('id', $teacherId)
@@ -650,8 +1016,12 @@ class AcademicManagementController extends Controller
             ->exists();
 
         if (! $teacherIsAssignable) {
+            $message = $field === 'advisor_teacher_id'
+                ? 'Selected adviser must be a teacher in the selected department.'
+                : 'Selected teacher is invalid or belongs to another department.';
+
             throw ValidationException::withMessages([
-                'teacher_id' => 'Selected teacher is invalid or belongs to another department.',
+                $field => $message,
             ]);
         }
     }
@@ -661,6 +1031,7 @@ class AcademicManagementController extends Controller
         int $sectionId,
         string $schoolYear,
         ?int $ignoreClassId = null,
+        string $field = 'section_id',
     ): void {
         $query = SchoolClass::query()
             ->where('subject_id', $subjectId)
@@ -673,7 +1044,7 @@ class AcademicManagementController extends Controller
 
         if ($query->exists()) {
             throw ValidationException::withMessages([
-                'section_id' => 'This section already has the selected subject for the given school year.',
+                $field => 'This section already has the selected subject for the given school year.',
             ]);
         }
     }

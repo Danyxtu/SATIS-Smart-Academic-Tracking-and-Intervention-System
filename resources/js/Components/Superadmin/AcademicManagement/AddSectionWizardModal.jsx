@@ -20,7 +20,7 @@ const WIZARD_STEPS = [
     {
         id: 1,
         title: "Section Details",
-        description: "Department, grade level, and section name",
+        description: "Track, department, grade level, section name, adviser",
     },
     {
         id: 2,
@@ -35,9 +35,42 @@ const WIZARD_STEPS = [
 ];
 
 const GRADE_LEVEL_OPTIONS = ["Grade 11", "Grade 12"];
+const TRACK_OPTIONS = ["Academic", "TVL"];
+
+const normalizeDepartmentSearch = (value = "") =>
+    String(value).trim().toLowerCase();
+
+const formatDepartmentOptionLabel = (department) =>
+    `${department.department_code} - ${department.department_name}`;
+
+const findDepartmentFromSearch = (departments, value) => {
+    const normalized = normalizeDepartmentSearch(value);
+
+    if (!normalized) {
+        return null;
+    }
+
+    return (
+        departments.find((department) => {
+            const code = normalizeDepartmentSearch(department.department_code);
+            const name = normalizeDepartmentSearch(department.department_name);
+            const label = normalizeDepartmentSearch(
+                formatDepartmentOptionLabel(department),
+            );
+
+            return (
+                normalized === code ||
+                normalized === name ||
+                normalized === label
+            );
+        }) || null
+    );
+};
 
 const STEP_ONE_ERROR_FIELDS = [
+    "track",
     "department_id",
+    "advisor_teacher_id",
     "section_name",
     "grade_level",
     "school_year",
@@ -366,12 +399,15 @@ export default function AddSectionWizardModal({
     isOpen,
     onClose,
     departments = [],
+    teachers = [],
     currentSchoolYear = "",
     availableStudents = [],
 }) {
     const initialFormState = useMemo(
         () => ({
+            track: "Academic",
             department_id: "",
+            advisor_teacher_id: "",
             section_name: "",
             grade_level: "",
             school_year: currentSchoolYear || "",
@@ -386,6 +422,7 @@ export default function AddSectionWizardModal({
 
     const [step, setStep] = useState(1);
     const [wizardNotice, setWizardNotice] = useState("");
+    const [departmentSearch, setDepartmentSearch] = useState("");
 
     const [existingSearch, setExistingSearch] = useState("");
     const [selectedExistingIds, setSelectedExistingIds] = useState([]);
@@ -396,14 +433,47 @@ export default function AddSectionWizardModal({
     const [bulkLines, setBulkLines] = useState("");
     const [bulkImportErrors, setBulkImportErrors] = useState([]);
 
+    const filteredDepartmentsByTrack = useMemo(
+        () =>
+            departments.filter(
+                (department) =>
+                    String(department.track || "Academic") ===
+                    String(data.track || "Academic"),
+            ),
+        [departments, data.track],
+    );
+
     const selectedDepartment = useMemo(
         () =>
-            departments.find(
+            filteredDepartmentsByTrack.find(
                 (department) =>
                     String(department.id) === String(data.department_id),
             ) || null,
-        [departments, data.department_id],
+        [filteredDepartmentsByTrack, data.department_id],
     );
+
+    const departmentSearchMessage = useMemo(() => {
+        if (!String(departmentSearch || "").trim()) {
+            return "";
+        }
+
+        if (selectedDepartment) {
+            return "";
+        }
+
+        return "Select a department from the loaded suggestions.";
+    }, [departmentSearch, selectedDepartment]);
+
+    const availableAdviserTeachers = useMemo(() => {
+        if (!selectedDepartment) {
+            return [];
+        }
+
+        return teachers.filter(
+            (teacher) =>
+                Number(teacher.department_id) === Number(selectedDepartment.id),
+        );
+    }, [teachers, selectedDepartment]);
 
     const gradeToken = useMemo(() => {
         const match = String(data.grade_level || "").match(/(\d{1,2})/);
@@ -473,8 +543,14 @@ export default function AddSectionWizardModal({
     const stepOneIssues = useMemo(() => {
         const issues = [];
 
-        if (!data.department_id) {
-            issues.push("Department is required.");
+        if (!String(data.track || "").trim()) {
+            issues.push("Track is required.");
+        }
+
+        if (!data.department_id || !selectedDepartment) {
+            issues.push(
+                "Department is required and must match a loaded option.",
+            );
         }
 
         if (!String(data.section_name || "").trim()) {
@@ -493,20 +569,16 @@ export default function AddSectionWizardModal({
 
         return issues;
     }, [
+        data.track,
         data.department_id,
         data.grade_level,
         data.section_name,
+        selectedDepartment,
         currentSchoolYear,
     ]);
 
     const summaryIssues = useMemo(() => {
         const issues = [...stepOneIssues];
-
-        if (assignmentCount === 0) {
-            issues.push(
-                "Add at least one student before creating the section.",
-            );
-        }
 
         const lrnCounts = new Map();
         newStudentsQueue.forEach((student) => {
@@ -529,7 +601,7 @@ export default function AddSectionWizardModal({
         }
 
         return issues;
-    }, [assignmentCount, newStudentsQueue, stepOneIssues]);
+    }, [newStudentsQueue, stepOneIssues]);
 
     const serverValidationEntries = useMemo(
         () =>
@@ -559,6 +631,7 @@ export default function AddSectionWizardModal({
     const resetWizardState = () => {
         setStep(1);
         setWizardNotice("");
+        setDepartmentSearch("");
         setExistingSearch("");
         setSelectedExistingIds([]);
         setQueuedExistingStudents([]);
@@ -607,6 +680,61 @@ export default function AddSectionWizardModal({
 
         setData("school_year", currentSchoolYear || "");
     }, [isOpen, currentSchoolYear, setData]);
+
+    useEffect(() => {
+        if (!data.department_id) {
+            return;
+        }
+
+        const stillLoaded = filteredDepartmentsByTrack.some(
+            (department) =>
+                String(department.id) === String(data.department_id),
+        );
+
+        if (!stillLoaded) {
+            setData("department_id", "");
+            setData("advisor_teacher_id", "");
+            setDepartmentSearch("");
+        }
+    }, [filteredDepartmentsByTrack, data.department_id, setData]);
+
+    useEffect(() => {
+        if (!data.advisor_teacher_id) {
+            return;
+        }
+
+        const adviserStillAvailable = availableAdviserTeachers.some(
+            (teacher) => String(teacher.id) === String(data.advisor_teacher_id),
+        );
+
+        if (!adviserStillAvailable) {
+            setData("advisor_teacher_id", "");
+        }
+    }, [availableAdviserTeachers, data.advisor_teacher_id, setData]);
+
+    const handleTrackChange = (track) => {
+        setData("track", track);
+        setData("department_id", "");
+        setData("advisor_teacher_id", "");
+        setDepartmentSearch("");
+    };
+
+    const handleDepartmentSearchChange = (value) => {
+        setDepartmentSearch(value);
+
+        const matchedDepartment = findDepartmentFromSearch(
+            filteredDepartmentsByTrack,
+            value,
+        );
+
+        if (matchedDepartment) {
+            setData("department_id", String(matchedDepartment.id));
+            return;
+        }
+
+        setData("department_id", "");
+        setData("advisor_teacher_id", "");
+    };
 
     const handleNextStep = () => {
         if (step === 1 && stepOneIssues.length > 0) {
@@ -961,69 +1089,86 @@ export default function AddSectionWizardModal({
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     <div>
                                         <label className="mb-1.5 block text-sm font-medium text-slate-800">
-                                            Department{" "}
+                                            Track{" "}
                                             <span className="text-rose-500">
                                                 *
                                             </span>
                                         </label>
                                         <select
-                                            value={data.department_id}
+                                            value={data.track}
                                             onChange={(event) =>
-                                                setData(
-                                                    "department_id",
+                                                handleTrackChange(
                                                     event.target.value,
                                                 )
                                             }
                                             className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
-                                                errors.department_id
+                                                errors.track
                                                     ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
                                                     : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
                                             }`}
                                         >
-                                            <option value="">
-                                                Select department
-                                            </option>
-                                            {departments.map((department) => (
+                                            {TRACK_OPTIONS.map((track) => (
                                                 <option
-                                                    key={department.id}
-                                                    value={department.id}
+                                                    key={track}
+                                                    value={track}
                                                 >
-                                                    {department.department_code}{" "}
-                                                    -{" "}
-                                                    {department.department_name}
+                                                    {track}
                                                 </option>
                                             ))}
                                         </select>
-                                        <FieldError
-                                            message={errors.department_id}
-                                        />
+                                        <FieldError message={errors.track} />
+                                        <p className="mt-1 text-xs text-indigo-600">
+                                            {data.track === "TVL"
+                                                ? "All departments are loaded in TVL Track."
+                                                : "All departments are loaded in Acedemic Track."}
+                                        </p>
                                     </div>
 
                                     <div>
                                         <label className="mb-1.5 block text-sm font-medium text-slate-800">
-                                            Section Name{" "}
+                                            Department{" "}
                                             <span className="text-rose-500">
                                                 *
                                             </span>
                                         </label>
                                         <input
                                             type="text"
-                                            value={data.section_name}
+                                            list="section-department-options"
+                                            value={departmentSearch}
                                             onChange={(event) =>
-                                                setData(
-                                                    "section_name",
+                                                handleDepartmentSearchChange(
                                                     event.target.value,
                                                 )
                                             }
-                                            placeholder="e.g., Einstein"
+                                            placeholder={`Type to search ${String(data.track || "").toLowerCase()} departments`}
                                             className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
-                                                errors.section_name
+                                                errors.department_id ||
+                                                departmentSearchMessage
                                                     ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
                                                     : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
                                             }`}
                                         />
+                                        <datalist id="section-department-options">
+                                            {filteredDepartmentsByTrack.map(
+                                                (department) => (
+                                                    <option
+                                                        key={department.id}
+                                                        value={formatDepartmentOptionLabel(
+                                                            department,
+                                                        )}
+                                                    />
+                                                ),
+                                            )}
+                                        </datalist>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            Type code or full name, then select
+                                            from loaded suggestions.
+                                        </p>
                                         <FieldError
-                                            message={errors.section_name}
+                                            message={
+                                                errors.department_id ||
+                                                departmentSearchMessage
+                                            }
                                         />
                                     </div>
 
@@ -1069,21 +1214,69 @@ export default function AddSectionWizardModal({
 
                                     <div>
                                         <label className="mb-1.5 block text-sm font-medium text-slate-800">
-                                            School Year
+                                            Section Name{" "}
+                                            <span className="text-rose-500">
+                                                *
+                                            </span>
                                         </label>
                                         <input
                                             type="text"
-                                            value={currentSchoolYear || ""}
-                                            readOnly
-                                            disabled
-                                            className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-100 px-3.5 py-2.5 text-sm font-medium text-slate-700"
+                                            value={data.section_name}
+                                            onChange={(event) =>
+                                                setData(
+                                                    "section_name",
+                                                    event.target.value,
+                                                )
+                                            }
+                                            placeholder="e.g., Einstein"
+                                            className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
+                                                errors.section_name
+                                                    ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
+                                                    : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
+                                            }`}
                                         />
-                                        <p className="mt-1 text-xs text-slate-500">
-                                            Loaded from School Settings
-                                            (read-only).
-                                        </p>
                                         <FieldError
-                                            message={errors.school_year}
+                                            message={errors.section_name}
+                                        />
+                                    </div>
+
+                                    <div className="md:col-span-2">
+                                        <label className="mb-1.5 block text-sm font-medium text-slate-800">
+                                            Adviser Teacher
+                                        </label>
+                                        <select
+                                            value={data.advisor_teacher_id}
+                                            onChange={(event) =>
+                                                setData(
+                                                    "advisor_teacher_id",
+                                                    event.target.value,
+                                                )
+                                            }
+                                            disabled={!selectedDepartment}
+                                            className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+                                                errors.advisor_teacher_id
+                                                    ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
+                                                    : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
+                                            }`}
+                                        >
+                                            <option value="">
+                                                {selectedDepartment
+                                                    ? "Unassigned (N/A)"
+                                                    : "Select department first"}
+                                            </option>
+                                            {availableAdviserTeachers.map(
+                                                (teacher) => (
+                                                    <option
+                                                        key={teacher.id}
+                                                        value={teacher.id}
+                                                    >
+                                                        {teacher.name}
+                                                    </option>
+                                                ),
+                                            )}
+                                        </select>
+                                        <FieldError
+                                            message={errors.advisor_teacher_id}
                                         />
                                     </div>
                                 </div>
@@ -1528,7 +1721,7 @@ export default function AddSectionWizardModal({
                                     </p>
                                 </div>
 
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                                     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                                         <p className="text-xs text-slate-500">
                                             Department
@@ -1541,6 +1734,14 @@ export default function AddSectionWizardModal({
                                     </div>
                                     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                                         <p className="text-xs text-slate-500">
+                                            Track
+                                        </p>
+                                        <p className="mt-1 text-sm font-semibold text-slate-900">
+                                            {data.track || "-"}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                                        <p className="text-xs text-slate-500">
                                             Grade Level
                                         </p>
                                         <p className="mt-1 text-sm font-semibold text-slate-900">
@@ -1549,18 +1750,24 @@ export default function AddSectionWizardModal({
                                     </div>
                                     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                                         <p className="text-xs text-slate-500">
-                                            School Year
-                                        </p>
-                                        <p className="mt-1 text-sm font-semibold text-slate-900">
-                                            {currentSchoolYear || "-"}
-                                        </p>
-                                    </div>
-                                    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-                                        <p className="text-xs text-slate-500">
                                             Students
                                         </p>
                                         <p className="mt-1 text-sm font-semibold text-slate-900">
                                             {assignmentCount}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                                        <p className="text-xs text-slate-500">
+                                            Adviser
+                                        </p>
+                                        <p className="mt-1 text-sm font-semibold text-slate-900">
+                                            {availableAdviserTeachers.find(
+                                                (teacher) =>
+                                                    String(teacher.id) ===
+                                                    String(
+                                                        data.advisor_teacher_id,
+                                                    ),
+                                            )?.name || "N/A"}
                                         </p>
                                     </div>
                                 </div>

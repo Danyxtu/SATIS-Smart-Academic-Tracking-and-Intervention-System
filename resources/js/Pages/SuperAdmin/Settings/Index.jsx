@@ -1,4 +1,4 @@
-import { Head, useForm } from "@inertiajs/react";
+import { Head, router, useForm } from "@inertiajs/react";
 import axios from "axios";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import { useState } from "react";
@@ -152,6 +152,16 @@ function NewSchoolYearModal({ currentSY, onClose }) {
                 },
             );
         } catch (archiveError) {
+            if (!axios.isAxiosError(archiveError)) {
+                setError(
+                    "Unable to start the new school year. Please try again.",
+                );
+                setProgressStep("idle");
+                setProgressPercent(0);
+                setSubmitting(false);
+                return;
+            }
+
             const responseErrors = archiveError?.response?.data?.errors;
             const backendMessage = getFirstErrorMessage(
                 responseErrors,

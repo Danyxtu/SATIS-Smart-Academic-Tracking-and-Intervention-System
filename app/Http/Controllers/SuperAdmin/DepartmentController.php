@@ -4,16 +4,20 @@ namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Department;
+use App\Models\Specialization;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class DepartmentController extends Controller
 {
+    private const TRACK_OPTIONS = ['Academic', 'TVL'];
+
     /**
      * Display a listing of departments.
      */
@@ -21,11 +25,18 @@ class DepartmentController extends Controller
     {
         $this->authorize('manage-departments');
 
+        $track = in_array($request->input('track'), self::TRACK_OPTIONS, true)
+            ? (string) $request->input('track')
+            : 'Academic';
+
         $query = Department::withCount(['admins', 'teachers', 'students'])
             ->with([
                 'admins:id,first_name,middle_name,last_name,personal_email,department_id',
                 'teachers:id,first_name,middle_name,last_name,personal_email,department_id',
+                'specializations:id,specialization_name',
             ]);
+
+        $query->where('track', $track);
 
         // Search
         if ($request->filled('search')) {
@@ -71,13 +82,23 @@ class DepartmentController extends Controller
                     'is_admin'    => $department->admins->contains('id', $t->id),
                 ])->values());
 
+                $department->setAttribute('specializations', $department->specializations->map(fn(Specialization $specialization) => [
+                    'id' => (int) $specialization->id,
+                    'specialization_name' => $specialization->specialization_name,
+                ])->values());
+
                 return $department;
             })
         );
 
         return Inertia::render('SuperAdmin/Departments/Index', [
             'departments' => $departments,
-            'filters' => $request->only(['search', 'status']),
+            'filters' => [
+                'search' => $request->input('search'),
+                'status' => $request->input('status'),
+                'track' => $track,
+            ],
+            'trackOptions' => self::TRACK_OPTIONS,
         ]);
     }
 
@@ -103,16 +124,20 @@ class DepartmentController extends Controller
         $validated = $request->validate([
             'department_name' => ['required', 'string', 'max:255'],
             'department_code' => ['required', 'string', 'max:50', 'unique:departments,department_code'],
+            'track' => ['nullable', 'string', Rule::in(self::TRACK_OPTIONS)],
             'description' => ['nullable', 'string', 'max:1000'],
             'is_active' => ['boolean'],
             'teacher_ids'   => ['nullable', 'array'],
             'teacher_ids.*' => ['exists:users,id'],
             'admin_id'      => ['nullable', 'exists:users,id'],
+            'specialization_names' => ['nullable', 'array'],
+            'specialization_names.*' => ['required', 'string', 'max:120'],
         ]);
 
         $department = Department::create([
             'department_name' => $validated['department_name'],
             'department_code' => $validated['department_code'],
+            'track' => $validated['track'] ?? 'Academic',
             'description'     => $validated['description'] ?? null,
             'is_active'       => $validated['is_active'] ?? true,
         ]);
@@ -131,8 +156,15 @@ class DepartmentController extends Controller
             }
         }
 
+        $this->syncDepartmentSpecializations(
+            $department,
+            $validated['specialization_names'] ?? [],
+        );
+
         return redirect()
-            ->route('superadmin.departments.index')
+            ->route('superadmin.departments.index', [
+                'track' => $validated['track'] ?? 'Academic',
+            ])
             ->with('success', 'Department created successfully.');
     }
 
@@ -181,18 +213,24 @@ class DepartmentController extends Controller
     {
         $this->authorize('update-department');
 
-        $department->loadCount(['admins', 'teachers', 'students']);
+        $department->loadCount(['admins', 'teachers', 'students'])
+            ->load('specializations:id,specialization_name');
 
         return Inertia::render('SuperAdmin/Departments/Edit', [
             'department' => [
                 'id' => $department->id,
                 'name' => $department->department_name,
                 'code' => $department->department_code,
+                'track' => $department->track,
                 'description' => $department->description,
                 'is_active' => $department->is_active,
                 'admins_count' => $department->admins_count,
                 'teachers_count' => $department->teachers_count,
                 'students_count' => $department->students_count,
+                'specializations' => $department->specializations->map(fn(Specialization $specialization) => [
+                    'id' => (int) $specialization->id,
+                    'specialization_name' => $specialization->specialization_name,
+                ])->values(),
             ],
         ]);
     }
@@ -230,16 +268,20 @@ class DepartmentController extends Controller
         $validated = $request->validate([
             'department_name' => ['required', 'string', 'max:255'],
             'department_code' => ['required', 'string', 'max:50', Rule::unique('departments')->ignore($department->id)],
+            'track' => ['nullable', 'string', Rule::in(self::TRACK_OPTIONS)],
             'description'     => ['nullable', 'string', 'max:1000'],
             'is_active'       => ['boolean'],
             'teacher_ids'     => ['nullable', 'array'],
             'teacher_ids.*'   => ['exists:users,id'],
             'admin_id'        => ['nullable', 'exists:users,id'],
+            'specialization_names' => ['nullable', 'array'],
+            'specialization_names.*' => ['required', 'string', 'max:120'],
         ]);
 
         $department->update([
             'department_name' => $validated['department_name'],
             'department_code' => $validated['department_code'],
+            'track' => $validated['track'] ?? ($department->track ?: 'Academic'),
             'description'     => $validated['description'] ?? null,
             'is_active'       => $validated['is_active'] ?? true,
         ]);
@@ -269,8 +311,15 @@ class DepartmentController extends Controller
             $adminUser?->syncRolesByName(['teacher', 'admin']);
         }
 
+        $this->syncDepartmentSpecializations(
+            $department,
+            $validated['specialization_names'] ?? [],
+        );
+
         return redirect()
-            ->route('superadmin.departments.index')
+            ->route('superadmin.departments.index', [
+                'track' => $validated['track'] ?? ($department->track ?: 'Academic'),
+            ])
             ->with('success', 'Department updated successfully.');
     }
 
@@ -288,9 +337,7 @@ class DepartmentController extends Controller
 
         $department->delete();
 
-        return redirect()
-            ->route('superadmin.departments.index')
-            ->with('success', 'Department deleted successfully.');
+        return back()->with('success', 'Department deleted successfully.');
     }
 
     /**
@@ -305,5 +352,38 @@ class DepartmentController extends Controller
         $status = $department->is_active ? 'activated' : 'deactivated';
 
         return back()->with('success', "Department {$status} successfully.");
+    }
+
+    /**
+     * @param  array<int, string>  $specializationNames
+     */
+    private function syncDepartmentSpecializations(Department $department, array $specializationNames): void
+    {
+        $normalizedNames = collect($specializationNames)
+            ->map(function ($value) {
+                $normalized = preg_replace('/\s+/', ' ', trim((string) $value));
+
+                return $normalized !== '' ? $normalized : null;
+            })
+            ->filter()
+            ->unique(fn(string $value) => Str::lower($value))
+            ->values();
+
+        if ($normalizedNames->isEmpty()) {
+            $department->specializations()->sync([]);
+
+            return;
+        }
+
+        $specializationIds = $normalizedNames
+            ->map(function (string $name) {
+                return Specialization::firstOrCreate([
+                    'specialization_name' => $name,
+                ])->id;
+            })
+            ->values()
+            ->all();
+
+        $department->specializations()->sync($specializationIds);
     }
 }

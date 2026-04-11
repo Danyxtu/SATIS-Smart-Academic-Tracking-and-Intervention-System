@@ -29,6 +29,7 @@ class SectionController extends Controller
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
 
         $sectionsQuery = Section::query()
+            ->with(['advisorTeacher:id,first_name,middle_name,last_name'])
             ->withCount('students')
             ->where('department_id', $departmentId);
 
@@ -58,6 +59,8 @@ class SectionController extends Controller
                     'strand' => $section->strand,
                     'track' => $section->track,
                     'school_year' => $section->school_year,
+                    'advisor_teacher_id' => $section->advisor_teacher_id ? (int) $section->advisor_teacher_id : null,
+                    'advisor_teacher_name' => $section->advisorTeacher?->name,
                     'description' => $section->description,
                     'students_count' => (int) ($section->students_count ?? 0),
                     'is_active' => (bool) $section->is_active,
@@ -101,9 +104,24 @@ class SectionController extends Controller
             })
             ->values();
 
+        $teachers = User::query()
+            ->where('department_id', $departmentId)
+            ->whereHas('roles', function ($query) {
+                $query->where('name', 'teacher');
+            })
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get(['id', 'first_name', 'middle_name', 'last_name'])
+            ->map(fn(User $teacher) => [
+                'id' => (int) $teacher->id,
+                'name' => $teacher->name,
+            ])
+            ->values();
+
         return Inertia::render('Admin/Sections/Index', [
             'sections' => $sections,
             'availableStudents' => $availableStudents,
+            'teachers' => $teachers,
             'filters' => $request->only(['search']),
             'currentSchoolYear' => $currentSchoolYear,
             'department' => $admin?->department ? [
@@ -136,6 +154,7 @@ class SectionController extends Controller
             'strand' => ['nullable', 'string', 'max:100'],
             'track' => ['nullable', 'string', 'max:100'],
             'description' => ['nullable', 'string', 'max:1000'],
+            'advisor_teacher_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'assigned_student_ids' => ['nullable', 'array'],
             'assigned_student_ids.*' => ['integer', 'exists:students,id'],
             'new_students' => ['nullable', 'array'],
@@ -164,10 +183,14 @@ class SectionController extends Controller
             })
             ->values();
 
-        if ($assignedStudentIds->isEmpty() && $newStudents->isEmpty()) {
-            throw ValidationException::withMessages([
-                'student_assignment' => 'Add at least one student (assign existing or create new) before saving.',
-            ]);
+        $advisorTeacherId = isset($validated['advisor_teacher_id'])
+            ? (int) $validated['advisor_teacher_id']
+            : null;
+
+        if ($advisorTeacherId !== null && $advisorTeacherId > 0) {
+            $this->ensureTeacherAssignable($advisorTeacherId, $departmentId, 'advisor_teacher_id');
+        } else {
+            $advisorTeacherId = null;
         }
 
         $sectionName = $this->normalizeText($validated['section_name']);
@@ -226,14 +249,10 @@ class SectionController extends Controller
             $validated,
             $assignedStudentIds,
             $newStudents,
+            $advisorTeacherId,
             $currentSchoolYear
         ) {
             $section = Section::create([
-                'department_id' => $departmentId,
-                'created_by' => $admin->id,
-                'section_name' => $sectionName,
-                'section_code' => $sectionCode,
-                'cohort' => $cohort,
                 'grade_level' => $this->normalizeNullableText($validated['grade_level'] ?? null),
                 'strand' => $this->normalizeNullableText($validated['strand'] ?? null),
                 'track' => $this->normalizeNullableText($validated['track'] ?? null),
@@ -322,6 +341,23 @@ class SectionController extends Controller
             ->route('admin.sections.index')
             ->with('success', 'Section created successfully.')
             ->with('section_create_summary', $summary);
+    }
+
+    private function ensureTeacherAssignable(int $teacherId, int $departmentId, string $field = 'advisor_teacher_id'): void
+    {
+        $teacherIsAssignable = User::query()
+            ->where('id', $teacherId)
+            ->where('department_id', $departmentId)
+            ->whereHas('roles', function ($query) {
+                $query->where('name', 'teacher');
+            })
+            ->exists();
+
+        if (! $teacherIsAssignable) {
+            throw ValidationException::withMessages([
+                $field => 'Selected adviser must be a teacher in your department.',
+            ]);
+        }
     }
 
     private function normalizeText(string $value): string

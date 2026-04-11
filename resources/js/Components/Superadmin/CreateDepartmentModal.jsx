@@ -18,6 +18,7 @@ import {
 import { useState, useEffect, useMemo } from "react";
 
 const STEPS = ["Department Info", "Add Teachers", "Confirmation"];
+const TRACK_OPTIONS = ["Academic", "TVL"];
 
 function StepIndicator({ current }) {
     return (
@@ -62,18 +63,26 @@ function FieldError({ error }) {
     );
 }
 
-export default function CreateDepartmentModal({ isOpen, onClose, onSuccess }) {
+export default function CreateDepartmentModal({
+    isOpen,
+    onClose,
+    onSuccess,
+    defaultTrack = "Academic",
+}) {
     const [step, setStep] = useState(0);
     const [teachers, setTeachers] = useState([]);
     const [teacherSearch, setTeacherSearch] = useState("");
     const [loadingTeachers, setLoadingTeachers] = useState(false);
+    const [specializationInput, setSpecializationInput] = useState("");
 
     const { data, setData, post, processing, errors, reset, clearErrors } =
         useForm({
             department_name: "",
             department_code: "",
+            track: "Academic",
             description: "",
             is_active: true,
+            specialization_names: [],
             teacher_ids: [],
             admin_id: "",
         });
@@ -88,14 +97,59 @@ export default function CreateDepartmentModal({ isOpen, onClose, onSuccess }) {
         }
     }, [isOpen, step]);
 
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        setData("track", defaultTrack || "Academic");
+    }, [isOpen, defaultTrack, setData]);
+
     const handleClose = () => {
         clearErrors();
         reset();
         setStep(0);
         setTeachers([]);
         setTeacherSearch("");
+        setSpecializationInput("");
         onClose();
     };
+
+    const addSpecialization = () => {
+        const value = specializationInput.trim();
+
+        if (!value) {
+            return;
+        }
+
+        const exists = data.specialization_names.some(
+            (item) => item.toLowerCase() === value.toLowerCase(),
+        );
+
+        if (exists) {
+            setSpecializationInput("");
+            return;
+        }
+
+        setData("specialization_names", [...data.specialization_names, value]);
+        setSpecializationInput("");
+    };
+
+    const removeSpecialization = (value) => {
+        setData(
+            "specialization_names",
+            data.specialization_names.filter((item) => item !== value),
+        );
+    };
+
+    const specializationErrors = Object.entries(errors)
+        .filter(
+            ([key]) =>
+                key === "specialization_names" ||
+                key.startsWith("specialization_names."),
+        )
+        .flatMap(([, value]) => (Array.isArray(value) ? value : [value]))
+        .filter(Boolean);
 
     const handleNext = () => {
         if (step === 0) {
@@ -253,6 +307,103 @@ export default function CreateDepartmentModal({ isOpen, onClose, onSuccess }) {
                                     <p className="mt-1 text-xs text-slate-400">
                                         Short unique identifier (e.g., ICT,
                                         STEM, ABM)
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1.5">
+                                        Track
+                                        <span className="text-rose-500">*</span>
+                                    </label>
+                                    <select
+                                        value={data.track}
+                                        onChange={(e) =>
+                                            setData("track", e.target.value)
+                                        }
+                                        className={`w-full rounded-xl border bg-slate-50 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors ${errors.track ? "border-rose-300 bg-rose-50" : "border-slate-200"}`}
+                                    >
+                                        {TRACK_OPTIONS.map((option) => (
+                                            <option key={option} value={option}>
+                                                {option}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <FieldError error={errors.track} />
+                                </div>
+
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1.5">
+                                        Strands / Specializations
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={specializationInput}
+                                            onChange={(e) =>
+                                                setSpecializationInput(
+                                                    e.target.value,
+                                                )
+                                            }
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                    e.preventDefault();
+                                                    addSpecialization();
+                                                }
+                                            }}
+                                            placeholder="e.g., ICT-CSS"
+                                            className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-colors"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={addSpecialization}
+                                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
+
+                                    {data.specialization_names.length > 0 && (
+                                        <div className="mt-2 flex flex-wrap gap-1.5">
+                                            {data.specialization_names.map(
+                                                (name) => (
+                                                    <span
+                                                        key={name}
+                                                        className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700"
+                                                    >
+                                                        {name}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                removeSpecialization(
+                                                                    name,
+                                                                )
+                                                            }
+                                                            className="text-blue-500 hover:text-blue-700"
+                                                        >
+                                                            <X size={12} />
+                                                        </button>
+                                                    </span>
+                                                ),
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {specializationErrors.length > 0 && (
+                                        <div className="mt-2 space-y-1">
+                                            {specializationErrors.map(
+                                                (error, index) => (
+                                                    <FieldError
+                                                        key={`${error}-${index}`}
+                                                        error={error}
+                                                    />
+                                                ),
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <p className="mt-1 text-xs text-slate-400">
+                                        Add strands/specializations for this
+                                        department. Leave blank if none yet.
                                     </p>
                                 </div>
 
@@ -521,6 +672,14 @@ export default function CreateDepartmentModal({ isOpen, onClose, onSuccess }) {
                                             {data.department_code}
                                         </span>
                                     </div>
+                                    <div className="flex items-center justify-between px-4 py-2.5">
+                                        <span className="text-xs text-slate-500">
+                                            Track
+                                        </span>
+                                        <span className="inline-flex items-center rounded-lg bg-indigo-100 px-2.5 py-0.5 text-xs font-bold text-indigo-700">
+                                            {data.track}
+                                        </span>
+                                    </div>
                                     {data.description && (
                                         <div className="px-4 py-2.5">
                                             <span className="text-xs text-slate-500 flex items-center gap-1.5 mb-1">
@@ -546,6 +705,31 @@ export default function CreateDepartmentModal({ isOpen, onClose, onSuccess }) {
                                                 ? "Active"
                                                 : "Inactive"}
                                         </span>
+                                    </div>
+
+                                    <div className="px-4 py-2.5">
+                                        <span className="text-xs text-slate-500">
+                                            Specializations
+                                        </span>
+                                        {data.specialization_names.length ===
+                                        0 ? (
+                                            <p className="mt-1 text-xs text-slate-400">
+                                                No specialization set.
+                                            </p>
+                                        ) : (
+                                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                                {data.specialization_names.map(
+                                                    (name) => (
+                                                        <span
+                                                            key={name}
+                                                            className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-bold text-blue-700"
+                                                        >
+                                                            {name}
+                                                        </span>
+                                                    ),
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 

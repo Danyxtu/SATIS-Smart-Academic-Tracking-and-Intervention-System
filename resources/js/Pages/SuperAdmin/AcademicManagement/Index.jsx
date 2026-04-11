@@ -2,12 +2,14 @@ import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import DeleteConfirmModal from "@/Components/Superadmin/DeleteConfirmModal";
 import AddSectionWizardModal from "@/Components/Superadmin/AcademicManagement/AddSectionWizardModal";
+import ClassQueueCreateModal from "@/Components/Superadmin/AcademicManagement/ClassQueueCreateModal";
 import {
     BookOpen,
     Building2,
     Layers,
     Search,
     School,
+    UserCheck,
     Users,
     X,
     Plus,
@@ -22,6 +24,18 @@ function FieldError({ message }) {
     return <p className="mt-1.5 text-xs text-rose-600">{message}</p>;
 }
 
+function normalizeWhitespace(value) {
+    return String(value || "")
+        .trim()
+        .replace(/\s+/g, " ");
+}
+
+function buildClassQueueKey(sectionId, subjectId, schoolYear) {
+    return `${Number(sectionId)}::${Number(subjectId)}::${normalizeWhitespace(
+        schoolYear,
+    ).toLowerCase()}`;
+}
+
 function SectionFormModal({
     isOpen,
     mode,
@@ -32,12 +46,20 @@ function SectionFormModal({
     onClose,
     onSubmit,
     departments = [],
+    teachers = [],
 }) {
     if (!isOpen) {
         return null;
     }
 
     const isEdit = mode === "edit";
+
+    const availableAdviserTeachers = data.department_id
+        ? teachers.filter(
+              (teacher) =>
+                  Number(teacher.department_id) === Number(data.department_id),
+          )
+        : [];
 
     return (
         <div className="fixed inset-0 z-50 flex items-end justify-center p-2 sm:items-center sm:p-4">
@@ -98,6 +120,8 @@ function SectionFormModal({
                                             selectedDepartmentId,
                                         );
 
+                                        setData("advisor_teacher_id", "");
+
                                         if (
                                             !data.strand &&
                                             selectedDepartment
@@ -152,6 +176,39 @@ function SectionFormModal({
                                 />
                                 <FieldError message={errors.section_name} />
                             </div>
+                        </div>
+
+                        <div>
+                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                                Adviser Teacher
+                            </label>
+                            <select
+                                value={data.advisor_teacher_id}
+                                onChange={(event) =>
+                                    setData(
+                                        "advisor_teacher_id",
+                                        event.target.value,
+                                    )
+                                }
+                                disabled={!data.department_id}
+                                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+                                    errors.advisor_teacher_id
+                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
+                                        : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
+                                }`}
+                            >
+                                <option value="">
+                                    {data.department_id
+                                        ? "Unassigned (N/A)"
+                                        : "Select department first"}
+                                </option>
+                                {availableAdviserTeachers.map((teacher) => (
+                                    <option key={teacher.id} value={teacher.id}>
+                                        {teacher.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <FieldError message={errors.advisor_teacher_id} />
                         </div>
 
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -672,6 +729,273 @@ function ClassFormModal({
     );
 }
 
+function AssignAdviserModal({
+    isOpen,
+    data,
+    setData,
+    errors,
+    processing,
+    onClose,
+    onSubmit,
+    teachers = [],
+    sections = [],
+}) {
+    if (!isOpen) {
+        return null;
+    }
+
+    const selectedTeacher =
+        teachers.find(
+            (teacher) => String(teacher.id) === String(data.teacher_id),
+        ) || null;
+
+    const selectableTeachers = teachers.filter((teacher) => {
+        if (!teacher.department_id) {
+            return false;
+        }
+
+        return sections.some(
+            (section) =>
+                Number(section.department_id) === Number(teacher.department_id),
+        );
+    });
+
+    const selectableSections = selectedTeacher
+        ? sections.filter(
+              (section) =>
+                  Number(section.department_id) ===
+                  Number(selectedTeacher.department_id),
+          )
+        : [];
+
+    const selectedSectionIds = Array.isArray(data.section_ids)
+        ? data.section_ids.map((id) => Number(id))
+        : [];
+
+    const allSelected =
+        selectableSections.length > 0 &&
+        selectableSections.every((section) =>
+            selectedSectionIds.includes(Number(section.id)),
+        );
+
+    const sectionError = errors.section_ids || errors["section_ids.0"];
+
+    const handleTeacherChange = (event) => {
+        setData("teacher_id", event.target.value);
+        setData("section_ids", []);
+    };
+
+    const toggleSectionSelection = (sectionId) => {
+        const normalizedSectionId = Number(sectionId);
+
+        if (selectedSectionIds.includes(normalizedSectionId)) {
+            setData(
+                "section_ids",
+                selectedSectionIds.filter((id) => id !== normalizedSectionId),
+            );
+            return;
+        }
+
+        setData("section_ids", [...selectedSectionIds, normalizedSectionId]);
+    };
+
+    const toggleAllSections = () => {
+        if (allSelected) {
+            setData("section_ids", []);
+            return;
+        }
+
+        setData(
+            "section_ids",
+            selectableSections.map((section) => Number(section.id)),
+        );
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-2 sm:items-center sm:p-4">
+            <div
+                className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
+                onClick={onClose}
+            />
+
+            <div className="relative max-h-[calc(100vh-1rem)] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-slate-200 sm:max-h-[90vh]">
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-6 sm:py-5">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 ring-1 ring-indigo-200">
+                            <UserCheck size={16} className="text-indigo-600" />
+                        </div>
+                        <div>
+                            <h2 className="text-base font-semibold text-slate-900">
+                                Assign Adviser
+                            </h2>
+                            <p className="text-xs text-slate-500">
+                                Choose a teacher first, then pick unassigned
+                                Grade 11 sections.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={processing}
+                        className="z-10 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+                    >
+                        <X size={16} />
+                    </button>
+                </div>
+
+                <form onSubmit={onSubmit}>
+                    <div className="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+                        <div>
+                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                                Teacher <span className="text-rose-500">*</span>
+                            </label>
+                            <select
+                                value={data.teacher_id}
+                                onChange={handleTeacherChange}
+                                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
+                                    errors.teacher_id
+                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
+                                        : "border-slate-300 bg-white focus:border-indigo-500 focus:ring-indigo-100"
+                                }`}
+                            >
+                                <option value="">Select teacher</option>
+                                {selectableTeachers.map((teacher) => (
+                                    <option key={teacher.id} value={teacher.id}>
+                                        {teacher.name} -{" "}
+                                        {teacher.department_code || "N/A"}
+                                    </option>
+                                ))}
+                            </select>
+                            <FieldError message={errors.teacher_id} />
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-sm font-medium text-slate-700">
+                                    Unassigned Grade 11 Sections
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={toggleAllSections}
+                                    disabled={
+                                        !data.teacher_id ||
+                                        selectableSections.length === 0
+                                    }
+                                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {allSelected ? "Clear all" : "Select all"}
+                                </button>
+                            </div>
+
+                            {!data.teacher_id ? (
+                                <p className="mt-2 text-xs text-slate-500">
+                                    Select a teacher first to show eligible
+                                    sections.
+                                </p>
+                            ) : selectableSections.length === 0 ? (
+                                <p className="mt-2 text-xs text-slate-500">
+                                    No unassigned Grade 11 sections are
+                                    available for this teacher's department.
+                                </p>
+                            ) : (
+                                <div className="mt-3 max-h-60 space-y-2 overflow-y-auto pr-1">
+                                    {selectableSections.map((section) => {
+                                        const sectionId = Number(section.id);
+                                        const isChecked =
+                                            selectedSectionIds.includes(
+                                                sectionId,
+                                            );
+
+                                        return (
+                                            <label
+                                                key={`assign-section-${section.id}`}
+                                                className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={() =>
+                                                        toggleSectionSelection(
+                                                            sectionId,
+                                                        )
+                                                    }
+                                                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                />
+                                                <span className="text-xs text-slate-700">
+                                                    <span className="font-semibold text-slate-900">
+                                                        {section.section_name}
+                                                    </span>{" "}
+                                                    (
+                                                    {section.section_code ||
+                                                        "-"}
+                                                    )
+                                                    <br />
+                                                    {[
+                                                        section.grade_level,
+                                                        section.strand,
+                                                        section.track,
+                                                    ]
+                                                        .filter(Boolean)
+                                                        .join(" • ") || "-"}
+                                                </span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                            <FieldError message={sectionError} />
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col-reverse gap-2.5 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6 sm:py-4">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={processing}
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={
+                                processing ||
+                                !data.teacher_id ||
+                                selectedSectionIds.length === 0
+                            }
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-indigo-700 disabled:opacity-60 sm:w-auto"
+                        >
+                            {processing && (
+                                <svg
+                                    className="h-3.5 w-3.5 animate-spin"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                >
+                                    <circle
+                                        className="opacity-25"
+                                        cx="12"
+                                        cy="12"
+                                        r="10"
+                                        stroke="currentColor"
+                                        strokeWidth="4"
+                                    />
+                                    <path
+                                        className="opacity-75"
+                                        fill="currentColor"
+                                        d="M4 12a8 8 0 018-8v8z"
+                                    />
+                                </svg>
+                            )}
+                            Assign Adviser
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 function StatCard({ icon: Icon, label, value, accent = "emerald" }) {
     const accents = {
         emerald: "bg-emerald-50 text-emerald-600 ring-emerald-200",
@@ -744,6 +1068,9 @@ export default function Index({
     teachers = [],
     currentSchoolYear = "",
     colorOptions = [],
+    rolloverNotice = null,
+    grade11TemplateSections = [],
+    unassignedGrade11Sections = [],
     filters,
     stats,
 }) {
@@ -768,6 +1095,7 @@ export default function Index({
             track: "",
             school_year: currentSchoolYear || "",
             description: "",
+            advisor_teacher_id: "",
             is_active: true,
         }),
         [currentSchoolYear],
@@ -799,6 +1127,14 @@ export default function Index({
     const [showClassModal, setShowClassModal] = useState(false);
     const [classModalMode, setClassModalMode] = useState("create");
     const [classToEdit, setClassToEdit] = useState(null);
+    const [classQueue, setClassQueue] = useState([]);
+    const [classQueueNotice, setClassQueueNotice] = useState("");
+    const [classQueueProcessing, setClassQueueProcessing] = useState(false);
+    const [classQueueErrors, setClassQueueErrors] = useState({});
+
+    const [recreateGrade11Processing, setRecreateGrade11Processing] =
+        useState(false);
+    const [showAssignAdviserModal, setShowAssignAdviserModal] = useState(false);
 
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleteProcessing, setDeleteProcessing] = useState(false);
@@ -815,7 +1151,6 @@ export default function Index({
     const {
         data: classData,
         setData: setClassData,
-        post: postClass,
         put: putClass,
         processing: classProcessing,
         errors: classErrors,
@@ -823,8 +1158,45 @@ export default function Index({
         clearErrors: clearClassErrors,
     } = useForm(defaultClassState);
 
+    const {
+        data: assignAdviserData,
+        setData: setAssignAdviserData,
+        post: postAssignAdviser,
+        processing: assignAdviserProcessing,
+        errors: assignAdviserErrors,
+        reset: resetAssignAdviser,
+        clearErrors: clearAssignAdviserErrors,
+    } = useForm({
+        teacher_id: "",
+        section_ids: [],
+    });
+
     const sectionRows = sections?.data || [];
     const classRows = classes?.data || [];
+
+    const normalizedRolloverNotice =
+        rolloverNotice && typeof rolloverNotice === "object"
+            ? rolloverNotice
+            : null;
+
+    const normalizedGrade11Templates = useMemo(
+        () =>
+            Array.isArray(grade11TemplateSections)
+                ? grade11TemplateSections
+                : [],
+        [grade11TemplateSections],
+    );
+
+    const normalizedUnassignedGrade11Sections = useMemo(
+        () =>
+            Array.isArray(unassignedGrade11Sections)
+                ? unassignedGrade11Sections
+                : [],
+        [unassignedGrade11Sections],
+    );
+
+    const hasUnassignedGrade11Sections =
+        normalizedUnassignedGrade11Sections.length > 0;
 
     const currentStats = useMemo(
         () => ({
@@ -877,6 +1249,187 @@ export default function Index({
         setClassData,
     ]);
 
+    const selectedClassDraftSection = useMemo(
+        () =>
+            sectionOptions.find(
+                (section) =>
+                    String(section.id) === String(classData.section_id),
+            ) || null,
+        [sectionOptions, classData.section_id],
+    );
+
+    const selectedClassDraftSubject = useMemo(
+        () =>
+            subjects.find(
+                (subject) =>
+                    String(subject.id) === String(classData.subject_id),
+            ) || null,
+        [subjects, classData.subject_id],
+    );
+
+    const selectedClassDraftTeacher = useMemo(
+        () =>
+            teachers.find(
+                (teacher) =>
+                    String(teacher.id) === String(classData.teacher_id),
+            ) || null,
+        [teachers, classData.teacher_id],
+    );
+
+    const normalizedDraftSchoolYear = useMemo(
+        () => normalizeWhitespace(classData.school_year),
+        [classData.school_year],
+    );
+
+    const classQueueKeySet = useMemo(
+        () =>
+            new Set(
+                classQueue.map((item) =>
+                    buildClassQueueKey(
+                        item.section_id,
+                        item.subject_id,
+                        item.school_year,
+                    ),
+                ),
+            ),
+        [classQueue],
+    );
+
+    const classDraftDuplicateMessage = useMemo(() => {
+        if (
+            !classData.section_id ||
+            !classData.subject_id ||
+            !/^\d{4}-\d{4}$/.test(normalizedDraftSchoolYear)
+        ) {
+            return "";
+        }
+
+        const draftKey = buildClassQueueKey(
+            classData.section_id,
+            classData.subject_id,
+            normalizedDraftSchoolYear,
+        );
+
+        if (classQueueKeySet.has(draftKey)) {
+            return "Duplicate queue entry detected. Same section, subject, and school year is already queued.";
+        }
+
+        return "";
+    }, [
+        classData.section_id,
+        classData.subject_id,
+        normalizedDraftSchoolYear,
+        classQueueKeySet,
+    ]);
+
+    const classCreateProgressPercent = useMemo(() => {
+        if (classQueueProcessing) {
+            return 100;
+        }
+
+        const draftReady =
+            String(classData.section_id || "").trim() !== "" &&
+            String(classData.subject_id || "").trim() !== "" &&
+            String(classData.teacher_id || "").trim() !== "" &&
+            /^\d{4}-\d{4}$/.test(normalizedDraftSchoolYear) &&
+            !classDraftDuplicateMessage;
+
+        if (classQueue.length > 0) {
+            return 75;
+        }
+
+        if (draftReady) {
+            return 45;
+        }
+
+        return 15;
+    }, [
+        classQueueProcessing,
+        classData.section_id,
+        classData.subject_id,
+        classData.teacher_id,
+        normalizedDraftSchoolYear,
+        classDraftDuplicateMessage,
+        classQueue.length,
+    ]);
+
+    const classCreateProgressLabel = useMemo(() => {
+        if (classQueueProcessing) {
+            return `Creating ${classQueue.length} queued class${classQueue.length === 1 ? "" : "es"}...`;
+        }
+
+        if (classQueue.length > 0) {
+            return `${classQueue.length} class${classQueue.length === 1 ? "" : "es"} queued and ready to create.`;
+        }
+
+        return "Build your first class entry, then add it to queue.";
+    }, [classQueueProcessing, classQueue.length]);
+
+    const addDraftClassToQueue = () => {
+        setClassQueueErrors({});
+        setClassQueueNotice("");
+
+        if (!selectedClassDraftSection) {
+            setClassQueueNotice(
+                "Select a valid section before adding to queue.",
+            );
+            return;
+        }
+
+        if (!selectedClassDraftSubject) {
+            setClassQueueNotice(
+                "Select a valid subject before adding to queue.",
+            );
+            return;
+        }
+
+        if (!selectedClassDraftTeacher) {
+            setClassQueueNotice(
+                "Select a valid teacher before adding to queue.",
+            );
+            return;
+        }
+
+        if (!/^\d{4}-\d{4}$/.test(normalizedDraftSchoolYear)) {
+            setClassQueueNotice("School year must be in YYYY-YYYY format.");
+            return;
+        }
+
+        if (classDraftDuplicateMessage) {
+            setClassQueueNotice(classDraftDuplicateMessage);
+            return;
+        }
+
+        const queueItem = {
+            queue_id: crypto.randomUUID(),
+            subject_id: Number(selectedClassDraftSubject.id),
+            section_id: Number(selectedClassDraftSection.id),
+            teacher_id: Number(selectedClassDraftTeacher.id),
+            school_year: normalizedDraftSchoolYear,
+            color: classData.color || resolvedColorOptions[0],
+            subject_name: selectedClassDraftSubject.subject_name,
+            subject_code: selectedClassDraftSubject.subject_code,
+            section_name: selectedClassDraftSection.section_name,
+            section_code: selectedClassDraftSection.section_code,
+            teacher_name: selectedClassDraftTeacher.name,
+            department_code:
+                selectedClassDraftSection.department?.department_code || "N/A",
+        };
+
+        setClassQueue((previousQueue) => [...previousQueue, queueItem]);
+        setClassData("subject_id", "");
+        setClassData("teacher_id", "");
+        setClassQueueNotice(
+            `Queued: ${queueItem.subject_name} for ${queueItem.section_name}.`,
+        );
+    };
+
+    const removeQueuedClass = (queueId) => {
+        setClassQueue((previousQueue) =>
+            previousQueue.filter((item) => item.queue_id !== queueId),
+        );
+    };
+
     const goToIndex = (
         nextTab,
         nextSearch = search,
@@ -914,6 +1467,46 @@ export default function Index({
         goToIndex(activeTab, "", "");
     };
 
+    const handleRecreateGrade11Sections = () => {
+        if (recreateGrade11Processing) {
+            return;
+        }
+
+        router.post(
+            route("superadmin.academic-management.sections.recreate-grade11"),
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setRecreateGrade11Processing(true),
+                onFinish: () => setRecreateGrade11Processing(false),
+            },
+        );
+    };
+
+    const openAssignAdviserModal = () => {
+        resetAssignAdviser();
+        clearAssignAdviserErrors();
+        setShowAssignAdviserModal(true);
+    };
+
+    const closeAssignAdviserModal = () => {
+        setShowAssignAdviserModal(false);
+        resetAssignAdviser();
+        clearAssignAdviserErrors();
+    };
+
+    const handleAssignAdviserSubmit = (event) => {
+        event.preventDefault();
+
+        postAssignAdviser(
+            route("superadmin.academic-management.sections.assign-adviser"),
+            {
+                preserveScroll: true,
+                onSuccess: closeAssignAdviserModal,
+            },
+        );
+    };
+
     const openCreateSectionWizard = () => {
         setShowSectionWizard(true);
     };
@@ -937,6 +1530,9 @@ export default function Index({
             track: section.track || "",
             school_year: section.school_year || currentSchoolYear || "",
             description: section.description || "",
+            advisor_teacher_id: section.advisor_teacher_id
+                ? String(section.advisor_teacher_id)
+                : "",
             is_active: Boolean(section.is_active),
         });
         setShowSectionModal(true);
@@ -998,15 +1594,55 @@ export default function Index({
             return;
         }
 
-        postClass(route("superadmin.academic-management.classes.store"), {
-            preserveScroll: true,
-            onSuccess: closeClassModal,
-        });
+        setClassQueueErrors({});
+        clearClassErrors();
+
+        if (classQueue.length === 0) {
+            setClassQueueNotice(
+                "Add at least one class to queue before creating classes.",
+            );
+            return;
+        }
+
+        setClassQueueNotice("");
+        setClassQueueProcessing(true);
+
+        const queuedPayload = classQueue.map((item) => ({
+            subject_id: item.subject_id,
+            section_id: item.section_id,
+            teacher_id: item.teacher_id,
+            school_year: item.school_year,
+            color: item.color,
+        }));
+
+        router.post(
+            route("superadmin.academic-management.classes.store"),
+            {
+                class_queue: queuedPayload,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: closeClassModal,
+                onError: (errors) => {
+                    setClassQueueErrors(errors || {});
+                    setClassQueueNotice(
+                        "Unable to create queued classes. Resolve validation errors and try again.",
+                    );
+                },
+                onFinish: () => {
+                    setClassQueueProcessing(false);
+                },
+            },
+        );
     };
 
     const openCreateClassModal = () => {
         setClassModalMode("create");
         setClassToEdit(null);
+        setClassQueue([]);
+        setClassQueueNotice("");
+        setClassQueueErrors({});
+        setClassQueueProcessing(false);
         clearClassErrors();
         resetClass();
         setClassData({ ...defaultClassState });
@@ -1016,6 +1652,10 @@ export default function Index({
     const openEditClassModal = (item) => {
         setClassModalMode("edit");
         setClassToEdit(item);
+        setClassQueue([]);
+        setClassQueueNotice("");
+        setClassQueueErrors({});
+        setClassQueueProcessing(false);
         clearClassErrors();
         setClassData({
             subject_id: item.subject_id ? String(item.subject_id) : "",
@@ -1030,6 +1670,12 @@ export default function Index({
     const closeClassModal = () => {
         setShowClassModal(false);
         setClassToEdit(null);
+        setClassQueue([]);
+        setClassQueueNotice("");
+        setClassQueueErrors({});
+        setClassQueueProcessing(false);
+        resetClass();
+        setClassData({ ...defaultClassState });
         clearClassErrors();
     };
 
@@ -1091,6 +1737,12 @@ export default function Index({
             ? "This will permanently remove the section record. If students or classes are still linked, deletion will be blocked."
             : "This will permanently remove the class record. Classes with enrollments cannot be deleted.";
 
+    const classModalErrors =
+        classModalMode === "edit" ? classErrors : classQueueErrors;
+
+    const classModalProcessing =
+        classModalMode === "edit" ? classProcessing : classQueueProcessing;
+
     return (
         <>
             <Head title="Section & Class Management" />
@@ -1132,7 +1784,8 @@ export default function Index({
                             {sectionCreateSummary.department_name} | Grade:{" "}
                             {sectionCreateSummary.grade_level} | Cohort:{" "}
                             {sectionCreateSummary.cohort} | School Year:{" "}
-                            {sectionCreateSummary.school_year}
+                            {sectionCreateSummary.school_year} | Adviser:{" "}
+                            {sectionCreateSummary.advisor_teacher_name || "N/A"}
                         </p>
                         <p className="mt-1 text-xs text-emerald-700">
                             Existing assigned:{" "}
@@ -1414,6 +2067,11 @@ export default function Index({
                                                         .filter(Boolean)
                                                         .join(" • ") || "-"}
                                                 </p>
+                                                <p className="mt-0.5 truncate text-xs text-slate-500">
+                                                    Adviser:{" "}
+                                                    {section.advisor_teacher_name ||
+                                                        "N/A"}
+                                                </p>
                                             </div>
 
                                             <div className="col-span-1 text-right">
@@ -1538,6 +2196,11 @@ export default function Index({
                                                 ]
                                                     .filter(Boolean)
                                                     .join(" • ") || "-"}
+                                            </p>
+                                            <p className="text-xs text-slate-500">
+                                                Adviser:{" "}
+                                                {section.advisor_teacher_name ||
+                                                    "N/A"}
                                             </p>
                                         </div>
                                     </div>
@@ -1785,30 +2448,55 @@ export default function Index({
                 onClose={closeSectionModal}
                 onSubmit={handleSectionSubmit}
                 departments={departments}
+                teachers={teachers}
             />
 
             <AddSectionWizardModal
                 isOpen={showSectionWizard}
                 onClose={closeSectionWizard}
                 departments={departments}
+                teachers={teachers}
                 currentSchoolYear={currentSchoolYear}
                 availableStudents={availableStudents}
             />
 
-            <ClassFormModal
-                isOpen={showClassModal}
-                mode={classModalMode}
-                data={classData}
-                setData={setClassData}
-                errors={classErrors}
-                processing={classProcessing}
-                onClose={closeClassModal}
-                onSubmit={handleClassSubmit}
-                sectionOptions={sectionOptions}
-                subjects={subjects}
-                teachers={teachers}
-                colorOptions={resolvedColorOptions}
-            />
+            {classModalMode === "create" ? (
+                <ClassQueueCreateModal
+                    isOpen={showClassModal}
+                    data={classData}
+                    setData={setClassData}
+                    errors={classModalErrors}
+                    processing={classModalProcessing}
+                    onClose={closeClassModal}
+                    onSubmit={handleClassSubmit}
+                    onAddToQueue={addDraftClassToQueue}
+                    onRemoveFromQueue={removeQueuedClass}
+                    queueItems={classQueue}
+                    queueNotice={classQueueNotice}
+                    sectionOptions={sectionOptions}
+                    subjects={subjects}
+                    teachers={teachers}
+                    colorOptions={resolvedColorOptions}
+                    duplicateDraftMessage={classDraftDuplicateMessage}
+                    progressPercent={classCreateProgressPercent}
+                    progressLabel={classCreateProgressLabel}
+                />
+            ) : (
+                <ClassFormModal
+                    isOpen={showClassModal}
+                    mode={classModalMode}
+                    data={classData}
+                    setData={setClassData}
+                    errors={classModalErrors}
+                    processing={classModalProcessing}
+                    onClose={closeClassModal}
+                    onSubmit={handleClassSubmit}
+                    sectionOptions={sectionOptions}
+                    subjects={subjects}
+                    teachers={teachers}
+                    colorOptions={resolvedColorOptions}
+                />
+            )}
 
             <DeleteConfirmModal
                 isOpen={Boolean(deleteTarget)}

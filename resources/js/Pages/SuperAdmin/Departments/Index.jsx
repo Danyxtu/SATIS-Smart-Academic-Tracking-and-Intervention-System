@@ -21,15 +21,16 @@ import {
     TrendingUp,
     ChevronRight,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import DeleteConfirmModal from "@/Components/Superadmin/DeleteConfirmModal";
 import EditDepartmentModal from "@/Components/Superadmin/EditDepartmentModal";
 import CreateDepartmentModal from "@/Components/Superadmin/CreateDepartmentModal";
 
-export default function Index({ departments, filters }) {
+export default function Index({ departments, filters, trackOptions = [] }) {
     const [search, setSearch] = useState(filters.search || "");
     const [status, setStatus] = useState(filters.status || "");
+    const [activeTrack, setActiveTrack] = useState(filters.track || "Academic");
     const [selectedDepartment, setSelectedDepartment] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -38,6 +39,12 @@ export default function Index({ departments, filters }) {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [departmentToEdit, setDepartmentToEdit] = useState(null);
     const [openMenuId, setOpenMenuId] = useState(null);
+
+    useEffect(() => {
+        setSearch(filters.search || "");
+        setStatus(filters.status || "");
+        setActiveTrack(filters.track || "Academic");
+    }, [filters.search, filters.status, filters.track]);
 
     const openModal = (dept) => {
         setSelectedDepartment(dept);
@@ -60,7 +67,7 @@ export default function Index({ departments, filters }) {
         e.preventDefault();
         router.get(
             route("superadmin.departments.index"),
-            { search, status },
+            { search, status, track: activeTrack },
             { preserveState: true },
         );
     };
@@ -157,6 +164,37 @@ export default function Index({ departments, filters }) {
 
                 {/* ── Search & Filter Bar ──────────────────────────────── */}
                 <div className="rounded-2xl bg-white border border-slate-100 shadow-sm px-5 py-4">
+                    <div className="mb-3 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+                        {(trackOptions.length > 0
+                            ? trackOptions
+                            : ["Academic", "TVL"]
+                        ).map((track) => (
+                            <button
+                                key={track}
+                                type="button"
+                                onClick={() => {
+                                    setActiveTrack(track);
+                                    router.get(
+                                        route("superadmin.departments.index"),
+                                        {
+                                            search,
+                                            status,
+                                            track,
+                                        },
+                                        { preserveState: true },
+                                    );
+                                }}
+                                className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition-all ${
+                                    activeTrack === track
+                                        ? "bg-white text-slate-800 shadow-sm ring-1 ring-slate-200"
+                                        : "text-slate-500 hover:text-slate-700"
+                                }`}
+                            >
+                                {track}
+                            </button>
+                        ))}
+                    </div>
+
                     <form
                         onSubmit={handleSearch}
                         className="flex flex-col sm:flex-row gap-3"
@@ -183,7 +221,10 @@ export default function Index({ departments, filters }) {
                                             route(
                                                 "superadmin.departments.index",
                                             ),
-                                            { status },
+                                            {
+                                                status,
+                                                track: activeTrack,
+                                            },
                                             { preserveState: true },
                                         );
                                     }}
@@ -210,7 +251,11 @@ export default function Index({ departments, filters }) {
                                             route(
                                                 "superadmin.departments.index",
                                             ),
-                                            { search, status: opt.value },
+                                            {
+                                                search,
+                                                status: opt.value,
+                                                track: activeTrack,
+                                            },
                                             { preserveState: true },
                                         );
                                     }}
@@ -301,6 +346,24 @@ export default function Index({ departments, filters }) {
                                                         {dept.description}
                                                     </p>
                                                 )}
+                                                <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                                                    Track:{" "}
+                                                    {dept.track || "Academic"}
+                                                </p>
+                                                <p className="text-[11px] text-slate-500 truncate">
+                                                    {Array.isArray(
+                                                        dept.specializations,
+                                                    ) &&
+                                                    dept.specializations
+                                                        .length > 0
+                                                        ? `Specializations: ${dept.specializations
+                                                              .map(
+                                                                  (item) =>
+                                                                      item.specialization_name,
+                                                              )
+                                                              .join(", ")}`
+                                                        : "Specializations: None"}
+                                                </p>
                                             </div>
                                         </div>
 
@@ -518,6 +581,43 @@ export default function Index({ departments, filters }) {
                                     </div>
                                 )}
 
+                                <div className="rounded-xl bg-indigo-50 border border-indigo-100 px-4 py-3">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 mb-1">
+                                        Track
+                                    </p>
+                                    <p className="text-sm font-semibold text-indigo-900">
+                                        {selectedDepartment.track || "Academic"}
+                                    </p>
+
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 mt-3 mb-1">
+                                        Specializations
+                                    </p>
+                                    {Array.isArray(
+                                        selectedDepartment.specializations,
+                                    ) &&
+                                    selectedDepartment.specializations.length >
+                                        0 ? (
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {selectedDepartment.specializations.map(
+                                                (item) => (
+                                                    <span
+                                                        key={item.id}
+                                                        className="inline-flex rounded-full bg-indigo-100 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700"
+                                                    >
+                                                        {
+                                                            item.specialization_name
+                                                        }
+                                                    </span>
+                                                ),
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-indigo-700">
+                                            No specialization assigned.
+                                        </p>
+                                    )}
+                                </div>
+
                                 <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3">
                                     <p className="text-[10px] font-bold uppercase tracking-wider text-blue-500 mb-1">
                                         Department Admin
@@ -686,6 +786,7 @@ export default function Index({ departments, filters }) {
                 isOpen={showCreateModal}
                 onClose={() => setShowCreateModal(false)}
                 onSuccess={() => router.reload({ only: ["departments"] })}
+                defaultTrack={activeTrack}
             />
         </>
     );

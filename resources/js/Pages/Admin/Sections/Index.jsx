@@ -78,6 +78,7 @@ function FieldError({ message }) {
 export default function Index({
     sections,
     availableStudents = [],
+    teachers = [],
     currentSchoolYear,
     department,
     filters,
@@ -115,6 +116,7 @@ export default function Index({
             track: "Academic",
             school_year: currentSchoolYear || "",
             description: "",
+            advisor_teacher_id: "",
             assigned_student_ids: [],
             new_students: [],
         });
@@ -205,12 +207,6 @@ export default function Index({
     const summaryIssues = useMemo(() => {
         const issues = [...stepOneIssues];
 
-        if (assignmentCount === 0) {
-            issues.push(
-                "Add at least one student by assigning existing students or creating new students.",
-            );
-        }
-
         const lrnCounts = new Map();
         newStudentsQueue.forEach((student) => {
             const normalizedLrn = String(student.lrn || "").trim();
@@ -232,7 +228,7 @@ export default function Index({
         }
 
         return issues;
-    }, [assignmentCount, newStudentsQueue, stepOneIssues]);
+    }, [newStudentsQueue, stepOneIssues]);
 
     const handleSearchSections = (event) => {
         event.preventDefault();
@@ -279,6 +275,7 @@ export default function Index({
             track: "Academic",
             school_year: currentSchoolYear || "",
             description: "",
+            advisor_teacher_id: "",
             assigned_student_ids: [],
             new_students: [],
         });
@@ -687,6 +684,11 @@ export default function Index({
                                             <p className="text-slate-500">
                                                 {section.strand || "-"}
                                             </p>
+                                            <p className="mt-0.5 text-[11px] text-slate-500">
+                                                Adviser:{" "}
+                                                {section.advisor_teacher_name ||
+                                                    "N/A"}
+                                            </p>
                                         </div>
 
                                         <div className="col-span-2 flex justify-center">
@@ -924,6 +926,41 @@ export default function Index({
                                                 />
                                                 <FieldError
                                                     message={errors.track}
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="mb-1.5 block text-sm font-medium text-slate-800">
+                                                    Adviser Teacher
+                                                </label>
+                                                <select
+                                                    value={
+                                                        data.advisor_teacher_id
+                                                    }
+                                                    onChange={(event) =>
+                                                        setData(
+                                                            "advisor_teacher_id",
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:ring-indigo-500"
+                                                >
+                                                    <option value="">
+                                                        Unassigned (N/A)
+                                                    </option>
+                                                    {teachers.map((teacher) => (
+                                                        <option
+                                                            key={teacher.id}
+                                                            value={teacher.id}
+                                                        >
+                                                            {teacher.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <FieldError
+                                                    message={
+                                                        errors.advisor_teacher_id
+                                                    }
                                                 />
                                             </div>
 
@@ -1501,6 +1538,20 @@ export default function Index({
                                                         School Year:
                                                     </span>{" "}
                                                     {data.school_year || "-"}
+                                                </p>
+                                                <p>
+                                                    <span className="font-semibold">
+                                                        Adviser:
+                                                    </span>{" "}
+                                                    {teachers.find(
+                                                        (teacher) =>
+                                                            String(
+                                                                teacher.id,
+                                                            ) ===
+                                                            String(
+                                                                data.advisor_teacher_id,
+                                                            ),
+                                                    )?.name || "N/A"}
                                                 </p>
                                             </div>
                                         </div>

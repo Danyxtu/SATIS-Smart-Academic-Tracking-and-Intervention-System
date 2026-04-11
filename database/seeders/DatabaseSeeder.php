@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use PHPUnit\Metadata\Test;
 
 class DatabaseSeeder extends Seeder
 {
@@ -17,10 +16,9 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             DepartmentSeeder::class,
+            SubjectTypeSeeder::class,
             SubjectSeeder::class,
             RoleUserSeeder::class,
-            SuperAdminSeeder::class,
-            TeacherSuperAdminSeeder::class,
             TestUserSeeder::class,
         ]);
     }

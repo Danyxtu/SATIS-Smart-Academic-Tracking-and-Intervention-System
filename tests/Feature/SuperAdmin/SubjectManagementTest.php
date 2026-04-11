@@ -4,6 +4,7 @@ namespace Tests\Feature\SuperAdmin;
 
 use App\Models\Subject;
 use App\Models\SubjectTeacher;
+use App\Models\SubjectType;
 use App\Models\User;
 use Tests\TestCase;
 
@@ -39,6 +40,8 @@ class SubjectManagementTest extends TestCase
             ->post(route('superadmin.subjects.store'), [
                 'subject_name' => 'Earth and Life Science',
                 'subject_code' => 'ELS',
+                'semester' => '1',
+                'grade_level' => 'Grade 11',
             ]);
 
         $response->assertRedirect(route('superadmin.subjects.index'));
@@ -46,6 +49,64 @@ class SubjectManagementTest extends TestCase
         $this->assertDatabaseHas('subjects', [
             'subject_name' => 'Earth and Life Science',
             'subject_code' => 'ELS',
+            'semester' => '1',
+            'grade_level' => 'Grade 11',
+        ]);
+    }
+
+    public function test_super_admin_can_create_subject_queue_with_type_and_hours(): void
+    {
+        /** @var User $superAdmin */
+        $superAdmin = $this->createUserWithRole('super_admin');
+
+        $response = $this->actingAs($superAdmin)
+            ->post(route('superadmin.subjects.store'), [
+                'type_key' => SubjectType::SPECIALIZED_TVL,
+                'semester' => '2',
+                'grade_level' => 'Grade 12',
+                'subjects' => [
+                    [
+                        'subject_name' => 'Computer Systems Servicing',
+                        'subject_code' => 'ICT-CSS',
+                        'total_hours' => 160,
+                    ],
+                    [
+                        'subject_name' => 'Cookery NC II',
+                        'subject_code' => 'TVL-COOKERY',
+                        'total_hours' => 160,
+                    ],
+                ],
+            ]);
+
+        $response->assertRedirect(route('superadmin.subjects.index'));
+
+        $this->assertDatabaseHas('subjects', [
+            'subject_name' => 'Computer Systems Servicing',
+            'subject_code' => 'ICT-CSS',
+            'total_hours' => 160,
+            'semester' => '2',
+            'grade_level' => 'Grade 12',
+        ]);
+
+        $this->assertDatabaseHas('subjects', [
+            'subject_name' => 'Cookery NC II',
+            'subject_code' => 'TVL-COOKERY',
+            'total_hours' => 160,
+            'semester' => '2',
+            'grade_level' => 'Grade 12',
+        ]);
+
+        $tvlType = SubjectType::query()
+            ->where('type_key', SubjectType::SPECIALIZED_TVL)
+            ->firstOrFail();
+
+        $cssSubject = Subject::query()
+            ->where('subject_code', 'ICT-CSS')
+            ->firstOrFail();
+
+        $this->assertDatabaseHas('subject_subject_type', [
+            'subject_id' => $cssSubject->id,
+            'subject_type_id' => $tvlType->id,
         ]);
     }
 
@@ -63,6 +124,8 @@ class SubjectManagementTest extends TestCase
             ->put(route('superadmin.subjects.update', $subject), [
                 'subject_name' => 'Advanced Physical Science',
                 'subject_code' => 'APS',
+                'semester' => '2',
+                'grade_level' => 'Grade 12',
             ]);
 
         $response->assertRedirect(route('superadmin.subjects.index'));
@@ -71,6 +134,8 @@ class SubjectManagementTest extends TestCase
             'id' => $subject->id,
             'subject_name' => 'Advanced Physical Science',
             'subject_code' => 'APS',
+            'semester' => '2',
+            'grade_level' => 'Grade 12',
         ]);
     }
 
@@ -139,5 +204,112 @@ class SubjectManagementTest extends TestCase
             ->get(route('superadmin.subjects.index'));
 
         $response->assertForbidden();
+    }
+
+    public function test_super_admin_can_filter_subjects_by_subject_type(): void
+    {
+        /** @var User $superAdmin */
+        $superAdmin = $this->createUserWithRole('super_admin');
+
+        $coreType = SubjectType::query()
+            ->where('type_key', SubjectType::CORE)
+            ->firstOrFail();
+
+        $tvlType = SubjectType::query()
+            ->where('type_key', SubjectType::SPECIALIZED_TVL)
+            ->firstOrFail();
+
+        $coreSubject = Subject::create([
+            'subject_name' => 'Core Subject Sample',
+            'subject_code' => 'CORE-SAMPLE',
+        ]);
+        $coreSubject->subjectTypes()->sync([$coreType->id]);
+
+        $tvlSubject = Subject::create([
+            'subject_name' => 'TVL Subject Sample',
+            'subject_code' => 'TVL-SAMPLE',
+            'total_hours' => 160,
+        ]);
+        $tvlSubject->subjectTypes()->sync([$tvlType->id]);
+
+        $response = $this->actingAs($superAdmin)
+            ->get(route('superadmin.subjects.index', [
+                'type' => SubjectType::SPECIALIZED_TVL,
+            ]));
+
+        $response->assertOk();
+        $response->assertInertia(
+            fn($page) => $page
+                ->component('SuperAdmin/Subjects/Index')
+                ->where('filters.type', SubjectType::SPECIALIZED_TVL)
+                ->has('subjects.data', 1)
+                ->where('subjects.data.0.subject_code', 'TVL-SAMPLE')
+        );
+    }
+
+    public function test_super_admin_can_filter_subjects_by_grade_level(): void
+    {
+        /** @var User $superAdmin */
+        $superAdmin = $this->createUserWithRole('super_admin');
+
+        Subject::create([
+            'subject_name' => 'Earth Science Grade 11',
+            'subject_code' => 'EARTH-11',
+            'grade_level' => 'Grade 11',
+        ]);
+
+        Subject::create([
+            'subject_name' => 'Earth Science Grade 12',
+            'subject_code' => 'EARTH-12',
+            'grade_level' => 'Grade 12',
+        ]);
+
+        $response = $this->actingAs($superAdmin)
+            ->get(route('superadmin.subjects.index', [
+                'grade_level' => 'Grade 12',
+            ]));
+
+        $response->assertOk();
+        $response->assertInertia(
+            fn($page) => $page
+                ->component('SuperAdmin/Subjects/Index')
+                ->where('filters.grade_level', 'Grade 12')
+                ->has('subjects.data', 1)
+                ->where('subjects.data.0.subject_code', 'EARTH-12')
+        );
+    }
+
+    public function test_super_admin_can_filter_subjects_by_semester(): void
+    {
+        /** @var User $superAdmin */
+        $superAdmin = $this->createUserWithRole('super_admin');
+
+        Subject::create([
+            'subject_name' => 'Reading and Writing 1st',
+            'subject_code' => 'READ-1',
+            'semester' => '1',
+            'grade_level' => 'Grade 11',
+        ]);
+
+        Subject::create([
+            'subject_name' => 'Reading and Writing 2nd',
+            'subject_code' => 'READ-2',
+            'semester' => '2',
+            'grade_level' => 'Grade 11',
+        ]);
+
+        $response = $this->actingAs($superAdmin)
+            ->get(route('superadmin.subjects.index', [
+                'semester' => '2',
+            ]));
+
+        $response->assertOk();
+        $response->assertInertia(
+            fn($page) => $page
+                ->component('SuperAdmin/Subjects/Index')
+                ->where('filters.semester', '2')
+                ->has('subjects.data', 1)
+                ->where('subjects.data.0.subject_code', 'READ-2')
+        );
     }
 }

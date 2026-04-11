@@ -20,6 +20,9 @@ class SubjectFactory extends Factory
         return [
             'subject_name' => $name,
             'subject_code' => 'SUB-' . Str::upper(Str::random(6)),
+            'total_hours' => $this->faker->randomElement([80, 120, 160]),
+            'semester' => $this->faker->randomElement(['1', '2']),
+            'grade_level' => $this->faker->randomElement(['Grade 11', 'Grade 12']),
         ];
     }
 }
