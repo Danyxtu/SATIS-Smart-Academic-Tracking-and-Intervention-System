@@ -53,6 +53,15 @@ class DepartmentController extends Controller
                     'email' => $primaryAdmin->email,
                 ] : null);
 
+                $department->setAttribute('department_admins', $department->admins->map(fn($admin) => [
+                    'id' => $admin->id,
+                    'first_name' => $admin->first_name,
+                    'middle_name' => $admin->middle_name,
+                    'last_name' => $admin->last_name,
+                    'name' => $admin->name,
+                    'email' => $admin->email,
+                ])->values());
+
                 $department->setAttribute('department_teachers', $department->teachers->map(fn($t) => [
                     'id'          => $t->id,
                     'first_name'  => $t->first_name,

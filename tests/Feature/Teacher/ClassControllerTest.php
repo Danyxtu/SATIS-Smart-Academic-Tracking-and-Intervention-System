@@ -3,6 +3,7 @@
 use App\Models\User;
 use App\Models\Student;
 use App\Models\SchoolClass;
+use App\Models\Enrollment;
 use App\Models\Subject;
 use App\Models\Department;
 use App\Models\SystemSetting;
@@ -250,6 +251,104 @@ test('teacher duplicate check treats subject casing and spacing as the same subj
         ->count();
 
     expect($count)->toBe(1);
+});
+
+test('students from selected section are auto-assigned to a newly created class', function () {
+    /** @var User $teacher */
+    $teacher = User::factory()->create();
+    $teacher->syncRolesByName(['teacher']);
+
+    Department::query()->create([
+        'department_name' => 'STEM Department',
+        'department_code' => 'STEM',
+        'is_active' => true,
+    ]);
+
+    $schoolYear = SystemSetting::getCurrentSchoolYear();
+
+    actingAs($teacher);
+
+    post(route('teacher.classes.store'), [
+        'grade_level' => 'Grade 11',
+        'section' => 'A',
+        'subject_name' => 'General Mathematics',
+        'color' => 'indigo',
+        'school_year' => $schoolYear,
+        'strand' => 'STEM',
+        'track' => 'Academic',
+    ])->assertSessionHas('success');
+
+    $sourceSubject = Subject::query()
+        ->whereRaw('LOWER(TRIM(subject_name)) = ?', ['general mathematics'])
+        ->first();
+
+    expect($sourceSubject)->not()->toBeNull();
+
+    $sourceClass = SchoolClass::query()
+        ->where('teacher_id', $teacher->id)
+        ->where('subject_id', $sourceSubject->id)
+        ->where('grade_level', 'Grade 11')
+        ->where('section', 'STEM-A')
+        ->first();
+
+    expect($sourceClass)->not()->toBeNull();
+
+    $studentUser = User::factory()->create();
+    $studentUser->syncRolesByName(['student']);
+
+    Student::query()->create([
+        'student_name' => 'Sample Student',
+        'lrn' => '123123123123',
+        'user_id' => $studentUser->id,
+        'grade_level' => 'Grade 11',
+        'section' => 'STEM-A',
+        'section_id' => $sourceClass->section_id,
+        'strand' => 'STEM',
+        'track' => 'Academic',
+    ]);
+
+    Enrollment::query()->create([
+        'user_id' => $studentUser->id,
+        'class_id' => $sourceClass->id,
+        'risk_status' => 'low',
+    ]);
+
+    $response = post(route('teacher.classes.store'), [
+        'grade_level' => 'Grade 11',
+        'section' => 'A',
+        'subject_name' => 'Earth Science',
+        'color' => 'blue',
+        'school_year' => $schoolYear,
+        'strand' => 'STEM',
+        'track' => 'Academic',
+    ]);
+
+    $response->assertSessionHas('success');
+    $response->assertSessionHas('import_summary');
+
+    $targetSubject = Subject::query()
+        ->whereRaw('LOWER(TRIM(subject_name)) = ?', ['earth science'])
+        ->first();
+
+    expect($targetSubject)->not()->toBeNull();
+
+    $targetClass = SchoolClass::query()
+        ->where('teacher_id', $teacher->id)
+        ->where('subject_id', $targetSubject->id)
+        ->where('grade_level', 'Grade 11')
+        ->where('section', 'STEM-A')
+        ->latest('id')
+        ->first();
+
+    expect($targetClass)->not()->toBeNull();
+
+    assertDatabaseHas('enrollments', [
+        'user_id' => $studentUser->id,
+        'class_id' => $targetClass->id,
+    ]);
+
+    $summary = session('import_summary');
+    expect((int) ($summary['assigned_existing'] ?? 0))->toBeGreaterThan(0);
 });
 
 test('teacher cannot update a class into a duplicate assignment', function () {

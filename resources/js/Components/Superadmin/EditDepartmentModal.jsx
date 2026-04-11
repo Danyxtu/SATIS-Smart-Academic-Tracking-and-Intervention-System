@@ -11,6 +11,7 @@ import {
     Search,
     UserCog,
     Shield,
+    UserPlus,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 
@@ -21,6 +22,27 @@ function FieldError({ error }) {
             <Info size={12} /> {error}
         </p>
     );
+}
+
+function getPersonName(person) {
+    if (!person) return "Unnamed user";
+    if (person.name) return person.name;
+
+    return (
+        [person.first_name, person.middle_name, person.last_name]
+            .filter(Boolean)
+            .join(" ") || "Unnamed user"
+    );
+}
+
+function getPersonEmail(person) {
+    return person?.email || person?.personal_email || "No email";
+}
+
+function getPersonInitials(person) {
+    const first = person?.first_name?.[0] ?? person?.name?.[0] ?? "U";
+    const last = person?.last_name?.[0] ?? "";
+    return `${first}${last}`.toUpperCase();
 }
 
 export default function EditDepartmentModal({
@@ -34,6 +56,49 @@ export default function EditDepartmentModal({
     const [teacherSearch, setTeacherSearch] = useState("");
     const [loadingTeachers, setLoadingTeachers] = useState(false);
 
+    const normalizedDepartment = useMemo(() => {
+        if (!department) return null;
+
+        return {
+            ...department,
+            name: department.name ?? department.department_name ?? "",
+            code: department.code ?? department.department_code ?? "",
+        };
+    }, [department]);
+
+    const departmentAdmins = useMemo(() => {
+        if (!normalizedDepartment) return [];
+
+        const adminsFromList = Array.isArray(
+            normalizedDepartment.department_admins,
+        )
+            ? normalizedDepartment.department_admins
+            : [];
+
+        if (adminsFromList.length > 0) return adminsFromList;
+
+        return normalizedDepartment.department_admin
+            ? [normalizedDepartment.department_admin]
+            : [];
+    }, [normalizedDepartment]);
+
+    const adminIdSet = useMemo(
+        () => new Set(departmentAdmins.map((admin) => String(admin.id))),
+        [departmentAdmins],
+    );
+
+    const departmentTeachers = useMemo(() => {
+        const teachersFromDepartment = Array.isArray(
+            normalizedDepartment?.department_teachers,
+        )
+            ? normalizedDepartment.department_teachers
+            : [];
+
+        return teachersFromDepartment.filter(
+            (teacher) => !adminIdSet.has(String(teacher.id)),
+        );
+    }, [normalizedDepartment, adminIdSet]);
+
     const { data, setData, put, processing, errors, reset, clearErrors } =
         useForm({
             department_name: "",
@@ -44,34 +109,55 @@ export default function EditDepartmentModal({
             admin_id: "",
         });
 
-    // Populate form + fetch teachers when department changes
+    // Populate form values immediately when edit modal opens.
     useEffect(() => {
-        if (!isOpen || !department) return;
+        if (!isOpen || !normalizedDepartment) return;
+
+        const initialTeacherIds = Array.isArray(
+            normalizedDepartment.department_teachers,
+        )
+            ? normalizedDepartment.department_teachers
+                  .map((teacher) => teacher.id)
+                  .filter((teacherId) => Boolean(teacherId))
+            : [];
+
+        const initialAdminId = departmentAdmins[0]?.id
+            ? String(departmentAdmins[0].id)
+            : "";
 
         setData({
-            department_name: department.name || "",
-            department_code: department.code || "",
-            description: department.description || "",
-            is_active: department.is_active ?? true,
-            teacher_ids: [],
-            admin_id: "",
+            department_name: normalizedDepartment.name,
+            department_code: normalizedDepartment.code,
+            description: normalizedDepartment.description || "",
+            is_active: normalizedDepartment.is_active ?? true,
+            teacher_ids: initialTeacherIds,
+            admin_id: initialAdminId,
         });
         setTab("info");
         setTeacherSearch("");
         setTeachers([]);
-    }, [isOpen, department?.id]);
+    }, [isOpen, normalizedDepartment, departmentAdmins]);
 
-    // Fetch teachers when switching to teachers tab
+    // Fetch assignable teachers when opening assignment tab.
     useEffect(() => {
-        if (tab !== "teachers" || !department?.id || teachers.length > 0)
+        if (
+            tab !== "assign" ||
+            !normalizedDepartment?.id ||
+            teachers.length > 0
+        )
             return;
+
         setLoadingTeachers(true);
-        fetch(route("superadmin.departments.teachers", department.id))
+        fetch(route("superadmin.departments.teachers", normalizedDepartment.id))
             .then((r) => r.json())
             .then(({ teachers: list, admin_id }) => {
                 setTeachers(list);
                 const currentIds = list
-                    .filter((t) => t.department_id === department.id)
+                    .filter(
+                        (t) =>
+                            String(t.department_id) ===
+                            String(normalizedDepartment.id),
+                    )
                     .map((t) => t.id);
                 setData((prev) => ({
                     ...prev,
@@ -80,7 +166,7 @@ export default function EditDepartmentModal({
                 }));
             })
             .finally(() => setLoadingTeachers(false));
-    }, [tab, department?.id]);
+    }, [tab, normalizedDepartment?.id, teachers.length]);
 
     const handleClose = () => {
         clearErrors();
@@ -93,7 +179,7 @@ export default function EditDepartmentModal({
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        put(route("superadmin.departments.update", department.id), {
+        put(route("superadmin.departments.update", normalizedDepartment.id), {
             preserveScroll: true,
             onSuccess: () => {
                 handleClose();
@@ -117,7 +203,7 @@ export default function EditDepartmentModal({
         () =>
             teachers.filter((t) => {
                 const full =
-                    `${t.first_name} ${t.middle_name ?? ""} ${t.last_name} ${t.email}`.toLowerCase();
+                    `${t.first_name} ${t.middle_name ?? ""} ${t.last_name} ${t.email ?? t.personal_email ?? ""}`.toLowerCase();
                 return full.includes(teacherSearch.toLowerCase());
             }),
         [teachers, teacherSearch],
@@ -127,7 +213,7 @@ export default function EditDepartmentModal({
         data.teacher_ids.includes(t.id),
     );
 
-    if (!isOpen || !department) return null;
+    if (!isOpen || !normalizedDepartment) return null;
 
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -157,7 +243,7 @@ export default function EditDepartmentModal({
                                     Edit Department
                                 </h2>
                                 <p className="text-xs text-blue-100 mt-0.5 truncate max-w-xs">
-                                    {department.name}
+                                    {normalizedDepartment.name}
                                 </p>
                             </div>
                         </div>
@@ -172,9 +258,14 @@ export default function EditDepartmentModal({
                                 icon: Building2,
                             },
                             {
-                                key: "teachers",
+                                key: "members",
                                 label: "Teachers & Admin",
                                 icon: Users,
+                            },
+                            {
+                                key: "assign",
+                                label: "Assign Teachers & Admin",
+                                icon: UserPlus,
                             },
                         ].map(({ key, label, icon: Icon }) => (
                             <button
@@ -328,15 +419,141 @@ export default function EditDepartmentModal({
                             )}
 
                             {/* ── Tab: Teachers & Admin ── */}
-                            {tab === "teachers" && (
+                            {tab === "members" && (
                                 <>
                                     <p className="text-xs text-slate-500">
-                                        Manage teachers in this department.
-                                        Teachers with no department or already
-                                        in this department are shown.
+                                        Current users assigned to this
+                                        department.
                                     </p>
 
-                                    {/* Search */}
+                                    {departmentAdmins.length === 0 &&
+                                    departmentTeachers.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50 py-10 text-center">
+                                            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100">
+                                                <Users
+                                                    size={22}
+                                                    className="text-slate-300"
+                                                />
+                                            </div>
+                                            <p className="text-sm font-medium text-slate-700">
+                                                No teacher or admin is assigned
+                                                to this department yet.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <div className="rounded-xl border border-violet-200 bg-violet-50/70 px-4 py-3">
+                                                <div className="mb-2 flex items-center justify-between">
+                                                    <p className="flex items-center gap-2 text-xs font-semibold text-violet-700">
+                                                        <Shield size={12} />
+                                                        Admins
+                                                    </p>
+                                                    <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">
+                                                        {
+                                                            departmentAdmins.length
+                                                        }
+                                                    </span>
+                                                </div>
+
+                                                {departmentAdmins.length ===
+                                                0 ? (
+                                                    <p className="text-xs text-violet-500">
+                                                        No admin assigned yet.
+                                                    </p>
+                                                ) : (
+                                                    <div className="space-y-1.5">
+                                                        {departmentAdmins.map(
+                                                            (admin) => (
+                                                                <div
+                                                                    key={`admin-${admin.id}`}
+                                                                    className="flex items-center gap-3 rounded-lg border border-violet-200 bg-white px-3 py-2.5"
+                                                                >
+                                                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-xs font-bold text-violet-700">
+                                                                        {getPersonInitials(
+                                                                            admin,
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="min-w-0">
+                                                                        <p className="truncate text-sm font-medium text-slate-800">
+                                                                            {getPersonName(
+                                                                                admin,
+                                                                            )}
+                                                                        </p>
+                                                                        <p className="truncate text-xs text-slate-500">
+                                                                            {getPersonEmail(
+                                                                                admin,
+                                                                            )}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
+                                                <div className="mb-2 flex items-center justify-between">
+                                                    <p className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
+                                                        <Users size={12} />
+                                                        Teachers
+                                                    </p>
+                                                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                                                        {
+                                                            departmentTeachers.length
+                                                        }
+                                                    </span>
+                                                </div>
+
+                                                {departmentTeachers.length ===
+                                                0 ? (
+                                                    <p className="text-xs text-emerald-600">
+                                                        No teacher assigned yet.
+                                                    </p>
+                                                ) : (
+                                                    <div className="space-y-1.5">
+                                                        {departmentTeachers.map(
+                                                            (teacher) => (
+                                                                <div
+                                                                    key={`teacher-${teacher.id}`}
+                                                                    className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-white px-3 py-2.5"
+                                                                >
+                                                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-xs font-bold text-emerald-700">
+                                                                        {getPersonInitials(
+                                                                            teacher,
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="min-w-0">
+                                                                        <p className="truncate text-sm font-medium text-slate-800">
+                                                                            {getPersonName(
+                                                                                teacher,
+                                                                            )}
+                                                                        </p>
+                                                                        <p className="truncate text-xs text-slate-500">
+                                                                            {getPersonEmail(
+                                                                                teacher,
+                                                                            )}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            {/* ── Tab: Assign Teachers & Admin ── */}
+                            {tab === "assign" && (
+                                <>
+                                    <p className="text-xs text-slate-500">
+                                        Assign teachers to this department and
+                                        choose one department admin.
+                                    </p>
+
                                     <div className="relative">
                                         <Search
                                             size={14}
@@ -375,7 +592,6 @@ export default function EditDepartmentModal({
                                         </div>
                                     ) : (
                                         <>
-                                            {/* Teacher list */}
                                             <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                                                 {filteredTeachers.length ===
                                                 0 ? (
@@ -413,31 +629,20 @@ export default function EditDepartmentModal({
                                                                         className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                                                                     />
                                                                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-bold">
-                                                                        {
-                                                                            t
-                                                                                .first_name[0]
-                                                                        }
-                                                                        {
-                                                                            t
-                                                                                .last_name[0]
-                                                                        }
+                                                                        {getPersonInitials(
+                                                                            t,
+                                                                        )}
                                                                     </div>
                                                                     <div className="min-w-0 flex-1">
                                                                         <p className="text-sm font-medium text-slate-800 truncate">
-                                                                            {
-                                                                                t.first_name
-                                                                            }
-                                                                            {t.middle_name
-                                                                                ? ` ${t.middle_name}`
-                                                                                : ""}{" "}
-                                                                            {
-                                                                                t.last_name
-                                                                            }
+                                                                            {getPersonName(
+                                                                                t,
+                                                                            )}
                                                                         </p>
                                                                         <p className="text-xs text-slate-400 truncate">
-                                                                            {
-                                                                                t.email
-                                                                            }
+                                                                            {getPersonEmail(
+                                                                                t,
+                                                                            )}
                                                                         </p>
                                                                     </div>
                                                                     {isAdmin && (
@@ -457,7 +662,6 @@ export default function EditDepartmentModal({
                                                 )}
                                             </div>
 
-                                            {/* Assign admin — only when teachers are selected */}
                                             {selectedTeachers.length > 0 && (
                                                 <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 space-y-2">
                                                     <p className="flex items-center gap-2 text-xs font-semibold text-violet-700">
@@ -486,12 +690,9 @@ export default function EditDepartmentModal({
                                                                     key={t.id}
                                                                     value={t.id}
                                                                 >
-                                                                    {
-                                                                        t.first_name
-                                                                    }{" "}
-                                                                    {
-                                                                        t.last_name
-                                                                    }
+                                                                    {getPersonName(
+                                                                        t,
+                                                                    )}
                                                                 </option>
                                                             ),
                                                         )}

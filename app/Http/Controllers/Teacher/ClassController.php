@@ -583,7 +583,7 @@ class ClassController extends Controller
             optional($classLock)->release();
         }
 
-        $summary = null;
+        $summary = $this->autoAssignSectionStudents($subjectTeacher);
 
         if ($request->hasFile('classlist')) {
             try {
@@ -1108,6 +1108,151 @@ class ClassController extends Controller
         $merged['created_students'] = $merged['newly_created_students'];
 
         return $merged;
+    }
+
+    private function autoAssignSectionStudents(SchoolClass $subjectTeacher): ?array
+    {
+        $normalizedSection = strtoupper(trim((string) $subjectTeacher->section));
+        $sectionSuffix = strtoupper(trim((string) Str::after($normalizedSection, '-')));
+
+        $sectionCandidates = collect([$normalizedSection, $sectionSuffix])
+            ->filter(fn($value) => $value !== '')
+            ->unique()
+            ->values();
+
+        $candidateUserIdsFromClasses = Enrollment::query()
+            ->whereHas('schoolClass', function ($query) use ($subjectTeacher) {
+                $query
+                    ->where('teacher_id', $subjectTeacher->teacher_id)
+                    ->where('school_year', $subjectTeacher->school_year)
+                    ->where('semester', $subjectTeacher->semester)
+                    ->where('grade_level', $subjectTeacher->grade_level)
+                    ->where('section', $subjectTeacher->section)
+                    ->where('id', '!=', $subjectTeacher->id);
+            })
+            ->pluck('user_id');
+
+        $candidateStudentsQuery = Student::query()->whereNotNull('user_id');
+
+        $candidateStudentsQuery->where(function ($query) use ($subjectTeacher, $sectionCandidates) {
+            if (! empty($subjectTeacher->section_id)) {
+                $query
+                    ->where('section_id', $subjectTeacher->section_id)
+                    ->orWhere(function ($inner) use ($subjectTeacher, $sectionCandidates) {
+                        $inner
+                            ->where('grade_level', $subjectTeacher->grade_level)
+                            ->where(function ($sectionQuery) use ($sectionCandidates) {
+                                foreach ($sectionCandidates as $candidateSection) {
+                                    $sectionQuery->orWhereRaw('UPPER(section) = ?', [$candidateSection]);
+                                }
+                            });
+
+                        if (! empty($subjectTeacher->strand)) {
+                            $inner->where(function ($strandQuery) use ($subjectTeacher) {
+                                $strandQuery
+                                    ->whereNull('strand')
+                                    ->orWhereRaw('UPPER(strand) = ?', [strtoupper((string) $subjectTeacher->strand)]);
+                            });
+                        }
+                    });
+
+                return;
+            }
+
+            $query->where(function ($inner) use ($subjectTeacher, $sectionCandidates) {
+                $inner
+                    ->where('grade_level', $subjectTeacher->grade_level)
+                    ->where(function ($sectionQuery) use ($sectionCandidates) {
+                        foreach ($sectionCandidates as $candidateSection) {
+                            $sectionQuery->orWhereRaw('UPPER(section) = ?', [$candidateSection]);
+                        }
+                    });
+
+                if (! empty($subjectTeacher->strand)) {
+                    $inner->where(function ($strandQuery) use ($subjectTeacher) {
+                        $strandQuery
+                            ->whereNull('strand')
+                            ->orWhereRaw('UPPER(strand) = ?', [strtoupper((string) $subjectTeacher->strand)]);
+                    });
+                }
+            });
+        });
+
+        $candidateUserIdsFromStudents = $candidateStudentsQuery->pluck('user_id');
+
+        $candidateUserIds = $candidateUserIdsFromClasses
+            ->merge($candidateUserIdsFromStudents)
+            ->filter(fn($id) => ! is_null($id))
+            ->map(fn($id) => (int) $id)
+            ->filter(fn($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($candidateUserIds->isEmpty()) {
+            return null;
+        }
+
+        $studentsByUserId = Student::query()
+            ->whereIn('user_id', $candidateUserIds)
+            ->get(['user_id', 'student_name', 'lrn'])
+            ->keyBy('user_id');
+
+        $usersById = User::query()
+            ->whereIn('id', $candidateUserIds)
+            ->get(['id', 'first_name', 'last_name', 'middle_name', 'username', 'personal_email'])
+            ->keyBy('id');
+
+        $assignedExistingStudents = [];
+        $alreadyEnrolledStudents = [];
+
+        foreach ($candidateUserIds as $candidateUserId) {
+            $enrollment = Enrollment::firstOrCreate(
+                [
+                    'user_id' => $candidateUserId,
+                    'class_id' => $subjectTeacher->id,
+                ],
+                [
+                    'risk_status' => 'low',
+                    'current_grade' => null,
+                    'current_attendance_rate' => null,
+                ]
+            );
+
+            $user = $usersById->get($candidateUserId);
+            $studentProfile = $studentsByUserId->get($candidateUserId);
+
+            $studentPayload = [
+                'name' => $this->formatStudentDisplayName($user, $studentProfile),
+                'lrn' => $studentProfile?->lrn,
+                'username' => $user?->username,
+                'personal_email' => $user?->personal_email,
+            ];
+
+            if ($enrollment->wasRecentlyCreated) {
+                $assignedExistingStudents[] = $studentPayload;
+                continue;
+            }
+
+            $alreadyEnrolledStudents[] = $studentPayload;
+        }
+
+        if ($assignedExistingStudents === [] && $alreadyEnrolledStudents === []) {
+            return null;
+        }
+
+        return [
+            'newly_created' => 0,
+            'assigned_existing' => count($assignedExistingStudents),
+            'already_enrolled' => count($alreadyEnrolledStudents),
+            'skipped' => 0,
+            'errors' => [],
+            'newly_created_students' => [],
+            'assigned_existing_students' => $assignedExistingStudents,
+            'already_enrolled_students' => $alreadyEnrolledStudents,
+            'imported' => 0,
+            'updated' => count($assignedExistingStudents) + count($alreadyEnrolledStudents),
+            'created_students' => [],
+        ];
     }
 
     private function persistStudentRecord(SchoolClass $subjectTeacher, array $payload): array
