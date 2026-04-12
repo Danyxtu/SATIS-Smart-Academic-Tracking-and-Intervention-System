@@ -20,7 +20,8 @@ const WIZARD_STEPS = [
     {
         id: 1,
         title: "Section Details",
-        description: "Track, department, grade level, section name, adviser",
+        description:
+            "Department, grade level, strand/specialization, section name, adviser",
         icon: Plus,
     },
     {
@@ -38,7 +39,8 @@ const WIZARD_STEPS = [
 ];
 
 const GRADE_LEVEL_OPTIONS = ["11", "12"];
-const TRACK_OPTIONS = ["Academic", "TVL"];
+
+const normalizeSpecializationOption = (value = "") => String(value).trim();
 
 const normalizeDepartmentSearch = (value = "") =>
     String(value).trim().toLowerCase();
@@ -71,8 +73,8 @@ const findDepartmentFromSearch = (departments, value) => {
 };
 
 const STEP_ONE_ERROR_FIELDS = [
-    "track",
     "department_id",
+    "specialization",
     "advisor_teacher_id",
     "section_name",
     "grade_level",
@@ -405,8 +407,8 @@ export default function AddSectionWizardModal({
 }) {
     const initialFormState = useMemo(
         () => ({
-            track: "Academic",
             department_id: "",
+            specialization: "",
             advisor_teacher_id: "",
             section_name: "",
             grade_level: "",
@@ -433,24 +435,49 @@ export default function AddSectionWizardModal({
     const [bulkLines, setBulkLines] = useState("");
     const [bulkImportErrors, setBulkImportErrors] = useState([]);
 
-    const filteredDepartmentsByTrack = useMemo(
+    const availableDepartments = useMemo(
         () =>
             departments.filter(
                 (department) =>
-                    String(department.track || "Academic") ===
-                    String(data.track || "Academic"),
+                    department && String(department.id || "") !== "",
             ),
-        [departments, data.track],
+        [departments],
     );
 
     const selectedDepartment = useMemo(
         () =>
-            filteredDepartmentsByTrack.find(
+            availableDepartments.find(
                 (department) =>
                     String(department.id) === String(data.department_id),
             ) || null,
-        [filteredDepartmentsByTrack, data.department_id],
+        [availableDepartments, data.department_id],
     );
+
+    const specializationOptions = useMemo(() => {
+        if (!selectedDepartment) {
+            return [];
+        }
+
+        const options = Array.isArray(selectedDepartment.specializations)
+            ? selectedDepartment.specializations
+                  .map((item) =>
+                      normalizeSpecializationOption(
+                          item?.specialization_name ?? item,
+                      ),
+                  )
+                  .filter((item) => item !== "")
+            : [];
+
+        if (options.length > 0) {
+            return [...new Set(options)];
+        }
+
+        const fallback = normalizeSpecializationOption(
+            selectedDepartment.department_code,
+        );
+
+        return fallback ? [fallback] : [];
+    }, [selectedDepartment]);
 
     const departmentSearchMessage = useMemo(() => {
         if (!String(departmentSearch || "").trim()) {
@@ -491,10 +518,18 @@ export default function AddSectionWizardModal({
         }
 
         const prefix = gradeToken || "?";
-        const departmentCode = selectedDepartment?.department_code || "DEPT";
+        const specializationToken =
+            normalizeSpecializationOption(data.specialization) ||
+            selectedDepartment?.department_code ||
+            "STRAND";
 
-        return `${prefix} - ${departmentCode} - ${sectionName}`;
-    }, [data.section_name, gradeToken, selectedDepartment?.department_code]);
+        return `${prefix} - ${specializationToken} - ${sectionName}`;
+    }, [
+        data.section_name,
+        data.specialization,
+        gradeToken,
+        selectedDepartment?.department_code,
+    ]);
 
     const queuedExistingIdSet = useMemo(
         () => new Set(queuedExistingStudents.map((student) => student.id)),
@@ -543,14 +578,14 @@ export default function AddSectionWizardModal({
     const stepOneIssues = useMemo(() => {
         const issues = [];
 
-        if (!String(data.track || "").trim()) {
-            issues.push("Track is required.");
-        }
-
         if (!data.department_id || !selectedDepartment) {
             issues.push(
                 "Department is required and must match a loaded option.",
             );
+        }
+
+        if (!String(data.specialization || "").trim()) {
+            issues.push("Strand/Specialization is required.");
         }
 
         if (!String(data.section_name || "").trim()) {
@@ -569,8 +604,8 @@ export default function AddSectionWizardModal({
 
         return issues;
     }, [
-        data.track,
         data.department_id,
+        data.specialization,
         data.grade_level,
         data.section_name,
         selectedDepartment,
@@ -686,17 +721,50 @@ export default function AddSectionWizardModal({
             return;
         }
 
-        const stillLoaded = filteredDepartmentsByTrack.some(
+        const stillLoaded = availableDepartments.some(
             (department) =>
                 String(department.id) === String(data.department_id),
         );
 
         if (!stillLoaded) {
             setData("department_id", "");
+            setData("specialization", "");
             setData("advisor_teacher_id", "");
             setDepartmentSearch("");
         }
-    }, [filteredDepartmentsByTrack, data.department_id, setData]);
+    }, [availableDepartments, data.department_id, setData]);
+
+    useEffect(() => {
+        const selectedSpecialization = normalizeSpecializationOption(
+            data.specialization,
+        );
+
+        if (!selectedDepartment) {
+            if (selectedSpecialization !== "") {
+                setData("specialization", "");
+            }
+
+            return;
+        }
+
+        if (specializationOptions.includes(selectedSpecialization)) {
+            return;
+        }
+
+        if (specializationOptions.length === 1) {
+            setData("specialization", specializationOptions[0]);
+            return;
+        }
+
+        if (selectedSpecialization !== "") {
+            setData("specialization", "");
+        }
+    }, [
+        selectedDepartment,
+        specializationOptions,
+        data.specialization,
+        setData,
+    ]);
 
     useEffect(() => {
         if (!data.advisor_teacher_id) {
@@ -712,18 +780,11 @@ export default function AddSectionWizardModal({
         }
     }, [availableAdviserTeachers, data.advisor_teacher_id, setData]);
 
-    const handleTrackChange = (track) => {
-        setData("track", track);
-        setData("department_id", "");
-        setData("advisor_teacher_id", "");
-        setDepartmentSearch("");
-    };
-
     const handleDepartmentSearchChange = (value) => {
         setDepartmentSearch(value);
 
         const matchedDepartment = findDepartmentFromSearch(
-            filteredDepartmentsByTrack,
+            availableDepartments,
             value,
         );
 
@@ -733,6 +794,7 @@ export default function AddSectionWizardModal({
         }
 
         setData("department_id", "");
+        setData("specialization", "");
         setData("advisor_teacher_id", "");
     };
 
@@ -1090,43 +1152,6 @@ export default function AddSectionWizardModal({
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     <div>
                                         <label className="mb-1.5 block text-sm font-medium text-slate-800">
-                                            Track{" "}
-                                            <span className="text-rose-500">
-                                                *
-                                            </span>
-                                        </label>
-                                        <select
-                                            value={data.track}
-                                            onChange={(event) =>
-                                                handleTrackChange(
-                                                    event.target.value,
-                                                )
-                                            }
-                                            className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
-                                                errors.track
-                                                    ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                                    : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
-                                            }`}
-                                        >
-                                            {TRACK_OPTIONS.map((track) => (
-                                                <option
-                                                    key={track}
-                                                    value={track}
-                                                >
-                                                    {track}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <FieldError message={errors.track} />
-                                        <p className="mt-1 text-xs text-indigo-600">
-                                            {data.track === "TVL"
-                                                ? "All departments are loaded in TVL Track."
-                                                : "All departments are loaded in Acedemic Track."}
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <label className="mb-1.5 block text-sm font-medium text-slate-800">
                                             Department{" "}
                                             <span className="text-rose-500">
                                                 *
@@ -1141,7 +1166,7 @@ export default function AddSectionWizardModal({
                                                     event.target.value,
                                                 )
                                             }
-                                            placeholder={`Type to search ${String(data.track || "").toLowerCase()} departments`}
+                                            placeholder="Type to search departments"
                                             className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
                                                 errors.department_id ||
                                                 departmentSearchMessage
@@ -1150,7 +1175,7 @@ export default function AddSectionWizardModal({
                                             }`}
                                         />
                                         <datalist id="section-department-options">
-                                            {filteredDepartmentsByTrack.map(
+                                            {availableDepartments.map(
                                                 (department) => (
                                                     <option
                                                         key={department.id}
@@ -1210,6 +1235,56 @@ export default function AddSectionWizardModal({
                                         </select>
                                         <FieldError
                                             message={errors.grade_level}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-1.5 block text-sm font-medium text-slate-800">
+                                            Strand/Specialization{" "}
+                                            <span className="text-rose-500">
+                                                *
+                                            </span>
+                                        </label>
+                                        <select
+                                            value={data.specialization}
+                                            onChange={(event) =>
+                                                setData(
+                                                    "specialization",
+                                                    event.target.value,
+                                                )
+                                            }
+                                            disabled={
+                                                !selectedDepartment ||
+                                                specializationOptions.length ===
+                                                    0
+                                            }
+                                            className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+                                                errors.specialization
+                                                    ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
+                                                    : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
+                                            }`}
+                                        >
+                                            <option value="">
+                                                {!selectedDepartment
+                                                    ? "Select department first"
+                                                    : specializationOptions.length ===
+                                                        0
+                                                      ? "No specialization available"
+                                                      : "Select strand/specialization"}
+                                            </option>
+                                            {specializationOptions.map(
+                                                (specialization) => (
+                                                    <option
+                                                        key={specialization}
+                                                        value={specialization}
+                                                    >
+                                                        {specialization}
+                                                    </option>
+                                                ),
+                                            )}
+                                        </select>
+                                        <FieldError
+                                            message={errors.specialization}
                                         />
                                     </div>
 
@@ -1735,10 +1810,10 @@ export default function AddSectionWizardModal({
                                     </div>
                                     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                                         <p className="text-xs text-slate-500">
-                                            Track
+                                            Strand/Specialization
                                         </p>
                                         <p className="mt-1 text-sm font-semibold text-slate-900">
-                                            {data.track || "-"}
+                                            {data.specialization || "-"}
                                         </p>
                                     </div>
                                     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">

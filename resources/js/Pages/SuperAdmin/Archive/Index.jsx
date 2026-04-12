@@ -481,6 +481,9 @@ export default function Index({
                         {row.strand || "-"}
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-700">
+                        {row.semester_label || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
                         {row.classes_count}
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-700">
@@ -610,7 +613,14 @@ export default function Index({
 
     const columnHeaders = () => {
         if (activeTab === "students") {
-            return ["Student", "Grade/Section", "Strand", "Classes", "Average"];
+            return [
+                "Student",
+                "Grade/Section",
+                "Strand",
+                "Semester",
+                "Classes",
+                "Average",
+            ];
         }
 
         if (activeTab === "teachers") {

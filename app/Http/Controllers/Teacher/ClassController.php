@@ -108,9 +108,25 @@ class ClassController extends Controller
     {
         $classesData = $this->ClassesServices->getClassesData($request);
         $departments = Department::query()
+            ->with(['specializations:id,specialization_name'])
             ->where('is_active', true)
             ->orderBy('department_code')
-            ->get(['department_name', 'department_code']);
+            ->get()
+            ->map(fn(Department $department) => [
+                'id' => (int) $department->id,
+                'department_name' => $department->department_name,
+                'department_code' => $department->department_code,
+                'track' => $department->track,
+                'description' => $department->description,
+                'is_active' => (bool) $department->is_active,
+                'specializations' => $department->specializations
+                    ->map(fn($specialization) => [
+                        'id' => (int) $specialization->id,
+                        'specialization_name' => $specialization->specialization_name,
+                    ])
+                    ->values(),
+            ])
+            ->values();
         $availableSubjects = Subject::query()
             ->orderBy('subject_name')
             ->get(['id', 'subject_name', 'subject_code'])
@@ -137,8 +153,8 @@ class ClassController extends Controller
                 'cohort',
             ])
             ->map(function (Section $section) {
-                $specialization = $section->track
-                    ?: ($section->strand ?: $section->department?->department_code);
+                $specialization = $section->strand
+                    ?: $section->department?->department_code;
 
                 return [
                     'id' => (int) $section->id,
@@ -214,6 +230,7 @@ class ClassController extends Controller
             'color' => 'required|string|in:' . implode(',', self::COLOR_OPTIONS),
             'school_year' => ['required', 'string', 'max:255', Rule::in([$currentSchoolYear])],
             'strand' => ['required', 'string', Rule::exists('departments', 'department_code')],
+            'specialization' => 'nullable|string|max:255',
             'track' => 'nullable|string|max:255',
             'classlist' => 'nullable|file|mimes:csv,txt,xls,xlsx|max:4096',
             'manual_students' => 'nullable|array',
@@ -222,8 +239,12 @@ class ClassController extends Controller
 
         $sectionSuffix = strtoupper(trim($data['section']));
         $normalizedStrand = strtoupper(trim($data['strand']));
+        $normalizedSpecialization = $this->normalizeSectionSpecialization(
+            $data['specialization'] ?? null,
+        );
         $sectionCombined = $normalizedStrand . '-' . $sectionSuffix;
         $normalizedSubjectName = preg_replace('/\s+/', ' ', trim((string) $data['subject_name'])) ?? '';
+        $resolvedTrack = $this->resolveTrackFromDepartmentCode($normalizedStrand);
 
         if ($normalizedSubjectName === '') {
             throw ValidationException::withMessages([
@@ -237,7 +258,7 @@ class ClassController extends Controller
             $sectionCombined,
             (string) $data['grade_level'],
             $normalizedStrand,
-            $data['track'] ?? null,
+            $normalizedSpecialization,
         );
 
         // First, find or create the subject
@@ -285,7 +306,7 @@ class ClassController extends Controller
                 'grade_level' => $data['grade_level'],
                 'section' => $sectionCombined,
                 'strand' => $normalizedStrand,
-                'track' => $data['track'] ?? null,
+                'track' => $resolvedTrack,
                 'color' => $data['color'],
                 'school_year' => $currentSchoolYear,
                 'semester' => (string) $currentSemester,
@@ -329,7 +350,8 @@ class ClassController extends Controller
                 'section' => $sectionCombined,
                 'subject_name' => $normalizedSubjectName,
                 'color' => $data['color'],
-                'track' => $data['track'] ?? null,
+                'track' => $resolvedTrack,
+                'specialization' => $normalizedSpecialization,
                 'school_year' => $currentSchoolYear,
                 'semester' => (string) $currentSemester,
                 'duplicate_section' => false,
@@ -350,13 +372,18 @@ class ClassController extends Controller
             'color' => 'required|string|in:' . implode(',', self::COLOR_OPTIONS),
             'school_year' => ['required', 'string', 'max:255', Rule::in([$currentSchoolYear])],
             'strand' => ['required', 'string', Rule::exists('departments', 'department_code')],
+            'specialization' => 'nullable|string|max:255',
             'track' => 'nullable|string|max:255',
         ]);
 
         $sectionSuffix = strtoupper(trim($data['section']));
         $normalizedStrand = strtoupper(trim($data['strand']));
+        $normalizedSpecialization = $this->normalizeSectionSpecialization(
+            $data['specialization'] ?? null,
+        );
         $sectionCombined = $normalizedStrand . '-' . $sectionSuffix;
         $normalizedSubjectName = preg_replace('/\s+/', ' ', trim((string) $data['subject_name'])) ?? '';
+        $resolvedTrack = $this->resolveTrackFromDepartmentCode($normalizedStrand);
 
         if ($normalizedSubjectName === '') {
             throw ValidationException::withMessages([
@@ -370,7 +397,7 @@ class ClassController extends Controller
             $sectionCombined,
             (string) $data['grade_level'],
             $normalizedStrand,
-            $data['track'] ?? null,
+            $normalizedSpecialization,
         );
 
         $subject = Subject::query()
@@ -418,7 +445,7 @@ class ClassController extends Controller
                 'grade_level' => $data['grade_level'],
                 'section' => $sectionCombined,
                 'strand' => $normalizedStrand,
-                'track' => $data['track'] ?? null,
+                'track' => $resolvedTrack,
                 'color' => $data['color'],
                 'school_year' => $currentSchoolYear,
             ]);
@@ -1398,16 +1425,45 @@ class ClassController extends Controller
         ]);
     }
 
+    private function normalizeSectionSpecialization(?string $specialization): string
+    {
+        $normalized = preg_replace('/\s+/', ' ', trim((string) $specialization));
+
+        return strtoupper((string) ($normalized ?? ''));
+    }
+
+    private function resolveTrackFromDepartmentCode(?string $departmentCode): string
+    {
+        $normalizedDepartmentCode = strtoupper(trim((string) $departmentCode));
+
+        if ($normalizedDepartmentCode === '') {
+            return 'academic';
+        }
+
+        $departmentTrack = Department::query()
+            ->whereRaw('UPPER(department_code) = ?', [$normalizedDepartmentCode])
+            ->value('track');
+
+        $normalizedTrack = strtolower(trim((string) $departmentTrack));
+
+        if ($normalizedTrack !== '') {
+            return $normalizedTrack;
+        }
+
+        return $normalizedDepartmentCode === 'ICT' ? 'tvl' : 'academic';
+    }
+
     private function resolveSectionRecordId(
         int $teacherId,
         string $schoolYear,
         string $sectionCombined,
         string $gradeLevel,
-        ?string $strand,
-        ?string $track,
+        ?string $departmentCode,
+        ?string $specialization,
     ): int {
         $normalizedSection = strtoupper(trim($sectionCombined));
-        $normalizedStrand = strtoupper(trim((string) $strand));
+        $normalizedDepartmentCode = strtoupper(trim((string) $departmentCode));
+        $normalizedSpecialization = $this->normalizeSectionSpecialization($specialization);
         $normalizedGradeLevel = satis_normalize_grade_level($gradeLevel);
 
         if ($normalizedGradeLevel === null) {
@@ -1426,14 +1482,14 @@ class ClassController extends Controller
             ]);
         }
 
-        if ($normalizedStrand === '' && str_contains($normalizedSection, '-')) {
-            $normalizedStrand = strtoupper((string) Str::before($normalizedSection, '-'));
+        if ($normalizedDepartmentCode === '' && str_contains($normalizedSection, '-')) {
+            $normalizedDepartmentCode = strtoupper((string) Str::before($normalizedSection, '-'));
         }
 
         $departmentQuery = Department::query();
 
-        if ($normalizedStrand !== '') {
-            $departmentQuery->where('department_code', $normalizedStrand);
+        if ($normalizedDepartmentCode !== '') {
+            $departmentQuery->where('department_code', $normalizedDepartmentCode);
         } else {
             $teacherDepartmentId = User::query()
                 ->whereKey($teacherId)
@@ -1452,6 +1508,10 @@ class ClassController extends Controller
             ]);
         }
 
+        if ($normalizedSpecialization === '') {
+            $normalizedSpecialization = strtoupper((string) $department->department_code);
+        }
+
         $cohort = $this->cohortFromSchoolYear($schoolYear);
 
         $sectionRecord = Section::query()
@@ -1463,11 +1523,11 @@ class ClassController extends Controller
                     ->whereRaw('UPPER(section_name) = ?', [$sectionBaseName])
                     ->orWhereRaw('UPPER(section_code) = ?', [$normalizedSection]);
             })
-            ->when($normalizedStrand !== '', function ($query) use ($normalizedStrand) {
-                $query->where(function ($strandQuery) use ($normalizedStrand) {
+            ->when($normalizedSpecialization !== '', function ($query) use ($normalizedSpecialization) {
+                $query->where(function ($strandQuery) use ($normalizedSpecialization) {
                     $strandQuery
                         ->whereNull('strand')
-                        ->orWhereRaw('UPPER(strand) = ?', [$normalizedStrand]);
+                        ->orWhereRaw('UPPER(strand) = ?', [$normalizedSpecialization]);
                 });
             })
             ->first();
@@ -1485,8 +1545,8 @@ class ClassController extends Controller
             'section_code' => $sectionCode,
             'cohort' => $cohort,
             'grade_level' => $normalizedGradeLevel,
-            'strand' => $normalizedStrand !== '' ? $normalizedStrand : $department->department_code,
-            'track' => satis_normalize_whitespace($track),
+            'strand' => $normalizedSpecialization,
+            'track' => $this->resolveTrackFromDepartmentCode((string) $department->department_code),
             'school_year' => $schoolYear,
             'description' => 'Auto-created from teacher class workflow.',
             'is_active' => true,

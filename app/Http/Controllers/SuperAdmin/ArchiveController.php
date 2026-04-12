@@ -417,9 +417,53 @@ class ArchiveController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        $rows->setCollection($rows->getCollection()->map(function ($row): array {
+        $semesterLabelsByStudent = [];
+
+        if ($semester !== null) {
+            $fixedLabel = $this->semesterLabel($semester);
+
+            foreach ($rows->getCollection() as $row) {
+                $semesterLabelsByStudent[(int) $row->student_user_id] = $fixedLabel;
+            }
+        } else {
+            $studentUserIds = $rows->getCollection()
+                ->pluck('student_user_id')
+                ->map(fn($value): int => (int) $value)
+                ->filter(fn(int $value): bool => $value > 0)
+                ->unique()
+                ->values();
+
+            if ($studentUserIds->isNotEmpty()) {
+                $semesterMap = ArchiveEnrollment::query()
+                    ->where('school_year_archive_id', $archive->id)
+                    ->whereIn('student_user_id', $studentUserIds)
+                    ->with('archiveClass:id,semester')
+                    ->get()
+                    ->groupBy('student_user_id')
+                    ->map(function (Collection $group): string {
+                        $semesters = $group
+                            ->map(fn(ArchiveEnrollment $enrollment): ?int => $enrollment->archiveClass?->semester)
+                            ->filter(fn($value): bool => in_array((int) $value, [1, 2], true))
+                            ->map(fn($value): int => (int) $value)
+                            ->unique()
+                            ->sort()
+                            ->values()
+                            ->all();
+
+                        return $this->semesterListLabel($semesters);
+                    });
+
+                $semesterLabelsByStudent = $semesterMap
+                    ->mapWithKeys(fn(string $label, $studentUserId): array => [(int) $studentUserId => $label])
+                    ->all();
+            }
+        }
+
+        $rows->setCollection($rows->getCollection()->map(function ($row) use ($semesterLabelsByStudent): array {
+            $studentUserId = (int) $row->student_user_id;
+
             return [
-                'student_user_id' => $row->student_user_id,
+                'student_user_id' => $studentUserId,
                 'student_name' => $row->student_name,
                 'student_username' => $row->student_username,
                 'student_lrn' => $row->student_lrn,
@@ -427,6 +471,7 @@ class ArchiveController extends Controller
                 'section_name' => $row->section_name,
                 'strand' => $row->strand,
                 'track' => $row->track,
+                'semester_label' => $semesterLabelsByStudent[$studentUserId] ?? '-',
                 'classes_count' => (int) $row->classes_count,
                 'average_grade' => $row->average_grade !== null ? (int) round((float) $row->average_grade) : null,
             ];
@@ -868,6 +913,43 @@ class ArchiveController extends Controller
         });
 
         return array_values($normalized);
+    }
+
+    private function semesterLabel(?int $semester): string
+    {
+        return match ((int) $semester) {
+            1 => '1st Semester',
+            2 => '2nd Semester',
+            default => '-',
+        };
+    }
+
+    /**
+     * @param array<int, int> $semesters
+     */
+    private function semesterListLabel(array $semesters): string
+    {
+        $normalized = collect($semesters)
+            ->map(fn($value): int => (int) $value)
+            ->filter(fn(int $value): bool => in_array($value, [1, 2], true))
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        if ($normalized === [1, 2]) {
+            return '1st Semester & 2nd Semester';
+        }
+
+        if ($normalized === [1]) {
+            return '1st Semester';
+        }
+
+        if ($normalized === [2]) {
+            return '2nd Semester';
+        }
+
+        return '-';
     }
 
     private function buildArchiveClassDetailsResponse(ArchiveClass $archiveClass, int $archiveId): JsonResponse

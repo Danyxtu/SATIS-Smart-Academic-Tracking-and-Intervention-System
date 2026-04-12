@@ -1,9 +1,13 @@
 import {
-    CheckCircle2,
+    BookOpen,
+    ClipboardList,
+    Check,
     ChevronLeft,
     ChevronRight,
     FileText,
+    Palette,
     Plus,
+    Save,
     Trash2,
     Upload,
     Users,
@@ -66,9 +70,11 @@ const normalizeGradeLevel = (value) => {
 };
 
 const WIZARD_STEPS = [
-    { id: 1, title: "Subject" },
-    { id: 2, title: "Section and Students" },
-    { id: 3, title: "Color and Save" },
+    { id: 1, title: "Subject", icon: BookOpen },
+    { id: 2, title: "Sections", icon: Users },
+    { id: 3, title: "Students", icon: Users },
+    { id: 4, title: "Color", icon: Palette },
+    { id: 5, title: "Review and Save", icon: ClipboardList },
 ];
 
 const parseSectionSuffix = (sectionValue, strandValue) => {
@@ -99,6 +105,13 @@ const sanitizeSectionName = (value) =>
         .replace(/[^A-Z]/g, "")
         .trim();
 
+const sanitizeSpecialization = (value) =>
+    String(value ?? "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9\s-]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
 const normalizeSearchValue = (value) =>
     String(value ?? "")
         .toLowerCase()
@@ -115,30 +128,49 @@ const buildSectionFullLabel = (gradeLevel, specialization, sectionName) => {
     return parts.join(" - ");
 };
 
+const DEFAULT_STUDENT_DRAFT = {
+    student_name: "",
+    lrn: "",
+    personal_email: "",
+};
+
+const createSectionWorkflowState = (color = "indigo") => ({
+    manualStudents: [],
+    studentDraft: { ...DEFAULT_STUDENT_DRAFT },
+    studentDraftError: "",
+    bulkRows: "",
+    bulkErrors: [],
+    classlist: null,
+    color,
+    studentsDone: false,
+    colorDone: false,
+    reviewDone: false,
+});
+
 const StepBadge = ({ step, currentStep }) => {
+    const Icon = step.icon;
     const isActive = currentStep === step.id;
     const isDone = currentStep > step.id;
 
     return (
-        <div className="flex items-center gap-2">
-            <div
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
-                    isDone
-                        ? "bg-emerald-600 text-white"
-                        : isActive
-                          ? "bg-indigo-600 text-white"
-                          : "bg-gray-200 text-gray-600"
-                }`}
-            >
-                {isDone ? <CheckCircle2 size={13} /> : step.id}
-            </div>
+        <div
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                isActive
+                    ? "bg-blue-100 text-blue-700"
+                    : isDone
+                      ? "bg-blue-50 text-blue-700"
+                      : "bg-slate-50 text-slate-400"
+            }`}
+        >
             <span
-                className={`text-xs font-semibold ${
-                    isActive ? "text-indigo-700" : "text-gray-500"
+                className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${
+                    isDone ? "bg-blue-600 text-white" : "bg-white"
                 }`}
             >
-                {step.title}
+                {isDone ? <Check size={10} /> : step.id}
             </span>
+            <Icon size={12} />
+            <span>{step.title}</span>
         </div>
     );
 };
@@ -163,16 +195,18 @@ const AddNewClassModal = ({
     const [selectedExistingSectionId, setSelectedExistingSectionId] =
         useState(null);
     const [existingSectionQuery, setExistingSectionQuery] = useState("");
-    const [isStepThreeSubmitReady, setIsStepThreeSubmitReady] = useState(false);
     const [manualStudents, setManualStudents] = useState([]);
     const [studentDraft, setStudentDraft] = useState({
-        student_name: "",
-        lrn: "",
-        personal_email: "",
+        ...DEFAULT_STUDENT_DRAFT,
     });
     const [studentDraftError, setStudentDraftError] = useState("");
     const [bulkRows, setBulkRows] = useState("");
     const [bulkErrors, setBulkErrors] = useState([]);
+    const [sectionQueue, setSectionQueue] = useState([]);
+    const [activeQueueSectionKey, setActiveQueueSectionKey] = useState(null);
+    const [sectionWorkflowMap, setSectionWorkflowMap] = useState({});
+    const [studentInputMode, setStudentInputMode] = useState("single");
+    const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
     const submitLockRef = useRef(false);
 
     const {
@@ -180,6 +214,7 @@ const AddNewClassModal = ({
         setData,
         post,
         put,
+        transform,
         processing,
         errors,
         reset,
@@ -195,7 +230,7 @@ const AddNewClassModal = ({
         color: classData?.color ?? "indigo",
         school_year: classData?.school_year ?? defaultSchoolYear,
         strand: classData?.strand ?? "",
-        track: classData?.track ?? "",
+        specialization: sanitizeSpecialization(classData?.specialization ?? ""),
         classlist: null,
         manual_students: [],
     });
@@ -203,12 +238,29 @@ const AddNewClassModal = ({
     const departmentOptions = useMemo(() => {
         return departments
             .map((department) => ({
+                id: department?.id,
                 department_code: normalizeDepartmentCode(
                     department?.department_code,
                 ),
                 department_name: String(
                     department?.department_name ?? "",
                 ).trim(),
+                track: String(department?.track ?? "")
+                    .trim()
+                    .toLowerCase(),
+                description: String(department?.description ?? "").trim(),
+                specializations: Array.isArray(department?.specializations)
+                    ? department.specializations
+                          .map((item) =>
+                              sanitizeSpecialization(
+                                  item?.specialization_name ?? item,
+                              ),
+                          )
+                          .filter(
+                              (value, index, arr) =>
+                                  value !== "" && arr.indexOf(value) === index,
+                          )
+                    : [],
             }))
             .filter((department) => department.department_code);
     }, [departments]);
@@ -225,7 +277,7 @@ const AddNewClassModal = ({
         return availableSections
             .map((section, index) => {
                 const strand = normalizeDepartmentCode(
-                    section?.strand ?? section?.department_code,
+                    section?.department_code ?? section?.strand,
                 );
                 const sectionSource =
                     section?.section_name ??
@@ -236,15 +288,13 @@ const AddNewClassModal = ({
                     parseSectionSuffix(sectionSource, strand),
                 );
                 const gradeLevel = normalizeGradeLevel(section?.grade_level);
-                const track = String(section?.track ?? "").trim();
                 const specialization =
                     [
                         section?.specialization,
-                        track,
                         section?.strand,
                         section?.department_code,
                     ]
-                        .map((value) => String(value ?? "").trim())
+                        .map((value) => sanitizeSpecialization(value))
                         .find((value) => value !== "") ?? "";
                 const sectionFullLabel = String(
                     section?.section_full_label ??
@@ -261,7 +311,6 @@ const AddNewClassModal = ({
                     strand,
                     section: sectionName,
                     grade_level: gradeLevel,
-                    track,
                     specialization,
                     section_label:
                         sectionFullLabel ||
@@ -291,17 +340,15 @@ const AddNewClassModal = ({
         const query = normalizeSearchValue(data.strand);
 
         if (!query) {
-            return departmentOptions.slice(0, 20);
+            return departmentOptions;
         }
 
-        return departmentOptions
-            .filter((department) => {
-                const code = normalizeSearchValue(department.department_code);
-                const name = normalizeSearchValue(department.department_name);
+        return departmentOptions.filter((department) => {
+            const code = normalizeSearchValue(department.department_code);
+            const name = normalizeSearchValue(department.department_name);
 
-                return code.includes(query) || name.includes(query);
-            })
-            .slice(0, 20);
+            return code.includes(query) || name.includes(query);
+        });
     }, [data.strand, departmentOptions]);
 
     const selectedDepartment = useMemo(
@@ -311,6 +358,18 @@ const AddNewClassModal = ({
             ) ?? null,
         [departmentOptions, normalizedStrand],
     );
+
+    const specializationOptions = useMemo(() => {
+        if (!selectedDepartment) {
+            return [];
+        }
+
+        if (selectedDepartment.specializations.length > 0) {
+            return selectedDepartment.specializations;
+        }
+
+        return [selectedDepartment.department_code];
+    }, [selectedDepartment]);
 
     const filteredExistingSections = useMemo(() => {
         const query = normalizeSearchValue(existingSectionQuery);
@@ -332,7 +391,6 @@ const AddNewClassModal = ({
                 );
                 const gradeLevel = normalizeSearchValue(section.grade_level);
                 const sectionName = normalizeSearchValue(section.section);
-                const track = normalizeSearchValue(section.track);
                 const specialization = normalizeSearchValue(
                     section.specialization,
                 );
@@ -341,7 +399,6 @@ const AddNewClassModal = ({
                     sectionLabel.includes(query) ||
                     gradeLevel.includes(query) ||
                     sectionName.includes(query) ||
-                    track.includes(query) ||
                     specialization.includes(query)
                 );
             })
@@ -358,6 +415,10 @@ const AddNewClassModal = ({
     }, [data.subject_name, data.school_year]);
 
     const canContinueStepTwo = useMemo(() => {
+        if (!isEditMode) {
+            return sectionQueue.length > 0;
+        }
+
         const hasBasicSectionDetails =
             data.grade_level && data.section && hasValidStrand;
 
@@ -365,14 +426,80 @@ const AddNewClassModal = ({
             return Boolean(selectedExistingSectionId && hasBasicSectionDetails);
         }
 
-        return Boolean(hasBasicSectionDetails);
+        return Boolean(hasBasicSectionDetails && data.specialization);
     }, [
+        isEditMode,
+        sectionQueue.length,
         data.grade_level,
         data.section,
+        data.specialization,
         hasValidStrand,
         sectionMode,
         selectedExistingSectionId,
     ]);
+
+    const activeQueuedSection = useMemo(
+        () =>
+            sectionQueue.find(
+                (section) => section.queueKey === activeQueueSectionKey,
+            ) ?? null,
+        [sectionQueue, activeQueueSectionKey],
+    );
+
+    const activeSectionWorkflow = useMemo(() => {
+        if (!activeQueuedSection) {
+            return null;
+        }
+
+        return (
+            sectionWorkflowMap[activeQueuedSection.queueKey] ??
+            createSectionWorkflowState(data.color)
+        );
+    }, [activeQueuedSection, sectionWorkflowMap, data.color]);
+
+    const areAllSectionsStudentsDone = useMemo(() => {
+        return (
+            sectionQueue.length > 0 &&
+            sectionQueue.every(
+                (section) => sectionWorkflowMap[section.queueKey]?.studentsDone,
+            )
+        );
+    }, [sectionQueue, sectionWorkflowMap]);
+
+    const areAllSectionsColorDone = useMemo(() => {
+        return (
+            sectionQueue.length > 0 &&
+            sectionQueue.every(
+                (section) => sectionWorkflowMap[section.queueKey]?.colorDone,
+            )
+        );
+    }, [sectionQueue, sectionWorkflowMap]);
+
+    const areAllSectionsReviewDone = useMemo(() => {
+        return (
+            sectionQueue.length > 0 &&
+            sectionQueue.every(
+                (section) => sectionWorkflowMap[section.queueKey]?.reviewDone,
+            )
+        );
+    }, [sectionQueue, sectionWorkflowMap]);
+
+    const sortedActiveQueuedStudents = useMemo(() => {
+        if (!activeSectionWorkflow) {
+            return [];
+        }
+
+        return [...activeSectionWorkflow.manualStudents].sort((a, b) => {
+            const nameA = normalizeSearchValue(a.student_name);
+            const nameB = normalizeSearchValue(b.student_name);
+
+            if (nameA === nameB) {
+                return String(a.lrn ?? "").localeCompare(String(b.lrn ?? ""));
+            }
+
+            return nameA.localeCompare(nameB);
+        });
+    }, [activeSectionWorkflow]);
 
     const combinedSectionValue = useMemo(() => {
         const sectionSuffix = sanitizeSectionName(data.section);
@@ -500,6 +627,45 @@ const AddNewClassModal = ({
             .slice(0, 50);
     }, [subjectOptions, data.subject_name]);
 
+    const activeStudentDraft =
+        activeSectionWorkflow?.studentDraft ?? DEFAULT_STUDENT_DRAFT;
+    const activeStudentDraftError =
+        activeSectionWorkflow?.studentDraftError ?? "";
+    const activeBulkRows = activeSectionWorkflow?.bulkRows ?? "";
+    const activeBulkErrors = activeSectionWorkflow?.bulkErrors ?? [];
+    const activeClasslist = activeSectionWorkflow?.classlist ?? null;
+    const activeSectionColorName = activeSectionWorkflow?.color ?? data.color;
+    const activeQueuedStudents = activeSectionWorkflow?.manualStudents ?? [];
+    const canMarkStudentsDone =
+        Boolean(activeQueuedSection) &&
+        (activeQueuedStudents.length > 0 || Boolean(activeClasslist));
+    const canMarkColorDone =
+        Boolean(activeQueuedSection) && Boolean(activeSectionColorName);
+
+    const canContinueStepThree = useMemo(() => {
+        if (isEditMode) {
+            return true;
+        }
+
+        return areAllSectionsStudentsDone;
+    }, [isEditMode, areAllSectionsStudentsDone]);
+
+    const canContinueStepFour = useMemo(() => {
+        if (isEditMode) {
+            return true;
+        }
+
+        return areAllSectionsColorDone;
+    }, [isEditMode, areAllSectionsColorDone]);
+
+    const canSubmitStepFive = useMemo(() => {
+        if (isEditMode) {
+            return true;
+        }
+
+        return areAllSectionsReviewDone;
+    }, [isEditMode, areAllSectionsReviewDone]);
+
     const resetWizardState = () => {
         setStep(1);
         setIsSubjectMenuOpen(false);
@@ -507,16 +673,16 @@ const AddNewClassModal = ({
         setSectionMode("existing");
         setSelectedExistingSectionId(null);
         setExistingSectionQuery("");
-        setIsStepThreeSubmitReady(false);
         setManualStudents([]);
-        setStudentDraft({
-            student_name: "",
-            lrn: "",
-            personal_email: "",
-        });
+        setStudentDraft({ ...DEFAULT_STUDENT_DRAFT });
         setStudentDraftError("");
         setBulkRows("");
         setBulkErrors([]);
+        setSectionQueue([]);
+        setActiveQueueSectionKey(null);
+        setSectionWorkflowMap({});
+        setStudentInputMode("single");
+        setIsSummaryModalOpen(false);
     };
 
     useEffect(() => {
@@ -534,7 +700,9 @@ const AddNewClassModal = ({
                 color: classData?.color ?? "indigo",
                 school_year: classData?.school_year ?? defaultSchoolYear,
                 strand: normalizeDepartmentCode(classData?.strand),
-                track: classData?.track ?? "",
+                specialization: sanitizeSpecialization(
+                    classData?.specialization ?? "",
+                ),
                 classlist: null,
                 manual_students: [],
             });
@@ -552,7 +720,7 @@ const AddNewClassModal = ({
             color: "indigo",
             school_year: defaultSchoolYear,
             strand: "",
-            track: "",
+            specialization: "",
             classlist: null,
             manual_students: [],
         });
@@ -563,26 +731,6 @@ const AddNewClassModal = ({
             setData("classlist", initialFile);
         }
     }, [initialFile, isEditMode]);
-
-    useEffect(() => {
-        if (isEditMode) {
-            setIsStepThreeSubmitReady(true);
-            return;
-        }
-
-        if (step !== 3) {
-            setIsStepThreeSubmitReady(false);
-            return;
-        }
-
-        const animationFrameId = window.requestAnimationFrame(() => {
-            setIsStepThreeSubmitReady(true);
-        });
-
-        return () => {
-            window.cancelAnimationFrame(animationFrameId);
-        };
-    }, [isEditMode, step]);
 
     useEffect(() => {
         if (sectionMode !== "existing" || !selectedExistingSectionId) {
@@ -607,8 +755,90 @@ const AddNewClassModal = ({
     ]);
 
     useEffect(() => {
-        setData("manual_students", manualStudents);
-    }, [manualStudents, setData]);
+        if (sectionMode !== "manual") {
+            return;
+        }
+
+        const normalizedSpecialization = sanitizeSpecialization(
+            data.specialization,
+        );
+
+        if (!selectedDepartment) {
+            if (normalizedSpecialization !== "") {
+                setData("specialization", "");
+            }
+            return;
+        }
+
+        if (specializationOptions.includes(normalizedSpecialization)) {
+            return;
+        }
+
+        if (specializationOptions.length === 1) {
+            setData("specialization", specializationOptions[0]);
+            return;
+        }
+
+        if (normalizedSpecialization !== "") {
+            setData("specialization", "");
+        }
+    }, [
+        sectionMode,
+        selectedDepartment,
+        specializationOptions,
+        data.specialization,
+        setData,
+    ]);
+
+    useEffect(() => {
+        if (isEditMode) {
+            setData("manual_students", manualStudents);
+        }
+    }, [isEditMode, manualStudents, setData]);
+
+    useEffect(() => {
+        if (isEditMode || sectionQueue.length === 0 || activeQueueSectionKey) {
+            return;
+        }
+
+        setActiveQueueSectionKey(sectionQueue[0].queueKey);
+    }, [isEditMode, sectionQueue, activeQueueSectionKey]);
+
+    useEffect(() => {
+        if (isEditMode || !activeQueuedSection) {
+            return;
+        }
+
+        const workflow =
+            sectionWorkflowMap[activeQueuedSection.queueKey] ??
+            createSectionWorkflowState(data.color);
+
+        setData("strand", activeQueuedSection.strand);
+        setData("grade_level", activeQueuedSection.grade_level);
+        setData("section", activeQueuedSection.section);
+        setData("specialization", activeQueuedSection.specialization ?? "");
+        setData("color", workflow.color);
+    }, [
+        isEditMode,
+        activeQueuedSection,
+        sectionWorkflowMap,
+        data.color,
+        setData,
+    ]);
+
+    useEffect(() => {
+        if (isEditMode) {
+            setIsSummaryModalOpen(false);
+            return;
+        }
+
+        if (step === 5) {
+            setIsSummaryModalOpen(true);
+            return;
+        }
+
+        setIsSummaryModalOpen(false);
+    }, [isEditMode, step]);
 
     const handleClose = () => {
         submitLockRef.current = false;
@@ -624,7 +854,7 @@ const AddNewClassModal = ({
                 color: "indigo",
                 school_year: defaultSchoolYear,
                 strand: "",
-                track: "",
+                specialization: "",
                 classlist: null,
                 manual_students: [],
             });
@@ -655,6 +885,11 @@ const AddNewClassModal = ({
             return;
         }
 
+        if (name === "specialization") {
+            setData("specialization", sanitizeSpecialization(value));
+            return;
+        }
+
         setData(name, value);
     };
 
@@ -670,8 +905,13 @@ const AddNewClassModal = ({
 
         setData("strand", normalizedCode);
         setIsDepartmentMenuOpen(false);
+        setExistingSectionQuery("");
 
-        if (sectionMode === "existing") {
+        if (sectionMode === "manual") {
+            setData("specialization", "");
+        }
+
+        if (isEditMode && sectionMode === "existing") {
             setSelectedExistingSectionId(null);
             setData("grade_level", "");
             setData("section", "");
@@ -684,33 +924,357 @@ const AddNewClassModal = ({
 
         if (mode === "manual") {
             setSelectedExistingSectionId(null);
-            setData("grade_level", "");
-            setData("section", "");
+            if (isEditMode) {
+                setData("grade_level", "");
+                setData("section", "");
+            }
             return;
         }
 
-        setData("grade_level", "");
+        if (isEditMode) {
+            setData("grade_level", "");
+            setData("section", "");
+        }
+    };
+
+    const ensureSectionWorkflowEntry = (queueKey, color = data.color) => {
+        setSectionWorkflowMap((prev) => {
+            if (prev[queueKey]) {
+                return prev;
+            }
+
+            return {
+                ...prev,
+                [queueKey]: createSectionWorkflowState(color),
+            };
+        });
+    };
+
+    const updateSectionWorkflow = (queueKey, updater) => {
+        setSectionWorkflowMap((prev) => {
+            const current =
+                prev[queueKey] ?? createSectionWorkflowState(data.color);
+            const nextValue =
+                typeof updater === "function"
+                    ? updater(current)
+                    : {
+                          ...current,
+                          ...updater,
+                      };
+
+            return {
+                ...prev,
+                [queueKey]: nextValue,
+            };
+        });
+    };
+
+    const syncQueueSectionToForm = (queueSection) => {
+        setData("strand", queueSection.strand);
+        setData("grade_level", queueSection.grade_level);
+        setData("section", queueSection.section);
+        setData("specialization", queueSection.specialization ?? "");
+
+        const workflow = sectionWorkflowMap[queueSection.queueKey];
+        if (workflow?.color) {
+            setData("color", workflow.color);
+        }
+    };
+
+    const getSectionQueueKey = (section) => {
+        return (
+            section.queueKey ??
+            `${section.strand}-${section.grade_level}-${section.specialization ?? ""}-${section.section}`
+        );
+    };
+
+    const addSectionToQueue = (section) => {
+        const queueKey = getSectionQueueKey(section);
+
+        if (sectionQueue.some((item) => item.queueKey === queueKey)) {
+            setError("section_queue", "Section is already in the queue.");
+            return;
+        }
+
+        const queuedSection = {
+            ...section,
+            queueKey,
+        };
+
+        clearErrors("section_queue");
+        setSectionQueue((prev) => [...prev, queuedSection]);
+        setActiveQueueSectionKey(queueKey);
+        syncQueueSectionToForm(queuedSection);
+        ensureSectionWorkflowEntry(queueKey, data.color);
+    };
+
+    const addManualSectionToQueue = () => {
+        clearErrors("section_queue");
+
+        const gradeLevel = normalizeGradeLevel(data.grade_level);
+        const sectionName = sanitizeSectionName(data.section);
+
+        if (!hasValidStrand) {
+            setError(
+                "section_queue",
+                "Select a valid department code before queuing sections.",
+            );
+            return;
+        }
+
+        if (!gradeLevel || !sectionName) {
+            setError(
+                "section_queue",
+                "Grade level and section name are required before adding a section card.",
+            );
+            return;
+        }
+
+        const specialization = sanitizeSpecialization(data.specialization);
+
+        if (!specialization) {
+            setError(
+                "section_queue",
+                "Strand/Specialization is required before adding a section card.",
+            );
+            return;
+        }
+
+        const sectionLabel = buildSectionFullLabel(
+            gradeLevel,
+            specialization,
+            sectionName,
+        );
+
+        addSectionToQueue({
+            id: `manual-${normalizedStrand}-${gradeLevel}-${specialization}-${sectionName}`,
+            key: `manual-${normalizedStrand}-${gradeLevel}-${specialization}-${sectionName}`,
+            strand: normalizedStrand,
+            section: sectionName,
+            grade_level: gradeLevel,
+            specialization,
+            section_label: sectionLabel,
+            section_full_label: sectionLabel,
+        });
+
         setData("section", "");
     };
 
+    const removeQueuedSection = (queueKey) => {
+        setSectionQueue((prev) => {
+            const targetIndex = prev.findIndex(
+                (section) => section.queueKey === queueKey,
+            );
+
+            if (targetIndex < 0) {
+                return prev;
+            }
+
+            const next = prev.filter(
+                (section) => section.queueKey !== queueKey,
+            );
+
+            if (next.length === 0) {
+                setActiveQueueSectionKey(null);
+                setData("grade_level", "");
+                setData("section", "");
+                return next;
+            }
+
+            if (activeQueueSectionKey === queueKey) {
+                const fallback = next[targetIndex] ?? next[targetIndex - 1];
+
+                if (fallback) {
+                    setActiveQueueSectionKey(fallback.queueKey);
+                    syncQueueSectionToForm(fallback);
+                }
+            }
+
+            return next;
+        });
+
+        setSectionWorkflowMap((prev) => {
+            if (!prev[queueKey]) {
+                return prev;
+            }
+
+            const next = { ...prev };
+            delete next[queueKey];
+            return next;
+        });
+    };
+
+    const getDoneFieldForStep = (currentStep) => {
+        if (currentStep === 3) return "studentsDone";
+        if (currentStep === 4) return "colorDone";
+        if (currentStep === 5) return "reviewDone";
+        return null;
+    };
+
+    const isQueueSectionLocked = (queueSection, currentStep = step) => {
+        const doneField = getDoneFieldForStep(currentStep);
+
+        if (!doneField) {
+            return false;
+        }
+
+        const sectionIndex = sectionQueue.findIndex(
+            (item) => item.queueKey === queueSection.queueKey,
+        );
+
+        if (sectionIndex <= 0) {
+            return false;
+        }
+
+        return sectionQueue
+            .slice(0, sectionIndex)
+            .some((item) => !sectionWorkflowMap[item.queueKey]?.[doneField]);
+    };
+
+    const selectQueuedSectionCard = (queueSection) => {
+        if (isQueueSectionLocked(queueSection)) {
+            return;
+        }
+
+        setActiveQueueSectionKey(queueSection.queueKey);
+        syncQueueSectionToForm(queueSection);
+    };
+
+    const markActiveSectionDone = (doneField) => {
+        if (!activeQueuedSection) {
+            return;
+        }
+
+        const activeKey = activeQueuedSection.queueKey;
+
+        setSectionWorkflowMap((prev) => {
+            const current =
+                prev[activeKey] ?? createSectionWorkflowState(data.color);
+            const nextState = {
+                ...prev,
+                [activeKey]: {
+                    ...current,
+                    [doneField]: true,
+                },
+            };
+
+            const currentIndex = sectionQueue.findIndex(
+                (section) => section.queueKey === activeKey,
+            );
+
+            for (let i = currentIndex + 1; i < sectionQueue.length; i += 1) {
+                const canOpen = sectionQueue
+                    .slice(0, i)
+                    .every(
+                        (section) => nextState[section.queueKey]?.[doneField],
+                    );
+
+                if (canOpen) {
+                    const nextSection = sectionQueue[i];
+
+                    window.requestAnimationFrame(() => {
+                        setActiveQueueSectionKey(nextSection.queueKey);
+                        syncQueueSectionToForm(nextSection);
+                    });
+                    break;
+                }
+            }
+
+            return nextState;
+        });
+    };
+
     const handleExistingSectionSelect = (section) => {
+        if (!isEditMode) {
+            setSelectedExistingSectionId(section.id);
+            addSectionToQueue(section);
+            return;
+        }
+
         clearErrors("class_duplicate");
         setSectionMode("existing");
         setSelectedExistingSectionId(section.id);
         setData("strand", section.strand);
         setData("grade_level", section.grade_level);
         setData("section", section.section);
-
-        if (!data.track && section.track) {
-            setData("track", section.track);
-        }
+        setData("specialization", section.specialization ?? "");
     };
 
     const handleFileChange = (file) => {
+        if (!isEditMode && activeQueuedSection) {
+            updateSectionWorkflow(activeQueuedSection.queueKey, {
+                classlist: file || null,
+                studentsDone: false,
+                reviewDone: false,
+            });
+            return;
+        }
+
         setData("classlist", file || null);
     };
 
     const addSingleStudent = () => {
+        if (!isEditMode) {
+            if (!activeQueuedSection || !activeSectionWorkflow) {
+                setError(
+                    "section_queue",
+                    "Select a section card first before adding students.",
+                );
+                return;
+            }
+
+            const draft = activeSectionWorkflow.studentDraft;
+            const name = String(draft.student_name ?? "")
+                .replace(/\s+/g, " ")
+                .trim();
+            const lrn = sanitizeLrn(draft.lrn);
+            const personalEmail = String(draft.personal_email ?? "")
+                .trim()
+                .toLowerCase();
+
+            if (!name || !lrn) {
+                updateSectionWorkflow(activeQueuedSection.queueKey, {
+                    studentDraftError: "Student name and LRN are required.",
+                });
+                return;
+            }
+
+            if (lrn.length !== 12) {
+                updateSectionWorkflow(activeQueuedSection.queueKey, {
+                    studentDraftError: "LRN must be exactly 12 digits.",
+                });
+                return;
+            }
+
+            if (
+                activeSectionWorkflow.manualStudents.some(
+                    (student) => student.lrn === lrn,
+                )
+            ) {
+                updateSectionWorkflow(activeQueuedSection.queueKey, {
+                    studentDraftError: "This LRN is already in the queue.",
+                });
+                return;
+            }
+
+            updateSectionWorkflow(activeQueuedSection.queueKey, (current) => ({
+                ...current,
+                studentsDone: false,
+                reviewDone: false,
+                studentDraftError: "",
+                studentDraft: { ...DEFAULT_STUDENT_DRAFT },
+                manualStudents: [
+                    ...current.manualStudents,
+                    {
+                        student_name: name,
+                        lrn,
+                        personal_email: personalEmail || null,
+                    },
+                ],
+            }));
+            return;
+        }
+
         const name = String(studentDraft.student_name ?? "")
             .replace(/\s+/g, " ")
             .trim();
@@ -752,6 +1316,92 @@ const AddNewClassModal = ({
     };
 
     const addBulkStudents = () => {
+        if (!isEditMode) {
+            if (!activeQueuedSection || !activeSectionWorkflow) {
+                setError(
+                    "section_queue",
+                    "Select a section card first before bulk queueing students.",
+                );
+                return;
+            }
+
+            const lines = activeSectionWorkflow.bulkRows
+                .split("\n")
+                .map((line) => line.trim())
+                .filter((line) => line !== "");
+
+            if (lines.length === 0) {
+                updateSectionWorkflow(activeQueuedSection.queueKey, {
+                    bulkErrors: ["Paste at least one line before bulk queue."],
+                });
+                return;
+            }
+
+            const errorsFromBulk = [];
+            const seenLrns = new Set(
+                activeSectionWorkflow.manualStudents.map(
+                    (student) => student.lrn,
+                ),
+            );
+            const queued = [];
+
+            lines.forEach((line, lineIndex) => {
+                const parts = line.split(",").map((item) => item.trim());
+
+                if (parts.length < 2) {
+                    errorsFromBulk.push(
+                        `Line ${lineIndex + 1}: Use student_name,lrn,email(optional).`,
+                    );
+                    return;
+                }
+
+                const name = parts[0]?.replace(/\s+/g, " ").trim();
+                const lrn = sanitizeLrn(parts[1]);
+                const personalEmail = (parts[2] ?? "").trim().toLowerCase();
+
+                if (!name || !lrn) {
+                    errorsFromBulk.push(
+                        `Line ${lineIndex + 1}: Missing student name or LRN.`,
+                    );
+                    return;
+                }
+
+                if (lrn.length !== 12) {
+                    errorsFromBulk.push(
+                        `Line ${lineIndex + 1}: LRN must be exactly 12 digits.`,
+                    );
+                    return;
+                }
+
+                if (seenLrns.has(lrn)) {
+                    errorsFromBulk.push(
+                        `Line ${lineIndex + 1}: Duplicate LRN ${lrn} skipped.`,
+                    );
+                    return;
+                }
+
+                seenLrns.add(lrn);
+                queued.push({
+                    student_name: name,
+                    lrn,
+                    personal_email: personalEmail || null,
+                });
+            });
+
+            updateSectionWorkflow(activeQueuedSection.queueKey, (current) => ({
+                ...current,
+                studentsDone: false,
+                reviewDone: false,
+                bulkErrors: errorsFromBulk,
+                bulkRows: queued.length > 0 ? "" : current.bulkRows,
+                manualStudents:
+                    queued.length > 0
+                        ? [...current.manualStudents, ...queued]
+                        : current.manualStudents,
+            }));
+            return;
+        }
+
         const lines = bulkRows
             .split("\n")
             .map((line) => line.trim())
@@ -818,7 +1468,273 @@ const AddNewClassModal = ({
     };
 
     const removeQueuedStudent = (index) => {
+        if (!isEditMode && activeQueuedSection) {
+            updateSectionWorkflow(activeQueuedSection.queueKey, (current) => ({
+                ...current,
+                studentsDone: false,
+                reviewDone: false,
+                manualStudents: current.manualStudents.filter(
+                    (_, itemIndex) => itemIndex !== index,
+                ),
+            }));
+            return;
+        }
+
         setManualStudents((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    const handleActiveStudentDraftChange = (field, value) => {
+        if (!activeQueuedSection) {
+            return;
+        }
+
+        updateSectionWorkflow(activeQueuedSection.queueKey, (current) => ({
+            ...current,
+            studentDraftError: "",
+            studentDraft: {
+                ...current.studentDraft,
+                [field]: field === "lrn" ? sanitizeLrn(value) : value,
+            },
+        }));
+    };
+
+    const handleActiveBulkRowsChange = (value) => {
+        if (!activeQueuedSection) {
+            return;
+        }
+
+        updateSectionWorkflow(activeQueuedSection.queueKey, (current) => ({
+            ...current,
+            bulkRows: value,
+            bulkErrors: [],
+        }));
+    };
+
+    const handleActiveSectionColorSelect = (colorName) => {
+        if (!activeQueuedSection) {
+            return;
+        }
+
+        updateSectionWorkflow(activeQueuedSection.queueKey, (current) => ({
+            ...current,
+            color: colorName,
+            colorDone: false,
+            reviewDone: false,
+        }));
+        setData("color", colorName);
+    };
+
+    const getQueueSectionWorkflow = (queueSection) => {
+        if (!queueSection) {
+            return createSectionWorkflowState(data.color);
+        }
+
+        return (
+            sectionWorkflowMap[queueSection.queueKey] ??
+            createSectionWorkflowState(data.color)
+        );
+    };
+
+    const renderSectionCardList = (
+        doneField,
+        lockStep = null,
+        showRemoveButton = false,
+    ) => {
+        if (sectionQueue.length === 0) {
+            return (
+                <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-6 text-center text-sm text-gray-500">
+                    No sections queued yet.
+                </div>
+            );
+        }
+
+        return (
+            <div className="space-y-2">
+                {sectionQueue.map((queueSection, index) => {
+                    const workflow = getQueueSectionWorkflow(queueSection);
+                    const isDone = doneField
+                        ? Boolean(workflow[doneField])
+                        : false;
+                    const isLocked =
+                        lockStep === null
+                            ? false
+                            : isQueueSectionLocked(queueSection, lockStep);
+                    const isActive =
+                        activeQueueSectionKey === queueSection.queueKey;
+
+                    return (
+                        <div key={queueSection.queueKey} className="relative">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    selectQueuedSectionCard(queueSection)
+                                }
+                                disabled={isLocked}
+                                className={`w-full rounded-xl border px-3 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-70 ${
+                                    isActive
+                                        ? "border-indigo-500 bg-indigo-50"
+                                        : "border-gray-200 bg-white hover:border-indigo-300"
+                                }`}
+                            >
+                                <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-800">
+                                            {queueSection.section_full_label ||
+                                                queueSection.section_label}
+                                        </p>
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            {queueSection.strand}-
+                                            {queueSection.section}
+                                            {queueSection.specialization
+                                                ? ` • ${queueSection.specialization}`
+                                                : ""}
+                                        </p>
+                                    </div>
+                                    <span
+                                        className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold ${
+                                            isDone
+                                                ? "bg-emerald-600 text-white"
+                                                : "bg-gray-200 text-gray-700"
+                                        }`}
+                                    >
+                                        {isDone ? (
+                                            <Check size={12} />
+                                        ) : (
+                                            <p>
+                                                Strand/Specialization:{" "}
+                                                {activeQueuedSection.specialization ||
+                                                    "-"}
+                                            </p>
+                                        )}
+                                    </span>
+                                </div>
+
+                                {isLocked && (
+                                    <p className="mt-2 text-[11px] font-medium text-amber-700">
+                                        Locked until earlier sections are done.
+                                    </p>
+                                )}
+                            </button>
+
+                            {showRemoveButton && (
+                                <button
+                                    type="button"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        removeQueuedSection(
+                                            queueSection.queueKey,
+                                        );
+                                    }}
+                                    className="absolute right-2 top-2 rounded-lg p-1 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+                                    aria-label="Remove queued section"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    };
+
+    const renderActiveSectionSummaryPanel = () => {
+        if (!activeQueuedSection || !activeSectionWorkflow) {
+            return (
+                <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-8 text-center text-sm text-gray-500">
+                    Select a section card to preview its summary.
+                </div>
+            );
+        }
+
+        const sectionColor =
+            COLOR_OPTIONS.find(
+                (option) => option.name === activeSectionWorkflow.color,
+            ) ?? selectedColor;
+
+        return (
+            <div className="space-y-4">
+                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                    <p className="text-sm font-semibold text-gray-800">
+                        {activeQueuedSection.section_full_label ||
+                            activeQueuedSection.section_label}
+                    </p>
+                    <div className="mt-2 grid gap-1 text-xs text-gray-600 sm:grid-cols-2">
+                        <p>Subject: {data.subject_name || "-"}</p>
+                        <p>School year: {data.school_year || "-"}</p>
+                        <p>
+                            Grade level:{" "}
+                            {activeQueuedSection.grade_level || "-"}
+                        </p>
+                        <p>
+                            Section: {activeQueuedSection.strand}-
+                            {activeQueuedSection.section}
+                        </p>
+                        <p>
+                            Strand/Specialization:{" "}
+                            {activeQueuedSection.specialization || "-"}
+                        </p>
+                        <p>
+                            Color:{" "}
+                            {sectionColor?.name ||
+                                activeSectionWorkflow.color ||
+                                "indigo"}
+                        </p>
+                        <p>
+                            CSV classlist:{" "}
+                            {activeSectionWorkflow.classlist?.name || "None"}
+                        </p>
+                        <p>
+                            Queued students:{" "}
+                            {activeSectionWorkflow.manualStudents.length}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                    <div className="mb-2 flex items-center justify-between">
+                        <p className="text-sm font-semibold text-indigo-800">
+                            Student Queue Summary
+                        </p>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                            <Users size={12} />
+                            {sortedActiveQueuedStudents.length}
+                        </span>
+                    </div>
+                    <p className="text-xs text-indigo-700">
+                        Includes students queued one-by-one and bulk text
+                        import, sorted alphabetically.
+                    </p>
+
+                    {sortedActiveQueuedStudents.length === 0 ? (
+                        <p className="mt-2 text-xs text-indigo-700">
+                            No queued students for this section.
+                        </p>
+                    ) : (
+                        <div className="mt-3 max-h-56 space-y-1.5 overflow-y-auto pr-1">
+                            {sortedActiveQueuedStudents.map(
+                                (student, index) => (
+                                    <div
+                                        key={`${student.lrn}-${index}`}
+                                        className="rounded-md bg-white px-3 py-2"
+                                    >
+                                        <p className="text-xs font-medium text-gray-800">
+                                            {student.student_name}
+                                        </p>
+                                        <p className="text-[11px] text-gray-500">
+                                            {student.lrn}
+                                            {student.personal_email
+                                                ? ` • ${student.personal_email}`
+                                                : ""}
+                                        </p>
+                                    </div>
+                                ),
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
     };
 
     const handleSubmit = (e) => {
@@ -828,20 +1744,84 @@ const AddNewClassModal = ({
             return;
         }
 
-        if (!isEditMode && (!isStepThreeSubmitReady || step !== 3)) {
+        if (!isEditMode && step !== 5) {
             return;
         }
 
-        if (hasLocalDuplicateClass) {
-            if (!isEditMode) {
-                setStep(3);
+        let createPayload = null;
+
+        if (!isEditMode) {
+            if (!areAllSectionsReviewDone) {
+                return;
             }
 
+            const submitSection =
+                activeQueuedSection ?? sectionQueue[0] ?? null;
+
+            if (!submitSection) {
+                setError(
+                    "section_queue",
+                    "Add at least one section to the queue before creating a class.",
+                );
+                return;
+            }
+
+            const submitWorkflow =
+                sectionWorkflowMap[submitSection.queueKey] ??
+                createSectionWorkflowState(data.color);
+            const sectionCombined = `${submitSection.strand}-${submitSection.section}`;
+            const gradeLevelKey = normalizeSearchValue(
+                submitSection.grade_level,
+            );
+            const subjectKey = normalizeSearchValue(data.subject_name);
+            const sectionKey = normalizeSearchValue(sectionCombined);
+
+            const duplicateExists = existingClasses.some((existingClass) => {
+                const existingGradeLevel = normalizeSearchValue(
+                    normalizeGradeLevel(
+                        existingClass?.name ?? existingClass?.grade_level,
+                    ),
+                );
+                const existingSubject = normalizeSearchValue(
+                    existingClass?.subject_name ?? existingClass?.subject,
+                );
+                const existingSection = normalizeSearchValue(
+                    existingClass?.section,
+                );
+
+                return (
+                    existingGradeLevel === gradeLevelKey &&
+                    existingSubject === subjectKey &&
+                    existingSection === sectionKey
+                );
+            });
+
+            if (duplicateExists) {
+                setStep(5);
+                setError(
+                    "class_duplicate",
+                    "Duplicate class detected. A class with the same grade level, subject, and section already exists. Please edit the class details or cancel.",
+                );
+                return;
+            }
+
+            createPayload = {
+                grade_level: submitSection.grade_level,
+                section: submitSection.section,
+                subject_name: data.subject_name,
+                color: submitWorkflow.color || data.color,
+                school_year: data.school_year,
+                strand: submitSection.strand,
+                specialization:
+                    submitSection.specialization ?? submitSection.strand,
+                classlist: submitWorkflow.classlist,
+                manual_students: submitWorkflow.manualStudents,
+            };
+        } else if (hasLocalDuplicateClass) {
             setError(
                 "class_duplicate",
                 "Duplicate class detected. A class with the same grade level, subject, and section already exists. Please edit the class details or cancel.",
             );
-
             return;
         }
 
@@ -862,6 +1842,8 @@ const AddNewClassModal = ({
             return;
         }
 
+        transform(() => createPayload ?? data);
+
         post(route("teacher.classes.store"), {
             forceFormData: true,
             preserveState: true,
@@ -869,972 +1851,1513 @@ const AddNewClassModal = ({
             replace: true,
             onError: (formErrors) => {
                 if (formErrors?.class_duplicate) {
-                    setStep(3);
+                    setStep(5);
                 }
             },
             onSuccess: () => {
                 handleClose();
             },
             onFinish: () => {
+                transform((formData) => formData);
                 submitLockRef.current = false;
             },
         });
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-                <form
-                    onSubmit={handleSubmit}
-                    className="flex flex-1 flex-col overflow-hidden"
-                >
-                    {/* Modal Header */}
-                    <div className="flex justify-between items-center p-6 border-b">
-                        <div>
-                            <h3 className="text-xl font-bold text-gray-900">
-                                {isEditMode ? "Edit Class" : "Add New Class"}
-                            </h3>
-                            <p className="text-sm text-gray-500 mt-1">
-                                Showing subjects for{" "}
-                                <span className="font-semibold text-indigo-600">
-                                    Semester {currentSemester}
-                                </span>
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={handleClose}
-                            className="z-10 text-gray-400 hover:text-gray-600"
-                        >
-                            <X size={24} />
-                        </button>
-                    </div>
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div
+                className="fixed inset-0 bg-slate-950/45 backdrop-blur-[2px]"
+                onClick={handleClose}
+            />
 
-                    {!isEditMode && (
-                        <div className="border-b px-6 py-3 bg-gray-50">
-                            <div className="flex items-center justify-between gap-3">
-                                {WIZARD_STEPS.map((wizardStep) => (
-                                    <StepBadge
-                                        key={wizardStep.id}
-                                        step={wizardStep}
-                                        currentStep={step}
-                                    />
-                                ))}
+            <div className="flex min-h-full items-end justify-center p-3 pb-10 sm:items-center sm:p-4">
+                <div className="relative flex h-[calc(100vh-6rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-2xl">
+                    <form
+                        onSubmit={handleSubmit}
+                        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                    >
+                        {/* Modal Header */}
+                        <div className="relative shrink-0 overflow-hidden border-b border-blue-100 bg-gradient-to-r from-blue-600 to-indigo-700 px-4 py-4 sm:px-6 sm:py-5">
+                            <div className="absolute -right-8 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
+                            <div className="relative flex items-center gap-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">
+                                    <Plus size={18} />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-semibold text-white">
+                                        {isEditMode
+                                            ? "Edit Class"
+                                            : "Add New Class Wizard"}
+                                    </h3>
+                                    <p className="text-xs text-blue-100">
+                                        {isEditMode
+                                            ? `Showing subjects for Semester ${currentSemester}`
+                                            : `Step ${step} of ${WIZARD_STEPS.length}: ${WIZARD_STEPS[step - 1].title}`}
+                                    </p>
+                                </div>
                             </div>
+                            <button
+                                type="button"
+                                onClick={handleClose}
+                                className="absolute right-3 top-3 rounded-lg p-1.5 text-blue-100 transition-colors hover:bg-white/15 hover:text-white"
+                            >
+                                <X size={16} />
+                            </button>
                         </div>
-                    )}
 
-                    {/* Modal Body (Form) */}
-                    <div className="p-6 space-y-6 overflow-y-auto flex-1">
-                        {(isEditMode || step === 1) && (
-                            <div className="space-y-4">
-                                {!isEditMode && (
-                                    <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
-                                        <p className="text-sm font-semibold text-indigo-800">
-                                            Step 1: Subject Selection
-                                        </p>
-                                        <p className="mt-1 text-xs text-indigo-700">
-                                            Pick or type the subject first, then
-                                            continue to section setup.
-                                        </p>
-                                    </div>
-                                )}
-
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">
-                                            Subject
-                                        </label>
-                                        <div className="relative">
-                                            <input
-                                                type="text"
-                                                name="subject_name"
-                                                required
-                                                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-                                                value={data.subject_name}
-                                                onChange={handleChange}
-                                                onFocus={() =>
-                                                    setIsSubjectMenuOpen(true)
-                                                }
-                                                onBlur={() => {
-                                                    setTimeout(() => {
-                                                        setIsSubjectMenuOpen(
-                                                            false,
-                                                        );
-                                                    }, 120);
-                                                }}
-                                                placeholder="Type to search subjects"
-                                                autoComplete="off"
-                                            />
-
-                                            {isSubjectMenuOpen &&
-                                                subjectOptions.length > 0 && (
-                                                    <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                                                        {filteredSubjects.length ===
-                                                        0 ? (
-                                                            <p className="px-3 py-2 text-sm text-gray-500">
-                                                                No matching
-                                                                subjects.
-                                                            </p>
-                                                        ) : (
-                                                            filteredSubjects.map(
-                                                                (subject) => (
-                                                                    <button
-                                                                        key={`${subject.id}-${subject.subject_name}`}
-                                                                        type="button"
-                                                                        onMouseDown={(
-                                                                            event,
-                                                                        ) => {
-                                                                            event.preventDefault();
-                                                                            handleSubjectSelect(
-                                                                                subject.subject_name,
-                                                                            );
-                                                                        }}
-                                                                        className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-indigo-50"
-                                                                    >
-                                                                        <span className="font-medium text-gray-700">
-                                                                            {
-                                                                                subject.subject_name
-                                                                            }
-                                                                        </span>
-                                                                        <span className="ml-2 text-xs text-gray-500">
-                                                                            {subject.subject_code ||
-                                                                                "No code"}
-                                                                        </span>
-                                                                    </button>
-                                                                ),
-                                                            )
-                                                        )}
-                                                    </div>
-                                                )}
-                                        </div>
-
-                                        {subjectOptions.length > 0 ? (
-                                            <p className="mt-1 text-xs text-gray-500">
-                                                {`Available subjects: ${subjectOptions.length}. Type to filter.`}
-                                            </p>
-                                        ) : (
-                                            <p className="mt-1 text-xs text-gray-500">
-                                                No subjects found in the system
-                                                yet. You may enter one manually.
-                                            </p>
-                                        )}
-
-                                        {errors.subject_name && (
-                                            <p className="text-sm text-red-600 mt-1">
-                                                {errors.subject_name}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">
-                                            School Year
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="school_year"
-                                            required
-                                            className="mt-1 block w-full rounded-lg border-gray-300 bg-gray-50 text-gray-600 shadow-sm"
-                                            value={data.school_year}
-                                            readOnly
-                                            placeholder="e.g., 2025-2026"
+                        {!isEditMode && (
+                            <div className="shrink-0 border-b border-blue-100 px-4 py-3 sm:px-6 sm:py-4">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {WIZARD_STEPS.map((wizardStep) => (
+                                        <StepBadge
+                                            key={wizardStep.id}
+                                            step={wizardStep}
+                                            currentStep={step}
                                         />
-                                        <p className="mt-1 text-xs text-gray-500">
-                                            School year is managed in system
-                                            settings.
-                                        </p>
-                                        {errors.school_year && (
-                                            <p className="text-sm text-red-600 mt-1">
-                                                {errors.school_year}
-                                            </p>
-                                        )}
-                                    </div>
+                                    ))}
                                 </div>
                             </div>
                         )}
 
-                        {(isEditMode || step === 2) && (
-                            <div className="space-y-5">
-                                {!isEditMode && (
-                                    <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
-                                        <p className="text-sm font-semibold text-indigo-800">
-                                            Step 2: Section Setup and Student
-                                            Queue
-                                        </p>
-                                        <p className="mt-1 text-xs text-indigo-700">
-                                            First select an existing section. If
-                                            none fits, switch to manual section
-                                            details and continue below.
-                                        </p>
-                                    </div>
-                                )}
-
-                                <div className="rounded-xl border border-gray-200 p-4 space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">
-                                            Strand (Department Code)
-                                        </label>
-                                        <div className="relative">
-                                            <input
-                                                type="text"
-                                                name="strand"
-                                                required
-                                                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-                                                value={data.strand}
-                                                onChange={handleChange}
-                                                onFocus={() =>
-                                                    setIsDepartmentMenuOpen(
-                                                        true,
-                                                    )
-                                                }
-                                                onBlur={() => {
-                                                    setTimeout(() => {
-                                                        setIsDepartmentMenuOpen(
-                                                            false,
-                                                        );
-                                                    }, 120);
-                                                }}
-                                                placeholder="Type department code (e.g., STEM, ABM, TVL)"
-                                                autoComplete="off"
-                                            />
-
-                                            {isDepartmentMenuOpen &&
-                                                departmentOptions.length >
-                                                    0 && (
-                                                    <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                                                        {filteredDepartments.length ===
-                                                        0 ? (
-                                                            <p className="px-3 py-2 text-sm text-gray-500">
-                                                                No matching
-                                                                department
-                                                                codes.
-                                                            </p>
-                                                        ) : (
-                                                            filteredDepartments.map(
-                                                                (
-                                                                    department,
-                                                                ) => (
-                                                                    <button
-                                                                        key={
-                                                                            department.department_code
-                                                                        }
-                                                                        type="button"
-                                                                        onMouseDown={(
-                                                                            event,
-                                                                        ) => {
-                                                                            event.preventDefault();
-                                                                            handleDepartmentSelect(
-                                                                                department.department_code,
-                                                                            );
-                                                                        }}
-                                                                        className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-indigo-50"
-                                                                    >
-                                                                        <span className="font-semibold text-gray-700">
-                                                                            {
-                                                                                department.department_code
-                                                                            }
-                                                                        </span>
-                                                                        <span className="ml-2 text-xs text-gray-500">
-                                                                            {
-                                                                                department.department_name
-                                                                            }
-                                                                        </span>
-                                                                    </button>
-                                                                ),
-                                                            )
-                                                        )}
-                                                    </div>
-                                                )}
-                                        </div>
-                                        <p className="mt-1 text-xs text-gray-500">
-                                            Strand is the department code. New
-                                            sections created here are linked to
-                                            that department.
-                                        </p>
-                                        {selectedDepartment && (
-                                            <p className="mt-1 text-xs text-emerald-700">
-                                                Linked department:{" "}
-                                                {
-                                                    selectedDepartment.department_code
-                                                }
-                                                {" - "}
-                                                {
-                                                    selectedDepartment.department_name
-                                                }
+                        {/* Modal Body (Form) */}
+                        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto bg-blue-50/40 px-4 py-4 sm:px-6 sm:py-5">
+                            {(isEditMode || step === 1) && (
+                                <div className="space-y-4">
+                                    {!isEditMode && (
+                                        <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+                                            <p className="text-sm font-semibold text-indigo-800">
+                                                Step 1: Subject Selection
                                             </p>
-                                        )}
-                                        {errors.strand && (
-                                            <p className="text-sm text-red-600 mt-1">
-                                                {errors.strand}
+                                            <p className="mt-1 text-xs text-indigo-700">
+                                                Pick or type the subject first,
+                                                then continue to section setup.
                                             </p>
-                                        )}
-                                    </div>
-
-                                    <div className="grid gap-2 sm:grid-cols-2">
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                handleSectionModeChange(
-                                                    "existing",
-                                                )
-                                            }
-                                            className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                                                sectionMode === "existing"
-                                                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                                                    : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                                            }`}
-                                        >
-                                            1. Select Existing Section
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                handleSectionModeChange(
-                                                    "manual",
-                                                )
-                                            }
-                                            className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                                                sectionMode === "manual"
-                                                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                                                    : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                                            }`}
-                                        >
-                                            2. Create New Section
-                                        </button>
-                                    </div>
-
-                                    {sectionMode === "existing" ? (
-                                        <div className="rounded-lg border border-gray-200 p-3 space-y-3">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <p className="text-sm font-semibold text-gray-800">
-                                                    Existing Sections
-                                                </p>
-                                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
-                                                    {hasValidStrand
-                                                        ? filteredExistingSections.length
-                                                        : 0}{" "}
-                                                    results
-                                                </span>
-                                            </div>
-
-                                            <input
-                                                type="text"
-                                                value={existingSectionQuery}
-                                                onChange={(event) =>
-                                                    setExistingSectionQuery(
-                                                        event.target.value,
-                                                    )
-                                                }
-                                                disabled={!hasValidStrand}
-                                                className="w-full rounded-lg border-gray-300 text-sm disabled:bg-gray-100 disabled:text-gray-500"
-                                                placeholder="Filter section by full label, grade level, or specialization"
-                                            />
-
-                                            {!hasValidStrand ? (
-                                                <p className="text-xs text-amber-700">
-                                                    Enter a valid strand
-                                                    department code first.
-                                                </p>
-                                            ) : filteredExistingSections.length ===
-                                              0 ? (
-                                                <p className="text-xs text-gray-500">
-                                                    No existing section matched
-                                                    this strand. Switch to
-                                                    Create New Section.
-                                                </p>
-                                            ) : (
-                                                <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
-                                                    {filteredExistingSections.map(
-                                                        (section) => (
-                                                            <button
-                                                                key={
-                                                                    section.key
-                                                                }
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    handleExistingSectionSelect(
-                                                                        section,
-                                                                    )
-                                                                }
-                                                                className={`w-full rounded-lg border px-3 py-2 text-left transition ${
-                                                                    selectedExistingSectionId ===
-                                                                    section.id
-                                                                        ? "border-indigo-500 bg-indigo-50"
-                                                                        : "border-gray-200 bg-white hover:border-indigo-300"
-                                                                }`}
-                                                            >
-                                                                <p className="text-sm font-semibold text-gray-800">
-                                                                    {section.section_full_label ||
-                                                                        section.section_label}
-                                                                </p>
-                                                                <p className="text-xs text-gray-500">
-                                                                    Section key:{" "}
-                                                                    {
-                                                                        section.strand
-                                                                    }
-                                                                    -
-                                                                    {
-                                                                        section.section
-                                                                    }
-                                                                    {section.specialization
-                                                                        ? ` • Specialization: ${section.specialization}`
-                                                                        : ""}
-                                                                </p>
-                                                            </button>
-                                                        ),
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {(errors.grade_level ||
-                                                errors.section) && (
-                                                <p className="text-sm text-red-600">
-                                                    {errors.grade_level ||
-                                                        errors.section}
-                                                </p>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className="grid gap-4 sm:grid-cols-2">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700">
-                                                    Grade Level
-                                                </label>
-                                                <select
-                                                    name="grade_level"
-                                                    required
-                                                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-                                                    value={data.grade_level}
-                                                    onChange={handleChange}
-                                                >
-                                                    <option value="" disabled>
-                                                        Select Grade Level
-                                                    </option>
-                                                    {GRADE_LEVEL_OPTIONS.map(
-                                                        (option) => (
-                                                            <option
-                                                                key={option}
-                                                                value={option}
-                                                            >
-                                                                {`Grade ${option}`}
-                                                            </option>
-                                                        ),
-                                                    )}
-                                                </select>
-                                                {errors.grade_level && (
-                                                    <p className="text-sm text-red-600 mt-1">
-                                                        {errors.grade_level}
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700">
-                                                    Section Name
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    name="section"
-                                                    required
-                                                    value={data.section}
-                                                    onChange={handleChange}
-                                                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-                                                    placeholder="e.g., A"
-                                                />
-                                                <p className="mt-1 text-xs text-gray-500">
-                                                    Letters only. The system
-                                                    saves section as
-                                                    strand-section (example:
-                                                    STEM-A).
-                                                </p>
-                                                {errors.section && (
-                                                    <p className="text-sm text-red-600 mt-1">
-                                                        {errors.section}
-                                                    </p>
-                                                )}
-                                            </div>
                                         </div>
                                     )}
 
-                                    {sectionMode === "existing" &&
-                                        selectedExistingSection && (
-                                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                                                Selected section:{" "}
-                                                {selectedExistingSection.section_full_label ||
-                                                    selectedExistingSection.section_label}
-                                            </div>
-                                        )}
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">
-                                            Track (optional)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="track"
-                                            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-                                            value={data.track}
-                                            onChange={handleChange}
-                                            placeholder="e.g., Academic"
-                                        />
-                                        {errors.track && (
-                                            <p className="text-sm text-red-600 mt-1">
-                                                {errors.track}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {!isEditMode && (
-                                    <>
+                                    <div className="grid gap-4 sm:grid-cols-2">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700">
-                                                Bulk Upload Classlist (CSV or
-                                                Excel)
+                                                Subject
                                             </label>
-                                            {data.classlist ? (
-                                                <div className="mt-3 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                                                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                                                        <FileText
-                                                            size={18}
-                                                            className="text-gray-500"
-                                                        />
-                                                        {data.classlist.name}
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            handleFileChange(
-                                                                null,
-                                                            )
-                                                        }
-                                                        className="text-red-600 hover:text-red-800"
-                                                    >
-                                                        <X size={18} />
-                                                    </button>
-                                                </div>
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    name="subject_name"
+                                                    required
+                                                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                                                    value={data.subject_name}
+                                                    onChange={handleChange}
+                                                    onFocus={() =>
+                                                        setIsSubjectMenuOpen(
+                                                            true,
+                                                        )
+                                                    }
+                                                    onBlur={() => {
+                                                        setTimeout(() => {
+                                                            setIsSubjectMenuOpen(
+                                                                false,
+                                                            );
+                                                        }, 120);
+                                                    }}
+                                                    placeholder="Type to search subjects"
+                                                    autoComplete="off"
+                                                />
+
+                                                {isSubjectMenuOpen &&
+                                                    subjectOptions.length >
+                                                        0 && (
+                                                        <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                                                            {filteredSubjects.length ===
+                                                            0 ? (
+                                                                <p className="px-3 py-2 text-sm text-gray-500">
+                                                                    No matching
+                                                                    subjects.
+                                                                </p>
+                                                            ) : (
+                                                                filteredSubjects.map(
+                                                                    (
+                                                                        subject,
+                                                                    ) => (
+                                                                        <button
+                                                                            key={`${subject.id}-${subject.subject_name}`}
+                                                                            type="button"
+                                                                            onMouseDown={(
+                                                                                event,
+                                                                            ) => {
+                                                                                event.preventDefault();
+                                                                                handleSubjectSelect(
+                                                                                    subject.subject_name,
+                                                                                );
+                                                                            }}
+                                                                            className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-indigo-50"
+                                                                        >
+                                                                            <span className="font-medium text-gray-700">
+                                                                                {
+                                                                                    subject.subject_name
+                                                                                }
+                                                                            </span>
+                                                                            <span className="ml-2 text-xs text-gray-500">
+                                                                                {subject.subject_code ||
+                                                                                    "No code"}
+                                                                            </span>
+                                                                        </button>
+                                                                    ),
+                                                                )
+                                                            )}
+                                                        </div>
+                                                    )}
+                                            </div>
+
+                                            {subjectOptions.length > 0 ? (
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    {`Available subjects: ${subjectOptions.length}. Type to filter.`}
+                                                </p>
                                             ) : (
-                                                <label className="mt-3 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 px-6 py-7 text-center text-sm text-gray-500 transition hover:border-indigo-400 hover:bg-indigo-50">
-                                                    <input
-                                                        type="file"
-                                                        name="file"
-                                                        className="hidden"
-                                                        accept=".csv,text/csv,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                                                        onChange={(e) =>
-                                                            handleFileChange(
-                                                                e.target
-                                                                    .files[0],
-                                                            )
-                                                        }
-                                                    />
-                                                    <Upload
-                                                        size={26}
-                                                        className="text-indigo-400"
-                                                    />
-                                                    <span className="mt-2 font-semibold text-gray-700">
-                                                        Drop classlist or click
-                                                        to browse
-                                                    </span>
-                                                    <span className="text-xs text-gray-500">
-                                                        CSV, XLS, XLSX up to 4MB
-                                                    </span>
-                                                </label>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    No subjects found in the
+                                                    system yet. You may enter
+                                                    one manually.
+                                                </p>
                                             )}
-                                            {errors.classlist && (
+
+                                            {errors.subject_name && (
                                                 <p className="text-sm text-red-600 mt-1">
-                                                    {errors.classlist}
+                                                    {errors.subject_name}
                                                 </p>
                                             )}
                                         </div>
 
-                                        <div className="rounded-xl border border-gray-200 p-4">
-                                            <p className="text-sm font-semibold text-gray-800">
-                                                Add Student One-by-One
-                                            </p>
-                                            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                                                <input
-                                                    type="text"
-                                                    value={
-                                                        studentDraft.student_name
-                                                    }
-                                                    onChange={(event) =>
-                                                        setStudentDraft(
-                                                            (prev) => ({
-                                                                ...prev,
-                                                                student_name:
-                                                                    event.target
-                                                                        .value,
-                                                            }),
-                                                        )
-                                                    }
-                                                    placeholder="Student name"
-                                                    className="rounded-lg border-gray-300 text-sm"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={studentDraft.lrn}
-                                                    onChange={(event) =>
-                                                        setStudentDraft(
-                                                            (prev) => ({
-                                                                ...prev,
-                                                                lrn: sanitizeLrn(
-                                                                    event.target
-                                                                        .value,
-                                                                ),
-                                                            }),
-                                                        )
-                                                    }
-                                                    placeholder="LRN (12 digits)"
-                                                    className="rounded-lg border-gray-300 text-sm"
-                                                    maxLength={12}
-                                                />
-                                                <input
-                                                    type="email"
-                                                    value={
-                                                        studentDraft.personal_email
-                                                    }
-                                                    onChange={(event) =>
-                                                        setStudentDraft(
-                                                            (prev) => ({
-                                                                ...prev,
-                                                                personal_email:
-                                                                    event.target
-                                                                        .value,
-                                                            }),
-                                                        )
-                                                    }
-                                                    placeholder="Personal email (optional)"
-                                                    className="rounded-lg border-gray-300 text-sm"
-                                                />
-                                            </div>
-                                            {studentDraftError && (
-                                                <p className="mt-2 text-xs text-red-600">
-                                                    {studentDraftError}
-                                                </p>
-                                            )}
-                                            <div className="mt-3 flex justify-end">
-                                                <button
-                                                    type="button"
-                                                    onClick={addSingleStudent}
-                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
-                                                >
-                                                    <Plus size={14} /> Queue
-                                                    Student
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div className="rounded-xl border border-gray-200 p-4">
-                                            <p className="text-sm font-semibold text-gray-800">
-                                                Bulk Queue by Text
-                                            </p>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">
+                                                School Year
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="school_year"
+                                                required
+                                                className="mt-1 block w-full rounded-lg border-gray-300 bg-gray-50 text-gray-600 shadow-sm"
+                                                value={data.school_year}
+                                                readOnly
+                                                placeholder="e.g., 2025-2026"
+                                            />
                                             <p className="mt-1 text-xs text-gray-500">
-                                                One line per student:
-                                                student_name,lrn,email(optional)
+                                                School year is managed in system
+                                                settings.
                                             </p>
-                                            <textarea
-                                                value={bulkRows}
-                                                onChange={(event) =>
-                                                    setBulkRows(
-                                                        event.target.value,
+                                            {errors.school_year && (
+                                                <p className="text-sm text-red-600 mt-1">
+                                                    {errors.school_year}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {(isEditMode || step === 2) && (
+                                <div className="space-y-5">
+                                    {!isEditMode && (
+                                        <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+                                            <p className="text-sm font-semibold text-indigo-800">
+                                                Step 2: Section Setup and Queue
+                                            </p>
+                                            <p className="mt-1 text-xs text-indigo-700">
+                                                First select an existing
+                                                section. If none fits, switch to
+                                                manual section details and add
+                                                it to the queue.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <div className="rounded-xl border border-gray-200 p-4 space-y-4">
+                                        <div className="grid gap-2 sm:grid-cols-2">
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    handleSectionModeChange(
+                                                        "existing",
                                                     )
                                                 }
-                                                rows={4}
-                                                className="mt-2 w-full rounded-lg border-gray-300 text-sm"
-                                                placeholder="Juan Dela Cruz,123456789012,juan@email.com"
-                                            />
-                                            <div className="mt-3 flex justify-end">
-                                                <button
-                                                    type="button"
-                                                    onClick={addBulkStudents}
-                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
-                                                >
-                                                    <Upload size={14} /> Bulk
-                                                    Queue
-                                                </button>
-                                            </div>
-                                            {bulkErrors.length > 0 && (
-                                                <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                                                    <div className="space-y-1 text-xs text-amber-700">
-                                                        {bulkErrors.map(
-                                                            (error) => (
-                                                                <p key={error}>
-                                                                    - {error}
+                                                className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                                                    sectionMode === "existing"
+                                                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                                        : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                                                }`}
+                                            >
+                                                Select Existing Section
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    handleSectionModeChange(
+                                                        "manual",
+                                                    )
+                                                }
+                                                className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                                                    sectionMode === "manual"
+                                                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                                        : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                                                }`}
+                                            >
+                                                Create New Section
+                                            </button>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">
+                                                Department
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    name="strand"
+                                                    required
+                                                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                                                    value={data.strand}
+                                                    onChange={handleChange}
+                                                    onFocus={() =>
+                                                        setIsDepartmentMenuOpen(
+                                                            true,
+                                                        )
+                                                    }
+                                                    onBlur={() => {
+                                                        setTimeout(() => {
+                                                            setIsDepartmentMenuOpen(
+                                                                false,
+                                                            );
+                                                        }, 120);
+                                                    }}
+                                                    placeholder="Type department code (e.g., STEM, ABM, TVL)"
+                                                    autoComplete="off"
+                                                />
+
+                                                {isDepartmentMenuOpen &&
+                                                    departmentOptions.length >
+                                                        0 && (
+                                                        <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                                                            {filteredDepartments.length ===
+                                                            0 ? (
+                                                                <p className="px-3 py-2 text-sm text-gray-500">
+                                                                    No matching
+                                                                    department
+                                                                    codes.
                                                                 </p>
+                                                            ) : (
+                                                                filteredDepartments.map(
+                                                                    (
+                                                                        department,
+                                                                    ) => (
+                                                                        <button
+                                                                            key={
+                                                                                department.department_code
+                                                                            }
+                                                                            type="button"
+                                                                            onMouseDown={(
+                                                                                event,
+                                                                            ) => {
+                                                                                event.preventDefault();
+                                                                                handleDepartmentSelect(
+                                                                                    department.department_code,
+                                                                                );
+                                                                            }}
+                                                                            className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-indigo-50"
+                                                                        >
+                                                                            <span className="font-semibold text-gray-700">
+                                                                                {
+                                                                                    department.department_code
+                                                                                }
+                                                                            </span>
+                                                                            <span className="ml-2 text-xs text-gray-500">
+                                                                                {
+                                                                                    department.department_name
+                                                                                }
+                                                                            </span>
+                                                                        </button>
+                                                                    ),
+                                                                )
+                                                            )}
+                                                        </div>
+                                                    )}
+                                            </div>
+                                            <p className="mt-1 text-xs text-gray-500">
+                                                Select the department first. New
+                                                sections created here are linked
+                                                to this department.
+                                            </p>
+                                            {selectedDepartment && (
+                                                <p className="mt-1 text-xs text-emerald-700">
+                                                    Linked department:{" "}
+                                                    {
+                                                        selectedDepartment.department_code
+                                                    }
+                                                    {" - "}
+                                                    {
+                                                        selectedDepartment.department_name
+                                                    }
+                                                </p>
+                                            )}
+                                            {errors.strand && (
+                                                <p className="text-sm text-red-600 mt-1">
+                                                    {errors.strand}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {sectionMode === "existing" ? (
+                                            <div className="rounded-lg border border-gray-200 p-3 space-y-3">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <p className="text-sm font-semibold text-gray-800">
+                                                        Existing Sections
+                                                    </p>
+                                                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
+                                                        {hasValidStrand
+                                                            ? filteredExistingSections.length
+                                                            : 0}{" "}
+                                                        results
+                                                    </span>
+                                                </div>
+
+                                                <input
+                                                    type="text"
+                                                    value={existingSectionQuery}
+                                                    onChange={(event) =>
+                                                        setExistingSectionQuery(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    disabled={!hasValidStrand}
+                                                    className="w-full rounded-lg border-gray-300 text-sm disabled:bg-gray-100 disabled:text-gray-500"
+                                                    placeholder="Filter section by full label, grade level, or specialization"
+                                                />
+
+                                                {!hasValidStrand ? (
+                                                    <p className="text-xs text-amber-700">
+                                                        Enter a valid department
+                                                        code first.
+                                                    </p>
+                                                ) : filteredExistingSections.length ===
+                                                  0 ? (
+                                                    <p className="text-xs text-gray-500">
+                                                        No existing section
+                                                        matched this strand.
+                                                        Switch to Create New
+                                                        Section.
+                                                    </p>
+                                                ) : (
+                                                    <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
+                                                        {filteredExistingSections.map(
+                                                            (section) => (
+                                                                <button
+                                                                    key={
+                                                                        section.key
+                                                                    }
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        handleExistingSectionSelect(
+                                                                            section,
+                                                                        )
+                                                                    }
+                                                                    className={`w-full rounded-lg border px-3 py-2 text-left transition ${
+                                                                        selectedExistingSectionId ===
+                                                                        section.id
+                                                                            ? "border-indigo-500 bg-indigo-50"
+                                                                            : "border-gray-200 bg-white hover:border-indigo-300"
+                                                                    }`}
+                                                                >
+                                                                    <p className="text-sm font-semibold text-gray-800">
+                                                                        {section.section_full_label ||
+                                                                            section.section_label}
+                                                                    </p>
+                                                                    <p className="text-xs text-gray-500">
+                                                                        Section
+                                                                        key:{" "}
+                                                                        {
+                                                                            section.strand
+                                                                        }
+                                                                        -
+                                                                        {
+                                                                            section.section
+                                                                        }
+                                                                        {section.specialization
+                                                                            ? ` • Specialization: ${section.specialization}`
+                                                                            : ""}
+                                                                    </p>
+                                                                </button>
                                                             ),
                                                         )}
                                                     </div>
-                                                </div>
-                                            )}
-                                        </div>
+                                                )}
 
-                                        <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
-                                            <div className="mb-2 flex items-center justify-between">
-                                                <p className="text-sm font-semibold text-indigo-800">
-                                                    Queued Students
-                                                </p>
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-indigo-700">
-                                                    <Users size={12} />
-                                                    {manualStudents.length}
-                                                </span>
+                                                {(errors.grade_level ||
+                                                    errors.section) && (
+                                                    <p className="text-sm text-red-600">
+                                                        {errors.grade_level ||
+                                                            errors.section}
+                                                    </p>
+                                                )}
                                             </div>
-                                            {manualStudents.length === 0 ? (
-                                                <p className="text-xs text-indigo-700">
-                                                    No manually queued students
-                                                    yet.
-                                                </p>
-                                            ) : (
-                                                <div className="max-h-36 space-y-1.5 overflow-y-auto pr-1">
-                                                    {manualStudents.map(
-                                                        (student, index) => (
-                                                            <div
-                                                                key={`${student.lrn}-${index}`}
-                                                                className="flex items-center justify-between rounded-md bg-white px-3 py-2"
-                                                            >
-                                                                <div>
-                                                                    <p className="text-xs font-medium text-gray-800">
-                                                                        {
-                                                                            student.student_name
-                                                                        }
-                                                                    </p>
-                                                                    <p className="text-[11px] text-gray-500">
-                                                                        {
-                                                                            student.lrn
-                                                                        }
-                                                                    </p>
-                                                                </div>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        removeQueuedStudent(
-                                                                            index,
-                                                                        )
+                                        ) : (
+                                            <div className="grid gap-4 sm:grid-cols-3">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700">
+                                                        Grade Level
+                                                    </label>
+                                                    <select
+                                                        name="grade_level"
+                                                        required
+                                                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                                                        value={data.grade_level}
+                                                        onChange={handleChange}
+                                                    >
+                                                        <option
+                                                            value=""
+                                                            disabled
+                                                        >
+                                                            Select Grade Level
+                                                        </option>
+                                                        {GRADE_LEVEL_OPTIONS.map(
+                                                            (option) => (
+                                                                <option
+                                                                    key={option}
+                                                                    value={
+                                                                        option
                                                                     }
-                                                                    className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
                                                                 >
-                                                                    <Trash2
-                                                                        size={
-                                                                            13
-                                                                        }
-                                                                    />
-                                                                </button>
-                                                            </div>
-                                                        ),
+                                                                    {`Grade ${option}`}
+                                                                </option>
+                                                            ),
+                                                        )}
+                                                    </select>
+                                                    {errors.grade_level && (
+                                                        <p className="text-sm text-red-600 mt-1">
+                                                            {errors.grade_level}
+                                                        </p>
                                                     )}
                                                 </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700">
+                                                        Strand/Specialization
+                                                    </label>
+                                                    <select
+                                                        name="specialization"
+                                                        required
+                                                        value={
+                                                            data.specialization
+                                                        }
+                                                        onChange={handleChange}
+                                                        disabled={
+                                                            !hasValidStrand
+                                                        }
+                                                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                                                    >
+                                                        <option
+                                                            value=""
+                                                            disabled
+                                                        >
+                                                            {hasValidStrand
+                                                                ? "Select Strand/Specialization"
+                                                                : "Select Department first"}
+                                                        </option>
+                                                        {specializationOptions.map(
+                                                            (option) => (
+                                                                <option
+                                                                    key={option}
+                                                                    value={
+                                                                        option
+                                                                    }
+                                                                >
+                                                                    {option}
+                                                                </option>
+                                                            ),
+                                                        )}
+                                                    </select>
+                                                    {hasValidStrand &&
+                                                        specializationOptions.length ===
+                                                            0 && (
+                                                            <p className="mt-1 text-xs text-amber-700">
+                                                                No configured
+                                                                specialization
+                                                                found for this
+                                                                department.
+                                                            </p>
+                                                        )}
+                                                    {errors.specialization && (
+                                                        <p className="text-sm text-red-600 mt-1">
+                                                            {
+                                                                errors.specialization
+                                                            }
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700">
+                                                        Section Name
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        name="section"
+                                                        required
+                                                        value={data.section}
+                                                        onChange={handleChange}
+                                                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                                                        placeholder="e.g., A"
+                                                    />
+                                                    <p className="mt-1 text-xs text-gray-500">
+                                                        Letters only. The system
+                                                        saves section as
+                                                        strand-section (example:
+                                                        STEM-A).
+                                                    </p>
+                                                    {errors.section && (
+                                                        <p className="text-sm text-red-600 mt-1">
+                                                            {errors.section}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {sectionMode === "existing" &&
+                                            selectedExistingSection && (
+                                                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                                                    Selected section:{" "}
+                                                    {selectedExistingSection.section_full_label ||
+                                                        selectedExistingSection.section_label}
+                                                </div>
+                                            )}
+                                    </div>
+
+                                    {!isEditMode && (
+                                        <div className="space-y-4">
+                                            {sectionMode === "manual" && (
+                                                <div className="flex justify-end">
+                                                    <button
+                                                        type="button"
+                                                        onClick={
+                                                            addManualSectionToQueue
+                                                        }
+                                                        disabled={
+                                                            !hasValidStrand ||
+                                                            !data.grade_level ||
+                                                            !data.specialization ||
+                                                            !data.section
+                                                        }
+                                                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                                                    >
+                                                        <Plus size={14} /> Add
+                                                        Section to Queue
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {errors.section_queue && (
+                                                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                                                    {errors.section_queue}
+                                                </div>
+                                            )}
+
+                                            <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                                                <div className="mb-3 flex items-center justify-between">
+                                                    <p className="text-sm font-semibold text-indigo-800">
+                                                        Queued Sections
+                                                    </p>
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                                                        <Users size={12} />
+                                                        {sectionQueue.length}
+                                                    </span>
+                                                </div>
+                                                {renderSectionCardList(
+                                                    null,
+                                                    null,
+                                                    true,
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {!isEditMode && step === 3 && (
+                                <div className="space-y-5">
+                                    <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+                                        <p className="text-sm font-semibold text-indigo-800">
+                                            Step 3: Add Students Per Section
+                                        </p>
+                                        <p className="mt-1 text-xs text-indigo-700">
+                                            Select a section card on the left,
+                                            add students on the right, then
+                                            click done for that section.
+                                        </p>
+                                    </div>
+
+                                    <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+                                        <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                            <p className="mb-3 text-sm font-semibold text-gray-800">
+                                                Section Cards
+                                            </p>
+                                            {renderSectionCardList(
+                                                "studentsDone",
+                                                3,
+                                                false,
                                             )}
                                         </div>
-                                    </>
-                                )}
-                            </div>
-                        )}
 
-                        {(isEditMode || step === 3) && (
-                            <>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Color Theme
-                                    </label>
-                                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                                        {COLOR_OPTIONS.map((color) => (
-                                            <label
-                                                key={color.name}
-                                                className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm font-medium shadow-sm transition hover:border-indigo-400 ${
-                                                    data.color === color.name
-                                                        ? "border-indigo-500 bg-indigo-50"
-                                                        : "border-gray-200"
-                                                }`}
-                                            >
-                                                <span
-                                                    className={`inline-flex items-center gap-2 capitalize ${color.text}`}
-                                                >
-                                                    <span
-                                                        className={`h-4 w-4 rounded-full ${color.bg}`}
-                                                    ></span>
-                                                    {color.name}
-                                                </span>
-                                                <input
-                                                    type="radio"
-                                                    name="color"
-                                                    value={color.name}
-                                                    checked={
-                                                        data.color ===
-                                                        color.name
-                                                    }
-                                                    onChange={handleChange}
-                                                    className="h-4 w-4 accent-indigo-600"
-                                                />
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
+                                        <div className="space-y-4">
+                                            {!activeQueuedSection ? (
+                                                <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-8 text-center text-sm text-gray-500">
+                                                    Select a section card to add
+                                                    students.
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                                        <p className="text-sm font-semibold text-gray-800">
+                                                            Active Section
+                                                        </p>
+                                                        <p className="mt-1 text-xs text-gray-600">
+                                                            {activeQueuedSection.section_full_label ||
+                                                                activeQueuedSection.section_label}
+                                                        </p>
 
-                                {!isEditMode && (
-                                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                                        <p className="text-sm font-semibold text-gray-800">
-                                            Create Summary
-                                        </p>
-                                        <div className="mt-2 grid gap-2 text-xs text-gray-700 sm:grid-cols-2">
-                                            <p>
-                                                Grade Level:{" "}
-                                                {data.grade_level || "-"}
-                                            </p>
-                                            <p>
-                                                Section: {data.section || "-"}
-                                            </p>
-                                            <p>
-                                                Subject:{" "}
-                                                {data.subject_name || "-"}
-                                            </p>
-                                            <p>Strand: {data.strand || "-"}</p>
-                                            <p>
-                                                Queued students:{" "}
-                                                {manualStudents.length}
-                                            </p>
-                                            <p>
-                                                Classlist file:{" "}
-                                                {data.classlist?.name || "None"}
-                                            </p>
-                                            <p>
-                                                Color:{" "}
-                                                {selectedColor?.name ||
-                                                    "indigo"}
-                                            </p>
-                                            <p>
-                                                School year:{" "}
-                                                {data.school_year || "-"}
-                                            </p>
+                                                        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    setStudentInputMode(
+                                                                        "single",
+                                                                    )
+                                                                }
+                                                                className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                                                                    studentInputMode ===
+                                                                    "single"
+                                                                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                                                        : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                                                                }`}
+                                                            >
+                                                                Add one by one
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    setStudentInputMode(
+                                                                        "bulk",
+                                                                    )
+                                                                }
+                                                                className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                                                                    studentInputMode ===
+                                                                    "bulk"
+                                                                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                                                        : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                                                                }`}
+                                                            >
+                                                                Bulk queue by
+                                                                text
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    setStudentInputMode(
+                                                                        "csv",
+                                                                    )
+                                                                }
+                                                                className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                                                                    studentInputMode ===
+                                                                    "csv"
+                                                                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                                                        : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                                                                }`}
+                                                            >
+                                                                CSV upload
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {studentInputMode ===
+                                                        "single" && (
+                                                        <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                                            <p className="text-sm font-semibold text-gray-800">
+                                                                Add Student
+                                                                One-by-One
+                                                            </p>
+                                                            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                                                                <input
+                                                                    type="text"
+                                                                    value={
+                                                                        activeStudentDraft.student_name
+                                                                    }
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        handleActiveStudentDraftChange(
+                                                                            "student_name",
+                                                                            event
+                                                                                .target
+                                                                                .value,
+                                                                        )
+                                                                    }
+                                                                    placeholder="Student name"
+                                                                    className="rounded-lg border-gray-300 text-sm"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    value={
+                                                                        activeStudentDraft.lrn
+                                                                    }
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        handleActiveStudentDraftChange(
+                                                                            "lrn",
+                                                                            event
+                                                                                .target
+                                                                                .value,
+                                                                        )
+                                                                    }
+                                                                    placeholder="LRN (12 digits)"
+                                                                    className="rounded-lg border-gray-300 text-sm"
+                                                                    maxLength={
+                                                                        12
+                                                                    }
+                                                                />
+                                                                <input
+                                                                    type="email"
+                                                                    value={
+                                                                        activeStudentDraft.personal_email
+                                                                    }
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        handleActiveStudentDraftChange(
+                                                                            "personal_email",
+                                                                            event
+                                                                                .target
+                                                                                .value,
+                                                                        )
+                                                                    }
+                                                                    placeholder="Personal email (optional)"
+                                                                    className="rounded-lg border-gray-300 text-sm"
+                                                                />
+                                                            </div>
+                                                            {activeStudentDraftError && (
+                                                                <p className="mt-2 text-xs text-red-600">
+                                                                    {
+                                                                        activeStudentDraftError
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                            <div className="mt-3 flex justify-end">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={
+                                                                        addSingleStudent
+                                                                    }
+                                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                                                                >
+                                                                    <Plus
+                                                                        size={
+                                                                            14
+                                                                        }
+                                                                    />
+                                                                    Queue
+                                                                    Student
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {studentInputMode ===
+                                                        "bulk" && (
+                                                        <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                                            <p className="text-sm font-semibold text-gray-800">
+                                                                Bulk Queue by
+                                                                Text
+                                                            </p>
+                                                            <p className="mt-1 text-xs text-gray-500">
+                                                                One line per
+                                                                student:
+                                                                student_name,lrn,email(optional)
+                                                            </p>
+                                                            <textarea
+                                                                value={
+                                                                    activeBulkRows
+                                                                }
+                                                                onChange={(
+                                                                    event,
+                                                                ) =>
+                                                                    handleActiveBulkRowsChange(
+                                                                        event
+                                                                            .target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                rows={5}
+                                                                className="mt-2 w-full rounded-lg border-gray-300 text-sm"
+                                                                placeholder="Juan Dela Cruz,123456789012,juan@email.com"
+                                                            />
+                                                            <div className="mt-3 flex justify-end">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={
+                                                                        addBulkStudents
+                                                                    }
+                                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                                                                >
+                                                                    <Upload
+                                                                        size={
+                                                                            14
+                                                                        }
+                                                                    />
+                                                                    Bulk Queue
+                                                                </button>
+                                                            </div>
+                                                            {activeBulkErrors.length >
+                                                                0 && (
+                                                                <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                                                                    <div className="space-y-1 text-xs text-amber-700">
+                                                                        {activeBulkErrors.map(
+                                                                            (
+                                                                                error,
+                                                                            ) => (
+                                                                                <p
+                                                                                    key={
+                                                                                        error
+                                                                                    }
+                                                                                >
+                                                                                    -{" "}
+                                                                                    {
+                                                                                        error
+                                                                                    }
+                                                                                </p>
+                                                                            ),
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {studentInputMode ===
+                                                        "csv" && (
+                                                        <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                                            <p className="text-sm font-semibold text-gray-800">
+                                                                CSV Upload
+                                                            </p>
+                                                            {activeClasslist ? (
+                                                                <div className="mt-3 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                                                                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                                                                        <FileText
+                                                                            size={
+                                                                                18
+                                                                            }
+                                                                            className="text-gray-500"
+                                                                        />
+                                                                        {
+                                                                            activeClasslist.name
+                                                                        }
+                                                                    </div>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            handleFileChange(
+                                                                                null,
+                                                                            )
+                                                                        }
+                                                                        className="text-red-600 hover:text-red-800"
+                                                                    >
+                                                                        <X
+                                                                            size={
+                                                                                18
+                                                                            }
+                                                                        />
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
+                                                                <label className="mt-3 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 px-6 py-7 text-center text-sm text-gray-500 transition hover:border-indigo-400 hover:bg-indigo-50">
+                                                                    <input
+                                                                        type="file"
+                                                                        name="file"
+                                                                        className="hidden"
+                                                                        accept=".csv,text/csv,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                                                        onChange={(
+                                                                            event,
+                                                                        ) =>
+                                                                            handleFileChange(
+                                                                                event
+                                                                                    .target
+                                                                                    .files[0],
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                    <Upload
+                                                                        size={
+                                                                            26
+                                                                        }
+                                                                        className="text-indigo-400"
+                                                                    />
+                                                                    <span className="mt-2 font-semibold text-gray-700">
+                                                                        Drop
+                                                                        classlist
+                                                                        or click
+                                                                        to
+                                                                        browse
+                                                                    </span>
+                                                                    <span className="text-xs text-gray-500">
+                                                                        CSV,
+                                                                        XLS,
+                                                                        XLSX up
+                                                                        to 4MB
+                                                                    </span>
+                                                                </label>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                                                        <div className="mb-2 flex items-center justify-between">
+                                                            <p className="text-sm font-semibold text-indigo-800">
+                                                                Queued Students
+                                                            </p>
+                                                            <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                                                                <Users
+                                                                    size={12}
+                                                                />
+                                                                {
+                                                                    activeQueuedStudents.length
+                                                                }
+                                                            </span>
+                                                        </div>
+
+                                                        {activeQueuedStudents.length ===
+                                                        0 ? (
+                                                            <p className="text-xs text-indigo-700">
+                                                                No queued
+                                                                students yet.
+                                                            </p>
+                                                        ) : (
+                                                            <div className="max-h-52 space-y-1.5 overflow-y-auto pr-1">
+                                                                {activeQueuedStudents.map(
+                                                                    (
+                                                                        student,
+                                                                        index,
+                                                                    ) => (
+                                                                        <div
+                                                                            key={`${student.lrn}-${index}`}
+                                                                            className="flex items-center justify-between rounded-md bg-white px-3 py-2"
+                                                                        >
+                                                                            <div>
+                                                                                <p className="text-xs font-medium text-gray-800">
+                                                                                    {
+                                                                                        student.student_name
+                                                                                    }
+                                                                                </p>
+                                                                                <p className="text-[11px] text-gray-500">
+                                                                                    {
+                                                                                        student.lrn
+                                                                                    }
+                                                                                </p>
+                                                                            </div>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    removeQueuedStudent(
+                                                                                        index,
+                                                                                    )
+                                                                                }
+                                                                                className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                                                                            >
+                                                                                <Trash2
+                                                                                    size={
+                                                                                        13
+                                                                                    }
+                                                                                />
+                                                                            </button>
+                                                                        </div>
+                                                                    ),
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex justify-end">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                markActiveSectionDone(
+                                                                    "studentsDone",
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                !canMarkStudentsDone
+                                                            }
+                                                            className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
+                                                        >
+                                                            <Check size={13} />
+                                                            Done for This
+                                                            Section
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
-                                )}
-                            </>
-                        )}
+                                </div>
+                            )}
 
-                        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                            <p className="text-sm text-blue-700">
-                                <strong>Note:</strong> Student accounts are
-                                created only when LRN is new. Existing LRNs are
-                                matched and assigned to this class.
-                            </p>
-                        </div>
-                    </div>
+                            {!isEditMode && step === 4 && (
+                                <div className="space-y-5">
+                                    <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+                                        <p className="text-sm font-semibold text-indigo-800">
+                                            Step 4: Pick Color Per Section
+                                        </p>
+                                        <p className="mt-1 text-xs text-indigo-700">
+                                            Select a section card then choose
+                                            its color theme and mark it done.
+                                        </p>
+                                    </div>
 
-                    {/* Modal Footer */}
-                    <div className="flex flex-col space-y-2 p-6 border-t bg-gray-50">
-                        {errors.class_duplicate && (
-                            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                                <p className="font-semibold">
-                                    Duplicate class detected
-                                </p>
-                                <p className="mt-1">{errors.class_duplicate}</p>
-                            </div>
-                        )}
-                        {(errors.grade_level ||
-                            errors.section ||
-                            errors.subject_name ||
-                            errors.color ||
-                            errors.school_year ||
-                            errors.strand ||
-                            errors.track ||
-                            errors.manual_students ||
-                            errors.class_duplicate) && (
-                            <div className="text-sm text-red-600">
-                                Please fix the highlighted errors before
-                                submitting.
-                            </div>
-                        )}
-                        {progress && (
-                            <div className="text-sm text-gray-600">
-                                Uploading… {progress.percentage}%
-                            </div>
-                        )}
-                        <div className="flex items-center justify-end gap-3">
-                            {isEditMode ? (
+                                    <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+                                        <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                            <p className="mb-3 text-sm font-semibold text-gray-800">
+                                                Section Cards
+                                            </p>
+                                            {renderSectionCardList(
+                                                "colorDone",
+                                                4,
+                                                false,
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            {!activeQueuedSection ? (
+                                                <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-8 text-center text-sm text-gray-500">
+                                                    Select a section card to set
+                                                    its color.
+                                                </div>
+                                            ) : (
+                                                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                                    <p className="text-sm font-semibold text-gray-800">
+                                                        Color for{" "}
+                                                        {activeQueuedSection.section_full_label ||
+                                                            activeQueuedSection.section_label}
+                                                    </p>
+
+                                                    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                                        {COLOR_OPTIONS.map(
+                                                            (color) => (
+                                                                <button
+                                                                    key={
+                                                                        color.name
+                                                                    }
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        handleActiveSectionColorSelect(
+                                                                            color.name,
+                                                                        )
+                                                                    }
+                                                                    className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm font-medium shadow-sm transition hover:border-indigo-400 ${
+                                                                        activeSectionColorName ===
+                                                                        color.name
+                                                                            ? "border-indigo-500 bg-indigo-50"
+                                                                            : "border-gray-200"
+                                                                    }`}
+                                                                >
+                                                                    <span
+                                                                        className={`inline-flex items-center gap-2 capitalize ${color.text}`}
+                                                                    >
+                                                                        <span
+                                                                            className={`h-4 w-4 rounded-full ${color.bg}`}
+                                                                        ></span>
+                                                                        {
+                                                                            color.name
+                                                                        }
+                                                                    </span>
+                                                                    {activeSectionColorName ===
+                                                                        color.name && (
+                                                                        <Check
+                                                                            size={
+                                                                                14
+                                                                            }
+                                                                            className="text-indigo-600"
+                                                                        />
+                                                                    )}
+                                                                </button>
+                                                            ),
+                                                        )}
+                                                    </div>
+
+                                                    <div className="mt-4 flex justify-end">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                markActiveSectionDone(
+                                                                    "colorDone",
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                !canMarkColorDone
+                                                            }
+                                                            className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
+                                                        >
+                                                            <Check size={13} />
+                                                            Done for This
+                                                            Section
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {!isEditMode && step === 5 && (
+                                <div className="space-y-5">
+                                    <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+                                        <p className="text-sm font-semibold text-indigo-800">
+                                            Step 5: Review and Save
+                                        </p>
+                                        <p className="mt-1 text-xs text-indigo-700">
+                                            Review each section summary and mark
+                                            it done before adding class.
+                                        </p>
+                                    </div>
+
+                                    <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+                                        <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                            <p className="mb-3 text-sm font-semibold text-gray-800">
+                                                Section Cards
+                                            </p>
+                                            {renderSectionCardList(
+                                                "reviewDone",
+                                                5,
+                                                false,
+                                            )}
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            {renderActiveSectionSummaryPanel()}
+
+                                            <div className="flex flex-wrap justify-end gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setIsSummaryModalOpen(
+                                                            true,
+                                                        )
+                                                    }
+                                                    className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                                                >
+                                                    Open Summary Modal
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        markActiveSectionDone(
+                                                            "reviewDone",
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        !activeQueuedSection
+                                                    }
+                                                    className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
+                                                >
+                                                    <Check size={13} /> Done for
+                                                    This Section
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {isEditMode && (
                                 <>
-                                    <button
-                                        type="button"
-                                        onClick={handleClose}
-                                        className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="bg-indigo-600 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                                        disabled={
-                                            processing ||
-                                            !canContinueStepOne ||
-                                            !canContinueStepTwo
-                                        }
-                                    >
-                                        {processing
-                                            ? "Saving..."
-                                            : "Save Changes"}
-                                    </button>
-                                </>
-                            ) : (
-                                <>
-                                    <button
-                                        type="button"
-                                        onClick={
-                                            step === 1
-                                                ? handleClose
-                                                : () =>
-                                                      setStep((current) =>
-                                                          Math.max(
-                                                              current - 1,
-                                                              1,
-                                                          ),
-                                                      )
-                                        }
-                                        className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                                    >
-                                        <ChevronLeft size={14} />
-                                        {step === 1 ? "Cancel" : "Back"}
-                                    </button>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Color Theme
+                                        </label>
+                                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                            {COLOR_OPTIONS.map((color) => (
+                                                <label
+                                                    key={color.name}
+                                                    className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm font-medium shadow-sm transition hover:border-indigo-400 ${
+                                                        data.color ===
+                                                        color.name
+                                                            ? "border-indigo-500 bg-indigo-50"
+                                                            : "border-gray-200"
+                                                    }`}
+                                                >
+                                                    <span
+                                                        className={`inline-flex items-center gap-2 capitalize ${color.text}`}
+                                                    >
+                                                        <span
+                                                            className={`h-4 w-4 rounded-full ${color.bg}`}
+                                                        ></span>
+                                                        {color.name}
+                                                    </span>
+                                                    <input
+                                                        type="radio"
+                                                        name="color"
+                                                        value={color.name}
+                                                        checked={
+                                                            data.color ===
+                                                            color.name
+                                                        }
+                                                        onChange={handleChange}
+                                                        className="h-4 w-4 accent-indigo-600"
+                                                    />
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
 
-                                    {step < 3 ? (
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setStep((current) =>
-                                                    Math.min(current + 1, 3),
-                                                )
-                                            }
-                                            disabled={
-                                                (step === 1 &&
-                                                    !canContinueStepOne) ||
-                                                (step === 2 &&
-                                                    !canContinueStepTwo)
-                                            }
-                                            className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                                        >
-                                            Next
-                                            <ChevronRight size={14} />
-                                        </button>
-                                    ) : (
-                                        <button
-                                            type="submit"
-                                            className="bg-indigo-600 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                                            disabled={
-                                                processing ||
-                                                !canContinueStepOne ||
-                                                !canContinueStepTwo ||
-                                                !data.color ||
-                                                !isStepThreeSubmitReady
-                                            }
-                                        >
-                                            {processing
-                                                ? "Creating..."
-                                                : "Create Class"}
-                                        </button>
+                                    {!isEditMode && (
+                                        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                                            <p className="text-sm font-semibold text-gray-800">
+                                                Create Summary
+                                            </p>
+                                            <div className="mt-2 grid gap-2 text-xs text-gray-700 sm:grid-cols-2">
+                                                <p>
+                                                    Grade Level:{" "}
+                                                    {data.grade_level || "-"}
+                                                </p>
+                                                <p>
+                                                    Section:{" "}
+                                                    {data.section || "-"}
+                                                </p>
+                                                <p>
+                                                    Subject:{" "}
+                                                    {data.subject_name || "-"}
+                                                </p>
+                                                <p>
+                                                    Strand: {data.strand || "-"}
+                                                </p>
+                                                <p>
+                                                    Queued students:{" "}
+                                                    {manualStudents.length}
+                                                </p>
+                                                <p>
+                                                    Classlist file:{" "}
+                                                    {data.classlist?.name ||
+                                                        "None"}
+                                                </p>
+                                                <p>
+                                                    Color:{" "}
+                                                    {selectedColor?.name ||
+                                                        "indigo"}
+                                                </p>
+                                                <p>
+                                                    School year:{" "}
+                                                    {data.school_year || "-"}
+                                                </p>
+                                            </div>
+                                        </div>
                                     )}
                                 </>
                             )}
+
+                            {!isEditMode && isSummaryModalOpen && (
+                                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                                    <div
+                                        className="absolute inset-0 bg-slate-950/45"
+                                        onClick={() =>
+                                            setIsSummaryModalOpen(false)
+                                        }
+                                    />
+                                    <div className="relative z-10 max-h-[85vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-2xl">
+                                        <div className="flex items-center justify-between border-b border-blue-100 bg-gradient-to-r from-blue-600 to-indigo-700 px-4 py-3 text-white">
+                                            <div>
+                                                <p className="text-sm font-semibold">
+                                                    Section Review Summary
+                                                </p>
+                                                <p className="text-xs text-blue-100">
+                                                    Review queued sections and
+                                                    close when done.
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setIsSummaryModalOpen(false)
+                                                }
+                                                className="rounded-lg p-1.5 text-blue-100 transition-colors hover:bg-white/15 hover:text-white"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+
+                                        <div className="max-h-[calc(85vh-4rem)] overflow-y-auto bg-blue-50/40 p-4">
+                                            <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+                                                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                                    <p className="mb-3 text-sm font-semibold text-gray-800">
+                                                        Section Cards
+                                                    </p>
+                                                    {renderSectionCardList(
+                                                        "reviewDone",
+                                                        5,
+                                                        false,
+                                                    )}
+                                                </div>
+
+                                                <div>
+                                                    {renderActiveSectionSummaryPanel()}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                                <p className="text-sm text-blue-700">
+                                    <strong>Note:</strong> Student accounts are
+                                    created only when LRN is new. Existing LRNs
+                                    are matched and assigned to this class.
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                </form>
+
+                        {/* Modal Footer */}
+                        <div className="shrink-0 border-t border-blue-100 bg-white px-4 py-3 sm:px-6 sm:py-4">
+                            <div className="space-y-2">
+                                {errors.class_duplicate && (
+                                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                                        <p className="font-semibold">
+                                            Duplicate class detected
+                                        </p>
+                                        <p className="mt-1">
+                                            {errors.class_duplicate}
+                                        </p>
+                                    </div>
+                                )}
+                                {(errors.grade_level ||
+                                    errors.section ||
+                                    errors.subject_name ||
+                                    errors.color ||
+                                    errors.school_year ||
+                                    errors.strand ||
+                                    errors.specialization ||
+                                    errors.manual_students ||
+                                    errors.class_duplicate) && (
+                                    <div className="text-sm text-red-600">
+                                        Please fix the highlighted errors before
+                                        submitting.
+                                    </div>
+                                )}
+                                {progress && (
+                                    <div className="text-sm text-gray-600">
+                                        Uploading… {progress.percentage}%
+                                    </div>
+                                )}
+                                <div
+                                    className={`flex items-center gap-3 ${
+                                        isEditMode
+                                            ? "justify-end"
+                                            : "justify-between"
+                                    }`}
+                                >
+                                    {isEditMode ? (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={handleClose}
+                                                className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                className="inline-flex items-center gap-1 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+                                                disabled={
+                                                    processing ||
+                                                    !canContinueStepOne ||
+                                                    !canContinueStepTwo
+                                                }
+                                            >
+                                                {processing
+                                                    ? "Saving..."
+                                                    : "Save Changes"}
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={
+                                                    step === 1
+                                                        ? handleClose
+                                                        : () =>
+                                                              setStep(
+                                                                  (current) =>
+                                                                      Math.max(
+                                                                          current -
+                                                                              1,
+                                                                          1,
+                                                                      ),
+                                                              )
+                                                }
+                                                className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                                            >
+                                                <ChevronLeft size={13} />
+                                                {step === 1 ? "Cancel" : "Back"}
+                                            </button>
+
+                                            {step < 5 ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setStep((current) =>
+                                                            Math.min(
+                                                                current + 1,
+                                                                5,
+                                                            ),
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        (step === 1 &&
+                                                            !canContinueStepOne) ||
+                                                        (step === 2 &&
+                                                            !canContinueStepTwo) ||
+                                                        (step === 3 &&
+                                                            !canContinueStepThree) ||
+                                                        (step === 4 &&
+                                                            !canContinueStepFour)
+                                                    }
+                                                    className="inline-flex items-center gap-1 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+                                                >
+                                                    Next
+                                                    <ChevronRight size={13} />
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    type="submit"
+                                                    className="inline-flex items-center gap-1 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+                                                    disabled={
+                                                        processing ||
+                                                        !canContinueStepOne ||
+                                                        !canContinueStepTwo ||
+                                                        !canContinueStepThree ||
+                                                        !canContinueStepFour ||
+                                                        !canSubmitStepFive
+                                                    }
+                                                >
+                                                    {processing
+                                                        ? "Creating..."
+                                                        : "Create Class"}
+                                                </button>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     );

@@ -40,14 +40,23 @@ class AcademicManagementController extends Controller
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
 
         $departments = Department::query()
+            ->with(['specializations:id,specialization_name'])
             ->orderBy('department_code')
             ->get(['id', 'department_name', 'department_code', 'track'])
-            ->map(fn(Department $department) => [
-                'id' => (int) $department->id,
-                'department_name' => $department->department_name,
-                'department_code' => $department->department_code,
-                'track' => $department->track ?: 'Academic',
-            ])
+            ->map(function (Department $department) {
+                return [
+                    'id' => (int) $department->id,
+                    'department_name' => $department->department_name,
+                    'department_code' => $department->department_code,
+                    'track' => $department->track ?: 'Academic',
+                    'specializations' => $department->specializations
+                        ->map(fn($specialization) => [
+                            'id' => (int) $specialization->id,
+                            'specialization_name' => $specialization->specialization_name,
+                        ])
+                        ->values(),
+                ];
+            })
             ->values();
 
         $sectionsQuery = Section::query()
@@ -121,8 +130,8 @@ class AcademicManagementController extends Controller
 
         $sections->setCollection(
             $sections->getCollection()->map(function (Section $section) {
-                $specialization = $section->track
-                    ?: ($section->strand ?: $section->department?->department_code);
+                $specialization = $section->strand
+                    ?: $section->department?->department_code;
 
                 return [
                     'id' => (int) $section->id,
@@ -586,14 +595,33 @@ class AcademicManagementController extends Controller
     {
         $validated = $request->validate($this->sectionCreateValidationRules());
 
-        $department = Department::query()->findOrFail((int) $validated['department_id']);
-        $selectedTrack = (string) $validated['track'];
+        $department = Department::query()
+            ->with(['specializations:id,specialization_name'])
+            ->findOrFail((int) $validated['department_id']);
 
-        if (($department->track ?: 'Academic') !== $selectedTrack) {
+        $normalizedSpecialization = $this->normalizeSectionSpecialization(
+            $validated['specialization'] ?? null,
+        );
+
+        $allowedSpecializations = $department->specializations
+            ->map(fn($specialization) => $this->normalizeSectionSpecialization($specialization->specialization_name))
+            ->filter(fn($specialization) => $specialization !== '')
+            ->values();
+
+        if (
+            $allowedSpecializations->isNotEmpty()
+            && ! $allowedSpecializations->contains($normalizedSpecialization)
+        ) {
             throw ValidationException::withMessages([
-                'department_id' => 'Selected department is not part of the chosen track.',
+                'specialization' => 'Select a valid strand/specialization for the selected department.',
             ]);
         }
+
+        if ($normalizedSpecialization === '') {
+            $normalizedSpecialization = Str::upper((string) $department->department_code);
+        }
+
+        $resolvedTrack = $this->resolveTrackFromDepartmentCode((string) $department->department_code);
 
         $schoolYear = SystemSetting::getCurrentSchoolYear();
         $cohort = $this->resolveCohortFromSchoolYear($schoolYear);
@@ -649,7 +677,8 @@ class AcademicManagementController extends Controller
             $gradeLevel,
             $sectionBaseName,
             $sectionCode,
-            $selectedTrack,
+            $normalizedSpecialization,
+            $resolvedTrack,
             $advisorTeacherId,
             $assignedStudentIds,
             $newStudents
@@ -662,8 +691,8 @@ class AcademicManagementController extends Controller
                 'section_code' => $sectionCode,
                 'cohort' => $cohort,
                 'grade_level' => $gradeLevel,
-                'strand' => $department->department_code,
-                'track' => $selectedTrack,
+                'strand' => $normalizedSpecialization,
+                'track' => $resolvedTrack,
                 'school_year' => $schoolYear,
                 'description' => null,
                 'is_active' => true,
@@ -761,6 +790,8 @@ class AcademicManagementController extends Controller
                 'department_code' => $department->department_code,
                 'cohort' => $section->cohort,
                 'grade_level' => $section->grade_level,
+                'specialization' => $section->strand,
+                'track' => $section->track,
                 'school_year' => $section->school_year,
                 'is_active' => (bool) $section->is_active,
                 'existing_assigned_count' => count($assignedExistingStudents),
@@ -831,8 +862,8 @@ class AcademicManagementController extends Controller
     private function sectionCreateValidationRules(): array
     {
         return [
-            'track' => ['required', 'string', Rule::in(['Academic', 'TVL'])],
             'department_id' => ['required', 'integer', Rule::exists('departments', 'id')],
+            'specialization' => ['required', 'string', 'max:255'],
             'section_name' => ['required', 'string', 'max:255'],
             'grade_level' => ['required', 'string', Rule::in(satis_grade_level_options())],
             'school_year' => ['nullable', 'string', 'max:20'],
@@ -1067,6 +1098,38 @@ class AcademicManagementController extends Controller
             'class_queue.*.school_year' => ['required', 'string', 'max:9', 'regex:/^\d{4}-\d{4}$/'],
             'class_queue.*.color' => ['nullable', 'string', Rule::in(self::COLOR_OPTIONS)],
         ];
+    }
+
+    private function normalizeSectionSpecialization(?string $specialization): string
+    {
+        $normalized = $this->normalizeNullableText($specialization);
+
+        return $normalized ? Str::upper($normalized) : '';
+    }
+
+    private function resolveTrackFromDepartmentCode(?string $departmentCode): string
+    {
+        $normalizedDepartmentCode = Str::upper(trim((string) $departmentCode));
+
+        if ($normalizedDepartmentCode === '') {
+            return 'Academic';
+        }
+
+        $departmentTrack = Department::query()
+            ->whereRaw('UPPER(department_code) = ?', [$normalizedDepartmentCode])
+            ->value('track');
+
+        $normalizedTrack = Str::lower(trim((string) $departmentTrack));
+
+        if ($normalizedTrack === 'tvl') {
+            return 'TVL';
+        }
+
+        if ($normalizedTrack === 'academic') {
+            return 'Academic';
+        }
+
+        return $normalizedDepartmentCode === 'ICT' ? 'TVL' : 'Academic';
     }
 
     private function ensureTeacherAssignable(int $teacherId, int $departmentId, string $field = 'teacher_id'): void
