@@ -73,6 +73,12 @@ class UserManagementController extends Controller
             ->pluck('total', 'name')
             ->toArray();
 
+        $studentCreationBaseCount = User::query()
+            ->whereHas('roles', function ($query) {
+                $query->where('name', 'student');
+            })
+            ->count();
+
         foreach ($roleCountRows as $roleName => $total) {
             if (array_key_exists($roleName, $roleCounts)) {
                 $roleCounts[$roleName] = (int) $total;
@@ -111,19 +117,166 @@ class UserManagementController extends Controller
             'departments' => $departments,
             'filters'     => $request->only('search', 'role'),
             'roleCounts'  => $roleCounts,
+            'studentCreationBaseCount' => $studentCreationBaseCount,
         ]);
     }
 
     public function store(Request $request)
     {
         $superAdmin = Auth::user();
+
+        $role = (string) $request->input('role', '');
+        $teacherMode = (string) $request->input('teacher_mode', 'single');
+        $studentMode = (string) $request->input('student_mode', 'single');
+
+        if ($role === 'teacher' && $teacherMode === 'multiple') {
+            $validated = $request->validate([
+                'role' => ['required', 'in:teacher'],
+                'teacher_mode' => ['required', 'in:multiple'],
+                'password' => ['required', Password::min(8)],
+                'teacher_queue' => ['required', 'array', 'min:1'],
+                'teacher_queue.*.first_name' => ['required', 'string', 'max:100'],
+                'teacher_queue.*.last_name' => ['required', 'string', 'max:100'],
+                'teacher_queue.*.middle_name' => ['nullable', 'string', 'max:100'],
+                'teacher_queue.*.email' => ['required', 'email', 'max:255', 'distinct', 'unique:users,personal_email'],
+                'teacher_queue.*.department_id' => ['required', 'exists:departments,id'],
+                'teacher_queue.*.assign_as_admin' => ['nullable', 'boolean'],
+            ]);
+
+            $departmentIds = collect($validated['teacher_queue'])
+                ->pluck('department_id')
+                ->filter()
+                ->unique()
+                ->values();
+
+            $departments = \App\Models\Department::query()
+                ->whereIn('id', $departmentIds)
+                ->withCount('admins')
+                ->get()
+                ->keyBy('id');
+
+            $pendingAdminDepartmentIds = [];
+
+            foreach ($validated['teacher_queue'] as $index => $teacherPayload) {
+                $wantsAdmin = (bool) ($teacherPayload['assign_as_admin'] ?? false);
+
+                if (! $wantsAdmin) {
+                    continue;
+                }
+
+                $departmentId = (int) $teacherPayload['department_id'];
+                $existingAdminCount = (int) ($departments[$departmentId]->admins_count ?? 0);
+
+                if ($existingAdminCount > 0 || in_array($departmentId, $pendingAdminDepartmentIds, true)) {
+                    return back()->withErrors([
+                        "teacher_queue.{$index}.assign_as_admin" => 'This department already has an assigned admin.',
+                    ]);
+                }
+
+                $pendingAdminDepartmentIds[] = $departmentId;
+            }
+
+            DB::transaction(function () use ($validated, $superAdmin) {
+                foreach ($validated['teacher_queue'] as $teacherPayload) {
+                    $assignedRoles = ['teacher'];
+
+                    if (!empty($teacherPayload['assign_as_admin'])) {
+                        $assignedRoles[] = 'admin';
+                    }
+
+                    $teacher = User::create([
+                        'first_name' => $teacherPayload['first_name'],
+                        'last_name' => $teacherPayload['last_name'],
+                        'middle_name' => $teacherPayload['middle_name'] ?? null,
+                        'personal_email' => $teacherPayload['email'] ?? null,
+                        'password' => Hash::make($validated['password']),
+                        'department_id' => $teacherPayload['department_id'],
+                        'must_change_password' => true,
+                        'status' => 'active',
+                        'created_by' => $superAdmin->id,
+                        'username' => null,
+                    ]);
+
+                    $roleIds = Role::whereIn('name', $assignedRoles)->pluck('id')->all();
+                    if (!empty($roleIds)) {
+                        $teacher->roles()->sync($roleIds);
+                    }
+                }
+            });
+
+            $createdCount = count($validated['teacher_queue']);
+            $label = $createdCount === 1 ? 'teacher' : 'teachers';
+
+            return redirect()->route('superadmin.users.index')
+                ->with('success', "{$createdCount} {$label} created successfully.");
+        }
+
+        if ($role === 'student' && in_array($studentMode, ['multiple', 'csv'], true)) {
+            $validated = $request->validate([
+                'role' => ['required', 'in:student'],
+                'student_mode' => ['required', 'in:multiple,csv'],
+                'password' => ['required', Password::min(8)],
+                'student_queue' => ['required', 'array', 'min:1'],
+                'student_queue.*.first_name' => ['required', 'string', 'max:100'],
+                'student_queue.*.last_name' => ['required', 'string', 'max:100'],
+                'student_queue.*.middle_name' => ['nullable', 'string', 'max:100'],
+                'student_queue.*.email' => ['nullable', 'email', 'max:255', 'distinct', 'unique:users,personal_email'],
+                'student_queue.*.username' => ['required', 'string', 'regex:/^[a-z]{2}\d{4}\d{5}$/', 'distinct', 'unique:users,username'],
+            ]);
+
+            foreach ($validated['student_queue'] as $index => $studentPayload) {
+                $isUsernameValidForPayload = $this->isValidStudentUsernameForName(
+                    (string) ($studentPayload['username'] ?? ''),
+                    (string) ($studentPayload['first_name'] ?? ''),
+                    (string) ($studentPayload['last_name'] ?? ''),
+                );
+
+                if (! $isUsernameValidForPayload) {
+                    return back()->withErrors([
+                        "student_queue.{$index}.username" => 'Username format must follow initials + current year + 5-digit number (example: dd202300100).',
+                    ]);
+                }
+            }
+
+            DB::transaction(function () use ($validated, $superAdmin) {
+                foreach ($validated['student_queue'] as $studentPayload) {
+                    $student = User::create([
+                        'first_name' => $studentPayload['first_name'],
+                        'last_name' => $studentPayload['last_name'],
+                        'middle_name' => $studentPayload['middle_name'] ?? null,
+                        'personal_email' => $studentPayload['email'] ?? null,
+                        'username' => $studentPayload['username'],
+                        'password' => Hash::make($validated['password']),
+                        'department_id' => null,
+                        'must_change_password' => true,
+                        'status' => 'active',
+                        'created_by' => $superAdmin->id,
+                    ]);
+
+                    $roleIds = Role::whereIn('name', ['student'])->pluck('id')->all();
+                    if (! empty($roleIds)) {
+                        $student->roles()->sync($roleIds);
+                    }
+                }
+            });
+
+            $createdCount = count($validated['student_queue']);
+            $label = $createdCount === 1 ? 'student' : 'students';
+
+            return redirect()->route('superadmin.users.index')
+                ->with('success', "{$createdCount} {$label} created successfully.");
+        }
+
         $validated = $request->validate([
             'first_name'    => ['required', 'string', 'max:100'],
             'last_name'     => ['required', 'string', 'max:100'],
             'middle_name'   => ['nullable', 'string', 'max:100'],
             'email'         => ['nullable', 'email', 'unique:users,personal_email'],
+            'username'      => ['nullable', 'string', 'regex:/^[a-z]{2}\d{4}\d{5}$/', 'unique:users,username'],
             'password'      => ['required', Password::min(8)],
             'role'          => ['required', 'in:teacher,student'],
+            'teacher_mode'  => ['nullable', 'in:single,multiple'],
+            'student_mode'  => ['nullable', 'in:single,multiple,csv'],
             'assign_as_admin' => ['nullable', 'boolean'],
             'department_id' => ['nullable', 'exists:departments,id'],
         ]);
@@ -151,6 +304,38 @@ class UserManagementController extends Controller
             }
         }
 
+        if ($validated['role'] === 'student') {
+            if (($validated['student_mode'] ?? 'single') !== 'single') {
+                return back()->withErrors([
+                    'student_mode' => 'Invalid student mode for single student creation.',
+                ]);
+            }
+
+            if (empty($validated['email'])) {
+                return back()->withErrors([
+                    'email' => 'Email address is required for single student creation.',
+                ]);
+            }
+
+            if (empty($validated['username'])) {
+                return back()->withErrors([
+                    'username' => 'Username is required for single student creation.',
+                ]);
+            }
+
+            $isValidUsername = $this->isValidStudentUsernameForName(
+                (string) $validated['username'],
+                (string) ($validated['first_name'] ?? ''),
+                (string) ($validated['last_name'] ?? ''),
+            );
+
+            if (! $isValidUsername) {
+                return back()->withErrors([
+                    'username' => 'Username format must follow initials + current year + 5-digit number (example: dd202300100).',
+                ]);
+            }
+        }
+
         if ($validated['role'] === 'teacher') {
             $assignedRoles = ['teacher'];
 
@@ -174,7 +359,7 @@ class UserManagementController extends Controller
             'status'               => 'active',
             'created_by'           => $superAdmin->id,
             'username'             => $validated['role'] === 'student'
-                ? User::generateUniqueUsername(trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? '')))
+                ? (string) ($validated['username'] ?? '')
                 : null,
         ]);
 
@@ -185,6 +370,50 @@ class UserManagementController extends Controller
 
         return redirect()->route('superadmin.users.index')
             ->with('success', 'User created successfully.');
+    }
+
+    private function isValidStudentUsernameForName(string $username, string $firstName, string $lastName): bool
+    {
+        if (preg_match('/^[a-z]{2}\d{4}\d{5}$/', $username) !== 1) {
+            return false;
+        }
+
+        $expectedPrefix = $this->buildStudentUsernamePrefix($firstName, $lastName);
+        $expectedYear = now()->format('Y');
+
+        return str_starts_with($username, $expectedPrefix . $expectedYear);
+    }
+
+    private function buildStudentUsernamePrefix(string $firstName, string $lastName): string
+    {
+        $firstToken = $this->normalizeStudentUsernameToken($firstName, 'first');
+        $lastToken = $this->normalizeStudentUsernameToken($lastName, 'last');
+
+        $firstInitial = $firstToken !== '' ? substr($firstToken, 0, 1) : 'x';
+        $lastInitial = $lastToken !== '' ? substr($lastToken, 0, 1) : 'x';
+
+        return strtolower($firstInitial . $lastInitial);
+    }
+
+    private function normalizeStudentUsernameToken(string $value, string $mode = 'first'): string
+    {
+        $normalized = strtolower(trim(preg_replace('/[^a-z0-9\s]/i', ' ', $value) ?? ''));
+
+        if ($normalized === '') {
+            return '';
+        }
+
+        $tokens = preg_split('/\s+/', $normalized);
+
+        if (! is_array($tokens) || empty($tokens)) {
+            return '';
+        }
+
+        if ($mode === 'last') {
+            return (string) ($tokens[count($tokens) - 1] ?? '');
+        }
+
+        return (string) ($tokens[0] ?? '');
     }
 
     public function destroy(Request $request, User $user)

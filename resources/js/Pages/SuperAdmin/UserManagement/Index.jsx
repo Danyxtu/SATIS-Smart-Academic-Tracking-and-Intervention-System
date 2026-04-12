@@ -102,6 +102,7 @@ export default function Index({
     departments,
     filters,
     roleCounts = {},
+    studentCreationBaseCount = 0,
 }) {
     const [search, setSearch] = useState(filters?.search || "");
     const [roleFilter, setRoleFilter] = useState(filters?.role || "");
@@ -572,6 +573,7 @@ export default function Index({
                 open={createModal}
                 onClose={() => setCreateModal(false)}
                 departments={departments}
+                studentCount={Number(studentCreationBaseCount || 0)}
             />
 
             {/* ── Edit Modal ───────────────────────────────────────────── */}
