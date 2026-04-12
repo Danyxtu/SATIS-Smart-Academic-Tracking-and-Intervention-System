@@ -58,9 +58,6 @@ export default function Index({ logs, filters, options }) {
     const [search, setSearch] = useState(filters?.search || "");
     const [roleFilter, setRoleFilter] = useState(filters?.role || "");
     const [actionFilter, setActionFilter] = useState(filters?.action || "");
-    const [schoolYearFilter, setSchoolYearFilter] = useState(
-        filters?.school_year || "",
-    );
     const [selectedLog, setSelectedLog] = useState(null);
 
     const totalLogs = Number(logs?.total || 0);
@@ -81,7 +78,6 @@ export default function Index({ logs, filters, options }) {
             search,
             role: roleFilter,
             action: actionFilter,
-            school_year: schoolYearFilter,
             ...overrides,
         };
 
@@ -100,7 +96,6 @@ export default function Index({ logs, filters, options }) {
         setSearch("");
         setRoleFilter("");
         setActionFilter("");
-        setSchoolYearFilter("");
 
         router.get(
             route("superadmin.activity-logs.index"),
@@ -179,7 +174,7 @@ export default function Index({ logs, filters, options }) {
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
                             <select
                                 value={roleFilter}
                                 onChange={(event) => {
@@ -213,23 +208,6 @@ export default function Index({ logs, filters, options }) {
                                         value={actionValue}
                                     >
                                         {actionValue}
-                                    </option>
-                                ))}
-                            </select>
-
-                            <select
-                                value={schoolYearFilter}
-                                onChange={(event) => {
-                                    const next = event.target.value;
-                                    setSchoolYearFilter(next);
-                                    runFilters({ school_year: next });
-                                }}
-                                className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                            >
-                                <option value="">All School Years</option>
-                                {(options?.school_years || []).map((year) => (
-                                    <option key={year} value={year}>
-                                        {year}
                                     </option>
                                 ))}
                             </select>

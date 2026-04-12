@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "@inertiajs/react";
 import {
     AlertTriangle,
-    CheckCircle2,
+    Check,
     ChevronLeft,
     ChevronRight,
     Plus,
@@ -21,16 +21,19 @@ const WIZARD_STEPS = [
         id: 1,
         title: "Section Details",
         description: "Track, department, grade level, section name, adviser",
+        icon: Plus,
     },
     {
         id: 2,
         title: "Students",
         description: "Assign existing or add new students",
+        icon: Users,
     },
     {
         id: 3,
         title: "Summary",
         description: "Review and create section",
+        icon: Save,
     },
 ];
 
@@ -83,32 +86,29 @@ function FieldError({ message }) {
 }
 
 function WizardStep({ step, currentStep }) {
+    const Icon = step.icon;
     const isActive = currentStep === step.id;
     const isComplete = currentStep > step.id;
 
     return (
-        <div className="flex items-center gap-2">
-            <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                    isComplete
-                        ? "bg-emerald-600 text-white"
-                        : isActive
-                          ? "bg-indigo-600 text-white"
-                          : "bg-slate-200 text-slate-600"
+        <div
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                isActive
+                    ? "bg-emerald-100 text-emerald-700"
+                    : isComplete
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-slate-50 text-slate-400"
+            }`}
+        >
+            <span
+                className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${
+                    isComplete ? "bg-emerald-600 text-white" : "bg-white"
                 }`}
             >
-                {isComplete ? <CheckCircle2 size={14} /> : step.id}
-            </div>
-            <div className="hidden sm:block">
-                <p
-                    className={`text-xs font-semibold ${
-                        isActive ? "text-indigo-700" : "text-slate-600"
-                    }`}
-                >
-                    {step.title}
-                </p>
-                <p className="text-[11px] text-slate-500">{step.description}</p>
-            </div>
+                {isComplete ? <Check size={10} /> : step.id}
+            </span>
+            <Icon size={12} />
+            <span>{step.title}</span>
         </div>
     );
 }
@@ -1022,19 +1022,20 @@ export default function AddSectionWizardModal({
             />
 
             <div className="flex min-h-full items-end justify-center p-3 pb-10 sm:items-center sm:p-4">
-                <div className="relative w-full max-w-6xl max-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
-                    <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-6 sm:py-5">
+                <div className="relative flex h-[calc(100vh-6rem)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-2xl">
+                    <div className="relative shrink-0 overflow-hidden border-b border-emerald-100 bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-4 sm:px-6 sm:py-5">
+                        <div className="absolute -right-8 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
                         <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 ring-1 ring-blue-200">
-                                <Plus size={16} className="text-blue-600" />
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">
+                                <Plus size={18} />
                             </div>
                             <div>
-                                <h2 className="text-base font-semibold text-slate-900">
+                                <h2 className="text-base font-semibold text-white">
                                     Add Section Wizard
                                 </h2>
-                                <p className="text-xs text-slate-500">
-                                    Simplified section setup with student
-                                    assignment
+                                <p className="text-xs text-emerald-100">
+                                    Step {step} of {WIZARD_STEPS.length}:{" "}
+                                    {WIZARD_STEPS[step - 1].title}
                                 </p>
                             </div>
                         </div>
@@ -1042,14 +1043,14 @@ export default function AddSectionWizardModal({
                             type="button"
                             onClick={closeWizard}
                             disabled={processing}
-                            className="z-10 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+                            className="absolute right-3 top-3 rounded-lg p-1.5 text-emerald-100 transition-colors hover:bg-white/15 hover:text-white disabled:opacity-60"
                         >
                             <X size={16} />
                         </button>
                     </div>
 
-                    <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-3 sm:px-6 sm:py-4">
-                        <div className="flex flex-wrap items-center gap-4">
+                    <div className="shrink-0 border-b border-emerald-100 px-4 py-3 sm:px-6 sm:py-4">
+                        <div className="flex flex-wrap items-center gap-2">
                             {WIZARD_STEPS.map((wizardStep) => (
                                 <WizardStep
                                     key={wizardStep.id}
@@ -1083,7 +1084,7 @@ export default function AddSectionWizardModal({
                         </div>
                     )}
 
-                    <div className="max-h-[72vh] overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+                    <div className="min-h-0 flex-1 overflow-y-auto bg-emerald-50/40 px-4 py-4 sm:px-6 sm:py-5">
                         {step === 1 && (
                             <div className="space-y-4">
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1907,78 +1908,67 @@ export default function AddSectionWizardModal({
                         )}
                     </div>
 
-                    <div className="flex flex-col-reverse gap-2.5 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
+                    <div className="shrink-0 flex items-center justify-between border-t border-emerald-100 bg-white px-4 py-3 sm:px-6 sm:py-4">
                         <button
                             type="button"
-                            onClick={closeWizard}
+                            onClick={
+                                step === 1 ? closeWizard : handlePreviousStep
+                            }
                             disabled={processing}
-                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
+                            className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
                         >
-                            Close
+                            <ChevronLeft size={13} />
+                            {step === 1 ? "Cancel" : "Back"}
                         </button>
 
-                        <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center">
-                            {step > 1 && (
-                                <button
-                                    type="button"
-                                    onClick={handlePreviousStep}
-                                    disabled={processing}
-                                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
-                                >
-                                    <ChevronLeft size={14} />
-                                    Back
-                                </button>
-                            )}
-
-                            {step < 3 ? (
-                                <button
-                                    type="button"
-                                    onClick={handleNextStep}
-                                    disabled={processing}
-                                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-blue-700 disabled:opacity-60 sm:w-auto"
-                                >
-                                    Next
-                                    <ChevronRight size={14} />
-                                </button>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={createSection}
-                                    disabled={processing}
-                                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-60 sm:w-auto"
-                                >
-                                    {processing ? (
-                                        <>
-                                            <svg
-                                                className="h-3.5 w-3.5 animate-spin"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                            >
-                                                <circle
-                                                    className="opacity-25"
-                                                    cx="12"
-                                                    cy="12"
-                                                    r="10"
-                                                    stroke="currentColor"
-                                                    strokeWidth="4"
-                                                />
-                                                <path
-                                                    className="opacity-75"
-                                                    fill="currentColor"
-                                                    d="M4 12a8 8 0 018-8v8z"
-                                                />
-                                            </svg>
-                                            Creating...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Save size={14} />
-                                            Create Section
-                                        </>
-                                    )}
-                                </button>
-                            )}
-                        </div>
+                        {step < 3 ? (
+                            <button
+                                type="button"
+                                onClick={handleNextStep}
+                                disabled={processing}
+                                className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
+                            >
+                                Next
+                                <ChevronRight size={13} />
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={createSection}
+                                disabled={processing}
+                                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
+                            >
+                                {processing ? (
+                                    <>
+                                        <svg
+                                            className="h-3.5 w-3.5 animate-spin"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                        >
+                                            <circle
+                                                className="opacity-25"
+                                                cx="12"
+                                                cy="12"
+                                                r="10"
+                                                stroke="currentColor"
+                                                strokeWidth="4"
+                                            />
+                                            <path
+                                                className="opacity-75"
+                                                fill="currentColor"
+                                                d="M4 12a8 8 0 018-8v8z"
+                                            />
+                                        </svg>
+                                        Creating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save size={13} />
+                                        Create Section
+                                    </>
+                                )}
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
     BookOpen,
+    Check,
     ClipboardList,
     Layers,
     ListChecks,
@@ -17,6 +18,24 @@ const STEP_QUEUE_SUBJECTS = 2;
 const STEP_SUMMARY = 3;
 const DEFAULT_SEMESTER_OPTIONS = ["1", "2"];
 const DEFAULT_GRADE_LEVEL_OPTIONS = ["11", "12"];
+
+const WIZARD_STEPS = [
+    {
+        id: STEP_SELECT_TYPE,
+        label: "Type",
+        icon: Layers,
+    },
+    {
+        id: STEP_QUEUE_SUBJECTS,
+        label: "Queue",
+        icon: ClipboardList,
+    },
+    {
+        id: STEP_SUMMARY,
+        label: "Summary",
+        icon: ListChecks,
+    },
+];
 
 const initialDraft = {
     subject_name: "",
@@ -54,6 +73,34 @@ function toSemesterLabel(semester) {
     }
 
     return "Selected Semester";
+}
+
+function WizardStep({ step, currentStep }) {
+    const Icon = step.icon;
+    const isActive = currentStep === step.id;
+    const isDone = currentStep > step.id;
+
+    return (
+        <div
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                isActive
+                    ? "bg-emerald-100 text-emerald-700"
+                    : isDone
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-slate-50 text-slate-400"
+            }`}
+        >
+            <span
+                className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${
+                    isDone ? "bg-emerald-600 text-white" : "bg-white"
+                }`}
+            >
+                {isDone ? <Check size={10} /> : step.id}
+            </span>
+            <Icon size={12} />
+            <span>{step.label}</span>
+        </div>
+    );
 }
 
 export default function SubjectWizardModal({
@@ -216,7 +263,26 @@ export default function SubjectWizardModal({
         });
     };
 
-    const stepLabels = ["Type", "Queue", "Summary"];
+    const goNext = () => {
+        if (step === STEP_SELECT_TYPE && (!semester || !gradeLevel)) {
+            return;
+        }
+
+        if (step === STEP_QUEUE_SUBJECTS && queue.length === 0) {
+            return;
+        }
+
+        setStep((prev) => Math.min(STEP_SUMMARY, prev + 1));
+    };
+
+    const goBack = () => {
+        if (step === STEP_SELECT_TYPE) {
+            onClose?.();
+            return;
+        }
+
+        setStep((prev) => Math.max(STEP_SELECT_TYPE, prev - 1));
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto p-4 pb-10 sm:items-center">
@@ -225,18 +291,20 @@ export default function SubjectWizardModal({
                 onClick={onClose}
             />
 
-            <div className="relative w-full max-w-3xl max-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
-                <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+            <div className="relative flex h-[calc(100vh-6rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-2xl">
+                <div className="relative shrink-0 overflow-hidden border-b border-emerald-100 bg-gradient-to-r from-emerald-600 to-emerald-700 px-6 py-5">
+                    <div className="absolute -right-8 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
                     <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 ring-1 ring-emerald-200">
-                            <BookOpen size={16} className="text-emerald-600" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">
+                            <BookOpen size={18} />
                         </div>
                         <div>
-                            <h2 className="text-base font-semibold text-slate-900">
+                            <h2 className="text-base font-semibold text-white">
                                 New Subject Wizard
                             </h2>
-                            <p className="text-xs text-slate-500">
-                                Step {step} of 3: {stepLabels[step - 1]}
+                            <p className="text-xs text-emerald-100">
+                                Step {step} of {WIZARD_STEPS.length}:{" "}
+                                {WIZARD_STEPS[step - 1].label}
                             </p>
                         </div>
                     </div>
@@ -244,39 +312,25 @@ export default function SubjectWizardModal({
                         type="button"
                         onClick={onClose}
                         disabled={processing}
-                        className="z-10 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+                        className="absolute right-3 top-3 rounded-lg p-1.5 text-emerald-100 transition-colors hover:bg-white/15 hover:text-white disabled:opacity-60"
                     >
                         <X size={16} />
                     </button>
                 </div>
 
-                <div className="border-b border-slate-100 px-6 py-3">
-                    <div className="flex items-center gap-2">
-                        {stepLabels.map((label, index) => {
-                            const current = index + 1;
-                            const active = current === step;
-                            const done = current < step;
-
-                            return (
-                                <div
-                                    key={label}
-                                    className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
-                                        active
-                                            ? "bg-emerald-100 text-emerald-700"
-                                            : done
-                                              ? "bg-slate-100 text-slate-600"
-                                              : "bg-slate-50 text-slate-400"
-                                    }`}
-                                >
-                                    <span>{current}</span>
-                                    <span>{label}</span>
-                                </div>
-                            );
-                        })}
+                <div className="shrink-0 border-b border-emerald-100 px-6 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {WIZARD_STEPS.map((wizardStep) => (
+                            <WizardStep
+                                key={wizardStep.id}
+                                step={wizardStep}
+                                currentStep={step}
+                            />
+                        ))}
                     </div>
                 </div>
 
-                <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+                <div className="min-h-0 flex-1 overflow-y-auto bg-emerald-50/40 px-6 py-5">
                     {step === STEP_SELECT_TYPE && (
                         <div className="space-y-5">
                             <div>
@@ -724,90 +778,64 @@ export default function SubjectWizardModal({
                     )}
                 </div>
 
-                <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
+                <div className="shrink-0 flex items-center justify-between border-t border-emerald-100 bg-white px-6 py-4">
                     <button
                         type="button"
-                        onClick={() =>
-                            setStep((prev) =>
-                                Math.max(STEP_SELECT_TYPE, prev - 1),
-                            )
-                        }
-                        disabled={step === STEP_SELECT_TYPE || processing}
-                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={goBack}
+                        disabled={processing}
+                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
                     >
-                        <ChevronLeft size={14} />
-                        Back
+                        <ChevronLeft size={13} />
+                        {step === STEP_SELECT_TYPE ? "Cancel" : "Back"}
                     </button>
 
-                    <div className="flex items-center gap-2">
+                    {step < STEP_SUMMARY ? (
                         <button
                             type="button"
-                            onClick={onClose}
-                            disabled={processing}
-                            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                            onClick={goNext}
+                            disabled={
+                                processing ||
+                                (step === STEP_SELECT_TYPE && !semester) ||
+                                (step === STEP_SELECT_TYPE && !gradeLevel) ||
+                                (step === STEP_QUEUE_SUBJECTS &&
+                                    queue.length === 0)
+                            }
+                            className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
                         >
-                            Cancel
+                            Next
+                            <ChevronRight size={13} />
                         </button>
-
-                        {step < STEP_SUMMARY ? (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (
-                                        step === STEP_QUEUE_SUBJECTS &&
-                                        queue.length === 0
-                                    ) {
-                                        return;
-                                    }
-                                    setStep((prev) =>
-                                        Math.min(STEP_SUMMARY, prev + 1),
-                                    );
-                                }}
-                                disabled={
-                                    processing ||
-                                    (step === STEP_SELECT_TYPE && !semester) ||
-                                    (step === STEP_SELECT_TYPE &&
-                                        !gradeLevel) ||
-                                    (step === STEP_QUEUE_SUBJECTS &&
-                                        queue.length === 0)
-                                }
-                                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                                Next
-                                <ChevronRight size={14} />
-                            </button>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={handleSubmit}
-                                disabled={processing || queue.length === 0}
-                                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                                {processing && (
-                                    <svg
-                                        className="h-3.5 w-3.5 animate-spin"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                    >
-                                        <circle
-                                            className="opacity-25"
-                                            cx="12"
-                                            cy="12"
-                                            r="10"
-                                            stroke="currentColor"
-                                            strokeWidth="4"
-                                        />
-                                        <path
-                                            className="opacity-75"
-                                            fill="currentColor"
-                                            d="M4 12a8 8 0 018-8v8z"
-                                        />
-                                    </svg>
-                                )}
-                                Create Subjects
-                            </button>
-                        )}
-                    </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={handleSubmit}
+                            disabled={processing || queue.length === 0}
+                            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
+                        >
+                            {processing && (
+                                <svg
+                                    className="h-3.5 w-3.5 animate-spin"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                >
+                                    <circle
+                                        className="opacity-25"
+                                        cx="12"
+                                        cy="12"
+                                        r="10"
+                                        stroke="currentColor"
+                                        strokeWidth="4"
+                                    />
+                                    <path
+                                        className="opacity-75"
+                                        fill="currentColor"
+                                        d="M4 12a8 8 0 018-8v8z"
+                                    />
+                                </svg>
+                            )}
+                            Create Subjects
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

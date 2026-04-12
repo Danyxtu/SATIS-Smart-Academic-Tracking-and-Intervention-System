@@ -12,6 +12,7 @@ import {
 import { useEffect, useState } from "react";
 
 import DepartmentDetailModal from "@/Components/Superadmin/DepartmentDetailModal";
+import CreateDepartmentModal from "@/Components/Superadmin/CreateDepartmentModal";
 
 export default function Index({ departments, filters, trackOptions = [] }) {
     const [search, setSearch] = useState(filters.search || "");
@@ -19,6 +20,7 @@ export default function Index({ departments, filters, trackOptions = [] }) {
     const [activeTrack, setActiveTrack] = useState(filters.track || "Academic");
     const [selectedDepartment, setSelectedDepartment] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [showCreateModal, setShowCreateModal] = useState(false);
     const [departmentModalMode, setDepartmentModalMode] = useState("view");
 
     useEffect(() => {
@@ -39,9 +41,11 @@ export default function Index({ departments, filters, trackOptions = [] }) {
     };
 
     const openCreateModal = () => {
-        setSelectedDepartment(null);
-        setDepartmentModalMode("create");
-        setShowModal(true);
+        setShowCreateModal(true);
+    };
+
+    const closeCreateModal = () => {
+        setShowCreateModal(false);
     };
 
     const openEditModal = (dept) => {
@@ -518,6 +522,14 @@ export default function Index({ departments, filters, trackOptions = [] }) {
                 row={selectedDepartment}
                 mode={departmentModalMode}
                 onSaved={() => router.reload({ only: ["departments"] })}
+            />
+
+            <CreateDepartmentModal
+                isOpen={showCreateModal}
+                onClose={closeCreateModal}
+                onSuccess={() => router.reload({ only: ["departments"] })}
+                trackOptions={trackOptions}
+                initialTrack={activeTrack || "Academic"}
             />
         </>
     );
