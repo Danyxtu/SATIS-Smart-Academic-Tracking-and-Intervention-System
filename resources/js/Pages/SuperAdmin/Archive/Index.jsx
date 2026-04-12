@@ -1,30 +1,572 @@
-import { Head, Link } from "@inertiajs/react";
-import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
+import { Head, Link, router } from "@inertiajs/react";
+import { useEffect, useMemo, useState } from "react";
 import {
-    Archive,
-    Calendar,
-    Users,
-    GraduationCap,
     BookOpen,
+    Building2,
+    CalendarRange,
+    ChevronLeft,
     ChevronRight,
-    Sparkles,
-    Database,
-    Clock3,
+    ClipboardList,
+    Eye,
+    GraduationCap,
+    Search,
+    Shield,
+    Users,
+    X,
 } from "lucide-react";
+import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
+import Modal from "@/Components/Modal";
 
-export default function Index({ years, currentSY, snapshots = [] }) {
-    const hasYears = years.length > 0;
-    const hasSnapshots = snapshots.length > 0;
+const TAB_OPTIONS = [
+    {
+        key: "students",
+        label: "Students",
+        summaryKey: "students",
+        icon: GraduationCap,
+        accent: "emerald",
+    },
+    {
+        key: "teachers",
+        label: "Teachers",
+        summaryKey: "teachers",
+        icon: Users,
+        accent: "blue",
+    },
+    {
+        key: "super-admins",
+        label: "Super Admins",
+        summaryKey: "super_admins",
+        icon: Shield,
+        accent: "violet",
+    },
+    {
+        key: "departments",
+        label: "Departments",
+        summaryKey: "departments",
+        icon: Building2,
+        accent: "amber",
+    },
+    {
+        key: "classes",
+        label: "Classes",
+        summaryKey: "classes",
+        icon: BookOpen,
+        accent: "rose",
+    },
+    {
+        key: "audit-logs",
+        label: "Audit Logs",
+        summaryKey: "audit_logs",
+        icon: ClipboardList,
+        accent: "emerald",
+    },
+];
 
-    const formatSnapshotDate = (isoDate) => {
-        if (!isoDate) {
-            return "Unknown date";
+const SEMESTER_OPTIONS = [
+    { value: "all", label: "All Semesters" },
+    { value: "1", label: "1st Semester" },
+    { value: "2", label: "2nd Semester" },
+];
+
+const ROLE_LABELS = {
+    super_admin: "Super Admin",
+    admin: "Admin",
+    teacher: "Teacher",
+    student: "Student",
+};
+
+function formatDateTime(value) {
+    if (!value) return "-";
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        return String(value);
+    }
+
+    return parsed.toLocaleString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+}
+
+function roleLabel(value) {
+    if (!value) return "-";
+    return ROLE_LABELS[value] ?? value;
+}
+
+function roleArrayLabel(roles) {
+    if (!Array.isArray(roles) || roles.length === 0) {
+        return "-";
+    }
+
+    return roles.map((role) => roleLabel(role)).join(", ");
+}
+
+function StatCard({ icon: Icon, label, value, accent, active, onClick }) {
+    const accents = {
+        emerald: "bg-emerald-50 text-emerald-600 ring-emerald-200",
+        blue: "bg-blue-50 text-blue-600 ring-blue-200",
+        violet: "bg-violet-50 text-violet-600 ring-violet-200",
+        amber: "bg-amber-50 text-amber-600 ring-amber-200",
+        rose: "bg-rose-50 text-rose-600 ring-rose-200",
+    };
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={`flex w-full items-center gap-4 rounded-xl border bg-white px-5 py-4 text-left transition ${
+                active
+                    ? "border-emerald-300 ring-2 ring-emerald-100"
+                    : "border-slate-200 hover:border-slate-300"
+            }`}
+        >
+            <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ${accents[accent]}`}
+            >
+                <Icon size={17} />
+            </div>
+            <div>
+                <p className="text-xs font-medium text-slate-500">{label}</p>
+                <p className="mt-0.5 text-xl font-bold text-slate-900">
+                    {value}
+                </p>
+            </div>
+        </button>
+    );
+}
+
+function Badge({ children }) {
+    return (
+        <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+            {children}
+        </span>
+    );
+}
+
+export default function Index({
+    archives = [],
+    selectedArchive = null,
+    summary = {},
+    options = {},
+    panelData = {},
+    filters = {},
+}) {
+    const [search, setSearch] = useState(filters.search || "");
+    const [detailModalOpen, setDetailModalOpen] = useState(false);
+    const [detailTitle, setDetailTitle] = useState("");
+    const [detailPayload, setDetailPayload] = useState(null);
+    const [detailError, setDetailError] = useState("");
+    const [detailLoading, setDetailLoading] = useState(false);
+
+    const activeTab = filters.tab || "students";
+    const semester = filters.semester || "all";
+
+    const rows = panelData?.rows?.data || [];
+
+    const selectedArchiveKey =
+        filters.archive || selectedArchive?.archive_key || "";
+    const hasSelectedArchive = Boolean(selectedArchive?.archive_key);
+
+    const studentOptions = options?.student_filters || {};
+    const classOptions = options?.class_filters || {};
+
+    const studentGradeLevels = useMemo(() => {
+        if (
+            Array.isArray(studentOptions.grade_levels) &&
+            studentOptions.grade_levels.length > 0
+        ) {
+            return studentOptions.grade_levels.map((grade) => String(grade));
         }
 
-        const parsed = new Date(isoDate);
-        return Number.isNaN(parsed.getTime())
-            ? String(isoDate)
-            : parsed.toLocaleString();
+        return [];
+    }, [studentOptions.grade_levels]);
+
+    const classGradeLevels = useMemo(() => {
+        if (
+            Array.isArray(classOptions.grade_levels) &&
+            classOptions.grade_levels.length > 0
+        ) {
+            return classOptions.grade_levels.map((grade) => String(grade));
+        }
+
+        return [];
+    }, [classOptions.grade_levels]);
+
+    const availableGradeLevels = useMemo(() => {
+        if (activeTab === "classes") {
+            if (classGradeLevels.length > 0) {
+                return classGradeLevels;
+            }
+
+            return studentGradeLevels;
+        }
+
+        if (activeTab === "students") {
+            if (studentGradeLevels.length > 0) {
+                return studentGradeLevels;
+            }
+
+            return classGradeLevels;
+        }
+
+        const merged = Array.from(
+            new Set([...studentGradeLevels, ...classGradeLevels]),
+        );
+
+        if (merged.length > 0) {
+            return merged;
+        }
+
+        return ["11", "12"];
+    }, [activeTab, studentGradeLevels, classGradeLevels]);
+
+    const activeGradeLevelFilter = useMemo(() => {
+        if (activeTab === "classes") {
+            return filters.class_grade_level || "all";
+        }
+
+        if (activeTab === "students") {
+            return filters.grade_level || "all";
+        }
+
+        return filters.grade_level || filters.class_grade_level || "all";
+    }, [activeTab, filters.class_grade_level, filters.grade_level]);
+
+    const resolvedSummary = useMemo(
+        () => ({
+            students: Number(summary?.students || 0),
+            teachers: Number(summary?.teachers || 0),
+            super_admins: Number(summary?.super_admins || 0),
+            departments: Number(summary?.departments || 0),
+            classes: Number(summary?.classes || 0),
+            audit_logs: Number(summary?.audit_logs || 0),
+        }),
+        [summary],
+    );
+
+    useEffect(() => {
+        setSearch(filters.search || "");
+    }, [filters.search]);
+
+    const applyFilters = (overrides = {}) => {
+        router.get(
+            route("superadmin.archive.index"),
+            {
+                ...filters,
+                archive: selectedArchiveKey,
+                ...overrides,
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            },
+        );
+    };
+
+    const handleSearchSubmit = (event) => {
+        event.preventDefault();
+        applyFilters({ search });
+    };
+
+    const clearSearch = () => {
+        setSearch("");
+        applyFilters({ search: "" });
+    };
+
+    const applyGradeLevelFilter = (nextGradeLevel) => {
+        const nextValue =
+            nextGradeLevel === "all" ? "" : String(nextGradeLevel);
+
+        if (activeTab === "students") {
+            applyFilters({
+                grade_level: nextValue,
+                section: "",
+                strand: "",
+            });
+
+            return;
+        }
+
+        if (activeTab === "classes") {
+            applyFilters({ class_grade_level: nextValue });
+
+            return;
+        }
+
+        applyFilters({
+            grade_level: nextValue,
+            class_grade_level: nextValue,
+        });
+    };
+
+    const openDetails = async (row) => {
+        setDetailError("");
+        setDetailLoading(false);
+        setDetailPayload(null);
+
+        if (!selectedArchiveKey) {
+            setDetailError("Select an archive first.");
+            setDetailTitle("Details");
+            setDetailModalOpen(true);
+            return;
+        }
+
+        if (activeTab === "super-admins") {
+            setDetailTitle("Super Admin Details");
+            setDetailPayload(row);
+            setDetailModalOpen(true);
+            return;
+        }
+
+        if (activeTab === "audit-logs") {
+            setDetailTitle("Audit Log Details");
+            setDetailPayload(row);
+            setDetailModalOpen(true);
+            return;
+        }
+
+        let endpoint = "";
+
+        if (activeTab === "students") {
+            endpoint = route("superadmin.archive.students.show", {
+                archive: selectedArchiveKey,
+                studentUserId: row.student_user_id,
+            });
+        } else if (activeTab === "teachers") {
+            endpoint = route("superadmin.archive.teachers.show", {
+                archive: selectedArchiveKey,
+                teacherUserId: row.teacher_user_id,
+            });
+        } else if (activeTab === "departments") {
+            endpoint = route("superadmin.archive.departments.show", {
+                archive: selectedArchiveKey,
+                archiveDepartment: row.id,
+            });
+        } else if (activeTab === "classes") {
+            endpoint = route("superadmin.archive.classes.show", {
+                archive: selectedArchiveKey,
+                archiveClass: row.id,
+            });
+        }
+
+        if (!endpoint) {
+            return;
+        }
+
+        setDetailTitle("Archive Details");
+        setDetailModalOpen(true);
+        setDetailLoading(true);
+
+        try {
+            const url = new URL(endpoint, window.location.origin);
+            if (semester) {
+                url.searchParams.set("semester", semester);
+            }
+
+            const response = await fetch(url.toString(), {
+                headers: { Accept: "application/json" },
+            });
+
+            if (!response.ok) {
+                throw new Error("Unable to load details.");
+            }
+
+            const payload = await response.json();
+            setDetailPayload(payload);
+        } catch (error) {
+            setDetailError(error?.message || "Unable to load details.");
+        } finally {
+            setDetailLoading(false);
+        }
+    };
+
+    const renderRowCells = (row) => {
+        if (activeTab === "students") {
+            return (
+                <>
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-900">
+                        {row.student_name}
+                        <p className="text-xs font-normal text-slate-500">
+                            {row.student_username || "-"}
+                        </p>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        <div>{row.grade_level || "-"}</div>
+                        <div className="text-xs text-slate-500">
+                            {row.section_name || "-"}
+                        </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        {row.strand || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        {row.classes_count}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        {row.average_grade ?? "-"}
+                    </td>
+                </>
+            );
+        }
+
+        if (activeTab === "teachers") {
+            return (
+                <>
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-900">
+                        {row.teacher_name}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        {row.teacher_department_name || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        {row.classes_count}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        {row.students_total}
+                    </td>
+                </>
+            );
+        }
+
+        if (activeTab === "super-admins") {
+            return (
+                <>
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-900">
+                        {row.name}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        {row.username || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        {row.personal_email || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        {roleArrayLabel(row.roles)}
+                    </td>
+                </>
+            );
+        }
+
+        if (activeTab === "departments") {
+            return (
+                <>
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-900">
+                        {row.department_name}
+                        <p className="text-xs font-normal text-slate-500">
+                            {row.department_code}
+                        </p>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        {row.track || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        {row.specializations_count}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        {row.admins_count}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        {row.teachers_count}
+                    </td>
+                </>
+            );
+        }
+
+        if (activeTab === "classes") {
+            return (
+                <>
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-900">
+                        {row.subject_name}
+                        <p className="text-xs font-normal text-slate-500">
+                            {row.subject_code || "-"}
+                        </p>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        {row.teacher_name || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        <div>Grade {row.grade_level || "-"}</div>
+                        <div className="text-xs text-slate-500">
+                            {row.section_name || "-"}
+                        </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        {row.track || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        {row.semester ? `Sem ${row.semester}` : "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                        {row.students_total ?? 0}
+                    </td>
+                </>
+            );
+        }
+
+        return (
+            <>
+                <td className="px-4 py-3 text-sm text-slate-700">
+                    {formatDateTime(row.logged_at)}
+                </td>
+                <td className="px-4 py-3 text-sm font-semibold text-slate-900">
+                    {row.task}
+                </td>
+                <td className="px-4 py-3 text-sm text-slate-700">
+                    {row.user_name || "-"}
+                </td>
+                <td className="px-4 py-3 text-sm text-slate-700">
+                    {roleArrayLabel(row.user_roles)}
+                </td>
+                <td className="px-4 py-3 text-sm text-slate-700">
+                    {row.semester ? `Sem ${row.semester}` : "All"}
+                </td>
+                <td className="px-4 py-3 text-sm text-slate-700">
+                    <Badge>{row.is_success ? "Success" : "Failed"}</Badge>
+                </td>
+            </>
+        );
+    };
+
+    const columnHeaders = () => {
+        if (activeTab === "students") {
+            return ["Student", "Grade/Section", "Strand", "Classes", "Average"];
+        }
+
+        if (activeTab === "teachers") {
+            return ["Teacher", "Department", "Classes", "Students"];
+        }
+
+        if (activeTab === "super-admins") {
+            return ["Name", "Username", "Email", "Roles"];
+        }
+
+        if (activeTab === "departments") {
+            return [
+                "Department",
+                "Track",
+                "Specializations",
+                "Admins",
+                "Teachers",
+            ];
+        }
+
+        if (activeTab === "classes") {
+            return [
+                "Subject",
+                "Teacher",
+                "Grade/Section",
+                "Track",
+                "Semester",
+                "Students",
+            ];
+        }
+
+        return ["Date", "Task", "User", "Roles", "Semester", "Status"];
     };
 
     return (
@@ -32,271 +574,406 @@ export default function Index({ years, currentSY, snapshots = [] }) {
             <Head title="Archive" />
 
             <div className="space-y-6">
-                {/* Header */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-800 to-slate-900 px-8 py-7 shadow-xl">
-                    <div className="absolute -top-10 -right-10 h-48 w-48 rounded-full bg-white/5 blur-2xl" />
-                    <div className="flex items-center gap-5">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm ring-1 ring-white/20">
-                            <Archive className="h-7 w-7 text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold text-white tracking-tight">
-                                School Year Archive
-                            </h1>
-                            <p className="text-slate-400 text-sm mt-0.5">
-                                View historical and current academic year data
-                            </p>
-                        </div>
+                <div>
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900">
+                            School Year Archive
+                        </h1>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Browse ended school years with semester-aware
+                            history.
+                        </p>
                     </div>
                 </div>
 
-                {/* Year Cards */}
-                {!hasYears && !hasSnapshots ? (
-                    <div className="rounded-2xl bg-white border border-slate-100 shadow-sm flex flex-col items-center justify-center py-20 text-center">
-                        <Archive className="h-12 w-12 text-slate-300 mb-3" />
-                        <p className="text-slate-500 font-medium">
-                            No academic data found.
-                        </p>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="mb-2 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Archived School Years
                     </div>
-                ) : (
-                    <>
-                        {hasSnapshots && (
-                            <section className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h2 className="text-sm font-semibold text-slate-900">
-                                            Rollover Snapshots
-                                        </h2>
-                                        <p className="text-xs text-slate-500 mt-0.5">
-                                            Saved right before each new school
-                                            year starts
-                                        </p>
-                                    </div>
-                                    <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
-                                        {snapshots.length} entries
-                                    </span>
-                                </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {snapshots.map((snapshot) => (
-                                        <div
-                                            key={snapshot.archive_key}
-                                            className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"
-                                        >
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-                                                        <Database
-                                                            size={15}
-                                                            className="text-blue-600"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-xs font-bold uppercase tracking-wide text-blue-600">
-                                                            Snapshot
-                                                        </p>
-                                                        <p className="text-sm font-semibold text-slate-900">
-                                                            {
-                                                                snapshot.school_year
-                                                            }
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <span className="text-[11px] font-medium text-slate-500">
-                                                    to{" "}
-                                                    {snapshot.next_school_year ||
-                                                        "-"}
-                                                </span>
-                                            </div>
+                    {archives.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+                            No archived school years available.
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            {archives.map((archive) => {
+                                const isActive =
+                                    selectedArchiveKey === archive.archive_key;
 
-                                            <p className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-500">
-                                                <Clock3
-                                                    size={12}
-                                                    className="text-slate-400"
-                                                />
-                                                {formatSnapshotDate(
-                                                    snapshot.created_at,
-                                                )}
+                                return (
+                                    <button
+                                        key={archive.archive_key}
+                                        type="button"
+                                        onClick={() =>
+                                            applyFilters({
+                                                archive: archive.archive_key,
+                                            })
+                                        }
+                                        className={`rounded-xl border px-4 py-3 text-left transition ${
+                                            isActive
+                                                ? "border-emerald-300 bg-emerald-50 ring-2 ring-emerald-100"
+                                                : "border-slate-200 bg-white hover:border-slate-300"
+                                        }`}
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <p className="text-sm font-semibold text-slate-900">
+                                                {archive.school_year}
                                             </p>
-
-                                            <div className="mt-4 grid grid-cols-3 gap-2">
-                                                <div className="rounded-lg bg-slate-50 p-2 text-center">
-                                                    <p className="text-base font-bold text-slate-900">
-                                                        {snapshot.students}
-                                                    </p>
-                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400">
-                                                        Students
-                                                    </p>
-                                                </div>
-                                                <div className="rounded-lg bg-slate-50 p-2 text-center">
-                                                    <p className="text-base font-bold text-slate-900">
-                                                        {snapshot.teachers}
-                                                    </p>
-                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400">
-                                                        Teachers
-                                                    </p>
-                                                </div>
-                                                <div className="rounded-lg bg-slate-50 p-2 text-center">
-                                                    <p className="text-base font-bold text-slate-900">
-                                                        {snapshot.classes}
-                                                    </p>
-                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400">
-                                                        Classes
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-slate-600">
-                                                <p>
-                                                    Enrollments:{" "}
-                                                    <span className="font-semibold">
-                                                        {snapshot.enrollments}
-                                                    </span>
-                                                </p>
-                                                <p>
-                                                    Grades:{" "}
-                                                    <span className="font-semibold">
-                                                        {snapshot.grades}
-                                                    </span>
-                                                </p>
-                                                <p>
-                                                    Attendance:{" "}
-                                                    <span className="font-semibold">
-                                                        {
-                                                            snapshot.attendance_records
-                                                        }
-                                                    </span>
-                                                </p>
-                                                <p>
-                                                    Interventions:{" "}
-                                                    <span className="font-semibold">
-                                                        {snapshot.interventions}
-                                                    </span>
-                                                </p>
-                                            </div>
-
-                                            <div className="mt-4 flex items-center justify-end">
-                                                <Link
-                                                    href={route(
-                                                        "superadmin.archive.snapshot.show",
-                                                        {
-                                                            archiveKey:
-                                                                snapshot.archive_key,
-                                                        },
-                                                    )}
-                                                    className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"
-                                                >
-                                                    Open Snapshot
-                                                    <ChevronRight size={14} />
-                                                </Link>
-                                            </div>
+                                            {isActive && (
+                                                <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                                                    Selected
+                                                </span>
+                                            )}
                                         </div>
-                                    ))}
-                                </div>
-                            </section>
-                        )}
 
-                        {hasYears && (
-                            <section className="space-y-3">
-                                <div>
-                                    <h2 className="text-sm font-semibold text-slate-900">
-                                        School Year Records
-                                    </h2>
-                                    <p className="text-xs text-slate-500 mt-0.5">
-                                        Data grouped by school year
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            Captured:{" "}
+                                            {formatDateTime(
+                                                archive.captured_at,
+                                            )}
+                                        </p>
+
+                                        <p className="mt-0.5 text-xs text-slate-500">
+                                            Next S.Y.:{" "}
+                                            {archive.next_school_year || "-"}
+                                        </p>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {hasSelectedArchive ? (
+                    <>
+                        <div className="w-full rounded-xl border border-slate-200 bg-white p-2">
+                            <div className="mb-2 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Semester
+                            </div>
+                            <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
+                                {SEMESTER_OPTIONS.map((item) => (
+                                    <button
+                                        key={item.value}
+                                        type="button"
+                                        onClick={() =>
+                                            applyFilters({
+                                                semester: item.value,
+                                            })
+                                        }
+                                        className={`w-full rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                                            semester === item.value
+                                                ? "bg-emerald-600 text-white"
+                                                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                        }`}
+                                    >
+                                        {item.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+                            {TAB_OPTIONS.map((tab) => (
+                                <StatCard
+                                    key={tab.key}
+                                    icon={tab.icon}
+                                    label={tab.label}
+                                    value={resolvedSummary[tab.summaryKey]}
+                                    accent={tab.accent}
+                                    active={activeTab === tab.key}
+                                    onClick={() =>
+                                        applyFilters({ tab: tab.key })
+                                    }
+                                />
+                            ))}
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-white p-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Grade Level
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => applyGradeLevelFilter("all")}
+                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                        activeGradeLevelFilter === "all"
+                                            ? "bg-emerald-600 text-white"
+                                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                    }`}
+                                >
+                                    All Grade Levels
+                                </button>
+                                {availableGradeLevels.map((gradeLevel) => (
+                                    <button
+                                        key={gradeLevel}
+                                        type="button"
+                                        onClick={() =>
+                                            applyGradeLevelFilter(gradeLevel)
+                                        }
+                                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                            activeGradeLevelFilter ===
+                                            gradeLevel
+                                                ? "bg-emerald-600 text-white"
+                                                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                        }`}
+                                    >
+                                        {gradeLevel}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-white p-2">
+                            <div className="flex flex-wrap gap-2">
+                                {TAB_OPTIONS.map((tab) => (
+                                    <button
+                                        key={tab.key}
+                                        type="button"
+                                        onClick={() =>
+                                            applyFilters({ tab: tab.key })
+                                        }
+                                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                            activeTab === tab.key
+                                                ? "bg-emerald-600 text-white"
+                                                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                        }`}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <form
+                            onSubmit={handleSearchSubmit}
+                            className="flex gap-2"
+                        >
+                            <div className="relative flex-1">
+                                <Search
+                                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                                    size={15}
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="Search archived records..."
+                                    value={search}
+                                    onChange={(event) =>
+                                        setSearch(event.target.value)
+                                    }
+                                    className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-9 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                                />
+                                {search && (
+                                    <button
+                                        type="button"
+                                        onClick={clearSearch}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-slate-400 transition hover:text-slate-600"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
+                            </div>
+                            <button
+                                type="submit"
+                                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                            >
+                                Search
+                            </button>
+                        </form>
+
+                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                            {rows.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
+                                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
+                                        <CalendarRange
+                                            size={24}
+                                            className="text-slate-400"
+                                        />
+                                    </div>
+                                    <h3 className="text-base font-semibold text-slate-800">
+                                        No records found
+                                    </h3>
+                                    <p className="mt-1 max-w-sm text-sm text-slate-500">
+                                        Adjust filters or change semester to
+                                        view archived data.
                                     </p>
                                 </div>
+                            ) : (
+                                <>
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-slate-200">
+                                            <thead className="bg-slate-50">
+                                                <tr>
+                                                    {columnHeaders().map(
+                                                        (header) => (
+                                                            <th
+                                                                key={header}
+                                                                className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500"
+                                                            >
+                                                                {header}
+                                                            </th>
+                                                        ),
+                                                    )}
+                                                    <th className="w-44 px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                                        Details
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 bg-white">
+                                                {rows.map((row, index) => (
+                                                    <tr
+                                                        key={
+                                                            row.id ||
+                                                            row.student_user_id ||
+                                                            row.teacher_user_id ||
+                                                            index
+                                                        }
+                                                    >
+                                                        {renderRowCells(row)}
+                                                        <td className="px-4 py-3 text-right">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    openDetails(
+                                                                        row,
+                                                                    )
+                                                                }
+                                                                className="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded-xl border border-cyan-200 bg-cyan-50 px-3.5 py-2 text-sm font-semibold text-cyan-800 transition hover:bg-cyan-100"
+                                                            >
+                                                                <Eye
+                                                                    size={14}
+                                                                />
+                                                                View Details
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {years.map((y) => (
-                                        <Link
-                                            key={y.school_year}
-                                            href={route(
-                                                "superadmin.archive.show",
-                                                {
-                                                    schoolYear: y.school_year,
-                                                },
-                                            )}
-                                            className="group relative rounded-2xl bg-white border border-slate-100 shadow-sm p-6 hover:-translate-y-1 hover:shadow-lg transition-all duration-200 overflow-hidden"
-                                        >
-                                            {/* Current badge */}
-                                            {y.is_current && (
-                                                <span className="absolute top-4 right-4 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700 uppercase tracking-wide">
-                                                    <Sparkles size={10} />
-                                                    Current
+                                    {panelData?.rows?.last_page > 1 && (
+                                        <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/70 px-4 py-3">
+                                            <p className="text-xs text-slate-500">
+                                                Showing
+                                                <span className="mx-1 font-semibold text-slate-700">
+                                                    {panelData.rows.from} -{" "}
+                                                    {panelData.rows.to}
                                                 </span>
-                                            )}
+                                                of
+                                                <span className="mx-1 font-semibold text-slate-700">
+                                                    {panelData.rows.total}
+                                                </span>
+                                            </p>
 
-                                            <div className="flex items-center gap-3 mb-5">
-                                                <div
-                                                    className={`flex h-11 w-11 items-center justify-center rounded-xl shadow-md ${y.is_current ? "bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/20" : "bg-gradient-to-br from-slate-600 to-slate-700 shadow-slate-500/20"}`}
-                                                >
-                                                    <Calendar className="h-5 w-5 text-white" />
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-slate-900 text-lg leading-none">
-                                                        {y.school_year}
-                                                    </p>
-                                                    <p className="text-xs text-slate-400 mt-0.5">
-                                                        School Year
-                                                    </p>
-                                                </div>
-                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                {panelData.rows.links.map(
+                                                    (link, index) => {
+                                                        const isPrev =
+                                                            index === 0;
+                                                        const isNext =
+                                                            index ===
+                                                            panelData.rows.links
+                                                                .length -
+                                                                1;
+                                                        const isNav =
+                                                            isPrev || isNext;
 
-                                            <div className="grid grid-cols-3 gap-3">
-                                                <div className="rounded-xl bg-slate-50 p-3 text-center">
-                                                    <GraduationCap
-                                                        size={14}
-                                                        className="text-slate-400 mx-auto mb-1"
-                                                    />
-                                                    <p className="text-lg font-bold text-slate-900">
-                                                        {y.students}
-                                                    </p>
-                                                    <p className="text-[10px] text-slate-400 uppercase tracking-wide">
-                                                        Students
-                                                    </p>
-                                                </div>
-                                                <div className="rounded-xl bg-slate-50 p-3 text-center">
-                                                    <Users
-                                                        size={14}
-                                                        className="text-slate-400 mx-auto mb-1"
-                                                    />
-                                                    <p className="text-lg font-bold text-slate-900">
-                                                        {y.teachers}
-                                                    </p>
-                                                    <p className="text-[10px] text-slate-400 uppercase tracking-wide">
-                                                        Teachers
-                                                    </p>
-                                                </div>
-                                                <div className="rounded-xl bg-slate-50 p-3 text-center">
-                                                    <BookOpen
-                                                        size={14}
-                                                        className="text-slate-400 mx-auto mb-1"
-                                                    />
-                                                    <p className="text-lg font-bold text-slate-900">
-                                                        {y.classes}
-                                                    </p>
-                                                    <p className="text-[10px] text-slate-400 uppercase tracking-wide">
-                                                        Classes
-                                                    </p>
-                                                </div>
+                                                        return (
+                                                            <Link
+                                                                key={`${link.label}-${index}`}
+                                                                href={
+                                                                    link.url ||
+                                                                    "#"
+                                                                }
+                                                                className={`inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg px-2 text-xs font-semibold transition-colors ${
+                                                                    link.active
+                                                                        ? "bg-cyan-600 text-white"
+                                                                        : link.url
+                                                                          ? "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                                                                          : "cursor-not-allowed border border-slate-100 text-slate-300"
+                                                                }`}
+                                                                dangerouslySetInnerHTML={
+                                                                    isNav
+                                                                        ? undefined
+                                                                        : {
+                                                                              __html: link.label,
+                                                                          }
+                                                                }
+                                                            >
+                                                                {isNav ? (
+                                                                    isPrev ? (
+                                                                        <ChevronLeft
+                                                                            size={
+                                                                                14
+                                                                            }
+                                                                        />
+                                                                    ) : (
+                                                                        <ChevronRight
+                                                                            size={
+                                                                                14
+                                                                            }
+                                                                        />
+                                                                    )
+                                                                ) : null}
+                                                            </Link>
+                                                        );
+                                                    },
+                                                )}
                                             </div>
-
-                                            <div className="mt-4 flex items-center justify-end text-xs font-semibold text-blue-600 group-hover:text-blue-700">
-                                                View Details{" "}
-                                                <ChevronRight
-                                                    size={14}
-                                                    className="ml-1 group-hover:translate-x-0.5 transition-transform"
-                                                />
-                                            </div>
-                                        </Link>
-                                    ))}
-                                </div>
-                            </section>
-                        )}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
                     </>
+                ) : (
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+                        Select an archived school year card first to open and
+                        view its data.
+                    </div>
                 )}
             </div>
+
+            <Modal
+                show={detailModalOpen}
+                onClose={() => setDetailModalOpen(false)}
+                maxWidth="3xl"
+            >
+                <div className="space-y-4 p-5">
+                    <div className="flex items-center justify-between gap-3">
+                        <h2 className="text-base font-bold text-slate-900">
+                            {detailTitle || "Details"}
+                        </h2>
+                        <button
+                            type="button"
+                            onClick={() => setDetailModalOpen(false)}
+                            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                        >
+                            Close
+                        </button>
+                    </div>
+
+                    {detailLoading && (
+                        <p className="text-sm text-slate-600">
+                            Loading details...
+                        </p>
+                    )}
+
+                    {detailError && (
+                        <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                            {detailError}
+                        </p>
+                    )}
+
+                    {!detailLoading && !detailError && detailPayload && (
+                        <pre className="max-h-[60vh] overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-800">
+                            {JSON.stringify(detailPayload, null, 2)}
+                        </pre>
+                    )}
+                </div>
+            </Modal>
         </>
     );
 }

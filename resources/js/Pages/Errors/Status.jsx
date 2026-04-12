@@ -25,7 +25,7 @@ const ERROR_CONTENT = {
     404: {
         code: "404",
         title: "Learning Resource Not Found",
-        subtitle: "Academic Archive Missing",
+        subtitle: "Academic Record Missing",
         description:
             "The page you requested is not in the current academic records. It may have been moved, renamed, or removed.",
         helper: "Please return to the previous page or go back to the main portal to continue your tasks.",

@@ -3,11 +3,11 @@ import {
     Building2,
     Users,
     Settings,
-    Archive,
     BookOpen,
     Layers,
     Key,
     ClipboardList,
+    Archive,
 } from "lucide-react";
 
 export const superAdminRoutes = [
@@ -55,7 +55,6 @@ export const superAdminRoutes = [
     {
         label: "Archive",
         path: "superadmin.archive.index",
-        activeCheck: "superadmin.archive.*",
         icon: Archive,
     },
 ];

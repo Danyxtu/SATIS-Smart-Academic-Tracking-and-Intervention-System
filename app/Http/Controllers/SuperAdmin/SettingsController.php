@@ -3,25 +3,18 @@
 namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
-use App\Models\AttendanceRecord;
 use App\Models\Department;
 use App\Models\Enrollment;
-use App\Models\Grade;
-use App\Models\Intervention;
-use App\Models\InterventionTask;
 use App\Models\SchoolClass;
 use App\Models\Section;
 use App\Models\Student;
-use App\Models\StudentNotification;
 use App\Models\SystemSetting;
 use App\Models\User;
-use App\Services\SchoolYearArchiveDetailsService;
-use Illuminate\Http\JsonResponse;
+use App\Services\SuperAdmin\SchoolYearArchiveSnapshotService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -45,18 +38,6 @@ class SettingsController extends Controller
         $currentSem = (int) ($settings['current_semester'] ?? 1);
         $syStats    = $this->buildSyStats($currentSY, $currentSem);
 
-        // Archive: all distinct school years that have classes, excluding current
-        $archiveYears = SchoolClass::select('school_year')
-            ->distinct()
-            ->where('school_year', '!=', $currentSY)
-            ->orderByDesc('school_year')
-            ->pluck('school_year');
-
-        $archive = $archiveYears->map(fn($sy) => [
-            'school_year' => $sy,
-            'stats'       => $this->buildSyStats($sy),
-        ])->values();
-
         $lockKey = "grades_locked_{$currentSY}_{$currentSem}";
 
         return Inertia::render('SuperAdmin/Settings/Index', [
@@ -71,7 +52,6 @@ class SettingsController extends Controller
             ],
             'schoolYears' => $schoolYearOptions,
             'syStats'     => $syStats,
-            'archive'     => $archive,
         ]);
     }
 
@@ -200,58 +180,25 @@ class SettingsController extends Controller
     }
 
     /**
-     * Create a snapshot archive entry for the current school year.
-     */
-    public function archiveCurrentSchoolYear(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'new_school_year' => ['required', 'string', 'regex:/^\d{4}-\d{4}$/'],
-        ]);
-
-        $oldSY = SystemSetting::getCurrentSchoolYear();
-        $newSY = $validated['new_school_year'];
-
-        if ($oldSY === $newSY) {
-            return response()->json([
-                'message' => 'New school year must be different from the current school year.',
-            ], 422);
-        }
-
-        $archiveKey = $this->createArchiveSnapshot($oldSY, $newSY, Auth::id());
-
-        return response()->json([
-            'message' => "Archive for {$oldSY} created successfully.",
-            'archive_key' => $archiveKey,
-            'archived_school_year' => $oldSY,
-            'new_school_year' => $newSY,
-        ]);
-    }
-
-    /**
      * End current school year and roll over to a new one.
-     * All existing data is preserved (archived by school_year).
+     * All existing data remains preserved by school year.
      */
     public function rollover(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'new_school_year' => ['required', 'string', 'regex:/^\d{4}-\d{4}$/'],
-            'archive_key' => ['nullable', 'string'],
         ]);
 
-        $newSY              = $validated['new_school_year'];
-        $userId             = Auth::id();
-        $providedArchiveKey = $validated['archive_key'] ?? null;
+        $newSY = $validated['new_school_year'];
+        $userId = Auth::id();
+        $snapshotService = app(SchoolYearArchiveSnapshotService::class);
 
-        if ($providedArchiveKey && !SystemSetting::where('key', $providedArchiveKey)->exists()) {
-            return back()->withErrors([
-                'new_school_year' => 'Archive creation step was not completed. Please try again.',
-            ]);
-        }
-
-        $rolloverSummary = DB::transaction(function () use ($newSY, $userId, $providedArchiveKey) {
+        $rolloverSummary = DB::transaction(function () use ($newSY, $userId, $snapshotService) {
             $oldSY   = SystemSetting::getCurrentSchoolYear();
             $oldSem  = SystemSetting::getCurrentSemester();
             $lockKey = "grades_locked_{$oldSY}_{$oldSem}";
+
+            $archive = $snapshotService->capture($oldSY, $newSY, $userId);
 
             $newCohort = $this->resolveCohortFromSchoolYear($newSY);
 
@@ -394,10 +341,6 @@ class SettingsController extends Controller
                     ]);
             }
 
-            if (!$providedArchiveKey) {
-                $this->createArchiveSnapshot($oldSY, $newSY, $userId);
-            }
-
             // Lock grades for the outgoing period
             SystemSetting::updateOrCreate(
                 ['key' => $lockKey],
@@ -441,6 +384,7 @@ class SettingsController extends Controller
             cache()->forget('system_setting_rollover_last_transition');
 
             return [
+                'archive_key' => $archive->archive_key,
                 'promoted_sections_count' => $promotedSectionsCount,
                 'promoted_students_count' => $promotedStudentsCount,
                 'graduated_students_count' => $graduatedStudentsCount,
@@ -449,7 +393,7 @@ class SettingsController extends Controller
         });
 
         return back()
-            ->with('success', "Rolled over to {$newSY}. Previous data is archived.")
+            ->with('success', "Rolled over to {$newSY} successfully.")
             ->with('rollover_summary', $rolloverSummary);
     }
 
@@ -464,57 +408,6 @@ class SettingsController extends Controller
         }
 
         return (string) now()->year;
-    }
-
-    private function createArchiveSnapshot(string $oldSY, string $newSY, ?int $userId): string
-    {
-        $classIds = SchoolClass::where('school_year', $oldSY)->pluck('id');
-        $enrollmentIds = Enrollment::whereIn('class_id', $classIds)->pluck('id');
-        $interventionIds = Intervention::whereIn('enrollment_id', $enrollmentIds)->pluck('id');
-        $details = app(SchoolYearArchiveDetailsService::class)->build($oldSY);
-
-        $snapshot = [
-            'school_year' => $oldSY,
-            'next_school_year' => $newSY,
-            'semester' => SystemSetting::getCurrentSemester(),
-            'stats' => $this->buildSyStats($oldSY),
-            'details' => $details,
-            'totals' => [
-                'classes' => (int) $classIds->count(),
-                'enrollments' => (int) $enrollmentIds->count(),
-                'grades' => (int) Grade::whereIn('enrollment_id', $enrollmentIds)->count(),
-                'attendance_records' => (int) AttendanceRecord::whereIn('enrollment_id', $enrollmentIds)->count(),
-                'interventions' => (int) $interventionIds->count(),
-                'intervention_tasks' => (int) InterventionTask::whereIn('intervention_id', $interventionIds)->count(),
-                'student_notifications' => (int) StudentNotification::whereIn('intervention_id', $interventionIds)->count(),
-            ],
-            'created_at' => now()->toIso8601String(),
-        ];
-
-        $safeSchoolYear = str_replace('-', '_', $oldSY);
-        $archiveKey = 'school_year_archive_snapshot_' . $safeSchoolYear . '_' . now()->format('YmdHis') . '_' . Str::lower(Str::random(6));
-
-        SystemSetting::create([
-            'key' => $archiveKey,
-            'value' => json_encode($snapshot),
-            'type' => 'json',
-            'group' => 'academic',
-            'description' => "Archive snapshot for {$oldSY} before rollover to {$newSY}",
-            'updated_by' => $userId,
-        ]);
-
-        cache()->forget("system_setting_{$archiveKey}");
-
-        return $archiveKey;
-    }
-
-    /**
-     * Return stats for any school year as JSON (archive viewer).
-     */
-    public function archiveStats(Request $request): JsonResponse
-    {
-        $sy = $request->query('sy', '');
-        return response()->json($this->buildSyStats($sy));
     }
 
     private function buildSyStats(string $schoolYear, ?int $semester = null): array

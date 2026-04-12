@@ -3,14 +3,9 @@
 namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
-use App\Models\AttendanceRecord;
-use App\Models\Enrollment;
-use App\Models\Grade;
-use App\Models\Intervention;
-use App\Models\InterventionTask;
-use App\Models\StudentNotification;
 use App\Models\SubjectTeacher;
 use App\Models\SystemSetting;
+use App\Services\SuperAdmin\SchoolYearArchiveSnapshotService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -47,33 +42,12 @@ class NewSchoolYearController extends Controller
         }
 
         DB::transaction(function () use ($newSY, $userId) {
-            // Delete in dependency order to respect FK constraints
-            // intervention_tasks → interventions → (grades, attendance_records) → enrollments → subject_teachers
-            // student_notifications reference interventions so delete first
-            StudentNotification::whereHas('intervention', fn($q) =>
-                $q->whereHas('enrollment', fn($q2) =>
-                    $q2->whereHas('subjectTeacher')
-                )
-            )->delete();
+            $currentSY = SystemSetting::getCurrentSchoolYear();
 
-            // Fallback: delete all notifications (they're session-scoped anyway)
-            StudentNotification::query()->delete();
+            app(SchoolYearArchiveSnapshotService::class)
+                ->capture($currentSY, $newSY, $userId);
 
-            InterventionTask::whereHas('intervention', fn($q) =>
-                $q->whereHas('enrollment')
-            )->delete();
-
-            Intervention::whereHas('enrollment')->delete();
-
-            AttendanceRecord::whereHas('enrollment')->delete();
-
-            Grade::whereHas('enrollment')->delete();
-
-            Enrollment::query()->delete();
-
-            SubjectTeacher::query()->delete();
-
-            // Update system settings for new SY
+            // Update system settings for new SY (preserve historical records)
             $settings = [
                 ['key' => 'current_school_year',   'value' => $newSY,   'type' => 'string',  'group' => 'academic', 'description' => 'Current school year'],
                 ['key' => 'current_semester',       'value' => '1',      'type' => 'integer', 'group' => 'academic', 'description' => 'Current semester'],
@@ -91,6 +65,6 @@ class NewSchoolYearController extends Controller
         });
 
         return redirect()->route('superadmin.settings.index')
-            ->with('success', "New school year {$newSY} has started. All previous session data has been cleared.");
+            ->with('success', "New school year {$newSY} has started. Previous records were archived and preserved.");
     }
 }

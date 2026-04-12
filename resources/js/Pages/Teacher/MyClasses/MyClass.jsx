@@ -570,7 +570,7 @@ const MyClass = (props) => {
         gradeSummaries = {},
         onRefreshClassData,
         isReadOnly = false,
-        readOnlyModeLabel = "Archive View Only",
+        readOnlyModeLabel = "Read Only",
         readOnlyActionMessage = "This class is view-only.",
     } = props;
 
@@ -582,12 +582,12 @@ const MyClass = (props) => {
     const [showFinalUnlockInfo, setShowFinalUnlockInfo] = useState(false);
     const [isStartQ2ModalOpen, setIsStartQ2ModalOpen] = useState(false);
     const currentQuarter = selectedClass?.current_quarter ?? 1;
-    const isArchiveReadOnly = Boolean(isReadOnly);
+    const isReadOnlyView = Boolean(isReadOnly);
     const readOnlyBadgeLabel = String(readOnlyModeLabel || "View Only");
     const readOnlyHint = String(
         readOnlyActionMessage || "This class is view-only.",
     );
-    const isQ2Unlocked = isArchiveReadOnly || currentQuarter >= 2;
+    const isQ2Unlocked = isReadOnlyView || currentQuarter >= 2;
     const [searchTerm, setSearchTerm] = useState("");
     const [gradesExpanded, setGradesExpanded] = useState(false);
     const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
@@ -716,10 +716,10 @@ const MyClass = (props) => {
     }, [gradeSummaries]);
 
     const isFinalUnlocked = useMemo(() => {
-        if (isArchiveReadOnly) return true;
+        if (isReadOnlyView) return true;
         if (currentQuarter < 2) return false;
         return hasEligibleFinalGradeData;
-    }, [isArchiveReadOnly, currentQuarter, hasEligibleFinalGradeData]);
+    }, [isReadOnlyView, currentQuarter, hasEligibleFinalGradeData]);
 
     const filteredStudents = useMemo(() => {
         if (!searchTerm.trim()) return students;
@@ -1017,7 +1017,7 @@ const MyClass = (props) => {
 
     // Event Handlers
     const handleStartEditingGrades = () => {
-        if (isArchiveReadOnly || selectedTab === "final") {
+        if (isReadOnlyView || selectedTab === "final") {
             return;
         }
 
@@ -1025,7 +1025,7 @@ const MyClass = (props) => {
     };
 
     const handleSaveGrades = async () => {
-        if (isArchiveReadOnly) return;
+        if (isReadOnlyView) return;
         if (!isEditingGrades) return;
         if (!hasGradeChanges || !selectedClass) return;
 
@@ -1090,7 +1090,7 @@ const MyClass = (props) => {
     };
 
     const handleGradeChange = (studentId, assignmentId, maxScore, rawValue) => {
-        if (isArchiveReadOnly || !isEditingGrades) {
+        if (isReadOnlyView || !isEditingGrades) {
             return;
         }
 
@@ -1146,7 +1146,7 @@ const MyClass = (props) => {
     };
 
     const handleCategoryTaskSave = async (categoryId, taskData) => {
-        if (isArchiveReadOnly) return;
+        if (isReadOnlyView) return;
         if (!selectedClass) return;
         setIsSavingCategoryTask(true);
 
@@ -1202,7 +1202,7 @@ const MyClass = (props) => {
     };
 
     const handleAutoAddCategoryTask = (category) => {
-        if (isArchiveReadOnly) return;
+        if (isReadOnlyView) return;
         if (!category || isSavingCategoryTask) return;
 
         if (
@@ -1227,7 +1227,7 @@ const MyClass = (props) => {
     };
 
     const handleTaskColumnUpdate = async ({ label, total }) => {
-        if (isArchiveReadOnly) return;
+        if (isReadOnlyView) return;
         if (!selectedClass || !selectedTaskColumnData || isSavingCategoryTask)
             return;
 
@@ -1299,7 +1299,7 @@ const MyClass = (props) => {
     };
 
     const handleTaskColumnDeleteRequest = () => {
-        if (isArchiveReadOnly) return;
+        if (isReadOnlyView) return;
         if (!selectedTaskColumnData) return;
         if (isQuarterlyExamCategory(selectedTaskColumnData.category)) {
             alert("Quarterly Exam activity cannot be deleted.");
@@ -1314,7 +1314,7 @@ const MyClass = (props) => {
     };
 
     const handleCategoryTaskDelete = (categoryId, taskId) => {
-        if (isArchiveReadOnly) return;
+        if (isReadOnlyView) return;
         if (!selectedClass || isSavingCategoryTask) return;
 
         const category = gradeCategories.find((item) => item.id === categoryId);
@@ -1354,7 +1354,7 @@ const MyClass = (props) => {
     };
 
     const handleConfirmCategoryTaskDelete = async () => {
-        if (isArchiveReadOnly) return;
+        if (isReadOnlyView) return;
         if (!selectedClass || !deleteTaskModal.isOpen) return;
 
         const categoryId = deleteTaskModal.categoryId;
@@ -1448,12 +1448,12 @@ const MyClass = (props) => {
     };
 
     const handleClasslistUploadClick = () => {
-        if (isArchiveReadOnly) return;
+        if (isReadOnlyView) return;
         classlistUploadRef.current?.click();
     };
 
     const handleClasslistFileChange = async (event) => {
-        if (isArchiveReadOnly) return;
+        if (isReadOnlyView) return;
         const file = event.target.files?.[0];
         if (!file || !selectedClass) return;
 
@@ -1501,12 +1501,12 @@ const MyClass = (props) => {
     };
 
     const handleGradesUploadClick = () => {
-        if (isArchiveReadOnly) return;
+        if (isReadOnlyView) return;
         gradeUploadRef.current?.click();
     };
 
     const handleGradesFileChange = async (event) => {
-        if (isArchiveReadOnly) return;
+        if (isReadOnlyView) return;
         const file = event.target.files?.[0];
         if (!file || !selectedClass) return;
 
@@ -1674,7 +1674,7 @@ const MyClass = (props) => {
                                     Q{selectedClass.current_quarter}
                                 </span>
                             )}
-                            {isArchiveReadOnly && (
+                            {isReadOnlyView && (
                                 <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 font-medium">
                                     {readOnlyBadgeLabel}
                                 </span>
@@ -1718,11 +1718,11 @@ const MyClass = (props) => {
                             disabled={
                                 !selectedClass ||
                                 isUploadingClasslist ||
-                                isArchiveReadOnly
+                                isReadOnlyView
                             }
                             className="flex items-center gap-1 rounded-md border border-indigo-300 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
                             title={
-                                isArchiveReadOnly
+                                isReadOnlyView
                                     ? readOnlyHint
                                     : "Upload students from CSV"
                             }
@@ -1751,11 +1751,11 @@ const MyClass = (props) => {
                                     disabled={
                                         !selectedClass ||
                                         isImportingGrades ||
-                                        isArchiveReadOnly
+                                        isReadOnlyView
                                     }
                                     className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium py-1.5 px-2.5 rounded-md hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60 text-xs"
                                     title={
-                                        isArchiveReadOnly
+                                        isReadOnlyView
                                             ? readOnlyHint
                                             : "Upload grades from CSV"
                                     }
@@ -1766,7 +1766,7 @@ const MyClass = (props) => {
                                         : "Upload Grades"}
                                 </button>
                                 {selectedTab !== "final" &&
-                                    !isArchiveReadOnly &&
+                                    !isReadOnlyView &&
                                     (isEditingGrades ? (
                                         <button
                                             onClick={handleSaveGrades}
@@ -1798,13 +1798,13 @@ const MyClass = (props) => {
 
                         <button
                             onClick={() => {
-                                if (isArchiveReadOnly) return;
+                                if (isReadOnlyView) return;
                                 setIsAddStudentModalOpen(true);
                             }}
                             className="flex items-center gap-1 bg-indigo-600 text-white font-medium py-1.5 px-2.5 rounded-md hover:bg-indigo-700 disabled:opacity-50 text-xs"
-                            disabled={!selectedClass || isArchiveReadOnly}
+                            disabled={!selectedClass || isReadOnlyView}
                             title={
-                                isArchiveReadOnly ? readOnlyHint : "Add student"
+                                isReadOnlyView ? readOnlyHint : "Add student"
                             }
                         >
                             <Plus size={14} />
@@ -1846,7 +1846,7 @@ const MyClass = (props) => {
                                 hasSearchTerm={Boolean(searchTerm)}
                                 searchTerm={searchTerm}
                                 onAddStudent={() => {
-                                    if (isArchiveReadOnly) return;
+                                    if (isReadOnlyView) return;
                                     setIsAddStudentModalOpen(true);
                                 }}
                             />
@@ -2002,7 +2002,7 @@ const MyClass = (props) => {
                                         )}
                                     </div>
                                 </div>
-                                {currentQuarter < 2 && !isArchiveReadOnly && (
+                                {currentQuarter < 2 && !isReadOnlyView && (
                                     <button
                                         type="button"
                                         onClick={() =>
@@ -2019,13 +2019,13 @@ const MyClass = (props) => {
                                 <div className="flex items-center gap-1.5">
                                     <button
                                         onClick={() => {
-                                            if (isArchiveReadOnly) return;
+                                            if (isReadOnlyView) return;
                                             setIsEditCategoriesModalOpen(true);
                                         }}
-                                        disabled={isArchiveReadOnly}
+                                        disabled={isReadOnlyView}
                                         className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 transition disabled:cursor-not-allowed disabled:opacity-60"
                                         title={
-                                            isArchiveReadOnly
+                                            isReadOnlyView
                                                 ? readOnlyHint
                                                 : "Edit grade category percentages"
                                         }
@@ -2097,7 +2097,7 @@ const MyClass = (props) => {
                                                                       1,
                                                                   );
                                                         const canAddTask =
-                                                            !isArchiveReadOnly &&
+                                                            !isReadOnlyView &&
                                                             (!isQE ||
                                                                 tasks.length ===
                                                                     0);
@@ -2248,7 +2248,7 @@ const MyClass = (props) => {
                                                                 <th
                                                                     key={`${category.id}-empty`}
                                                                     className={`px-3 py-1.5 text-left text-[10px] font-medium text-gray-400 dark:text-gray-500 ${
-                                                                        isArchiveReadOnly
+                                                                        isReadOnlyView
                                                                             ? "border-r border-gray-200 dark:border-gray-700"
                                                                             : ""
                                                                     }`}
@@ -2264,7 +2264,7 @@ const MyClass = (props) => {
                                                                 <th
                                                                     key={`${category.id}-collapsed`}
                                                                     className={`px-3 py-1.5 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 bg-indigo-50/30 dark:bg-indigo-900/10 transition-colors hover:bg-indigo-100/50 dark:hover:bg-indigo-900/20 ${
-                                                                        isArchiveReadOnly
+                                                                        isReadOnlyView
                                                                             ? "border-r border-gray-200 dark:border-gray-700"
                                                                             : ""
                                                                     }`}
@@ -2301,7 +2301,7 @@ const MyClass = (props) => {
                                                                     taskIndex,
                                                                 ) => {
                                                                     const hasRightBorder =
-                                                                        isArchiveReadOnly &&
+                                                                        isReadOnlyView &&
                                                                         taskIndex ===
                                                                             tasks.length -
                                                                                 1;
@@ -2344,9 +2344,7 @@ const MyClass = (props) => {
                                                             );
                                                         }
 
-                                                        if (
-                                                            !isArchiveReadOnly
-                                                        ) {
+                                                        if (!isReadOnlyView) {
                                                             const isQECategory =
                                                                 isQuarterlyExam(
                                                                     category,
@@ -2522,7 +2520,7 @@ const MyClass = (props) => {
                                                                             <td
                                                                                 key={`${studentKey}-${category.id}-placeholder`}
                                                                                 className={`px-3 py-2 text-center text-xs text-gray-400 dark:text-gray-500 ${
-                                                                                    isArchiveReadOnly
+                                                                                    isReadOnlyView
                                                                                         ? "border-r border-gray-200 dark:border-gray-700"
                                                                                         : ""
                                                                                 }`}
@@ -2565,12 +2563,12 @@ const MyClass = (props) => {
                                                                             <td
                                                                                 key={`${studentKey}-${category.id}-collapsed`}
                                                                                 className={`px-3 py-2 text-xs text-gray-700 dark:text-gray-300 ${
-                                                                                    isArchiveReadOnly
+                                                                                    isReadOnlyView
                                                                                         ? "border-r border-gray-200 dark:border-gray-700"
                                                                                         : ""
                                                                                 }`}
                                                                             >
-                                                                                {isArchiveReadOnly ||
+                                                                                {isReadOnlyView ||
                                                                                 !isEditingGrades ? (
                                                                                     <span className="inline-flex w-16 items-center justify-center rounded bg-gray-100/80 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">
                                                                                         {inputValue ===
@@ -2587,7 +2585,7 @@ const MyClass = (props) => {
                                                                                             inputValue
                                                                                         }
                                                                                         disabled={
-                                                                                            isArchiveReadOnly
+                                                                                            isReadOnlyView
                                                                                         }
                                                                                         onChange={(
                                                                                             event,
@@ -2640,7 +2638,7 @@ const MyClass = (props) => {
                                                                                         ? ""
                                                                                         : `${rawValue}`;
                                                                                 const hasRightBorder =
-                                                                                    isArchiveReadOnly &&
+                                                                                    isReadOnlyView &&
                                                                                     taskIndex ===
                                                                                         tasks.length -
                                                                                             1;
@@ -2654,7 +2652,7 @@ const MyClass = (props) => {
                                                                                                 : ""
                                                                                         }`}
                                                                                     >
-                                                                                        {isArchiveReadOnly ||
+                                                                                        {isReadOnlyView ||
                                                                                         !isEditingGrades ? (
                                                                                             <span className="inline-flex w-16 items-center justify-center rounded bg-gray-100/80 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">
                                                                                                 {inputValue ===
@@ -2671,7 +2669,7 @@ const MyClass = (props) => {
                                                                                                     inputValue
                                                                                                 }
                                                                                                 disabled={
-                                                                                                    isArchiveReadOnly
+                                                                                                    isReadOnlyView
                                                                                                 }
                                                                                                 onChange={(
                                                                                                     event,
@@ -2696,7 +2694,7 @@ const MyClass = (props) => {
                                                                     }
 
                                                                     if (
-                                                                        !isArchiveReadOnly
+                                                                        !isReadOnlyView
                                                                     ) {
                                                                         const canAddTask =
                                                                             !isQuarterlyExamCategory(
@@ -2771,7 +2769,7 @@ const MyClass = (props) => {
                                         hasSearchTerm={Boolean(searchTerm)}
                                         searchTerm={searchTerm}
                                         onAddStudent={() => {
-                                            if (isArchiveReadOnly) return;
+                                            if (isReadOnlyView) return;
                                             setIsAddStudentModalOpen(true);
                                         }}
                                     />
@@ -3073,7 +3071,7 @@ const MyClass = (props) => {
                                         hasSearchTerm={Boolean(searchTerm)}
                                         searchTerm={searchTerm}
                                         onAddStudent={() => {
-                                            if (isArchiveReadOnly) return;
+                                            if (isReadOnlyView) return;
                                             setIsAddStudentModalOpen(true);
                                         }}
                                     />
@@ -3082,7 +3080,7 @@ const MyClass = (props) => {
                         )}
                         {selectedTab !== "final" && !hasAssignments && (
                             <p className="text-center text-gray-500 dark:text-gray-400 py-4 text-xs">
-                                {isArchiveReadOnly
+                                {isReadOnlyView
                                     ? "No activity records are available for this quarter."
                                     : "Add your first activity under Written Works, Performance Task, or Quarterly Exam to begin encoding scores."}
                             </p>
@@ -3101,7 +3099,7 @@ const MyClass = (props) => {
                     }}
                 />
             )}
-            {!isArchiveReadOnly && (
+            {!isReadOnlyView && (
                 <EditGradeCategoriesModal
                     isOpen={isEditCategoriesModalOpen}
                     onClose={() => setIsEditCategoriesModalOpen(false)}
@@ -3113,7 +3111,7 @@ const MyClass = (props) => {
                     }}
                 />
             )}
-            {!isArchiveReadOnly && isAddStudentModalOpen && selectedClass && (
+            {!isReadOnlyView && isAddStudentModalOpen && selectedClass && (
                 <AddStudentModal
                     subjectId={selectedClass.id}
                     subjectLabel={selectedClassHeading}
@@ -3130,7 +3128,7 @@ const MyClass = (props) => {
                 categoryLabel={selectedTaskColumnData?.category?.label}
                 summary={selectedTaskColumnData?.summary}
                 isSubmitting={isSavingCategoryTask}
-                isReadOnly={isArchiveReadOnly}
+                isReadOnly={isReadOnlyView}
                 canDelete={
                     !isQuarterlyExamCategory(selectedTaskColumnData?.category)
                 }
@@ -3161,7 +3159,7 @@ const MyClass = (props) => {
                 status={gradeSubmissionModal.status}
                 message={gradeSubmissionModal.message}
             />
-            {!isArchiveReadOnly && (
+            {!isReadOnlyView && (
                 <DeleteGradeTaskModal
                     isOpen={deleteTaskModal.isOpen}
                     categoryLabel={deleteTaskModal.categoryLabel}
@@ -3175,7 +3173,7 @@ const MyClass = (props) => {
                     onConfirm={handleConfirmCategoryTaskDelete}
                 />
             )}
-            {!isArchiveReadOnly && (
+            {!isReadOnlyView && (
                 <StartQ2ConfirmModal
                     isOpen={isStartQ2ModalOpen}
                     onClose={() => setIsStartQ2ModalOpen(false)}

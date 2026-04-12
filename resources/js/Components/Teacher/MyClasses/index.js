@@ -21,5 +21,3 @@ export { default as ClassList } from "./ClassList";
 export { default as GradeSubmissionModal } from "./GradeSubmissionModal";
 export { default as StartQ2ConfirmModal } from "./StartQ2ConfirmModal";
 export { default as BulkStudentImportSummaryModal } from "./BulkStudentImportSummaryModal";
-export { default as ReuseArchivedClassesModal } from "./ReuseArchivedClassesModal";
-export { default as ReuseArchivedClassesSummaryModal } from "./ReuseArchivedClassesSummaryModal";

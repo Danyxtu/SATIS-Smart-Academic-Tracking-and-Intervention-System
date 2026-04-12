@@ -25,8 +25,8 @@ test('my classes only shows assignments for the active school year', function ()
         'subject_code' => 'CUR-S2',
     ]);
 
-    $archivedSubject = Subject::create([
-        'subject_name' => 'Archived School Year Subject',
+    $previousSchoolYearSubject = Subject::create([
+        'subject_name' => 'Previous School Year Subject',
         'subject_code' => 'OLD-S1',
     ]);
 
@@ -53,7 +53,7 @@ test('my classes only shows assignments for the active school year', function ()
     ]);
 
     SubjectTeacher::create([
-        'subject_id' => $archivedSubject->id,
+        'subject_id' => $previousSchoolYearSubject->id,
         'teacher_id' => $teacher->id,
         'grade_level' => 'Grade 11',
         'section' => 'TVL-C',

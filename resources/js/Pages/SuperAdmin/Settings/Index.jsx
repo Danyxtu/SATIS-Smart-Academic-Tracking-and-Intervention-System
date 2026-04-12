@@ -1,5 +1,4 @@
 import { Head, router, useForm } from "@inertiajs/react";
-import axios from "axios";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import { useState } from "react";
 import {
@@ -24,8 +23,6 @@ function NewSchoolYearModal({ currentSY, onClose }) {
     const [confirm, setConfirm] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
-    const [progressStep, setProgressStep] = useState("idle");
-    const [progressPercent, setProgressPercent] = useState(0);
 
     const parseSchoolYear = (value) => {
         const match = String(value || "")
@@ -80,9 +77,6 @@ function NewSchoolYearModal({ currentSY, onClose }) {
         matchesExpectedNext &&
         hasMatchingConfirmation;
 
-    const isArchiving = submitting && progressStep === "archiving";
-    const isCreating = submitting && progressStep === "creating";
-
     const getFirstErrorMessage = (errorsBag, fallbackMessage) => {
         if (!errorsBag || typeof errorsBag !== "object") {
             return fallbackMessage;
@@ -109,73 +103,28 @@ function NewSchoolYearModal({ currentSY, onClose }) {
 
         setError("");
         setSubmitting(true);
-        setProgressStep("archiving");
-        setProgressPercent(35);
 
-        try {
-            const archiveResponse = await axios.post(
-                route("superadmin.settings.archive-current-school-year"),
-                {
-                    new_school_year: trimmedNewSY,
+        router.post(
+            route("superadmin.settings.rollover"),
+            {
+                new_school_year: trimmedNewSY,
+                confirm_school_year: trimmedConfirm,
+            },
+            {
+                onError: (errs) => {
+                    setError(
+                        getFirstErrorMessage(
+                            errs,
+                            "Unable to create the new school year.",
+                        ),
+                    );
                 },
-            );
-
-            const archiveKey = archiveResponse?.data?.archive_key ?? null;
-
-            setProgressStep("creating");
-            setProgressPercent(75);
-
-            router.post(
-                route("superadmin.settings.rollover"),
-                {
-                    new_school_year: trimmedNewSY,
-                    confirm_school_year: trimmedConfirm,
-                    archive_key: archiveKey,
+                onSuccess: () => {
+                    onClose();
                 },
-                {
-                    onError: (errs) => {
-                        setError(
-                            getFirstErrorMessage(
-                                errs,
-                                "Unable to create the new school year.",
-                            ),
-                        );
-                        setProgressStep("idle");
-                        setProgressPercent(0);
-                        setSubmitting(false);
-                    },
-                    onSuccess: () => {
-                        setProgressPercent(100);
-                        onClose();
-                    },
-                    onFinish: () => setSubmitting(false),
-                },
-            );
-        } catch (archiveError) {
-            if (!axios.isAxiosError(archiveError)) {
-                setError(
-                    "Unable to start the new school year. Please try again.",
-                );
-                setProgressStep("idle");
-                setProgressPercent(0);
-                setSubmitting(false);
-                return;
-            }
-
-            const responseErrors = archiveError?.response?.data?.errors;
-            const backendMessage = getFirstErrorMessage(
-                responseErrors,
-                archiveError?.response?.data?.message,
-            );
-
-            setError(
-                backendMessage ||
-                    "Unable to archive the current school year. Please try again.",
-            );
-            setProgressStep("idle");
-            setProgressPercent(0);
-            setSubmitting(false);
-        }
+                onFinish: () => setSubmitting(false),
+            },
+        );
     };
 
     return (
@@ -197,7 +146,7 @@ function NewSchoolYearModal({ currentSY, onClose }) {
                                     Start New School Year
                                 </h2>
                                 <p className="text-rose-200 text-xs mt-0.5">
-                                    This rolls over and archives current SY data
+                                    This rolls over current school year data
                                 </p>
                             </div>
                         </div>
@@ -220,8 +169,8 @@ function NewSchoolYearModal({ currentSY, onClose }) {
                         />
                         <div className="text-xs text-rose-700 space-y-1">
                             <p className="font-semibold">
-                                The following current school year data will be
-                                archived:
+                                The current school year will be closed and a new
+                                one will start.
                             </p>
                             <ul className="list-disc list-inside space-y-0.5 text-rose-600">
                                 <li>
@@ -234,8 +183,7 @@ function NewSchoolYearModal({ currentSY, onClose }) {
                                 <li>All student notifications</li>
                             </ul>
                             <p className="font-semibold mt-1">
-                                No records are deleted. You can review old
-                                school years in Archive.
+                                Existing records are preserved by school year.
                             </p>
                         </div>
                     </div>
@@ -323,92 +271,9 @@ function NewSchoolYearModal({ currentSY, onClose }) {
                         <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
                             <div className="flex items-center justify-between gap-3">
                                 <p className="text-[11px] font-semibold text-blue-700">
-                                    {isArchiving
-                                        ? `Creating ${currentSY || "current school year"} archive...`
-                                        : `Creating new school year ${trimmedNewSY || suggestedSY}...`}
+                                    Creating new school year{" "}
+                                    {trimmedNewSY || suggestedSY}...
                                 </p>
-                                <span className="text-[11px] font-semibold text-blue-600 tabular-nums">
-                                    {progressPercent}%
-                                </span>
-                            </div>
-
-                            <div className="mt-2 h-2 overflow-hidden rounded-full bg-blue-100">
-                                <div
-                                    className="h-full rounded-full bg-blue-500 transition-all duration-300"
-                                    style={{ width: `${progressPercent}%` }}
-                                />
-                            </div>
-
-                            <div className="mt-3 space-y-1.5 text-[11px]">
-                                <div
-                                    className={`flex items-center gap-2 ${
-                                        isArchiving
-                                            ? "text-blue-700"
-                                            : isCreating
-                                              ? "text-emerald-700"
-                                              : "text-slate-500"
-                                    }`}
-                                >
-                                    {isCreating ? (
-                                        <CheckCircle size={12} />
-                                    ) : (
-                                        <svg
-                                            className={`h-3 w-3 ${isArchiving ? "animate-spin" : ""}`}
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <circle
-                                                className="opacity-25"
-                                                cx="12"
-                                                cy="12"
-                                                r="10"
-                                                stroke="currentColor"
-                                                strokeWidth="4"
-                                            />
-                                            <path
-                                                className="opacity-75"
-                                                fill="currentColor"
-                                                d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z"
-                                            />
-                                        </svg>
-                                    )}
-                                    <span>
-                                        Creating{" "}
-                                        {currentSY || "current school year"}{" "}
-                                        archive
-                                    </span>
-                                </div>
-                                <div
-                                    className={`flex items-center gap-2 ${
-                                        isCreating
-                                            ? "text-blue-700"
-                                            : "text-slate-500"
-                                    }`}
-                                >
-                                    <svg
-                                        className={`h-3 w-3 ${isCreating ? "animate-spin" : ""}`}
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <circle
-                                            className="opacity-25"
-                                            cx="12"
-                                            cy="12"
-                                            r="10"
-                                            stroke="currentColor"
-                                            strokeWidth="4"
-                                        />
-                                        <path
-                                            className="opacity-75"
-                                            fill="currentColor"
-                                            d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z"
-                                        />
-                                    </svg>
-                                    <span>
-                                        Creating new school year{" "}
-                                        {trimmedNewSY || suggestedSY}
-                                    </span>
-                                </div>
                             </div>
                         </div>
                     )}
@@ -451,9 +316,7 @@ function NewSchoolYearModal({ currentSY, onClose }) {
                                 <Trash2 size={15} />
                             )}
                             {submitting
-                                ? isArchiving
-                                    ? "Creating Archive..."
-                                    : "Creating School Year..."
+                                ? "Creating School Year..."
                                 : "Start New Year"}
                         </button>
                     </div>
@@ -912,10 +775,8 @@ export default function Index({ settings }) {
                                     <span className="font-semibold">
                                         {currentSchoolYear}
                                     </span>{" "}
-                                    and archives current school year data —
-                                    enrollments, grades, attendance,
-                                    interventions, and notifications. No records
-                                    are deleted.
+                                    and starts the next school year while
+                                    preserving existing records.
                                 </p>
                             </div>
                             <button

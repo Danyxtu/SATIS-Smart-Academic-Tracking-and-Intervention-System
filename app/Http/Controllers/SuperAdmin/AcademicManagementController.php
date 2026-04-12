@@ -59,6 +59,7 @@ class AcademicManagementController extends Controller
             ->withCount('students');
 
         $classesQuery = SchoolClass::query()
+            ->where('school_year', $currentSchoolYear)
             ->with([
                 'subject:id,subject_name,subject_code',
                 'teacher:id,first_name,middle_name,last_name,department_id',
@@ -196,6 +197,7 @@ class AcademicManagementController extends Controller
 
         $sectionOptions = Section::query()
             ->with('department:id,department_name,department_code')
+            ->where('school_year', $currentSchoolYear)
             ->where('is_active', true)
             ->orderBy('section_name')
             ->get([
@@ -398,8 +400,8 @@ class AcademicManagementController extends Controller
             ],
             'stats' => [
                 'departments_count' => Department::query()->count(),
-                'sections_count' => Section::query()->count(),
-                'classes_count' => SchoolClass::query()->count(),
+                'sections_count' => Section::query()->where('school_year', $currentSchoolYear)->count(),
+                'classes_count' => SchoolClass::query()->where('school_year', $currentSchoolYear)->count(),
             ],
         ]);
     }

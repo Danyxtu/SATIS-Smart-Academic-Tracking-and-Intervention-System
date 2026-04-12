@@ -17,15 +17,17 @@ class AuditLogController extends Controller
     {
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:120'],
-            'role' => ['nullable', 'string', 'in:super_admin,teacher,student'],
+            'role' => ['nullable', 'string', 'in:super_admin,admin,teacher,student'],
             'action' => ['nullable', 'string', 'max:50'],
             'school_year' => ['nullable', 'string', 'max:32'],
+            'semester' => ['nullable', 'string', 'in:1,2'],
         ]);
 
         $search = trim((string) ($validated['search'] ?? ''));
         $role = (string) ($validated['role'] ?? '');
         $action = (string) ($validated['action'] ?? '');
         $schoolYear = (string) ($validated['school_year'] ?? '');
+        $semester = (string) ($validated['semester'] ?? '');
 
         $query = AuditLog::query()->with('user:id,first_name,middle_name,last_name,username');
 
@@ -42,7 +44,11 @@ class AuditLogController extends Controller
         }
 
         if ($role !== '') {
-            $query->where('user_role', $role);
+            $query->where(function ($builder) use ($role): void {
+                $builder
+                    ->where('user_role', $role)
+                    ->orWhereJsonContains('user_roles', $role);
+            });
         }
 
         if ($action !== '') {
@@ -51,6 +57,10 @@ class AuditLogController extends Controller
 
         if ($schoolYear !== '') {
             $query->where('school_year', $schoolYear);
+        }
+
+        if ($semester !== '') {
+            $query->where('semester', (int) $semester);
         }
 
         $logs = $query
@@ -70,7 +80,9 @@ class AuditLogController extends Controller
                         'username' => $log->user?->username,
                     ],
                     'user_role' => $log->user_role,
+                    'user_roles' => $log->user_roles ?? ($log->user_role ? [$log->user_role] : []),
                     'school_year' => $log->school_year,
+                    'semester' => $log->semester,
                     'module' => $log->module,
                     'task' => $log->task,
                     'action' => $log->action,
@@ -108,6 +120,17 @@ class AuditLogController extends Controller
             ->values()
             ->all();
 
+        $semesterOptions = AuditLog::query()
+            ->select('semester')
+            ->whereNotNull('semester')
+            ->distinct()
+            ->orderBy('semester')
+            ->pluck('semester')
+            ->filter()
+            ->map(fn($value) => (int) $value)
+            ->values()
+            ->all();
+
         return Inertia::render('SuperAdmin/AuditLogs/Index', [
             'logs' => $logs,
             'filters' => [
@@ -115,15 +138,18 @@ class AuditLogController extends Controller
                 'role' => $role,
                 'action' => $action,
                 'school_year' => $schoolYear,
+                'semester' => $semester,
             ],
             'options' => [
                 'roles' => [
                     ['label' => 'Super Admin', 'value' => 'super_admin'],
+                    ['label' => 'Admin', 'value' => 'admin'],
                     ['label' => 'Teacher', 'value' => 'teacher'],
                     ['label' => 'Student', 'value' => 'student'],
                 ],
                 'actions' => $actionOptions,
                 'school_years' => $schoolYearOptions,
+                'semesters' => $semesterOptions,
             ],
         ]);
     }

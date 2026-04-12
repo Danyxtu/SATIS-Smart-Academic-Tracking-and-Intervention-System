@@ -18,7 +18,7 @@ class AuditUserActivity
     /**
      * @var list<string>
      */
-    private const TRACKED_ROLES = ['super_admin', 'teacher', 'student'];
+    private const TRACKED_ROLES = ['super_admin', 'admin', 'teacher', 'student'];
 
     /**
      * Only persist mutation requests to avoid noisy page-view logs.
@@ -107,7 +107,7 @@ class AuditUserActivity
 
         $user = $request->user();
 
-        return $user instanceof User && $this->resolvePrimaryRole($user) !== null;
+        return $user instanceof User && $this->resolveTrackedRoles($user) !== [];
     }
 
     private function writeLog(Request $request, int $statusCode, ?Throwable $exception): void
@@ -119,11 +119,13 @@ class AuditUserActivity
                 return;
             }
 
-            $primaryRole = $this->resolvePrimaryRole($user);
+            $trackedRoles = $this->resolveTrackedRoles($user);
 
-            if ($primaryRole === null) {
+            if ($trackedRoles === []) {
                 return;
             }
+
+            $primaryRole = $trackedRoles[0];
 
             $route = $request->route();
             $routeName = $route?->getName();
@@ -147,7 +149,9 @@ class AuditUserActivity
                 'user_id' => $user->id,
                 'user_name' => $user->name,
                 'user_role' => $primaryRole,
+                'user_roles' => $trackedRoles,
                 'school_year' => SystemSetting::getCurrentSchoolYear(),
+                'semester' => SystemSetting::getCurrentSemester(),
                 'module' => $module,
                 'task' => $this->buildTaskLabel(
                     action: $action,
@@ -174,19 +178,24 @@ class AuditUserActivity
         }
     }
 
-    private function resolvePrimaryRole(User $user): ?string
+    /**
+     * @return array<int, string>
+     */
+    private function resolveTrackedRoles(User $user): array
     {
         $roleNames = $user->relationLoaded('roles')
             ? $user->roles->pluck('name')->all()
             : $user->roles()->pluck('name')->all();
 
+        $tracked = [];
+
         foreach (self::TRACKED_ROLES as $trackedRole) {
             if (in_array($trackedRole, $roleNames, true)) {
-                return $trackedRole;
+                $tracked[] = $trackedRole;
             }
         }
 
-        return null;
+        return $tracked;
     }
 
     private function resolveModule(Request $request, ?string $routeName, string $role): string

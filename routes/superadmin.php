@@ -4,12 +4,12 @@
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
 use App\Http\Controllers\SuperAdmin\DepartmentController;
 use App\Http\Controllers\SuperAdmin\AdminController as SuperAdminAdminController;
-use App\Http\Controllers\SuperAdmin\ArchiveController;
 use App\Http\Controllers\SuperAdmin\NewSchoolYearController;
 use App\Http\Controllers\SuperAdmin\SettingsController;
 use App\Http\Controllers\SuperAdmin\SubjectController;
 use App\Http\Controllers\SuperAdmin\AcademicManagementController;
 use App\Http\Controllers\SuperAdmin\AuditLogController;
+use App\Http\Controllers\SuperAdmin\ArchiveController;
 use App\Http\Controllers\SuperAdmin\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
@@ -35,6 +35,22 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
         // Audit Logs
         Route::get('/audit-logs', [AuditLogController::class, 'index'])
             ->name('audit-logs.index');
+
+        // School Year Archive
+        Route::get('/archive', [ArchiveController::class, 'index'])
+            ->name('archive.index');
+        Route::get('/archive/{archive}/students/{studentUserId}', [ArchiveController::class, 'studentShow'])
+            ->name('archive.students.show');
+        Route::get('/archive/{archive}/students/{studentUserId}/classes/{archiveClass}', [ArchiveController::class, 'studentClassShow'])
+            ->name('archive.students.classes.show');
+        Route::get('/archive/{archive}/teachers/{teacherUserId}', [ArchiveController::class, 'teacherShow'])
+            ->name('archive.teachers.show');
+        Route::get('/archive/{archive}/teachers/{teacherUserId}/classes/{archiveClass}', [ArchiveController::class, 'teacherClassShow'])
+            ->name('archive.teachers.classes.show');
+        Route::get('/archive/{archive}/departments/{archiveDepartment}', [ArchiveController::class, 'departmentShow'])
+            ->name('archive.departments.show');
+        Route::get('/archive/{archive}/classes/{archiveClass}', [ArchiveController::class, 'classShow'])
+            ->name('archive.classes.show');
 
         // Department Management
         Route::get('/departments', [DepartmentController::class, 'index'])
@@ -99,22 +115,15 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
         Route::post('/admins/{admin}/resend-credentials', [SuperAdminAdminController::class, 'resendCredentials'])
             ->name('admins.resend-credentials');
 
-        // Archive
-        Route::get('/archive', [ArchiveController::class, 'index'])->name('archive.index');
-        Route::get('/archive/snapshots/{archiveKey}', [ArchiveController::class, 'snapshotShow'])->name('archive.snapshot.show');
-        Route::get('/archive/{schoolYear}', [ArchiveController::class, 'show'])->name('archive.show');
-
         // New School Year
         Route::post('/new-school-year', [NewSchoolYearController::class, 'start'])->name('new-school-year.start');
 
         // System Settings
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::post('/settings', [SettingsController::class, 'update'])->name('settings.update');
-        Route::post('/settings/archive-current-school-year', [SettingsController::class, 'archiveCurrentSchoolYear'])->name('settings.archive-current-school-year');
         Route::put('/settings/academic', [SettingsController::class, 'updateAcademic'])->name('settings.academic');
         Route::put('/settings/enrollment', [SettingsController::class, 'updateEnrollment'])->name('settings.enrollment');
         Route::put('/settings/grading', [SettingsController::class, 'updateGrading'])->name('settings.grading');
         Route::put('/settings/school-info', [SettingsController::class, 'updateSchoolInfo'])->name('settings.school-info');
         Route::post('/settings/rollover', [SettingsController::class, 'rollover'])->name('settings.rollover');
-        Route::get('/settings/archive-stats', [SettingsController::class, 'archiveStats'])->name('settings.archive-stats');
     });

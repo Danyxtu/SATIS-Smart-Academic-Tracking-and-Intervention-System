@@ -18,7 +18,9 @@ class AuditLog extends Model
         'user_id',
         'user_name',
         'user_role',
+        'user_roles',
         'school_year',
+        'semester',
         'module',
         'task',
         'action',
@@ -43,10 +45,12 @@ class AuditLog extends Model
     {
         return [
             'logged_at' => 'datetime',
+            'user_roles' => 'array',
             'query_params' => 'array',
             'request_payload' => 'array',
             'metadata' => 'array',
             'is_success' => 'boolean',
+            'semester' => 'integer',
         ];
     }
 

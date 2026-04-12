@@ -64,11 +64,8 @@ Student and grade actions inside class:
 - `Class Detail -> Update Grade Structure -> POST /teacher/classes/{subjectTeacher}/grade-structure (teacher.classes.grade-structure.update) -> Class Detail (updated)`
 - `Class Detail -> Send Nudge -> POST /teacher/classes/{subjectTeacher}/nudge (teacher.classes.nudge) -> Nudge Confirmation`
 
-Archive and calculation branches:
+Calculation branches:
 
-- `My Classes -> Open Archive Summary -> GET /teacher/classes/archive/summary (teacher.classes.archive.summary) -> Archive Summary`
-- `Archive Summary -> Open School Year -> GET /teacher/classes/archive/{schoolYear} (teacher.classes.archive.show) -> Archived Classes`
-- `Archived Classes -> Reuse Selected -> POST /teacher/classes/archive/use (teacher.classes.archive.use) -> My Classes (updated)`
 - `Class Detail -> Calculate Class Grades -> GET /teacher/classes/{subjectTeacher}/calculate-grades (teacher.classes.calculate-grades) -> Grade Calculation Result`
 - `Class Detail -> Calculate Student Grades -> GET /teacher/classes/{subjectTeacher}/students/{enrollment}/calculate-grades (teacher.classes.students.calculate-grades) -> Student Grade Result`
 
@@ -174,7 +171,7 @@ User actions:
 - `Departments Page -> Unassigned Teachers -> GET /superadmin/departments/unassigned-teachers (superadmin.departments.unassigned-teachers) -> Unassigned List`
 - `Departments Page -> Department Teachers -> GET /superadmin/departments/{department}/teachers (superadmin.departments.teachers) -> Teacher List`
 
-### B. Subjects, Users, Admins, Archive, Settings
+### B. Subjects, Users, Admins, and Settings
 
 - `Super Admin Nav -> Subjects -> GET /superadmin/subjects (superadmin.subjects.index) -> Subjects Page`
 - `Subjects Page -> Create/Update/Delete -> POST|PUT|DELETE /superadmin/subjects[...] -> Subjects Updated`
@@ -187,14 +184,9 @@ User actions:
 - `Admins Page -> Reset Password -> POST /superadmin/admins/{admin}/reset-password (superadmin.admins.reset-password) -> Reset Confirmation`
 - `Admins Page -> Resend Credentials -> POST /superadmin/admins/{admin}/resend-credentials (superadmin.admins.resend-credentials) -> Sent Confirmation`
 
-- `Super Admin Nav -> Archive -> GET /superadmin/archive (superadmin.archive.index) -> Archive Overview`
-- `Archive Overview -> Open Snapshot -> GET /superadmin/archive/snapshots/{archiveKey} (superadmin.archive.snapshot.show) -> Snapshot Detail`
-- `Archive Overview -> Open School Year -> GET /superadmin/archive/{schoolYear} (superadmin.archive.show) -> Archive Detail`
-
 - `Super Admin Dashboard/Settings -> Start New School Year -> POST /superadmin/new-school-year (superadmin.new-school-year.start) -> Year Started`
 - `Super Admin Nav -> Settings -> GET /superadmin/settings (superadmin.settings.index) -> Settings Page`
 - `Settings Page -> Save General Settings -> POST /superadmin/settings (superadmin.settings.update) -> Settings Saved`
-- `Settings Page -> Archive Current Year -> POST /superadmin/settings/archive-current-school-year (superadmin.settings.archive-current-school-year) -> Archive Created`
 - `Settings Page -> Update Academic/Enrollment/Grading/School Info -> PUT specific settings routes -> Settings Saved`
 - `Settings Page -> Run Rollover -> POST /superadmin/settings/rollover (superadmin.settings.rollover) -> Rollover Result`
 

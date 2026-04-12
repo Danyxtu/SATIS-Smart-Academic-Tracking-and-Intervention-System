@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             SubjectSeeder::class,
             RoleUserSeeder::class,
             TestUserSeeder::class,
+            SchoolYearArchiveSeeder::class,
         ]);
     }
 }
