@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\EnrollmentGradeService;
 use App\Services\GradeCalculationService;
 use App\Support\Concerns\HasDefaultAssignments;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -1513,11 +1514,27 @@ class ClassController extends Controller
         }
 
         $cohort = $this->cohortFromSchoolYear($schoolYear);
+        $sectionCode = $normalizedGradeLevel . '-' . $normalizedSection;
+        $gradeLevelCandidates = [
+            $normalizedGradeLevel,
+            'Grade ' . $normalizedGradeLevel,
+            'GRADE ' . $normalizedGradeLevel,
+        ];
+
+        $existingByUniqueCode = Section::query()
+            ->where('department_id', $department->id)
+            ->where('cohort', $cohort)
+            ->whereRaw('UPPER(section_code) = ?', [$sectionCode])
+            ->first();
+
+        if ($existingByUniqueCode) {
+            return (int) $existingByUniqueCode->id;
+        }
 
         $sectionRecord = Section::query()
             ->where('department_id', $department->id)
             ->where('cohort', $cohort)
-            ->where('grade_level', $normalizedGradeLevel)
+            ->whereIn('grade_level', $gradeLevelCandidates)
             ->where(function ($query) use ($sectionBaseName, $normalizedSection) {
                 $query
                     ->whereRaw('UPPER(section_name) = ?', [$sectionBaseName])
@@ -1536,21 +1553,33 @@ class ClassController extends Controller
             return (int) $sectionRecord->id;
         }
 
-        $sectionCode = $normalizedGradeLevel . '-' . $normalizedSection;
+        try {
+            $sectionRecord = Section::create([
+                'department_id' => $department->id,
+                'created_by' => $teacherId,
+                'section_name' => $sectionBaseName,
+                'section_code' => $sectionCode,
+                'cohort' => $cohort,
+                'grade_level' => $normalizedGradeLevel,
+                'strand' => $normalizedSpecialization,
+                'track' => $this->resolveTrackFromDepartmentCode((string) $department->department_code),
+                'school_year' => $schoolYear,
+                'description' => 'Auto-created from teacher class workflow.',
+                'is_active' => true,
+            ]);
+        } catch (UniqueConstraintViolationException $exception) {
+            $existingSection = Section::query()
+                ->where('department_id', $department->id)
+                ->where('cohort', $cohort)
+                ->whereRaw('UPPER(section_code) = ?', [$sectionCode])
+                ->first();
 
-        $sectionRecord = Section::create([
-            'department_id' => $department->id,
-            'created_by' => $teacherId,
-            'section_name' => $sectionBaseName,
-            'section_code' => $sectionCode,
-            'cohort' => $cohort,
-            'grade_level' => $normalizedGradeLevel,
-            'strand' => $normalizedSpecialization,
-            'track' => $this->resolveTrackFromDepartmentCode((string) $department->department_code),
-            'school_year' => $schoolYear,
-            'description' => 'Auto-created from teacher class workflow.',
-            'is_active' => true,
-        ]);
+            if ($existingSection) {
+                return (int) $existingSection->id;
+            }
+
+            throw $exception;
+        }
 
         return (int) $sectionRecord->id;
     }

@@ -3,10 +3,20 @@ import SATISHeader from "@/Components/SATISHeader";
 import ConfirmationDialog from "@/Components/ConfirmationDialog";
 import { Link, usePage, router } from "@inertiajs/react";
 import getInitials from "@/utils/initialsHelper";
-import { X, ChevronRight, LogOut, CheckCircle, XCircle } from "lucide-react";
+import {
+    X,
+    ChevronRight,
+    LogOut,
+    CheckCircle,
+    XCircle,
+    Calendar,
+    BookOpen,
+    Building2,
+} from "lucide-react";
 import { superAdminRoutes } from "@/routes/superadmin";
 import { adminRoutes } from "@/routes/admin";
 import { teachersRoutes } from "@/routes/teachers";
+import { getSemesterLabel } from "@/Utils/Teacher/Dashboard";
 
 // ── Role section config ──────────────────────────────────────────
 const ROLE_SECTIONS = [
@@ -152,7 +162,7 @@ function SidebarContent({
     onLogout,
     collapsed = false,
 }) {
-    const { auth } = usePage().props;
+    const { auth, academicPeriod, department } = usePage().props;
     const userRoles = auth.user.roles?.map((r) => r.name) || [];
     const visibleSections = ROLE_SECTIONS.filter((section) =>
         userRoles.includes(sectionRoleMap[section.key]),
@@ -180,6 +190,15 @@ function SidebarContent({
     const hasTeacherRole = userRoles.includes("teacher");
     const hasAdminRole = userRoles.includes("admin");
     const hasSuperAdminRole = userRoles.includes("super_admin");
+    const departmentCode =
+        department?.code ?? department?.department_code ?? null;
+    const shouldShowAcademicSnapshot =
+        hasTeacherRole &&
+        Boolean(
+            academicPeriod?.schoolYear ||
+            academicPeriod?.semester ||
+            departmentCode,
+        );
     const shouldMoveDashboardSwitcherToPage =
         hasTeacherRole && (hasAdminRole || hasSuperAdminRole);
 
@@ -296,6 +315,55 @@ function SidebarContent({
                                 );
                             })}
                         </div>
+
+                        {shouldShowAcademicSnapshot && (
+                            <div className="space-y-1.5">
+                                {(academicPeriod?.schoolYear ||
+                                    academicPeriod?.semester) && (
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                        {academicPeriod?.schoolYear && (
+                                            <div className="inline-flex items-center gap-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2 py-1">
+                                                <Calendar
+                                                    size={12}
+                                                    className="text-indigo-300"
+                                                />
+                                                <span className="truncate text-[10px] font-semibold text-indigo-100">
+                                                    {academicPeriod.schoolYear}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {academicPeriod?.semester && (
+                                            <div className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1">
+                                                <BookOpen
+                                                    size={12}
+                                                    className="text-emerald-300"
+                                                />
+                                                <span className="truncate text-[10px] font-semibold text-emerald-100">
+                                                    {getSemesterLabel(
+                                                        academicPeriod.semester,
+                                                    )}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {departmentCode && (
+                                    <div className="inline-flex items-center gap-1.5 rounded-md border border-violet-500/30 bg-violet-500/10 px-2 py-1">
+                                        <Building2
+                                            size={12}
+                                            className="text-violet-300"
+                                        />
+                                        <span className="truncate text-[10px] font-semibold text-violet-100">
+                                            {String(
+                                                departmentCode,
+                                            ).toUpperCase()}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {availableDashboardRoles.length > 1 &&
                             !shouldMoveDashboardSwitcherToPage && (

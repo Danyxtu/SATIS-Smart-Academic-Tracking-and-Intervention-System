@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Intervention;
 use App\Models\StudentNotification;
 use App\Models\Enrollment;
+use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -64,11 +65,24 @@ class HandleInertiaRequests extends Middleware
             ] : null,
         ]) : null;
 
+        $sharedDepartment = $user && $user->department ? [
+            'id' => $user->department->id,
+            'name' => $user->department->department_name,
+            'code' => $user->department->department_code,
+        ] : null;
+
+        $sharedAcademicPeriod = $user ? [
+            'schoolYear' => SystemSetting::getCurrentSchoolYear(),
+            'semester' => (string) SystemSetting::getCurrentSemester(),
+        ] : null;
+
         return [
             ...parent::share($request),
             'auth' => [
                 'user' => $userData,
             ],
+            'academicPeriod' => $sharedAcademicPeriod,
+            'department' => $sharedDepartment,
             'flash' => [
                 'success' => fn() => $request->session()->get('success'),
                 'error' => fn() => $request->session()->get('error'),

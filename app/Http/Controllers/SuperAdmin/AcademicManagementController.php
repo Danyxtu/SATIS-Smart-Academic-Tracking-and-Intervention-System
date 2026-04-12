@@ -10,6 +10,7 @@ use App\Models\Student;
 use App\Models\Subject;
 use App\Models\SystemSetting;
 use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -669,139 +670,155 @@ class AcademicManagementController extends Controller
             })
             ->values();
 
-        $summary = DB::transaction(function () use (
-            $request,
-            $department,
-            $schoolYear,
-            $cohort,
-            $gradeLevel,
-            $sectionBaseName,
-            $sectionCode,
-            $normalizedSpecialization,
-            $resolvedTrack,
-            $advisorTeacherId,
-            $assignedStudentIds,
-            $newStudents
-        ) {
-            $section = Section::create([
-                'department_id' => (int) $department->id,
-                'created_by' => $request->user()?->id,
-                'advisor_teacher_id' => $advisorTeacherId,
-                'section_name' => $sectionBaseName,
-                'section_code' => $sectionCode,
-                'cohort' => $cohort,
-                'grade_level' => $gradeLevel,
-                'strand' => $normalizedSpecialization,
-                'track' => $resolvedTrack,
-                'school_year' => $schoolYear,
-                'description' => null,
-                'is_active' => true,
-            ]);
+        try {
+            $summary = DB::transaction(function () use (
+                $request,
+                $department,
+                $schoolYear,
+                $cohort,
+                $gradeLevel,
+                $sectionBaseName,
+                $sectionCode,
+                $normalizedSpecialization,
+                $resolvedTrack,
+                $advisorTeacherId,
+                $assignedStudentIds,
+                $newStudents
+            ) {
+                $section = Section::create([
+                    'department_id' => (int) $department->id,
+                    'created_by' => $request->user()?->id,
+                    'advisor_teacher_id' => $advisorTeacherId,
+                    'section_name' => $sectionBaseName,
+                    'section_code' => $sectionCode,
+                    'cohort' => $cohort,
+                    'grade_level' => $gradeLevel,
+                    'strand' => $normalizedSpecialization,
+                    'track' => $resolvedTrack,
+                    'school_year' => $schoolYear,
+                    'description' => null,
+                    'is_active' => true,
+                ]);
 
-            $assignedExistingStudents = [];
-            if ($assignedStudentIds->isNotEmpty()) {
-                $students = Student::query()
-                    ->with('user')
-                    ->whereIn('id', $assignedStudentIds)
-                    ->get();
+                $assignedExistingStudents = [];
+                if ($assignedStudentIds->isNotEmpty()) {
+                    $students = Student::query()
+                        ->with('user')
+                        ->whereIn('id', $assignedStudentIds)
+                        ->get();
 
-                foreach ($students as $student) {
-                    $previousSection = $student->section;
+                    foreach ($students as $student) {
+                        $previousSection = $student->section;
 
-                    if (
-                        $student->user &&
-                        (int) ($student->user->department_id ?? 0) !== (int) $department->id
-                    ) {
-                        $student->user->update(['department_id' => (int) $department->id]);
+                        if (
+                            $student->user &&
+                            (int) ($student->user->department_id ?? 0) !== (int) $department->id
+                        ) {
+                            $student->user->update(['department_id' => (int) $department->id]);
+                        }
+
+                        $student->update([
+                            'section_id' => (int) $section->id,
+                            'section' => $section->section_name,
+                            'grade_level' => $section->grade_level,
+                            'strand' => $section->strand,
+                            'track' => $section->track,
+                        ]);
+
+                        $assignedExistingStudents[] = [
+                            'id' => (int) $student->id,
+                            'student_name' => $student->student_name,
+                            'lrn' => $student->lrn,
+                            'previous_section' => $previousSection,
+                        ];
                     }
+                }
 
-                    $student->update([
-                        'section_id' => (int) $section->id,
-                        'section' => $section->section_name,
+                $createdStudents = [];
+                foreach ($newStudents as $newStudent) {
+                    $temporaryPassword = Str::random(10);
+
+                    $user = User::create([
+                        'first_name' => $newStudent['first_name'],
+                        'middle_name' => $newStudent['middle_name'],
+                        'last_name' => $newStudent['last_name'],
+                        'username' => User::generateUniqueUsername($newStudent['first_name'] . ' ' . $newStudent['last_name']),
+                        'personal_email' => $newStudent['personal_email'],
+                        'password' => Hash::make($temporaryPassword),
+                        'must_change_password' => true,
+                        'department_id' => (int) $department->id,
+                        'created_by' => $request->user()?->id,
+                    ]);
+
+                    $user->syncRolesByName(['student']);
+
+                    $middleName = $newStudent['middle_name'];
+                    $studentName = trim(
+                        $newStudent['first_name']
+                            . ' '
+                            . ($middleName ? $middleName . ' ' : '')
+                            . $newStudent['last_name']
+                    );
+
+                    $createdStudent = Student::create([
+                        'user_id' => (int) $user->id,
+                        'student_name' => $studentName,
+                        'lrn' => $newStudent['lrn'],
                         'grade_level' => $section->grade_level,
+                        'section' => $section->section_name,
+                        'section_id' => (int) $section->id,
                         'strand' => $section->strand,
                         'track' => $section->track,
                     ]);
 
-                    $assignedExistingStudents[] = [
-                        'id' => (int) $student->id,
-                        'student_name' => $student->student_name,
-                        'lrn' => $student->lrn,
-                        'previous_section' => $previousSection,
+                    $createdStudents[] = [
+                        'id' => (int) $createdStudent->id,
+                        'student_name' => $createdStudent->student_name,
+                        'lrn' => $createdStudent->lrn,
+                        'personal_email' => $newStudent['personal_email'],
                     ];
                 }
-            }
 
-            $createdStudents = [];
-            foreach ($newStudents as $newStudent) {
-                $temporaryPassword = Str::random(10);
-
-                $user = User::create([
-                    'first_name' => $newStudent['first_name'],
-                    'middle_name' => $newStudent['middle_name'],
-                    'last_name' => $newStudent['last_name'],
-                    'username' => User::generateUniqueUsername($newStudent['first_name'] . ' ' . $newStudent['last_name']),
-                    'personal_email' => $newStudent['personal_email'],
-                    'password' => Hash::make($temporaryPassword),
-                    'must_change_password' => true,
-                    'department_id' => (int) $department->id,
-                    'created_by' => $request->user()?->id,
-                ]);
-
-                $user->syncRolesByName(['student']);
-
-                $middleName = $newStudent['middle_name'];
-                $studentName = trim(
-                    $newStudent['first_name']
-                        . ' '
-                        . ($middleName ? $middleName . ' ' : '')
-                        . $newStudent['last_name']
-                );
-
-                $createdStudent = Student::create([
-                    'user_id' => (int) $user->id,
-                    'student_name' => $studentName,
-                    'lrn' => $newStudent['lrn'],
-                    'grade_level' => $section->grade_level,
-                    'section' => $section->section_name,
+                return [
                     'section_id' => (int) $section->id,
-                    'strand' => $section->strand,
+                    'section_name' => $section->section_name,
+                    'section_full_label' => satis_section_full_label(
+                        $section->grade_level,
+                        $section->strand ?: $department->department_code,
+                        $section->section_name,
+                    ),
+                    'section_code' => $section->section_code,
+                    'department_name' => $department->department_name,
+                    'department_code' => $department->department_code,
+                    'cohort' => $section->cohort,
+                    'grade_level' => $section->grade_level,
+                    'specialization' => $section->strand,
                     'track' => $section->track,
-                ]);
-
-                $createdStudents[] = [
-                    'id' => (int) $createdStudent->id,
-                    'student_name' => $createdStudent->student_name,
-                    'lrn' => $createdStudent->lrn,
-                    'personal_email' => $newStudent['personal_email'],
+                    'school_year' => $section->school_year,
+                    'is_active' => (bool) $section->is_active,
+                    'existing_assigned_count' => count($assignedExistingStudents),
+                    'new_students_created_count' => count($createdStudents),
+                    'total_students' => count($assignedExistingStudents) + count($createdStudents),
+                    'assigned_existing_students' => $assignedExistingStudents,
+                    'created_students' => $createdStudents,
+                    'advisor_teacher_name' => $section->advisorTeacher?->name,
                 ];
+            });
+        } catch (UniqueConstraintViolationException $exception) {
+            $existingSection = Section::query()
+                ->where('department_id', (int) $department->id)
+                ->where('cohort', $cohort)
+                ->where('section_code', $sectionCode)
+                ->first();
+
+            if ($existingSection) {
+                throw ValidationException::withMessages([
+                    'section_name' => 'A section with this code already exists for the selected cohort and department.',
+                ]);
             }
 
-            return [
-                'section_id' => (int) $section->id,
-                'section_name' => $section->section_name,
-                'section_full_label' => satis_section_full_label(
-                    $section->grade_level,
-                    $section->strand ?: $department->department_code,
-                    $section->section_name,
-                ),
-                'section_code' => $section->section_code,
-                'department_name' => $department->department_name,
-                'department_code' => $department->department_code,
-                'cohort' => $section->cohort,
-                'grade_level' => $section->grade_level,
-                'specialization' => $section->strand,
-                'track' => $section->track,
-                'school_year' => $section->school_year,
-                'is_active' => (bool) $section->is_active,
-                'existing_assigned_count' => count($assignedExistingStudents),
-                'new_students_created_count' => count($createdStudents),
-                'total_students' => count($assignedExistingStudents) + count($createdStudents),
-                'assigned_existing_students' => $assignedExistingStudents,
-                'created_students' => $createdStudents,
-                'advisor_teacher_name' => $section->advisorTeacher?->name,
-            ];
-        });
+            throw $exception;
+        }
 
         return redirect()
             ->route('superadmin.academic-management.index', ['tab' => 'sections'])
