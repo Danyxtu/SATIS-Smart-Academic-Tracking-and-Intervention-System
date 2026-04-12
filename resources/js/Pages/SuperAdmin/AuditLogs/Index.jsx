@@ -11,16 +11,18 @@ import {
     XCircle,
 } from "lucide-react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
-import ArchiveDetailModal from "@/Components/Superadmin/ArchiveDetailModal";
+import ActivityLogDetailModal from "@/Components/Superadmin/ActivityLogDetailModal";
 
 const ROLE_LABELS = {
     super_admin: "Super Admin",
+    admin: "Admin",
     teacher: "Teacher",
     student: "Student",
 };
 
 const ROLE_BADGE_STYLES = {
     super_admin: "bg-amber-100 text-amber-700 border border-amber-200",
+    admin: "bg-violet-100 text-violet-700 border border-violet-200",
     teacher: "bg-blue-100 text-blue-700 border border-blue-200",
     student: "bg-emerald-100 text-emerald-700 border border-emerald-200",
 };
@@ -83,7 +85,7 @@ export default function Index({ logs, filters, options }) {
             ...overrides,
         };
 
-        router.get(route("superadmin.audit-logs.index"), payload, {
+        router.get(route("superadmin.activity-logs.index"), payload, {
             preserveState: true,
             replace: true,
         });
@@ -101,7 +103,7 @@ export default function Index({ logs, filters, options }) {
         setSchoolYearFilter("");
 
         router.get(
-            route("superadmin.audit-logs.index"),
+            route("superadmin.activity-logs.index"),
             {},
             {
                 preserveState: true,
@@ -112,13 +114,13 @@ export default function Index({ logs, filters, options }) {
 
     return (
         <>
-            <Head title="Audit Logs" />
+            <Head title="Activity Logs" />
 
             <div className="space-y-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h1 className="text-2xl font-bold text-slate-900">
-                            Activity Audit Logs
+                            Activity Logs
                         </h1>
                         <p className="mt-1 text-sm text-slate-500">
                             Track teacher, student, and super admin tasks per
@@ -253,7 +255,7 @@ export default function Index({ logs, filters, options }) {
                                 />
                             </div>
                             <h3 className="text-base font-semibold text-slate-800">
-                                No audit logs found
+                                No activity logs found
                             </h3>
                             <p className="mt-1 max-w-sm text-sm text-slate-500">
                                 Try adjusting your filters or perform actions as
@@ -433,10 +435,9 @@ export default function Index({ logs, filters, options }) {
                 </div>
             </div>
 
-            <ArchiveDetailModal
+            <ActivityLogDetailModal
                 show={Boolean(selectedLog)}
                 onClose={() => setSelectedLog(null)}
-                activeTab="audit-logs"
                 payload={selectedLog}
                 loading={false}
                 error=""

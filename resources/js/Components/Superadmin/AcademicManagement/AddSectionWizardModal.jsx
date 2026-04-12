@@ -1021,8 +1021,8 @@ export default function AddSectionWizardModal({
                 onClick={closeWizard}
             />
 
-            <div className="flex min-h-full items-center justify-center p-3 sm:p-4">
-                <div className="relative w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
+            <div className="flex min-h-full items-end justify-center p-3 pb-10 sm:items-center sm:p-4">
+                <div className="relative w-full max-w-6xl max-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
                     <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-6 sm:py-5">
                         <div className="flex items-center gap-3">
                             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 ring-1 ring-blue-200">

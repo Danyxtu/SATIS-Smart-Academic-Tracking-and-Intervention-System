@@ -44,8 +44,8 @@ export default function DeleteConfirmModal({
             />
 
             {/* Modal */}
-            <div className="flex min-h-full items-center justify-center p-4">
-                <div className="relative w-full max-w-md transform rounded-2xl bg-white shadow-2xl transition-all">
+            <div className="flex min-h-full items-end justify-center p-4 pb-10 sm:items-center">
+                <div className="relative w-full max-w-md transform max-h-[calc(100vh-6rem)] overflow-y-auto rounded-2xl bg-white shadow-2xl transition-all">
                     {/* Header */}
                     <div className="relative overflow-hidden rounded-t-2xl bg-gradient-to-r from-rose-500 to-red-600 px-6 py-6">
                         {/* Decorative blobs */}

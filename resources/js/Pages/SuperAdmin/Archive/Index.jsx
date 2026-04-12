@@ -54,8 +54,8 @@ const TAB_OPTIONS = [
         accent: "rose",
     },
     {
-        key: "audit-logs",
-        label: "Audit Logs",
+        key: "activity-logs",
+        label: "Activity Logs",
         summaryKey: "audit_logs",
         icon: ClipboardList,
         accent: "emerald",
@@ -322,7 +322,7 @@ export default function Index({
             nextFilters.track = filters.track || "";
         }
 
-        if (nextTab === "audit-logs") {
+        if (nextTab === "activity-logs") {
             nextFilters.audit_role = filters.audit_role || "";
         }
 
@@ -399,7 +399,7 @@ export default function Index({
             return;
         }
 
-        if (activeTab === "audit-logs") {
+        if (activeTab === "activity-logs") {
             setDetailPayload(row);
             setDetailModalOpen(true);
             return;
@@ -836,7 +836,7 @@ export default function Index({
             );
         }
 
-        if (activeTab === "audit-logs") {
+        if (activeTab === "activity-logs") {
             return (
                 <div className="rounded-xl border border-slate-200 bg-white p-2">
                     <div className="flex flex-wrap items-center gap-2">

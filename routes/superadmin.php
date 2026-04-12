@@ -32,9 +32,9 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
         Route::get('/dashboard', [SuperAdminDashboardController::class, 'index'])
             ->name('dashboard');
 
-        // Audit Logs
-        Route::get('/audit-logs', [AuditLogController::class, 'index'])
-            ->name('audit-logs.index');
+        // Activity Logs
+        Route::get('/activity-logs', [AuditLogController::class, 'index'])
+            ->name('activity-logs.index');
 
         // School Year Archive
         Route::get('/archive', [ArchiveController::class, 'index'])

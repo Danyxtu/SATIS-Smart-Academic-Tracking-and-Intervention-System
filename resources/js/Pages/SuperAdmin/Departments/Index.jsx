@@ -4,29 +4,14 @@ import {
     Building2,
     Plus,
     Search,
-    Edit,
-    Trash2,
     Users,
     GraduationCap,
     UserCog,
-    Filter,
     X,
-    CheckCircle,
-    XCircle,
-    Calendar,
-    Hash,
-    FileText,
-    Activity,
-    MoreVertical,
-    TrendingUp,
-    ChevronRight,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import DeleteConfirmModal from "@/Components/Superadmin/DeleteConfirmModal";
-import EditDepartmentModal from "@/Components/Superadmin/EditDepartmentModal";
-import CreateDepartmentModal from "@/Components/Superadmin/CreateDepartmentModal";
-import ArchiveDetailModal from "@/Components/Superadmin/ArchiveDetailModal";
+import DepartmentDetailModal from "@/Components/Superadmin/DepartmentDetailModal";
 
 export default function Index({ departments, filters, trackOptions = [] }) {
     const [search, setSearch] = useState(filters.search || "");
@@ -34,12 +19,7 @@ export default function Index({ departments, filters, trackOptions = [] }) {
     const [activeTrack, setActiveTrack] = useState(filters.track || "Academic");
     const [selectedDepartment, setSelectedDepartment] = useState(null);
     const [showModal, setShowModal] = useState(false);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [departmentToDelete, setDepartmentToDelete] = useState(null);
-    const [showEditModal, setShowEditModal] = useState(false);
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [departmentToEdit, setDepartmentToEdit] = useState(null);
-    const [openMenuId, setOpenMenuId] = useState(null);
+    const [departmentModalMode, setDepartmentModalMode] = useState("view");
 
     useEffect(() => {
         setSearch(filters.search || "");
@@ -49,19 +29,25 @@ export default function Index({ departments, filters, trackOptions = [] }) {
 
     const openModal = (dept) => {
         setSelectedDepartment(dept);
+        setDepartmentModalMode("view");
         setShowModal(true);
     };
     const closeModal = () => {
         setShowModal(false);
         setSelectedDepartment(null);
+        setDepartmentModalMode("view");
     };
-    const confirmDelete = (dept) => {
-        setDepartmentToDelete(dept);
-        setShowDeleteModal(true);
+
+    const openCreateModal = () => {
+        setSelectedDepartment(null);
+        setDepartmentModalMode("create");
+        setShowModal(true);
     };
+
     const openEditModal = (dept) => {
-        setDepartmentToEdit(dept);
-        setShowEditModal(true);
+        setSelectedDepartment(dept);
+        setDepartmentModalMode("edit");
+        setShowModal(true);
     };
 
     const handleSearch = (e) => {
@@ -70,18 +56,6 @@ export default function Index({ departments, filters, trackOptions = [] }) {
             route("superadmin.departments.index"),
             { search, status, track: activeTrack },
             { preserveState: true },
-        );
-    };
-
-    const handleDelete = () => {
-        router.delete(
-            route("superadmin.departments.destroy", departmentToDelete.id),
-            {
-                onFinish: () => {
-                    setShowDeleteModal(false);
-                    setDepartmentToDelete(null);
-                },
-            },
         );
     };
 
@@ -133,7 +107,7 @@ export default function Index({ departments, filters, trackOptions = [] }) {
                         </div>
                         <button
                             type="button"
-                            onClick={() => setShowCreateModal(true)}
+                            onClick={openCreateModal}
                             className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
                         >
                             <Plus size={16} />
@@ -276,7 +250,7 @@ export default function Index({ departments, filters, trackOptions = [] }) {
                             </p>
                             <button
                                 type="button"
-                                onClick={() => setShowCreateModal(true)}
+                                onClick={openCreateModal}
                                 className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
                             >
                                 <Plus size={16} />
@@ -441,14 +415,6 @@ export default function Index({ departments, filters, trackOptions = [] }) {
                                             >
                                                 Edit
                                             </button>
-                                            <button
-                                                onClick={() =>
-                                                    confirmDelete(dept)
-                                                }
-                                                className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
                                         </div>
                                     </div>
                                 ))}
@@ -495,10 +461,9 @@ export default function Index({ departments, filters, trackOptions = [] }) {
                 </div>
             </div>
 
-            <ArchiveDetailModal
-                show={showModal && Boolean(selectedDepartment)}
+            <DepartmentDetailModal
+                show={showModal}
                 onClose={closeModal}
-                activeTab="departments"
                 payload={
                     selectedDepartment
                         ? {
@@ -532,39 +497,27 @@ export default function Index({ departments, filters, trackOptions = [] }) {
                               },
                               sections: [],
                           }
-                        : null
+                        : {
+                              department: {
+                                  id: null,
+                                  name: "",
+                                  code: "",
+                                  track: activeTrack || "Academic",
+                                  description: "",
+                                  is_active: true,
+                                  specializations: [],
+                                  admins: [],
+                                  teachers: [],
+                                  classes_count: 0,
+                              },
+                              sections: [],
+                          }
                 }
                 loading={false}
                 error=""
                 row={selectedDepartment}
-            />
-
-            <DeleteConfirmModal
-                isOpen={showDeleteModal}
-                onClose={() => {
-                    setShowDeleteModal(false);
-                    setDepartmentToDelete(null);
-                }}
-                onConfirm={handleDelete}
-                title="Delete Department"
-                itemName={departmentToDelete?.department_name}
-                description="This will permanently remove the department and all its associated data. This action cannot be undone."
-            />
-            <EditDepartmentModal
-                key={departmentToEdit?.id}
-                isOpen={showEditModal}
-                onClose={() => {
-                    setShowEditModal(false);
-                    setDepartmentToEdit(null);
-                }}
-                department={departmentToEdit}
-                onSuccess={() => router.reload({ only: ["departments"] })}
-            />
-            <CreateDepartmentModal
-                isOpen={showCreateModal}
-                onClose={() => setShowCreateModal(false)}
-                onSuccess={() => router.reload({ only: ["departments"] })}
-                defaultTrack={activeTrack}
+                mode={departmentModalMode}
+                onSaved={() => router.reload({ only: ["departments"] })}
             />
         </>
     );

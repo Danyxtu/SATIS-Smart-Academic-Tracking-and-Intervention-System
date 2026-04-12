@@ -2,6 +2,7 @@ import { Head, Link, router, useForm } from "@inertiajs/react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import DeleteConfirmModal from "@/Components/Superadmin/DeleteConfirmModal";
 import SubjectWizardModal from "@/Components/Superadmin/SubjectWizardModal";
+import SubjectDetailModal from "@/Components/Superadmin/SubjectDetailModal";
 import {
     BookOpen,
     Plus,
@@ -39,13 +40,13 @@ function SubjectEditModal({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto p-4 pb-10 sm:items-center">
             <div
                 className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
                 onClick={onClose}
             />
 
-            <div className="relative w-full max-w-md rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
+            <div className="relative w-full max-w-md max-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
                 <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
                     <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 ring-1 ring-emerald-200">
@@ -71,7 +72,7 @@ function SubjectEditModal({
                 </div>
 
                 <form onSubmit={onSubmit}>
-                    <div className="space-y-5 px-6 py-5">
+                    <div className="max-h-[calc(100vh-14rem)] space-y-5 overflow-y-auto px-6 py-5">
                         <div>
                             <label className="mb-1.5 block text-sm font-medium text-slate-700">
                                 Subject Name{" "}
@@ -340,6 +341,7 @@ export default function Index({
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [subjectToEdit, setSubjectToEdit] = useState(null);
     const [subjectToDelete, setSubjectToDelete] = useState(null);
+    const [subjectToView, setSubjectToView] = useState(null);
 
     const createForm = useForm({ type_key: "", subjects: [] });
 
@@ -501,6 +503,14 @@ export default function Index({
             grade_level: subject.grade_level ?? "",
         });
         setShowEditModal(true);
+    };
+
+    const openDetailModal = (subject) => {
+        setSubjectToView(subject);
+    };
+
+    const closeDetailModal = () => {
+        setSubjectToView(null);
     };
 
     const handleCreateFromWizard = (payload) => {
@@ -799,7 +809,8 @@ export default function Index({
                                 {subjects.data.map((subject) => (
                                     <div
                                         key={subject.id}
-                                        className="grid grid-cols-12 items-center gap-4 px-5 py-4 transition-colors hover:bg-slate-50/70"
+                                        onClick={() => openDetailModal(subject)}
+                                        className="grid cursor-pointer grid-cols-12 items-center gap-4 px-5 py-4 transition-colors hover:bg-slate-50/70"
                                     >
                                         <div className="col-span-2 min-w-0">
                                             <p className="truncate text-sm font-semibold text-slate-900">
@@ -886,7 +897,12 @@ export default function Index({
                                             </p>
                                         </div>
 
-                                        <div className="col-span-1 flex items-center justify-end gap-1">
+                                        <div
+                                            className="col-span-1 flex items-center justify-end gap-1"
+                                            onClick={(event) =>
+                                                event.stopPropagation()
+                                            }
+                                        >
                                             <button
                                                 type="button"
                                                 onClick={() =>
@@ -996,6 +1012,14 @@ export default function Index({
                 gradeLevelOptions={availableGradeLevelOptions}
                 onClose={closeEditModal}
                 onSubmit={handleUpdate}
+            />
+            <SubjectDetailModal
+                show={Boolean(subjectToView)}
+                onClose={closeDetailModal}
+                payload={subjectToView ? { subject: subjectToView } : null}
+                loading={false}
+                error=""
+                row={subjectToView}
             />
             <DeleteConfirmModal
                 isOpen={showDeleteModal}

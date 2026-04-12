@@ -4,15 +4,25 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Models\AuditLog;
+use App\Models\SystemSetting;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class AuthenticatedSessionController extends Controller
 {
+    /**
+     * @var list<string>
+     */
+    private const TRACKED_ROLES = ['super_admin', 'admin', 'teacher', 'student'];
+
     /**
      * Display the login view.
      */
@@ -34,6 +44,12 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
 
         $user = Auth::user();
+
+        if (! $user instanceof User) {
+            return redirect('/');
+        }
+
+        $this->logAuthActivity($user, $request, 'login');
 
         // Force password change on first login — runs before any role redirect
         if ($user->must_change_password) {
@@ -61,12 +77,80 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        $user = $request->user();
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();
 
         $request->session()->regenerateToken();
 
+        if ($user instanceof User) {
+            $this->logAuthActivity($user, $request, 'logout');
+        }
+
         return redirect('/');
+    }
+
+    private function logAuthActivity(User $user, Request $request, string $action): void
+    {
+        $trackedRoles = $this->resolveTrackedRoles($user);
+
+        if ($trackedRoles === []) {
+            return;
+        }
+
+        $task = $action === 'logout' ? 'Logged Out' : 'Logged In';
+
+        try {
+            AuditLog::create([
+                'logged_at' => now(),
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'user_role' => $trackedRoles[0],
+                'user_roles' => $trackedRoles,
+                'school_year' => SystemSetting::getCurrentSchoolYear(),
+                'semester' => SystemSetting::getCurrentSemester(),
+                'module' => 'Authentication',
+                'task' => $task,
+                'action' => $action,
+                'target_type' => 'User',
+                'target_id' => (string) $user->id,
+                'route_name' => $request->route()?->getName(),
+                'method' => strtoupper($request->method()),
+                'path' => '/' . ltrim($request->path(), '/'),
+                'status_code' => 302,
+                'is_success' => true,
+                'ip_address' => $request->ip(),
+                'user_agent' => Str::limit((string) $request->userAgent(), 1000, '...'),
+                'query_params' => $request->query(),
+                'request_payload' => null,
+                'metadata' => [
+                    'source' => 'authenticated_session_controller',
+                ],
+            ]);
+        } catch (Throwable) {
+            // Activity log writes should never block authentication.
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function resolveTrackedRoles(User $user): array
+    {
+        $roleNames = $user->relationLoaded('roles')
+            ? $user->roles->pluck('name')->all()
+            : $user->roles()->pluck('name')->all();
+
+        $tracked = [];
+
+        foreach (self::TRACKED_ROLES as $trackedRole) {
+            if (in_array($trackedRole, $roleNames, true)) {
+                $tracked[] = $trackedRole;
+            }
+        }
+
+        return $tracked;
     }
 }

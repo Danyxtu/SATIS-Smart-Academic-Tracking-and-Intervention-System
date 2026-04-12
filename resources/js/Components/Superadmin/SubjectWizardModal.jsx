@@ -219,13 +219,13 @@ export default function SubjectWizardModal({
     const stepLabels = ["Type", "Queue", "Summary"];
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto p-4 pb-10 sm:items-center">
             <div
                 className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
                 onClick={onClose}
             />
 
-            <div className="relative w-full max-w-3xl rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
+            <div className="relative w-full max-w-3xl max-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
                 <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
                     <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 ring-1 ring-emerald-200">

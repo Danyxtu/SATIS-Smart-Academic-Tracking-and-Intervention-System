@@ -3,6 +3,8 @@ import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import DeleteConfirmModal from "@/Components/Superadmin/DeleteConfirmModal";
 import AddSectionWizardModal from "@/Components/Superadmin/AcademicManagement/AddSectionWizardModal";
 import ClassQueueCreateModal from "@/Components/Superadmin/AcademicManagement/ClassQueueCreateModal";
+import SectionDetailModal from "@/Components/Superadmin/SectionDetailModal";
+import ClassDetailModal from "@/Components/Superadmin/ClassDetailModal";
 import {
     BookOpen,
     Building2,
@@ -1055,6 +1057,11 @@ export default function Index({
     const [showClassModal, setShowClassModal] = useState(false);
     const [classModalMode, setClassModalMode] = useState("create");
     const [classToEdit, setClassToEdit] = useState(null);
+    const [detailModal, setDetailModal] = useState({
+        open: false,
+        tab: "",
+        row: null,
+    });
     const [classQueue, setClassQueue] = useState([]);
     const [classQueueNotice, setClassQueueNotice] = useState("");
     const [classQueueProcessing, setClassQueueProcessing] = useState(false);
@@ -1569,6 +1576,22 @@ export default function Index({
 
     const openDeleteModal = (type, item) => {
         setDeleteTarget({ type, item });
+    };
+
+    const openDetailModal = (tabKey, item) => {
+        setDetailModal({
+            open: true,
+            tab: tabKey,
+            row: item,
+        });
+    };
+
+    const closeDetailModal = () => {
+        setDetailModal({
+            open: false,
+            tab: "",
+            row: null,
+        });
     };
 
     const handleDelete = () => {
@@ -2096,7 +2119,15 @@ export default function Index({
                                 <div className="divide-y divide-slate-100">
                                     {sectionRows.map((section) => (
                                         <div key={section.id}>
-                                            <div className="hidden grid-cols-12 items-center gap-4 px-5 py-4 hover:bg-slate-50/70 md:grid">
+                                            <div
+                                                onClick={() =>
+                                                    openDetailModal(
+                                                        "sections",
+                                                        section,
+                                                    )
+                                                }
+                                                className="hidden cursor-pointer grid-cols-12 items-center gap-4 px-5 py-4 hover:bg-slate-50/70 md:grid"
+                                            >
                                                 <div className="col-span-3 min-w-0">
                                                     <p className="truncate text-sm font-semibold text-slate-900">
                                                         {section.section_full_label ||
@@ -2157,7 +2188,12 @@ export default function Index({
                                                     </span>
                                                 </div>
 
-                                                <div className="col-span-1 flex justify-end gap-1">
+                                                <div
+                                                    className="col-span-1 flex justify-end gap-1"
+                                                    onClick={(event) =>
+                                                        event.stopPropagation()
+                                                    }
+                                                >
                                                     <button
                                                         type="button"
                                                         onClick={() =>
@@ -2186,7 +2222,15 @@ export default function Index({
                                                 </div>
                                             </div>
 
-                                            <div className="space-y-3 px-4 py-4 md:hidden">
+                                            <div
+                                                onClick={() =>
+                                                    openDetailModal(
+                                                        "sections",
+                                                        section,
+                                                    )
+                                                }
+                                                className="space-y-3 cursor-pointer px-4 py-4 md:hidden"
+                                            >
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div className="min-w-0">
                                                         <p className="truncate text-sm font-semibold text-slate-900">
@@ -2199,7 +2243,12 @@ export default function Index({
                                                                 "-"}
                                                         </p>
                                                     </div>
-                                                    <div className="flex shrink-0 gap-1">
+                                                    <div
+                                                        className="flex shrink-0 gap-1"
+                                                        onClick={(event) =>
+                                                            event.stopPropagation()
+                                                        }
+                                                    >
                                                         <button
                                                             type="button"
                                                             onClick={() =>
@@ -2329,7 +2378,12 @@ export default function Index({
                             <div className="divide-y divide-slate-100">
                                 {classRows.map((item) => (
                                     <div key={item.id}>
-                                        <div className="hidden grid-cols-12 items-center gap-4 px-5 py-4 hover:bg-slate-50/70 md:grid">
+                                        <div
+                                            onClick={() =>
+                                                openDetailModal("classes", item)
+                                            }
+                                            className="hidden cursor-pointer grid-cols-12 items-center gap-4 px-5 py-4 hover:bg-slate-50/70 md:grid"
+                                        >
                                             <div className="col-span-3 min-w-0">
                                                 <p className="truncate text-sm font-semibold text-slate-900">
                                                     {item.subject_name || "N/A"}
@@ -2389,7 +2443,12 @@ export default function Index({
                                                 </p>
                                             </div>
 
-                                            <div className="col-span-1 flex justify-end gap-1">
+                                            <div
+                                                className="col-span-1 flex justify-end gap-1"
+                                                onClick={(event) =>
+                                                    event.stopPropagation()
+                                                }
+                                            >
                                                 <button
                                                     type="button"
                                                     onClick={() =>
@@ -2416,7 +2475,12 @@ export default function Index({
                                             </div>
                                         </div>
 
-                                        <div className="space-y-3 px-4 py-4 md:hidden">
+                                        <div
+                                            onClick={() =>
+                                                openDetailModal("classes", item)
+                                            }
+                                            className="space-y-3 cursor-pointer px-4 py-4 md:hidden"
+                                        >
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
                                                     <p className="truncate text-sm font-semibold text-slate-900">
@@ -2435,7 +2499,12 @@ export default function Index({
                                                         )}
                                                     </p>
                                                 </div>
-                                                <div className="flex shrink-0 gap-1">
+                                                <div
+                                                    className="flex shrink-0 gap-1"
+                                                    onClick={(event) =>
+                                                        event.stopPropagation()
+                                                    }
+                                                >
                                                     <button
                                                         type="button"
                                                         onClick={() =>
@@ -2511,6 +2580,24 @@ export default function Index({
                     </div>
                 )}
             </div>
+
+            <SectionDetailModal
+                show={detailModal.open && detailModal.tab === "sections"}
+                onClose={closeDetailModal}
+                payload={detailModal.row ? { section: detailModal.row } : null}
+                loading={false}
+                error=""
+                row={detailModal.row}
+            />
+
+            <ClassDetailModal
+                show={detailModal.open && detailModal.tab === "classes"}
+                onClose={closeDetailModal}
+                payload={detailModal.row ? { class: detailModal.row } : null}
+                loading={false}
+                error=""
+                row={detailModal.row}
+            />
 
             <SectionFormModal
                 isOpen={showSectionModal}

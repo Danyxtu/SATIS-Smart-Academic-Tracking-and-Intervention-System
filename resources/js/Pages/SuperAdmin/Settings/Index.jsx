@@ -126,12 +126,12 @@ function NewSchoolYearModal({ currentSY, onClose }) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto p-4 pb-10 sm:items-center">
             <div
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                 onClick={submitting ? undefined : onClose}
             />
-            <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-gray-900 shadow-2xl overflow-hidden">
+            <div className="relative w-full max-w-md max-h-[calc(100vh-6rem)] overflow-y-auto rounded-2xl bg-white dark:bg-gray-900 shadow-2xl">
                 {/* Modal header */}
                 <div className="bg-gradient-to-r from-rose-600 to-red-700 px-6 py-5">
                     <div className="flex items-center justify-between">

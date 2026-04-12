@@ -48,8 +48,8 @@ export const superAdminRoutes = [
         icon: Settings,
     },
     {
-        label: "Audit Logs",
-        path: "superadmin.audit-logs.index",
+        label: "Activity Logs",
+        path: "superadmin.activity-logs.index",
         icon: ClipboardList,
     },
     {

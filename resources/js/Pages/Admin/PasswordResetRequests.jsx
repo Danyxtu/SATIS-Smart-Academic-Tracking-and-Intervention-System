@@ -106,7 +106,7 @@ const ApproveModal = ({ isOpen, onClose, request, routePrefix }) => {
                 </Transition.Child>
 
                 <div className="fixed inset-0 z-50 overflow-y-auto">
-                    <div className="flex min-h-full items-center justify-center p-4">
+                    <div className="flex min-h-full items-end justify-center p-4 pb-10 sm:items-center">
                         <Transition.Child
                             as={Fragment}
                             enter="ease-out duration-300"
@@ -116,7 +116,7 @@ const ApproveModal = ({ isOpen, onClose, request, routePrefix }) => {
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-xl transition-all">
+                            <Dialog.Panel className="w-full max-w-md transform max-h-[calc(100vh-6rem)] overflow-y-auto rounded-2xl bg-white dark:bg-gray-800 shadow-xl transition-all">
                                 <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                                     <div className="flex items-center justify-between">
                                         <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
@@ -247,7 +247,7 @@ const RejectModal = ({ isOpen, onClose, request, routePrefix }) => {
                 </Transition.Child>
 
                 <div className="fixed inset-0 z-50 overflow-y-auto">
-                    <div className="flex min-h-full items-center justify-center p-4">
+                    <div className="flex min-h-full items-end justify-center p-4 pb-10 sm:items-center">
                         <Transition.Child
                             as={Fragment}
                             enter="ease-out duration-300"
@@ -257,7 +257,7 @@ const RejectModal = ({ isOpen, onClose, request, routePrefix }) => {
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-xl transition-all p-6">
+                            <Dialog.Panel className="w-full max-w-md transform max-h-[calc(100vh-6rem)] overflow-y-auto rounded-2xl bg-white dark:bg-gray-800 shadow-xl transition-all p-6">
                                 <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 dark:bg-red-900/30 rounded-full mb-4">
                                     <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
                                 </div>

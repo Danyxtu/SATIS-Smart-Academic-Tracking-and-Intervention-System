@@ -175,8 +175,8 @@ export default function EditUserModal({ open, onClose, user, departments }) {
                 onClick={handleClose}
             />
 
-            <div className="flex min-h-full items-center justify-center p-4">
-                <div className="relative w-full max-w-lg transform rounded-2xl bg-white shadow-2xl">
+            <div className="flex min-h-full items-end justify-center p-4 pb-10 sm:items-center">
+                <div className="relative w-full max-w-lg transform max-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl bg-white shadow-2xl">
                     {/* ── Modal Header ──────────────────────────────────── */}
                     <div className="relative overflow-hidden rounded-t-2xl bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-5">
                         <div className="absolute -top-8 -right-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />

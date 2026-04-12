@@ -23,7 +23,7 @@ class ArchiveController extends Controller
     {
         $validated = $request->validate([
             'archive' => ['nullable', 'string', 'max:96'],
-            'tab' => ['nullable', 'string', 'in:students,teachers,super-admins,departments,classes,audit-logs'],
+            'tab' => ['nullable', 'string', 'in:students,teachers,super-admins,departments,classes,activity-logs'],
             'semester' => ['nullable', 'string', 'in:all,1,2'],
             'search' => ['nullable', 'string', 'max:120'],
             'grade_level' => ['nullable', 'string', 'in:11,12'],
@@ -95,7 +95,7 @@ class ArchiveController extends Controller
                 'super-admins' => $this->superAdminsPanel($selectedArchive, $validated),
                 'departments' => $this->departmentsPanel($selectedArchive, $validated),
                 'classes' => $this->classesPanel($selectedArchive, $validated, $semesterInt),
-                'audit-logs' => $this->auditLogsPanel($selectedArchive, $validated, $semesterInt),
+                'activity-logs' => $this->auditLogsPanel($selectedArchive, $validated, $semesterInt),
                 default => $this->studentsPanel($selectedArchive, $validated, $semesterInt),
             };
         }
