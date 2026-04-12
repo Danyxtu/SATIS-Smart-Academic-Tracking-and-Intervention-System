@@ -45,37 +45,37 @@ const ROLE_CONFIG = {
     admin: {
         label: "Admin",
         icon: Shield,
-        badgeClass: "bg-violet-100 text-violet-700",
-        filterActive: "bg-violet-600 text-white shadow-violet-200",
+        badgeClass: "bg-emerald-100 text-emerald-700",
+        filterActive: "bg-emerald-700 text-white shadow-emerald-200",
         filterInactive:
-            "bg-violet-50 text-violet-600 border border-violet-200 hover:bg-violet-100",
-        dot: "bg-violet-500",
+            "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100",
+        dot: "bg-emerald-600",
         avatarStyle: {
-            background: "linear-gradient(135deg, #8b5cf6, #7c3aed)",
+            background: "linear-gradient(135deg, #047857, #065f46)",
         },
     },
     teacher: {
         label: "Teacher",
         icon: BookOpen,
-        badgeClass: "bg-blue-100 text-blue-700",
-        filterActive: "bg-blue-600 text-white shadow-blue-200",
+        badgeClass: "bg-green-100 text-green-700",
+        filterActive: "bg-green-600 text-white shadow-green-200",
         filterInactive:
-            "bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100",
-        dot: "bg-blue-500",
+            "bg-green-50 text-green-700 border border-green-200 hover:bg-green-100",
+        dot: "bg-green-500",
         avatarStyle: {
-            background: "linear-gradient(135deg, #3b82f6, #0891b2)",
+            background: "linear-gradient(135deg, #10b981, #059669)",
         },
     },
     student: {
         label: "Student",
         icon: GraduationCap,
-        badgeClass: "bg-emerald-100 text-emerald-700",
-        filterActive: "bg-emerald-600 text-white shadow-emerald-200",
+        badgeClass: "bg-lime-100 text-lime-700",
+        filterActive: "bg-lime-600 text-white shadow-lime-200",
         filterInactive:
-            "bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100",
-        dot: "bg-emerald-500",
+            "bg-lime-50 text-lime-700 border border-lime-200 hover:bg-lime-100",
+        dot: "bg-lime-500",
         avatarStyle: {
-            background: "linear-gradient(135deg, #10b981, #0d9488)",
+            background: "linear-gradient(135deg, #84cc16, #65a30d)",
         },
     },
 };
@@ -180,59 +180,44 @@ export default function Index({
             <Head title="User Management" />
 
             <div className="space-y-5">
-                {/* ── Hero Header ──────────────────────────────────────── */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600 to-purple-700 px-7 py-6 shadow-lg shadow-violet-500/20">
-                    <div className="absolute -top-10 -right-10 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
-                    <div className="absolute bottom-0 left-1/3 h-28 w-28 rounded-full bg-purple-400/20 blur-xl" />
-                    <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm ring-1 ring-white/20 p-3">
-                                <Users className="h-6 w-6 text-white" />
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold text-white">
-                                    User Management
-                                </h1>
-                                <p className="text-sm text-violet-100 mt-0.5">
-                                    Manage all system users across every role
-                                </p>
-                            </div>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900">
+                            User Management
+                        </h1>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Manage all system users across every role
+                        </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                            <Users size={12} />
+                            {totalUsers} Total
                         </div>
-                        <div className="flex flex-wrap items-center gap-3">
-                            <div className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 backdrop-blur-sm ring-1 ring-white/15">
-                                <Users size={13} className="text-violet-200" />
-                                <span className="text-xs font-semibold text-white">
-                                    {totalUsers} Total
-                                </span>
-                            </div>
-                            {ROLE_ORDER.map((role) => {
-                                const count = normalizedRoleCounts[role] ?? 0;
-                                const cfg = getRoleConfig(role);
-                                const Icon = cfg.icon;
-                                return (
-                                    <div
-                                        key={role}
-                                        className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 backdrop-blur-sm ring-1 ring-white/15"
-                                    >
-                                        <Icon
-                                            size={13}
-                                            className="text-violet-200"
-                                        />
-                                        <span className="text-xs font-semibold text-white">
-                                            {count} {cfg.label}
-                                            {count !== 1 ? "s" : ""}
-                                        </span>
-                                    </div>
-                                );
-                            })}
-                            <button
-                                onClick={() => setCreateModal(true)}
-                                className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 shadow-sm hover:bg-violet-50 transition-colors"
-                            >
-                                <Plus size={16} />
-                                Add User
-                            </button>
-                        </div>
+                        {ROLE_ORDER.map((role) => {
+                            const count = normalizedRoleCounts[role] ?? 0;
+                            const cfg = getRoleConfig(role);
+                            const Icon = cfg.icon;
+
+                            return (
+                                <div
+                                    key={role}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600"
+                                >
+                                    <Icon size={12} />
+                                    {count} {cfg.label}
+                                    {count !== 1 ? "s" : ""}
+                                </div>
+                            );
+                        })}
+                        <button
+                            onClick={() => setCreateModal(true)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
+                        >
+                            <Plus size={16} />
+                            Add User
+                        </button>
                     </div>
                 </div>
 
@@ -253,7 +238,7 @@ export default function Index({
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder="Search by name or email..."
-                                className="w-full rounded-xl border-slate-200 bg-slate-50 pl-10 py-2.5 text-sm focus:border-violet-500 focus:ring-violet-500 focus:bg-white transition-colors"
+                                className="w-full rounded-xl border-slate-200 bg-slate-50 pl-10 py-2.5 text-sm focus:border-emerald-500 focus:ring-emerald-500 focus:bg-white transition-colors"
                             />
                             {search && (
                                 <button
@@ -274,7 +259,7 @@ export default function Index({
                         </div>
                         <button
                             type="submit"
-                            className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-700 transition-colors"
+                            className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
                         >
                             Search
                         </button>
@@ -299,13 +284,13 @@ export default function Index({
                             }}
                             className={`inline-flex items-center gap-1.5 rounded-full min-w-[110px] px-5 py-2 text-sm font-semibold transition-all shadow-sm ${
                                 roleFilter === ""
-                                    ? "bg-slate-800 text-slate-100 shadow-slate-300 ring-2 ring-violet-400"
+                                    ? "bg-emerald-600 text-white shadow-emerald-200 ring-2 ring-emerald-300"
                                     : "bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200"
                             }`}
                             style={{
                                 boxShadow:
                                     roleFilter === ""
-                                        ? "0 0 0 2px #a78bfa"
+                                        ? "0 0 0 2px #6ee7b7"
                                         : undefined,
                             }}
                         >
@@ -486,7 +471,7 @@ export default function Index({
                                                             user,
                                                         })
                                                     }
-                                                    className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                                                    className="rounded-lg p-1.5 text-slate-400 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
                                                     title="Edit"
                                                 >
                                                     <Pencil size={14} />
@@ -532,7 +517,7 @@ export default function Index({
                                                 href={link.url || "#"}
                                                 className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                                                     link.active
-                                                        ? "bg-violet-600 text-white shadow-sm"
+                                                        ? "bg-emerald-600 text-white shadow-sm"
                                                         : link.url
                                                           ? "text-slate-600 hover:bg-slate-100"
                                                           : "text-slate-300 cursor-not-allowed"
@@ -562,7 +547,7 @@ export default function Index({
                             {!search && !roleFilter && (
                                 <button
                                     onClick={() => setCreateModal(true)}
-                                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/25"
+                                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
                                 >
                                     <Plus size={16} />
                                     Add User
@@ -711,7 +696,7 @@ export default function Index({
                                         className={`w-full rounded-xl border text-sm px-4 py-2.5 focus:outline-none focus:ring-2 transition-colors ${
                                             deleteErrors.password
                                                 ? "border-rose-300 focus:ring-rose-500/30 bg-rose-50/50"
-                                                : "border-slate-200 focus:ring-violet-500/30 bg-slate-50"
+                                                : "border-slate-200 focus:ring-emerald-500/30 bg-slate-50"
                                         }`}
                                     />
                                     {deleteErrors.password && (

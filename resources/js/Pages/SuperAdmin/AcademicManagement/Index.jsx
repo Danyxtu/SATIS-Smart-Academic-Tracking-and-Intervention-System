@@ -70,8 +70,8 @@ function SectionFormModal({
             <div className="relative max-h-[calc(100vh-1rem)] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-slate-200 sm:max-h-[90vh]">
                 <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-6 sm:py-5">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 ring-1 ring-blue-200">
-                            <Layers size={16} className="text-blue-600" />
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 ring-1 ring-emerald-200">
+                            <Layers size={16} className="text-emerald-600" />
                         </div>
                         <div>
                             <h2 className="text-base font-semibold text-slate-900">
@@ -135,7 +135,7 @@ function SectionFormModal({
                                     className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
                                         errors.department_id
                                             ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
+                                            : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
                                     }`}
                                 >
                                     <option value="">Select department</option>
@@ -170,7 +170,7 @@ function SectionFormModal({
                                     className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
                                         errors.section_name
                                             ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
+                                            : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
                                     }`}
                                 />
                                 <FieldError message={errors.section_name} />
@@ -193,7 +193,7 @@ function SectionFormModal({
                                 className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
                                     errors.advisor_teacher_id
                                         ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                        : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
+                                        : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
                                 }`}
                             >
                                 <option value="">
@@ -228,7 +228,7 @@ function SectionFormModal({
                                     className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
                                         errors.section_code
                                             ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
+                                            : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
                                     }`}
                                 />
                                 <FieldError message={errors.section_code} />
@@ -249,7 +249,7 @@ function SectionFormModal({
                                     className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
                                         errors.cohort
                                             ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
+                                            : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
                                     }`}
                                 />
                                 <FieldError message={errors.cohort} />
@@ -272,7 +272,7 @@ function SectionFormModal({
                                     className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
                                         errors.grade_level
                                             ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
+                                            : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
                                     }`}
                                 />
                                 <FieldError message={errors.grade_level} />
@@ -294,7 +294,7 @@ function SectionFormModal({
                                     className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
                                         errors.strand
                                             ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
+                                            : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
                                     }`}
                                 />
                                 <FieldError message={errors.strand} />
@@ -314,7 +314,7 @@ function SectionFormModal({
                                     className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
                                         errors.track
                                             ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
+                                            : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
                                     }`}
                                 />
                                 <FieldError message={errors.track} />
@@ -337,7 +337,7 @@ function SectionFormModal({
                                     className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
                                         errors.school_year
                                             ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
+                                            : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
                                     }`}
                                 />
                                 <FieldError message={errors.school_year} />
@@ -358,7 +358,7 @@ function SectionFormModal({
                                 className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
                                     errors.description
                                         ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                        : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
+                                        : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
                                 }`}
                             />
                             <FieldError message={errors.description} />
@@ -371,7 +371,7 @@ function SectionFormModal({
                                 onChange={(event) =>
                                     setData("is_active", event.target.checked)
                                 }
-                                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                             />
                             Section is active and available for class
                             assignments
@@ -391,7 +391,7 @@ function SectionFormModal({
                         <button
                             type="submit"
                             disabled={processing}
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-blue-700 disabled:opacity-60 sm:w-auto"
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-60 sm:w-auto"
                         >
                             {processing && (
                                 <svg
@@ -473,8 +473,8 @@ function ClassFormModal({
             <div className="relative max-h-[calc(100vh-1rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-slate-200 sm:max-h-[90vh]">
                 <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-6 sm:py-5">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 ring-1 ring-violet-200">
-                            <BookOpen size={16} className="text-violet-600" />
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-50 ring-1 ring-green-200">
+                            <BookOpen size={16} className="text-green-600" />
                         </div>
                         <div>
                             <h2 className="text-base font-semibold text-slate-900">
@@ -542,7 +542,7 @@ function ClassFormModal({
                                     className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
                                         errors.section_id
                                             ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-violet-500 focus:ring-violet-100"
+                                            : "border-slate-300 bg-white focus:border-green-500 focus:ring-green-100"
                                     }`}
                                 >
                                     <option value="">Select section</option>
@@ -577,7 +577,7 @@ function ClassFormModal({
                                     className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
                                         errors.subject_id
                                             ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-violet-500 focus:ring-violet-100"
+                                            : "border-slate-300 bg-white focus:border-green-500 focus:ring-green-100"
                                     }`}
                                 >
                                     <option value="">Select subject</option>
@@ -608,7 +608,7 @@ function ClassFormModal({
                                 className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
                                     errors.teacher_id
                                         ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                        : "border-slate-300 bg-white focus:border-violet-500 focus:ring-violet-100"
+                                        : "border-slate-300 bg-white focus:border-green-500 focus:ring-green-100"
                                 }`}
                             >
                                 <option value="">
@@ -651,7 +651,7 @@ function ClassFormModal({
                                     className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
                                         errors.school_year
                                             ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-violet-500 focus:ring-violet-100"
+                                            : "border-slate-300 bg-white focus:border-green-500 focus:ring-green-100"
                                     }`}
                                 />
                                 <FieldError message={errors.school_year} />
@@ -669,7 +669,7 @@ function ClassFormModal({
                                     className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
                                         errors.color
                                             ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-violet-500 focus:ring-violet-100"
+                                            : "border-slate-300 bg-white focus:border-green-500 focus:ring-green-100"
                                     }`}
                                 >
                                     {colorOptions.map((color) => (
@@ -696,7 +696,7 @@ function ClassFormModal({
                         <button
                             type="submit"
                             disabled={processing}
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-violet-700 disabled:opacity-60 sm:w-auto"
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-green-700 disabled:opacity-60 sm:w-auto"
                         >
                             {processing && (
                                 <svg
@@ -762,8 +762,8 @@ function AssignAdviserModal({
             <div className="relative max-h-[calc(100vh-1rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-slate-200 sm:max-h-[90vh]">
                 <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-6 sm:py-5">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 ring-1 ring-indigo-200">
-                            <Users size={16} className="text-indigo-600" />
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 ring-1 ring-emerald-200">
+                            <Users size={16} className="text-emerald-600" />
                         </div>
                         <div>
                             <h2 className="text-base font-semibold text-slate-900">
@@ -800,7 +800,7 @@ function AssignAdviserModal({
                                 className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
                                     errors.teacher_id
                                         ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                        : "border-slate-300 bg-white focus:border-indigo-500 focus:ring-indigo-100"
+                                        : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
                                 }`}
                             >
                                 <option value="">Select teacher</option>
@@ -825,7 +825,7 @@ function AssignAdviserModal({
                                     <button
                                         type="button"
                                         onClick={onSelectAllSections}
-                                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                                        className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
                                     >
                                         {allSelected
                                             ? "Clear Selection"
@@ -854,7 +854,7 @@ function AssignAdviserModal({
                                                 onChange={() =>
                                                     onToggleSection(section.id)
                                                 }
-                                                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                                             />
                                             <span className="min-w-0">
                                                 <span className="block font-medium text-slate-900">
@@ -890,7 +890,7 @@ function AssignAdviserModal({
                         <button
                             type="submit"
                             disabled={processing}
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-indigo-700 disabled:opacity-60 sm:w-auto"
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-60 sm:w-auto"
                         >
                             {processing && (
                                 <svg
@@ -925,8 +925,8 @@ function AssignAdviserModal({
 function StatCard({ icon: Icon, label, value, accent = "emerald" }) {
     const accents = {
         emerald: "bg-emerald-50 text-emerald-600 ring-emerald-200",
-        blue: "bg-blue-50 text-blue-600 ring-blue-200",
-        violet: "bg-violet-50 text-violet-600 ring-violet-200",
+        blue: "bg-emerald-50 text-emerald-600 ring-emerald-200",
+        violet: "bg-green-50 text-green-600 ring-green-200",
     };
 
     return (
@@ -972,7 +972,7 @@ function Pagination({ links = [] }) {
                         href={link.url}
                         className={`rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
                             link.active
-                                ? "border-indigo-600 bg-indigo-600 text-white"
+                                ? "border-emerald-600 bg-emerald-600 text-white"
                                 : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                         }`}
                         dangerouslySetInnerHTML={{ __html: link.label }}
@@ -1769,7 +1769,7 @@ export default function Index({
                                 ? openCreateSectionWizard()
                                 : openCreateClassModal()
                         }
-                        className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 sm:w-auto"
+                        className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 sm:w-auto"
                     >
                         <Plus size={16} />
                         {activeTab === "sections" ? "Add Section" : "Add Class"}
@@ -1895,7 +1895,7 @@ export default function Index({
                                 onClick={() => handleTabSwitch("sections")}
                                 className={`w-full rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
                                     activeTab === "sections"
-                                        ? "bg-indigo-600 text-white"
+                                        ? "bg-emerald-600 text-white"
                                         : "text-slate-600 hover:bg-white"
                                 }`}
                             >
@@ -1906,7 +1906,7 @@ export default function Index({
                                 onClick={() => handleTabSwitch("classes")}
                                 className={`w-full rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
                                     activeTab === "classes"
-                                        ? "bg-indigo-600 text-white"
+                                        ? "bg-emerald-600 text-white"
                                         : "text-slate-600 hover:bg-white"
                                 }`}
                             >
@@ -1935,7 +1935,7 @@ export default function Index({
                                 onChange={(event) =>
                                     setSearch(event.target.value)
                                 }
-                                className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-9 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-9 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                             />
                             {search && (
                                 <button
@@ -1954,7 +1954,7 @@ export default function Index({
                                 onChange={(event) =>
                                     setDepartmentId(event.target.value)
                                 }
-                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                             >
                                 <option value="">All Departments</option>
                                 {departments.map((department) => (
@@ -1990,19 +1990,19 @@ export default function Index({
                 {activeTab === "sections" ? (
                     <div className="space-y-4">
                         {canShowRestorePrompt && showRestorePrompt && (
-                            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
-                                <p className="text-sm font-semibold text-blue-900">
+                            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                                <p className="text-sm font-semibold text-emerald-900">
                                     School year updated to{" "}
                                     {rolloverNotice?.new_school_year ||
                                         currentSchoolYear}
                                 </p>
-                                <p className="mt-1 text-xs text-blue-800">
+                                <p className="mt-1 text-xs text-emerald-800">
                                     Grade 11 sections were promoted to Grade 12.
                                     Do you want to restore the previous Grade 11
                                     section list for this school year? Restored
                                     sections will have no adviser assigned.
                                 </p>
-                                <p className="mt-1 text-xs text-blue-700">
+                                <p className="mt-1 text-xs text-emerald-700">
                                     Promoted sections:{" "}
                                     {rolloverNotice?.promoted_sections_count ||
                                         0}{" "}
@@ -2021,7 +2021,7 @@ export default function Index({
                                         type="button"
                                         onClick={handleRestoreGrade11Sections}
                                         disabled={restoreProcessing}
-                                        className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+                                        className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
                                     >
                                         {restoreProcessing
                                             ? "Restoring..."
@@ -2033,7 +2033,7 @@ export default function Index({
                                             setShowRestorePrompt(false)
                                         }
                                         disabled={restoreProcessing}
-                                        className="inline-flex items-center justify-center rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-60"
+                                        className="inline-flex items-center justify-center rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-60"
                                     >
                                         Dismiss
                                     </button>
@@ -2046,7 +2046,7 @@ export default function Index({
                                 <button
                                     type="button"
                                     onClick={openAssignAdviserModal}
-                                    className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-sm font-semibold text-indigo-700 transition-colors hover:bg-indigo-100"
+                                    className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
                                 >
                                     <Users size={15} />
                                     Assign Adviser
@@ -2147,7 +2147,7 @@ export default function Index({
                                                 </div>
 
                                                 <div className="col-span-1 text-right">
-                                                    <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                                                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                                                         <Users
                                                             size={12}
                                                             className="mr-1"
@@ -2251,7 +2251,7 @@ export default function Index({
                                                         Cohort:{" "}
                                                         {section.cohort || "-"}
                                                     </span>
-                                                    <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                                                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                                                         <Users
                                                             size={12}
                                                             className="mr-1"

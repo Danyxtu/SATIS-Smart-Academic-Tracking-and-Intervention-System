@@ -2,13 +2,11 @@ import { Head, router, useForm } from "@inertiajs/react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import { useState } from "react";
 import {
-    Settings,
     Save,
     Calendar,
     Info,
     School,
     MapPin,
-    CheckCircle,
     Sparkles,
     BookOpen,
     AlertCircle,
@@ -382,38 +380,21 @@ export default function Index({ settings }) {
             <Head title="School Settings" />
 
             <div className="space-y-6">
-                {/* ── Page Header ──────────────────────────────────────── */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-800 to-slate-900 px-8 py-7 shadow-xl">
-                    {/* Decorative circles */}
-                    <div className="absolute -top-10 -right-10 h-48 w-48 rounded-full bg-white/5 blur-2xl" />
-                    <div className="absolute -bottom-8 left-1/3 h-32 w-32 rounded-full bg-blue-500/10 blur-xl" />
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                            School Settings
+                        </h1>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Configure global school system parameters
+                        </p>
+                    </div>
 
-                    <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                        <div className="flex items-center gap-5">
-                            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm ring-1 ring-white/20">
-                                <Settings className="h-7 w-7 text-white" />
-                            </div>
-                            <div>
-                                <h1 className="text-2xl font-bold text-white tracking-tight">
-                                    School Settings
-                                </h1>
-                                <p className="text-slate-400 text-sm mt-0.5">
-                                    Configure global school system parameters
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Current Academic Period */}
-                        <div className="flex flex-wrap items-center gap-3">
-                            <div className="flex items-center gap-2 rounded-xl bg-blue-500/20 px-4 py-2 backdrop-blur-sm ring-1 ring-blue-400/30">
-                                <BookOpen size={12} className="text-blue-300" />
-                                <span className="text-xs font-semibold text-blue-200">
-                                    Current Academic Period:{" "}
-                                    {currentSchoolYear || "Not set"} · Sem{" "}
-                                    {academicData.current_semester}
-                                </span>
-                            </div>
-                        </div>
+                    <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                        <BookOpen size={12} />
+                        Current Academic Period:{" "}
+                        {currentSchoolYear || "Not set"} · Sem{" "}
+                        {academicData.current_semester}
                     </div>
                 </div>
 
@@ -424,7 +405,7 @@ export default function Index({ settings }) {
                         <div className="rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-slate-100 overflow-hidden">
                             <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-slate-100">
                                 <div className="flex items-center gap-4">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md shadow-blue-500/20">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 shadow-sm">
                                         <Calendar className="h-5 w-5 text-white" />
                                     </div>
                                     <div>
@@ -485,7 +466,7 @@ export default function Index({ settings }) {
                                                         className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all ${
                                                             academicData.current_semester ===
                                                             sem
-                                                                ? "bg-white dark:bg-gray-900 text-blue-600 shadow-sm ring-1 ring-slate-200"
+                                                                ? "bg-white dark:bg-gray-900 text-emerald-700 shadow-sm ring-1 ring-emerald-200"
                                                                 : "text-slate-500 hover:text-slate-700"
                                                         }`}
                                                     >
@@ -523,7 +504,7 @@ export default function Index({ settings }) {
                                             type="button"
                                             onClick={handleSaveSemester}
                                             disabled={academicProcessing}
-                                            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                                            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
                                         >
                                             <Save size={14} />
                                             {academicProcessing
@@ -563,7 +544,7 @@ export default function Index({ settings }) {
                         {/* School Information Card */}
                         <div className="rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-slate-100 overflow-hidden">
                             <div className="flex items-center gap-4 px-6 py-5 border-b border-slate-100">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-md shadow-emerald-500/20">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 shadow-sm">
                                     <School className="h-5 w-5 text-white" />
                                 </div>
                                 <div>
@@ -593,7 +574,7 @@ export default function Index({ settings }) {
                                             )
                                         }
                                         placeholder="e.g., Sample Senior High School"
-                                        className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white dark:bg-gray-900 transition-colors"
+                                        className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-emerald-500 focus:ring-emerald-500 focus:bg-white dark:bg-gray-900 transition-colors"
                                     />
                                 </div>
 
@@ -612,7 +593,7 @@ export default function Index({ settings }) {
                                         }
                                         rows={3}
                                         placeholder="Full school address including barangay, city, and province..."
-                                        className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-blue-500 focus:ring-blue-500 focus:bg-white dark:bg-gray-900 transition-colors resize-none"
+                                        className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:border-emerald-500 focus:ring-emerald-500 focus:bg-white dark:bg-gray-900 transition-colors resize-none"
                                     />
                                 </div>
 
@@ -713,7 +694,7 @@ export default function Index({ settings }) {
                             type="button"
                             onClick={handleSaveSchoolInfo}
                             disabled={schoolInfoProcessing}
-                            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {schoolInfoProcessing ? (
                                 <>

@@ -4,7 +4,6 @@ import { Head, Link, router, useForm } from "@inertiajs/react";
 import { Fragment } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import {
-    Key,
     Clock,
     CheckCircle,
     XCircle,
@@ -56,13 +55,13 @@ const FilterTab = ({ label, count, isActive, onClick }) => (
         onClick={onClick}
         className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
             isActive
-                ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                 : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
         }`}
     >
         {label}
         <span
-            className={`ml-2 px-1.5 py-0.5 text-xs rounded-full ${isActive ? "bg-purple-200 dark:bg-purple-800" : "bg-gray-200 dark:bg-gray-600"}`}
+            className={`ml-2 px-1.5 py-0.5 text-xs rounded-full ${isActive ? "bg-emerald-200 dark:bg-emerald-800" : "bg-gray-200 dark:bg-gray-600"}`}
         >
             {count}
         </span>
@@ -179,7 +178,7 @@ const ApproveModal = ({ isOpen, onClose, request, routePrefix }) => {
                                                     e.target.value,
                                                 )
                                             }
-                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                                             placeholder="Add any notes..."
                                             rows={2}
                                         />
@@ -286,7 +285,7 @@ const RejectModal = ({ isOpen, onClose, request, routePrefix }) => {
                                                     e.target.value,
                                                 )
                                             }
-                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                                             placeholder="Explain why the request is being rejected..."
                                             rows={3}
                                             required
@@ -360,8 +359,7 @@ export function PasswordResetRequestsPage({
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        <Key size={28} className="text-purple-500" />
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                         Password Reset Requests
                     </h1>
                     <p className="text-gray-600 dark:text-gray-400 mt-1">
@@ -460,7 +458,7 @@ export function PasswordResetRequestsPage({
                                                 </p>
                                             )}
                                             {request.admin_notes && (
-                                                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 bg-purple-50 dark:bg-purple-900/20 px-3 py-2 rounded-lg">
+                                                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 rounded-lg">
                                                     <strong>
                                                         Admin Notes:
                                                     </strong>{" "}
@@ -511,7 +509,10 @@ export function PasswordResetRequestsPage({
                     </div>
                 ) : (
                     <div className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
-                        <Key size={48} className="mx-auto mb-3 opacity-50" />
+                        <Shield
+                            size={48}
+                            className="mx-auto mb-3 text-emerald-500/60"
+                        />
                         <p className="text-lg font-medium">No requests found</p>
                         <p className="text-sm">
                             {currentStatus === "pending"
@@ -558,7 +559,7 @@ export function PasswordResetRequestsPage({
                                     <Link
                                         key={index}
                                         href={link.url || "#"}
-                                        className={`px-3 py-1 rounded-lg text-sm font-medium ${link.active ? "bg-purple-600 text-white" : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"}`}
+                                        className={`px-3 py-1 rounded-lg text-sm font-medium ${link.active ? "bg-emerald-600 text-white" : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"}`}
                                         preserveState
                                     >
                                         {link.label}

@@ -5,14 +5,13 @@ import {
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
-    ClipboardList,
     Eye,
     Search,
     X,
     XCircle,
 } from "lucide-react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
-import Modal from "@/Components/Modal";
+import ArchiveDetailModal from "@/Components/Superadmin/ArchiveDetailModal";
 
 const ROLE_LABELS = {
     super_admin: "Super Admin",
@@ -51,21 +50,6 @@ function formatDateTime(value) {
         hour: "2-digit",
         minute: "2-digit",
     });
-}
-
-function formatJson(value) {
-    if (
-        !value ||
-        (typeof value === "object" && Object.keys(value).length === 0)
-    ) {
-        return "No data";
-    }
-
-    try {
-        return JSON.stringify(value, null, 2);
-    } catch {
-        return "Unable to render data";
-    }
 }
 
 export default function Index({ logs, filters, options }) {
@@ -131,39 +115,26 @@ export default function Index({ logs, filters, options }) {
             <Head title="Audit Logs" />
 
             <div className="space-y-6">
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 px-7 py-6 shadow-xl">
-                    <div className="absolute -top-10 -right-10 h-44 w-44 rounded-full bg-cyan-500/15 blur-3xl" />
-                    <div className="absolute -bottom-10 left-1/4 h-36 w-36 rounded-full bg-indigo-500/10 blur-2xl" />
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900">
+                            Activity Audit Logs
+                        </h1>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Track teacher, student, and super admin tasks per
+                            school year
+                        </p>
+                    </div>
 
-                    <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500/20 ring-1 ring-cyan-300/20">
-                                <ClipboardList className="h-6 w-6 text-cyan-200" />
-                            </div>
-                            <div>
-                                <p className="text-xs font-semibold uppercase tracking-widest text-cyan-300">
-                                    Super Admin
-                                </p>
-                                <h1 className="text-2xl font-bold text-white">
-                                    Activity Audit Logs
-                                </h1>
-                                <p className="mt-0.5 text-sm text-slate-300">
-                                    Track teacher, student, and super admin
-                                    tasks per school year
-                                </p>
-                            </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                            {totalLogs} Total Logs
                         </div>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                            <div className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white">
-                                {totalLogs} Total Logs
-                            </div>
-                            <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 px-4 py-2 text-xs font-semibold text-emerald-200">
-                                {summary.successCount} Success
-                            </div>
-                            <div className="rounded-xl border border-rose-300/20 bg-rose-500/10 px-4 py-2 text-xs font-semibold text-rose-200">
-                                {summary.failureCount} Failed
-                            </div>
+                        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                            {summary.successCount} Success
+                        </div>
+                        <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700">
+                            {summary.failureCount} Failed
                         </div>
                     </div>
                 </div>
@@ -183,7 +154,7 @@ export default function Index({ logs, filters, options }) {
                                         setSearch(event.target.value)
                                     }
                                     placeholder="Search by user, task, module, route, or school year"
-                                    className="w-full rounded-xl border border-slate-300 bg-slate-50 py-2.5 pl-10 pr-9 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white focus:ring-2 focus:ring-cyan-100"
+                                    className="w-full rounded-xl border border-slate-300 bg-slate-50 py-2.5 pl-10 pr-9 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
                                 />
                                 {search && (
                                     <button
@@ -200,7 +171,7 @@ export default function Index({ logs, filters, options }) {
                             </div>
                             <button
                                 type="submit"
-                                className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700"
+                                className="rounded-xl bg-[#27500A] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1f4008]"
                             >
                                 Search
                             </button>
@@ -214,7 +185,7 @@ export default function Index({ logs, filters, options }) {
                                     setRoleFilter(next);
                                     runFilters({ role: next });
                                 }}
-                                className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                                className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                             >
                                 <option value="">All Roles</option>
                                 {(options?.roles || []).map((role) => (
@@ -231,7 +202,7 @@ export default function Index({ logs, filters, options }) {
                                     setActionFilter(next);
                                     runFilters({ action: next });
                                 }}
-                                className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                                className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                             >
                                 <option value="">All Actions</option>
                                 {(options?.actions || []).map((actionValue) => (
@@ -251,7 +222,7 @@ export default function Index({ logs, filters, options }) {
                                     setSchoolYearFilter(next);
                                     runFilters({ school_year: next });
                                 }}
-                                className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                                className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                             >
                                 <option value="">All School Years</option>
                                 {(options?.school_years || []).map((year) => (
@@ -390,7 +361,7 @@ export default function Index({ logs, filters, options }) {
                                                 onClick={() =>
                                                     setSelectedLog(log)
                                                 }
-                                                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50"
+                                                className="inline-flex items-center gap-1 rounded-lg border border-[#C0DD97] bg-[#EAF3DE] px-2 py-1 text-[11px] font-semibold text-[#27500A] transition hover:bg-[#DDEEC7]"
                                             >
                                                 <Eye size={12} />
                                                 View
@@ -427,7 +398,7 @@ export default function Index({ logs, filters, options }) {
                                                     href={link.url || "#"}
                                                     className={`inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg px-2 text-xs font-semibold transition-colors ${
                                                         link.active
-                                                            ? "bg-cyan-600 text-white"
+                                                            ? "bg-[#27500A] text-white"
                                                             : link.url
                                                               ? "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                                                               : "cursor-not-allowed border border-slate-100 text-slate-300"
@@ -462,130 +433,15 @@ export default function Index({ logs, filters, options }) {
                 </div>
             </div>
 
-            <Modal
+            <ArchiveDetailModal
                 show={Boolean(selectedLog)}
                 onClose={() => setSelectedLog(null)}
-                maxWidth="3xl"
-            >
-                {selectedLog && (
-                    <div className="space-y-5 p-6">
-                        <div className="flex items-start justify-between gap-3">
-                            <div>
-                                <h2 className="text-lg font-bold text-slate-900">
-                                    Audit Log Details
-                                </h2>
-                                <p className="mt-1 text-sm text-slate-500">
-                                    {selectedLog.task}
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setSelectedLog(null)}
-                                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-                            >
-                                <X size={16} />
-                            </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                    Date and Time
-                                </p>
-                                <p className="mt-1 text-sm font-semibold text-slate-800">
-                                    {formatDateTime(selectedLog.logged_at)}
-                                </p>
-                            </div>
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                    User
-                                </p>
-                                <p className="mt-1 text-sm font-semibold text-slate-800">
-                                    {selectedLog.user?.name || "Unknown"}
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                    {selectedLog.user?.username || "-"}
-                                </p>
-                            </div>
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                    Role and School Year
-                                </p>
-                                <p className="mt-1 text-sm font-semibold text-slate-800">
-                                    {ROLE_LABELS[selectedLog.user_role] ||
-                                        selectedLog.user_role ||
-                                        "-"}
-                                    {" · "}
-                                    {selectedLog.school_year || "N/A"}
-                                </p>
-                            </div>
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                    Method / Status
-                                </p>
-                                <p className="mt-1 text-sm font-semibold text-slate-800">
-                                    {selectedLog.method} ·{" "}
-                                    {selectedLog.status_code || "-"}
-                                </p>
-                            </div>
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:col-span-2">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                    Route and Path
-                                </p>
-                                <p className="mt-1 break-all font-mono text-xs text-slate-700">
-                                    {selectedLog.route_name || "-"}
-                                </p>
-                                <p className="mt-1 break-all font-mono text-xs text-slate-600">
-                                    {selectedLog.path}
-                                </p>
-                            </div>
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:col-span-2">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                    Source
-                                </p>
-                                <p className="mt-1 text-xs text-slate-700">
-                                    IP: {selectedLog.ip_address || "N/A"}
-                                </p>
-                                <p className="mt-1 text-xs text-slate-600">
-                                    Target: {selectedLog.target_type || "N/A"}
-                                    {selectedLog.target_id
-                                        ? ` #${selectedLog.target_id}`
-                                        : ""}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-3">
-                            <div className="rounded-xl border border-slate-200 bg-slate-950 p-3">
-                                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
-                                    Query Parameters
-                                </p>
-                                <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-relaxed text-slate-100">
-                                    {formatJson(selectedLog.query_params)}
-                                </pre>
-                            </div>
-
-                            <div className="rounded-xl border border-slate-200 bg-slate-950 p-3">
-                                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
-                                    Request Payload
-                                </p>
-                                <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-relaxed text-slate-100">
-                                    {formatJson(selectedLog.request_payload)}
-                                </pre>
-                            </div>
-
-                            <div className="rounded-xl border border-slate-200 bg-slate-950 p-3">
-                                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
-                                    Metadata
-                                </p>
-                                <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-relaxed text-slate-100">
-                                    {formatJson(selectedLog.metadata)}
-                                </pre>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </Modal>
+                activeTab="audit-logs"
+                payload={selectedLog}
+                loading={false}
+                error=""
+                row={selectedLog}
+            />
         </>
     );
 }

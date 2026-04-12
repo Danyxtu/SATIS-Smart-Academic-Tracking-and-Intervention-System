@@ -10,7 +10,6 @@ import {
     UserCog,
     Calendar,
     ArrowRight,
-    Shield,
     Settings,
     ChevronRight,
     Zap,
@@ -53,10 +52,10 @@ export default function Dashboard({
             value: stats.total_departments,
             subtext: `${stats.active_departments} active`,
             icon: Building2,
-            gradient: "from-blue-500 to-indigo-600",
-            bgLight: "bg-blue-50",
-            textColor: "text-blue-600",
-            shadowColor: "shadow-blue-500/20",
+            gradient: "from-emerald-500 to-green-600",
+            bgLight: "bg-emerald-50",
+            textColor: "text-emerald-600",
+            shadowColor: "shadow-emerald-500/20",
             href: route("superadmin.departments.index"),
         },
         {
@@ -64,10 +63,10 @@ export default function Dashboard({
             value: stats.total_admins,
             subtext: "Department admins",
             icon: UserCog,
-            gradient: "from-violet-500 to-purple-600",
-            bgLight: "bg-violet-50",
-            textColor: "text-violet-600",
-            shadowColor: "shadow-violet-500/20",
+            gradient: "from-green-500 to-emerald-600",
+            bgLight: "bg-green-50",
+            textColor: "text-green-600",
+            shadowColor: "shadow-green-500/20",
             href: route("superadmin.users.index", { role: "admin" }),
         },
         {
@@ -75,7 +74,7 @@ export default function Dashboard({
             value: stats.total_teachers,
             subtext: "All departments",
             icon: Users,
-            gradient: "from-emerald-500 to-teal-600",
+            gradient: "from-teal-500 to-emerald-600",
             bgLight: "bg-emerald-50",
             textColor: "text-emerald-600",
             shadowColor: "shadow-emerald-500/20",
@@ -86,10 +85,10 @@ export default function Dashboard({
             value: stats.total_students,
             subtext: "All departments",
             icon: GraduationCap,
-            gradient: "from-amber-500 to-orange-500",
-            bgLight: "bg-amber-50",
-            textColor: "text-amber-600",
-            shadowColor: "shadow-amber-500/20",
+            gradient: "from-lime-500 to-emerald-600",
+            bgLight: "bg-lime-50",
+            textColor: "text-lime-700",
+            shadowColor: "shadow-lime-500/20",
             href: route("superadmin.users.index", { role: "student" }),
         },
         {
@@ -111,24 +110,24 @@ export default function Dashboard({
             description: "Create a new academic department",
             icon: Building2,
             href: route("superadmin.departments.index"),
-            color: "from-blue-500 to-indigo-600",
-            shadow: "shadow-blue-500/30",
+            color: "from-emerald-500 to-green-600",
+            shadow: "shadow-emerald-500/30",
         },
         {
             name: "Add Admin",
             description: "Assign a department administrator",
             icon: UserCog,
             href: route("superadmin.admins.create"),
-            color: "from-violet-500 to-purple-600",
-            shadow: "shadow-violet-500/30",
+            color: "from-green-500 to-emerald-600",
+            shadow: "shadow-green-500/30",
         },
         {
             name: "School Settings",
             description: "Configure school-wide settings",
             icon: Settings,
             href: route("superadmin.settings.index"),
-            color: "from-slate-600 to-slate-700",
-            shadow: "shadow-slate-500/30",
+            color: "from-emerald-600 to-teal-600",
+            shadow: "shadow-emerald-500/30",
         },
     ];
 
@@ -225,65 +224,28 @@ export default function Dashboard({
             <div className="space-y-6">
                 <UnifiedDashboardSwitcher />
 
-                {/* ── Hero Banner ──────────────────────────────────────── */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 px-8 py-7 shadow-xl">
-                    <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-blue-500/15 blur-3xl" />
-                    <div className="absolute -bottom-12 left-1/4 h-40 w-40 rounded-full bg-indigo-500/10 blur-2xl" />
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900">
+                            {heroTitle}
+                        </h1>
+                        <p className="mt-1 text-sm text-slate-500">
+                            {heroSubtitle}
+                        </p>
+                    </div>
 
-                    <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                        {/* Left: Title */}
-                        <div className="flex items-center gap-5">
-                            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30">
-                                <Shield className="h-7 w-7 text-white" />
-                            </div>
-                            <div>
-                                <p className="text-xs font-semibold uppercase tracking-widest text-blue-400 mb-1">
-                                    Super Admin Panel
-                                </p>
-                                <h1 className="text-2xl font-bold text-white">
-                                    {heroTitle}
-                                </h1>
-                                <p className="text-sm text-slate-400 mt-0.5">
-                                    {heroSubtitle}
-                                </p>
-                            </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                            <Calendar size={13} />
+                            {schoolYearLabel} · Sem {semesterLabel}
                         </div>
-
-                        {/* Right: Academic Period + System Status */}
-                        <div className="flex flex-wrap items-center gap-3">
-                            {/* Academic period pill */}
-                            <div className="flex items-center gap-3 rounded-xl bg-white/8 border border-white/10 px-4 py-3 backdrop-blur-sm">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/20">
-                                    <Calendar
-                                        className="h-4.5 w-4.5 text-blue-300"
-                                        size={18}
-                                    />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                                        Academic Period
-                                    </p>
-                                    <p className="text-sm font-bold text-white">
-                                        {schoolYearLabel} · Sem {semesterLabel}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* System status pills */}
-                            <div className="flex flex-col gap-1.5">
-                                <div className="flex items-center gap-2 rounded-lg bg-white/8 border border-white/10 px-3 py-1.5">
-                                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                    <span className="text-xs font-medium text-slate-300">
-                                        Enrollment Open
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-2 rounded-lg bg-white/8 border border-white/10 px-3 py-1.5">
-                                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                    <span className="text-xs font-medium text-slate-300">
-                                        Grades Open
-                                    </span>
-                                </div>
-                            </div>
+                        <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            Enrollment Open
+                        </div>
+                        <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            Grades Open
                         </div>
                     </div>
                 </div>
@@ -302,14 +264,14 @@ export default function Dashboard({
                                     onClick={() => setActiveTab(tab.id)}
                                     className={`group flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${
                                         isActive
-                                            ? "border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-sm"
+                                            ? "border-emerald-200 bg-emerald-50 shadow-sm"
                                             : "border-slate-100 bg-white hover:bg-slate-50"
                                     }`}
                                 >
                                     <div
                                         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
                                             isActive
-                                                ? "bg-blue-100 text-blue-700"
+                                                ? "bg-emerald-100 text-emerald-700"
                                                 : "bg-slate-100 text-slate-500"
                                         }`}
                                     >
@@ -384,8 +346,8 @@ export default function Dashboard({
                             <div className="xl:col-span-2 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
                                 <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
                                     <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100">
-                                            <Building2 className="h-5 w-5 text-blue-600" />
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100">
+                                            <Building2 className="h-5 w-5 text-emerald-700" />
                                         </div>
                                         <div>
                                             <h2 className="font-semibold text-slate-900">
@@ -400,7 +362,7 @@ export default function Dashboard({
                                         href={route(
                                             "superadmin.departments.index",
                                         )}
-                                        className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 transition-colors hover:text-blue-700"
+                                        className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:text-emerald-800"
                                     >
                                         View all <ArrowRight size={13} />
                                     </Link>
@@ -418,7 +380,7 @@ export default function Dashboard({
                                             href={route(
                                                 "superadmin.departments.index",
                                             )}
-                                            className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+                                            className="text-sm font-semibold text-emerald-700 hover:text-emerald-800"
                                         >
                                             Create your first department
                                         </Link>
@@ -430,7 +392,7 @@ export default function Dashboard({
                                                 key={dept.id}
                                                 className="flex items-center gap-4 px-6 py-4 transition-colors hover:bg-slate-50/60"
                                             >
-                                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm">
+                                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
                                                     <Building2 size={18} />
                                                 </div>
 
@@ -492,8 +454,8 @@ export default function Dashboard({
                             <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
                                 <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
                                     <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100">
-                                            <UserCog className="h-5 w-5 text-violet-600" />
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100">
+                                            <UserCog className="h-5 w-5 text-emerald-700" />
                                         </div>
                                         <div>
                                             <h2 className="font-semibold text-slate-900">
@@ -506,7 +468,7 @@ export default function Dashboard({
                                     </div>
                                     <Link
                                         href={route("superadmin.admins.index")}
-                                        className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 transition-colors hover:text-blue-700"
+                                        className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:text-emerald-800"
                                     >
                                         View all <ArrowRight size={13} />
                                     </Link>
@@ -524,7 +486,7 @@ export default function Dashboard({
                                             href={route(
                                                 "superadmin.admins.create",
                                             )}
-                                            className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+                                            className="text-sm font-semibold text-emerald-700 hover:text-emerald-800"
                                         >
                                             Add your first admin
                                         </Link>
@@ -536,7 +498,7 @@ export default function Dashboard({
                                                 key={admin.id}
                                                 className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 transition-colors hover:bg-slate-100/80"
                                             >
-                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-sm font-bold text-white shadow-sm">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-sm font-bold text-white shadow-sm">
                                                     {(admin.name || "A")
                                                         .charAt(0)
                                                         .toUpperCase()}
@@ -550,7 +512,7 @@ export default function Dashboard({
                                                         {admin.email}
                                                     </p>
                                                 </div>
-                                                <span className="inline-flex shrink-0 items-center rounded-lg bg-blue-100 px-2 py-1 text-[10px] font-semibold text-blue-700">
+                                                <span className="inline-flex shrink-0 items-center rounded-lg bg-emerald-100 px-2 py-1 text-[10px] font-semibold text-emerald-700">
                                                     {admin.department}
                                                 </span>
                                             </div>
@@ -605,8 +567,8 @@ export default function Dashboard({
                         <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
                             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
                                 <div className="flex items-center gap-3">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100">
-                                        <Building2 className="h-5 w-5 text-indigo-600" />
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100">
+                                        <Building2 className="h-5 w-5 text-emerald-700" />
                                     </div>
                                     <div>
                                         <h2 className="font-semibold text-slate-900">
@@ -745,50 +707,45 @@ export default function Dashboard({
                 )}
 
                 {/* ── Quick Actions ────────────────────────────────────── */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 p-7 shadow-xl">
-                    <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full bg-blue-500/10 blur-3xl" />
-                    <div className="absolute -bottom-16 left-1/3 h-48 w-48 rounded-full bg-violet-500/10 blur-3xl" />
-
-                    <div className="relative">
-                        <div className="flex items-center gap-2 mb-5">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/20">
-                                <Zap size={16} className="text-amber-400" />
-                            </div>
-                            <h2 className="text-lg font-bold text-white">
-                                Quick Actions
-                            </h2>
+                <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white p-7 shadow-sm">
+                    <div className="mb-5 flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100">
+                            <Zap size={16} className="text-emerald-700" />
                         </div>
+                        <h2 className="text-lg font-bold text-slate-900">
+                            Quick Actions
+                        </h2>
+                    </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            {quickActions.map((action) => {
-                                const Icon = action.icon;
-                                return (
-                                    <Link
-                                        key={action.name}
-                                        href={action.href}
-                                        className="group flex items-center gap-4 rounded-2xl bg-white/6 border border-white/10 p-5 backdrop-blur-sm transition-all duration-200 hover:bg-white/12 hover:border-white/20 hover:-translate-y-0.5"
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        {quickActions.map((action) => {
+                            const Icon = action.icon;
+                            return (
+                                <Link
+                                    key={action.name}
+                                    href={action.href}
+                                    className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:bg-white"
+                                >
+                                    <div
+                                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${action.color} shadow-md ${action.shadow}`}
                                     >
-                                        <div
-                                            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${action.color} shadow-lg ${action.shadow} group-hover:scale-105 transition-transform`}
-                                        >
-                                            <Icon className="h-6 w-6 text-white" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-semibold text-white text-sm">
-                                                {action.name}
-                                            </p>
-                                            <p className="text-xs text-slate-400 mt-0.5 truncate">
-                                                {action.description}
-                                            </p>
-                                        </div>
-                                        <ArrowRight
-                                            size={16}
-                                            className="text-slate-600 group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all shrink-0"
-                                        />
-                                    </Link>
-                                );
-                            })}
-                        </div>
+                                        <Icon className="h-6 w-6 text-white" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-semibold text-slate-900">
+                                            {action.name}
+                                        </p>
+                                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                                            {action.description}
+                                        </p>
+                                    </div>
+                                    <ArrowRight
+                                        size={16}
+                                        className="shrink-0 text-slate-400 transition-all group-hover:translate-x-0.5 group-hover:text-slate-600"
+                                    />
+                                </Link>
+                            );
+                        })}
                     </div>
                 </div>
             </div>

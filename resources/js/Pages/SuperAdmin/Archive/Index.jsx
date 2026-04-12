@@ -15,7 +15,7 @@ import {
     X,
 } from "lucide-react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
-import Modal from "@/Components/Modal";
+import ArchiveDetailModal from "@/Components/Superadmin/ArchiveDetailModal";
 
 const TAB_OPTIONS = [
     {
@@ -74,6 +74,13 @@ const ROLE_LABELS = {
     teacher: "Teacher",
     student: "Student",
 };
+
+const ARCHIVE_AUDIT_ROLES = [
+    { value: "super_admin", label: "Super Admin" },
+    { value: "admin", label: "Admin" },
+    { value: "teacher", label: "Teacher" },
+    { value: "student", label: "Student" },
+];
 
 function formatDateTime(value) {
     if (!value) return "-";
@@ -157,7 +164,7 @@ export default function Index({
 }) {
     const [search, setSearch] = useState(filters.search || "");
     const [detailModalOpen, setDetailModalOpen] = useState(false);
-    const [detailTitle, setDetailTitle] = useState("");
+    const [detailRow, setDetailRow] = useState(null);
     const [detailPayload, setDetailPayload] = useState(null);
     const [detailError, setDetailError] = useState("");
     const [detailLoading, setDetailLoading] = useState(false);
@@ -173,6 +180,10 @@ export default function Index({
 
     const studentOptions = options?.student_filters || {};
     const classOptions = options?.class_filters || {};
+    const departmentOptions = Array.isArray(options?.department_codes)
+        ? options.department_codes
+        : [];
+    const trackOptions = Array.isArray(options?.tracks) ? options.tracks : [];
 
     const studentGradeLevels = useMemo(() => {
         if (
@@ -236,6 +247,10 @@ export default function Index({
         return filters.grade_level || filters.class_grade_level || "all";
     }, [activeTab, filters.class_grade_level, filters.grade_level]);
 
+    const activeDepartmentFilter = filters.department || "all";
+    const activeTrackFilter = filters.track || "all";
+    const activeAuditRoleFilter = filters.audit_role || "all";
+
     const resolvedSummary = useMemo(
         () => ({
             students: Number(summary?.students || 0),
@@ -278,6 +293,42 @@ export default function Index({
         applyFilters({ search: "" });
     };
 
+    const switchTab = (nextTab) => {
+        const nextFilters = {
+            tab: nextTab,
+            grade_level: "",
+            class_grade_level: "",
+            section: "",
+            strand: "",
+            department: "",
+            track: "",
+            audit_role: "",
+        };
+
+        if (nextTab === "students") {
+            nextFilters.grade_level = filters.grade_level || "";
+        }
+
+        if (nextTab === "classes") {
+            nextFilters.class_grade_level = filters.class_grade_level || "";
+            nextFilters.track = filters.track || "";
+        }
+
+        if (nextTab === "teachers") {
+            nextFilters.department = filters.department || "";
+        }
+
+        if (nextTab === "departments") {
+            nextFilters.track = filters.track || "";
+        }
+
+        if (nextTab === "audit-logs") {
+            nextFilters.audit_role = filters.audit_role || "";
+        }
+
+        applyFilters(nextFilters);
+    };
+
     const applyGradeLevelFilter = (nextGradeLevel) => {
         const nextValue =
             nextGradeLevel === "all" ? "" : String(nextGradeLevel);
@@ -304,27 +355,51 @@ export default function Index({
         });
     };
 
+    const applyDepartmentFilter = (nextDepartment) => {
+        applyFilters({
+            department: nextDepartment === "all" ? "" : nextDepartment,
+        });
+    };
+
+    const applyTrackFilter = (nextTrack) => {
+        applyFilters({
+            track: nextTrack === "all" ? "" : nextTrack,
+        });
+    };
+
+    const applyAuditRoleFilter = (nextRole) => {
+        applyFilters({
+            audit_role: nextRole === "all" ? "" : nextRole,
+        });
+    };
+
+    const closeDetails = () => {
+        setDetailModalOpen(false);
+        setDetailRow(null);
+        setDetailPayload(null);
+        setDetailError("");
+        setDetailLoading(false);
+    };
+
     const openDetails = async (row) => {
+        setDetailRow(row);
         setDetailError("");
         setDetailLoading(false);
         setDetailPayload(null);
 
         if (!selectedArchiveKey) {
             setDetailError("Select an archive first.");
-            setDetailTitle("Details");
             setDetailModalOpen(true);
             return;
         }
 
         if (activeTab === "super-admins") {
-            setDetailTitle("Super Admin Details");
             setDetailPayload(row);
             setDetailModalOpen(true);
             return;
         }
 
         if (activeTab === "audit-logs") {
-            setDetailTitle("Audit Log Details");
             setDetailPayload(row);
             setDetailModalOpen(true);
             return;
@@ -355,10 +430,11 @@ export default function Index({
         }
 
         if (!endpoint) {
+            setDetailError("No detail endpoint is configured for this tab.");
+            setDetailModalOpen(true);
             return;
         }
 
-        setDetailTitle("Archive Details");
         setDetailModalOpen(true);
         setDetailLoading(true);
 
@@ -569,6 +645,241 @@ export default function Index({
         return ["Date", "Task", "User", "Roles", "Semester", "Status"];
     };
 
+    const renderTabFilters = () => {
+        if (activeTab === "students") {
+            return (
+                <div className="rounded-xl border border-slate-200 bg-white p-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Grade Level
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => applyGradeLevelFilter("all")}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                activeGradeLevelFilter === "all"
+                                    ? "bg-emerald-600 text-white"
+                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                            }`}
+                        >
+                            All Grade Levels
+                        </button>
+                        {availableGradeLevels.map((gradeLevel) => (
+                            <button
+                                key={gradeLevel}
+                                type="button"
+                                onClick={() =>
+                                    applyGradeLevelFilter(gradeLevel)
+                                }
+                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                    activeGradeLevelFilter === gradeLevel
+                                        ? "bg-emerald-600 text-white"
+                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                }`}
+                            >
+                                {gradeLevel}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        if (activeTab === "teachers") {
+            return (
+                <div className="rounded-xl border border-slate-200 bg-white p-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Department
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => applyDepartmentFilter("all")}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                activeDepartmentFilter === "all"
+                                    ? "bg-emerald-600 text-white"
+                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                            }`}
+                        >
+                            All Departments
+                        </button>
+                        {departmentOptions.map((department) => (
+                            <button
+                                key={department.code}
+                                type="button"
+                                onClick={() =>
+                                    applyDepartmentFilter(department.code)
+                                }
+                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                    activeDepartmentFilter === department.code
+                                        ? "bg-emerald-600 text-white"
+                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                }`}
+                                title={department.name}
+                            >
+                                {department.code}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        if (activeTab === "departments") {
+            return (
+                <div className="rounded-xl border border-slate-200 bg-white p-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Track
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => applyTrackFilter("all")}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                activeTrackFilter === "all"
+                                    ? "bg-emerald-600 text-white"
+                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                            }`}
+                        >
+                            All Tracks
+                        </button>
+                        {trackOptions.map((track) => (
+                            <button
+                                key={track}
+                                type="button"
+                                onClick={() => applyTrackFilter(track)}
+                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                    activeTrackFilter === track
+                                        ? "bg-emerald-600 text-white"
+                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                }`}
+                            >
+                                {track}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        if (activeTab === "classes") {
+            return (
+                <div className="space-y-2">
+                    <div className="rounded-xl border border-slate-200 bg-white p-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Grade Level
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => applyGradeLevelFilter("all")}
+                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                    activeGradeLevelFilter === "all"
+                                        ? "bg-emerald-600 text-white"
+                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                }`}
+                            >
+                                All Grade Levels
+                            </button>
+                            {availableGradeLevels.map((gradeLevel) => (
+                                <button
+                                    key={gradeLevel}
+                                    type="button"
+                                    onClick={() =>
+                                        applyGradeLevelFilter(gradeLevel)
+                                    }
+                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                        activeGradeLevelFilter === gradeLevel
+                                            ? "bg-emerald-600 text-white"
+                                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                    }`}
+                                >
+                                    {gradeLevel}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-white p-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Track
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => applyTrackFilter("all")}
+                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                    activeTrackFilter === "all"
+                                        ? "bg-emerald-600 text-white"
+                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                }`}
+                            >
+                                All Tracks
+                            </button>
+                            {trackOptions.map((track) => (
+                                <button
+                                    key={track}
+                                    type="button"
+                                    onClick={() => applyTrackFilter(track)}
+                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                        activeTrackFilter === track
+                                            ? "bg-emerald-600 text-white"
+                                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                    }`}
+                                >
+                                    {track}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        if (activeTab === "audit-logs") {
+            return (
+                <div className="rounded-xl border border-slate-200 bg-white p-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            User Role
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => applyAuditRoleFilter("all")}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                activeAuditRoleFilter === "all"
+                                    ? "bg-emerald-600 text-white"
+                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                            }`}
+                        >
+                            All Roles
+                        </button>
+                        {ARCHIVE_AUDIT_ROLES.map((role) => (
+                            <button
+                                key={role.value}
+                                type="button"
+                                onClick={() => applyAuditRoleFilter(role.value)}
+                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                    activeAuditRoleFilter === role.value
+                                        ? "bg-emerald-600 text-white"
+                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                }`}
+                            >
+                                {role.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600">
+                Search and semester filters are available for this view.
+            </div>
+        );
+    };
+
     return (
         <>
             <Head title="Archive" />
@@ -682,48 +993,12 @@ export default function Index({
                                     value={resolvedSummary[tab.summaryKey]}
                                     accent={tab.accent}
                                     active={activeTab === tab.key}
-                                    onClick={() =>
-                                        applyFilters({ tab: tab.key })
-                                    }
+                                    onClick={() => switchTab(tab.key)}
                                 />
                             ))}
                         </div>
 
-                        <div className="rounded-xl border border-slate-200 bg-white p-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                    Grade Level
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={() => applyGradeLevelFilter("all")}
-                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                                        activeGradeLevelFilter === "all"
-                                            ? "bg-emerald-600 text-white"
-                                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                                    }`}
-                                >
-                                    All Grade Levels
-                                </button>
-                                {availableGradeLevels.map((gradeLevel) => (
-                                    <button
-                                        key={gradeLevel}
-                                        type="button"
-                                        onClick={() =>
-                                            applyGradeLevelFilter(gradeLevel)
-                                        }
-                                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                                            activeGradeLevelFilter ===
-                                            gradeLevel
-                                                ? "bg-emerald-600 text-white"
-                                                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                                        }`}
-                                    >
-                                        {gradeLevel}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                        {renderTabFilters()}
 
                         <div className="rounded-xl border border-slate-200 bg-white p-2">
                             <div className="flex flex-wrap gap-2">
@@ -731,9 +1006,7 @@ export default function Index({
                                     <button
                                         key={tab.key}
                                         type="button"
-                                        onClick={() =>
-                                            applyFilters({ tab: tab.key })
-                                        }
+                                        onClick={() => switchTab(tab.key)}
                                         className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                                             activeTab === tab.key
                                                 ? "bg-emerald-600 text-white"
@@ -936,44 +1209,15 @@ export default function Index({
                 )}
             </div>
 
-            <Modal
+            <ArchiveDetailModal
                 show={detailModalOpen}
-                onClose={() => setDetailModalOpen(false)}
-                maxWidth="3xl"
-            >
-                <div className="space-y-4 p-5">
-                    <div className="flex items-center justify-between gap-3">
-                        <h2 className="text-base font-bold text-slate-900">
-                            {detailTitle || "Details"}
-                        </h2>
-                        <button
-                            type="button"
-                            onClick={() => setDetailModalOpen(false)}
-                            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                        >
-                            Close
-                        </button>
-                    </div>
-
-                    {detailLoading && (
-                        <p className="text-sm text-slate-600">
-                            Loading details...
-                        </p>
-                    )}
-
-                    {detailError && (
-                        <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                            {detailError}
-                        </p>
-                    )}
-
-                    {!detailLoading && !detailError && detailPayload && (
-                        <pre className="max-h-[60vh] overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-800">
-                            {JSON.stringify(detailPayload, null, 2)}
-                        </pre>
-                    )}
-                </div>
-            </Modal>
+                onClose={closeDetails}
+                activeTab={activeTab}
+                payload={detailPayload}
+                loading={detailLoading}
+                error={detailError}
+                row={detailRow}
+            />
         </>
     );
 }
