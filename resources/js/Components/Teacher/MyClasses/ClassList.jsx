@@ -6,8 +6,14 @@ const ClassList = ({
     setSelectedStudentForStatus,
     setIsStudentStatusModalOpen,
     buildStudentKey,
+    onViewStudent,
 }) => {
     const handleStudentClick = (student) => {
+        if (typeof onViewStudent === "function") {
+            onViewStudent(student);
+            return;
+        }
+
         setSelectedStudentForStatus(student);
         setIsStudentStatusModalOpen(true);
     };

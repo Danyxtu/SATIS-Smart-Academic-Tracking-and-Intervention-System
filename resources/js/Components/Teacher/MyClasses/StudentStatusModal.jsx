@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { X, Check } from "lucide-react";
+import { X, Check, QrCode, Copy, AlertTriangle } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 
 const StudentStatusModal = ({
     student,
@@ -14,10 +15,12 @@ const StudentStatusModal = ({
 }) => {
     const [selectedQuarter, setSelectedQuarter] = useState(1);
     const [overviewMode, setOverviewMode] = useState("grades");
+    const [credentialsCopied, setCredentialsCopied] = useState(false);
 
     useEffect(() => {
         setSelectedQuarter(1);
         setOverviewMode("grades");
+        setCredentialsCopied(false);
     }, [student?.id]);
 
     if (!student) return null;
@@ -91,6 +94,44 @@ const StudentStatusModal = ({
         { label: "Strand", value: student.strand || "—" },
         { label: "Track", value: student.track || "—" },
     ];
+
+    const credentialUsername = student.username || student.user?.username || "";
+    const credentialPassword =
+        student.password ||
+        student.temporary_password ||
+        student.generated_password ||
+        "";
+    const hasCredentialPayload = Boolean(
+        credentialUsername && credentialPassword,
+    );
+    const qrCredentialsPayload = hasCredentialPayload
+        ? JSON.stringify({
+              type: "satis_student_credentials",
+              version: 1,
+              username: credentialUsername,
+              password: credentialPassword,
+          })
+        : "";
+
+    const copyCredentialDetails = async () => {
+        if (!hasCredentialPayload) {
+            return;
+        }
+
+        if (typeof navigator === "undefined" || !navigator.clipboard) {
+            return;
+        }
+
+        const payload = `Username: ${credentialUsername}\nPassword: ${credentialPassword}`;
+
+        try {
+            await navigator.clipboard.writeText(payload);
+            setCredentialsCopied(true);
+            window.setTimeout(() => setCredentialsCopied(false), 1800);
+        } catch (error) {
+            console.error("Failed to copy student credentials", error);
+        }
+    };
 
     const getInitials = () => {
         if (!student.name) return "ST";
@@ -208,7 +249,7 @@ const StudentStatusModal = ({
                 <div className="flex-1 overflow-y-auto p-3 space-y-3">
                     {/* Overview Toggle */}
                     <div className="rounded-lg border border-gray-100 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-800/70">
-                        <div className="grid grid-cols-2 gap-1">
+                        <div className="grid grid-cols-3 gap-1">
                             <button
                                 type="button"
                                 onClick={() => setOverviewMode("grades")}
@@ -230,6 +271,17 @@ const StudentStatusModal = ({
                                 }`}
                             >
                                 Attendance Overview
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setOverviewMode("credentials")}
+                                className={`rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
+                                    overviewMode === "credentials"
+                                        ? "bg-white text-indigo-700 shadow-sm dark:bg-gray-900 dark:text-indigo-300"
+                                        : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                                }`}
+                            >
+                                Login Credentials
                             </button>
                         </div>
                     </div>
@@ -605,6 +657,92 @@ const StudentStatusModal = ({
                                 yet.
                             </div>
                         )}
+
+                    {/* Student Credentials Overview */}
+                    {overviewMode === "credentials" && (
+                        <div className="rounded-lg border border-gray-100 dark:border-gray-700 p-2.5">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-2 dark:border-gray-700">
+                                <div>
+                                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                                        Student Login Credentials
+                                    </h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        Scan this QR code in the mobile login
+                                        page (bottom-right scanner button).
+                                    </p>
+                                </div>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+                                    <QrCode size={14} /> Auto Login QR
+                                </span>
+                            </div>
+
+                            {hasCredentialPayload ? (
+                                <div className="mt-3 grid gap-3 md:grid-cols-[220px_1fr]">
+                                    <div className="rounded-lg border border-gray-200 bg-white p-3 flex items-center justify-center">
+                                        <QRCodeSVG
+                                            value={qrCredentialsPayload}
+                                            size={180}
+                                            includeMargin
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <div className="rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/70 p-2">
+                                            <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                Username
+                                            </p>
+                                            <p className="mt-0.5 text-xs font-semibold text-gray-900 dark:text-gray-100 break-all">
+                                                {credentialUsername}
+                                            </p>
+                                        </div>
+
+                                        <div className="rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/70 p-2">
+                                            <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                Temporary Password
+                                            </p>
+                                            <p className="mt-0.5 text-xs font-semibold text-gray-900 dark:text-gray-100 break-all">
+                                                {credentialPassword}
+                                            </p>
+                                        </div>
+
+                                        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                                            This QR contains plain login
+                                            credentials. Let the student scan it
+                                            immediately, then close this modal.
+                                        </p>
+
+                                        <button
+                                            type="button"
+                                            onClick={copyCredentialDetails}
+                                            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                                credentialsCopied
+                                                    ? "bg-emerald-100 text-emerald-700"
+                                                    : "bg-indigo-600 text-white hover:bg-indigo-700"
+                                            }`}
+                                        >
+                                            <Copy size={14} />
+                                            {credentialsCopied
+                                                ? "Credentials Copied"
+                                                : "Copy Credentials"}
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                                    <p className="font-semibold inline-flex items-center gap-1.5">
+                                        <AlertTriangle size={14} /> Temporary
+                                        password unavailable
+                                    </p>
+                                    <p className="mt-1">
+                                        QR auto-login is available when a
+                                        temporary password is present (for
+                                        example, right after student account
+                                        creation).
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Attendance Overview */}
                     {overviewMode === "attendance" && (

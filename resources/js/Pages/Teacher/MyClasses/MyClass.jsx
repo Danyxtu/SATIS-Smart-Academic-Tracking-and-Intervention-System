@@ -568,6 +568,7 @@ const MyClass = (props) => {
         roster = [],
         gradeStructure,
         gradeSummaries = {},
+        latestStudentCredential = null,
         onRefreshClassData,
         isReadOnly = false,
         readOnlyModeLabel = "Read Only",
@@ -657,6 +658,52 @@ const MyClass = (props) => {
             }
             return { column, order: "asc" };
         });
+    };
+
+    const enrichStudentWithLatestCredential = (student) => {
+        if (!student || student.password) {
+            return student;
+        }
+
+        const latestCredential =
+            latestStudentCredential &&
+            typeof latestStudentCredential === "object"
+                ? latestStudentCredential
+                : null;
+
+        if (!latestCredential?.password) {
+            return student;
+        }
+
+        const studentUsername = String(student.username ?? "").trim();
+        const credentialUsername = String(
+            latestCredential.username ?? "",
+        ).trim();
+        const usernameMatches =
+            studentUsername !== "" &&
+            credentialUsername !== "" &&
+            studentUsername === credentialUsername;
+
+        const studentLrn = String(student.lrn ?? "").trim();
+        const credentialLrn = String(latestCredential.lrn ?? "").trim();
+        const lrnMatches =
+            studentLrn !== "" &&
+            credentialLrn !== "" &&
+            studentLrn === credentialLrn;
+
+        if (!usernameMatches && !lrnMatches) {
+            return student;
+        }
+
+        return {
+            ...student,
+            password: latestCredential.password,
+        };
+    };
+
+    const handleOpenStudentStatus = (student) => {
+        setSelectedStudentForStatus(enrichStudentWithLatestCredential(student));
+        setIsStudentStatusModalOpen(true);
     };
 
     // Computed Values
@@ -1840,6 +1887,7 @@ const MyClass = (props) => {
                                 setIsStudentStatusModalOpen
                             }
                             buildStudentKey={buildStudentKey}
+                            onViewStudent={handleOpenStudentStatus}
                         />
                         {sortedStudents.length === 0 && (
                             <EmptyStudentState

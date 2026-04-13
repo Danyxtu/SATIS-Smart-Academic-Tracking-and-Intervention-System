@@ -9,7 +9,7 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::middleware(['auth', 'verified', 'can:access-student-portal'])->group(function () {
+Route::middleware(['auth', 'student.email.verified', 'can:access-student-portal'])->group(function () {
 
     Route::get('/dashboard', [StudentDashboardController::class, 'index'])
         ->name('dashboard');

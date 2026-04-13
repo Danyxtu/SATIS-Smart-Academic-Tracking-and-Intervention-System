@@ -312,11 +312,12 @@ class SectionController extends Controller
                     'last_name' => $newStudent['last_name'],
                     'username' => User::generateUniqueUsername($newStudent['first_name'] . ' ' . $newStudent['last_name']),
                     'personal_email' => $newStudent['personal_email'],
+                    'temporary_password' => $tempPassword,
                     'password' => Hash::make($tempPassword),
                     'must_change_password' => true,
                     'department_id' => $departmentId,
                     'created_by' => $admin->id,
-                    'email_verified_at' => now(),
+                    'email_verified_at' => null,
                 ]);
 
                 $user->syncRolesByName(['student']);

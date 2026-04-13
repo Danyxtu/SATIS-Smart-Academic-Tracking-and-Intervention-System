@@ -21,13 +21,13 @@ return new class extends Migration
             $table->string('personal_email')->nullable()->unique();
             $table->timestamp('email_verified_at')->nullable();
             // Password management fields
+            $table->string('temporary_password')->nullable();
             $table->string('password');
-            $table->string('temp_password')->nullable()->after('password');
-            $table->boolean('must_change_password')->default(false)->after('temp_password');
-            $table->timestamp('password_changed_at')->nullable()->after('must_change_password');
+            $table->boolean('must_change_password')->default(false);
+            $table->timestamp('password_changed_at')->nullable();
 
-            $table->foreignId('department_id')->nullable()->after('password_changed_at')->constrained()->nullOnDelete();
-            $table->foreignId('created_by')->nullable()->after('department_id')->constrained('users')->nullOnDelete();
+            $table->foreignId('department_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->rememberToken();
             $table->timestamps();
         });

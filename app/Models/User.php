@@ -2,7 +2,8 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -14,9 +15,10 @@ use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
+implements MustVerifyEmailContract
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens;
+    use HasFactory, Notifiable, HasApiTokens, MustVerifyEmail;
 
     /**
      * The attributes that are mass assignable.
@@ -30,6 +32,7 @@ class User extends Authenticatable
         'username',
         'email',
         'personal_email',
+        'temporary_password',
         'password',
         'status',
         'department_id',
@@ -53,6 +56,7 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $hidden = [
+        'temporary_password',
         'password',
         'remember_token',
     ];
@@ -66,6 +70,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'temporary_password' => 'encrypted',
             'password' => 'hashed',
             'must_change_password' => 'boolean',
             'password_changed_at' => 'datetime',
@@ -252,6 +257,19 @@ class User extends Authenticatable
     public function isStaff(): bool
     {
         return !$this->isStudent();
+    }
+
+    /**
+     * Enforce email verification for students while allowing existing
+     * non-student portal behavior to remain unchanged.
+     */
+    public function hasVerifiedEmail(): bool
+    {
+        if (! $this->isStudent()) {
+            return true;
+        }
+
+        return ! is_null($this->email_verified_at);
     }
 
     /**

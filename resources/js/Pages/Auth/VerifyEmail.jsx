@@ -2,16 +2,32 @@ import PrimaryButton from "@/Components/PrimaryButton";
 import ApplicationLogo from "@/Components/ApplicationLogo";
 import GuestLayout from "@/Layouts/GuestLayout";
 import { Head, Link, useForm } from "@inertiajs/react";
+import { useEffect } from "react";
 import { Mail, CheckCircle, Send } from "lucide-react";
 
-export default function VerifyEmail({ status }) {
-    const { post, processing } = useForm({});
+export default function VerifyEmail({
+    status,
+    currentEmail = "",
+    requiresEmailInput = false,
+    expiresInMinutes = 30,
+}) {
+    const { data, setData, post, processing, errors } = useForm({
+        email: currentEmail || "",
+    });
+
+    useEffect(() => {
+        setData("email", currentEmail || "");
+    }, [currentEmail, setData]);
 
     const submit = (e) => {
         e.preventDefault();
 
-        post(route("verification.send"));
+        post(route("verification.send"), {
+            preserveScroll: true,
+        });
     };
+
+    const showEmailRequiredHint = status === "verification-email-required";
 
     return (
         <GuestLayout>
@@ -35,28 +51,61 @@ export default function VerifyEmail({ status }) {
 
             <div className="mb-6 text-sm text-gray-600 text-center bg-blue-50 p-4 rounded-xl border border-blue-100">
                 <Mail className="w-8 h-8 text-blue-500 mx-auto mb-3" />
-                Thanks for signing up! Before getting started, could you verify
-                your email address by clicking on the link we just emailed to
-                you? If you didn't receive the email, we will gladly send you
-                another.
+                {requiresEmailInput
+                    ? "Please enter your personal email first. We will send a verification link to activate your student dashboard access."
+                    : "Before getting started, verify your personal email by clicking the link we send. You can resend a new link anytime."}
+                <p className="mt-2 text-xs text-blue-700">
+                    Verification links expire in {expiresInMinutes} minutes.
+                </p>
             </div>
+
+            {showEmailRequiredHint && (
+                <div className="mb-4 text-sm font-medium text-amber-700 text-center bg-amber-50 p-3 rounded-xl border border-amber-200">
+                    A personal email is required before you can access the
+                    student dashboard.
+                </div>
+            )}
 
             {status === "verification-link-sent" && (
                 <div className="mb-4 text-sm font-medium text-green-600 text-center bg-green-50 p-3 rounded-xl border border-green-200 flex items-center justify-center gap-2">
                     <CheckCircle className="w-4 h-4" />A new verification link
-                    has been sent to the email address you provided during
-                    registration.
+                    has been sent to your personal email.
                 </div>
             )}
 
             <form onSubmit={submit}>
+                <div className="mb-4">
+                    <label
+                        htmlFor="email"
+                        className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1"
+                    >
+                        Personal Email
+                    </label>
+                    <input
+                        id="email"
+                        type="email"
+                        value={data.email}
+                        onChange={(e) => setData("email", e.target.value)}
+                        placeholder="student@example.com"
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:ring-primary/30"
+                        required={requiresEmailInput}
+                    />
+                    {errors.email && (
+                        <p className="mt-1 text-xs text-red-600">
+                            {errors.email}
+                        </p>
+                    )}
+                </div>
+
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                     <PrimaryButton
                         disabled={processing}
                         className="w-full sm:w-auto justify-center bg-gradient-to-r from-primary to-pink-400 hover:from-primary/90 hover:to-pink-500 rounded-xl shadow-lg shadow-primary/25 transition-all duration-200"
                     >
                         <Send className="w-4 h-4 mr-2" />
-                        Resend Verification Email
+                        {requiresEmailInput
+                            ? "Send Verification Email"
+                            : "Resend Verification Email"}
                     </PrimaryButton>
 
                     <Link

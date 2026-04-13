@@ -110,6 +110,7 @@ class StudentProfileController extends Controller
         $user = $request->user();
         $user->update([
             'password' => Hash::make($request->password),
+            'temporary_password' => null,
         ]);
 
         return response()->json([

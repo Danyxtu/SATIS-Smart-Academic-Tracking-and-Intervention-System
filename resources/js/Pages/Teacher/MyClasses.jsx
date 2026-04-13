@@ -1033,6 +1033,7 @@ const MyClasses = ({
                         roster={roster}
                         gradeStructure={gradeStructure}
                         gradeSummaries={gradeSummaries}
+                        latestStudentCredential={newStudentPassword}
                         onRefreshClassData={refreshClassData}
                         isReadOnly={isReadOnlyMode}
                         readOnlyModeLabel="Semester View Only"

@@ -13,6 +13,8 @@ use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureStaff;
 use App\Http\Middleware\EnsureStudent;
+use App\Http\Middleware\EnsureStudentApiAccountReady;
+use App\Http\Middleware\EnsureStudentEmailVerified;
 use App\Http\Middleware\EnsureTeacher;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
@@ -43,6 +45,8 @@ return Application::configure(basePath: dirname(__DIR__))
                 'admin'      => EnsureAdmin::class,
                 'superadmin' => EnsureSuperAdmin::class,
                 'student'    => EnsureStudent::class,
+                'student.account.ready' => EnsureStudentApiAccountReady::class,
+                'student.email.verified' => EnsureStudentEmailVerified::class,
                 'teacher'    => EnsureTeacher::class,
             ]
         );

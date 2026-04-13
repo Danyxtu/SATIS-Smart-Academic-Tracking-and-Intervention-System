@@ -32,6 +32,10 @@ Route::get('/', function () {
             return redirect()->route('admin.dashboard');
         }
         if ($user->hasRole('student')) {
+            if (! filled((string) $user->personal_email) || ! $user->hasVerifiedEmail()) {
+                return redirect()->route('verification.notice');
+            }
+
             return redirect()->route('dashboard');
         }
     }
@@ -103,6 +107,10 @@ Route::get('/redirect-after-login', function () {
         return redirect()->route('admin.dashboard');
     }
     if ($user->hasRole('student')) {
+        if (! filled((string) $user->personal_email) || ! $user->hasVerifiedEmail()) {
+            return redirect()->route('verification.notice');
+        }
+
         return redirect()->route('dashboard');
     }
     return redirect('/');

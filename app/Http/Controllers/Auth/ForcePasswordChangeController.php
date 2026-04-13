@@ -37,6 +37,7 @@ class ForcePasswordChangeController extends Controller
         // Update password and clear first-login requirement.
         $user->update([
             'password' => Hash::make($request->password),
+            'temporary_password' => null,
             'must_change_password' => false,
             'password_changed_at' => now(),
         ]);
@@ -56,6 +57,13 @@ class ForcePasswordChangeController extends Controller
             return redirect()->route('admin.dashboard')->with('success', 'Password changed successfully!');
         }
         if ($user->isStudent()) {
+            if (! filled((string) $user->personal_email) || ! $user->hasVerifiedEmail()) {
+                return redirect()->route('verification.notice')->with(
+                    'status',
+                    'verification-email-required'
+                );
+            }
+
             return redirect()->route('dashboard')->with('success', 'Password changed successfully! Welcome to SATIS.');
         }
 

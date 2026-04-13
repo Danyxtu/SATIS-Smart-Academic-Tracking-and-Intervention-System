@@ -514,15 +514,14 @@ export default function Index({
     };
 
     const handleCreateFromWizard = (payload) => {
-        createForm
-            .transform(() => payload)
-            .post(route("superadmin.subjects.store"), {
-                preserveScroll: true,
-                onSuccess: closeCreateModal,
-                onFinish: () => {
-                    createForm.transform((data) => data);
-                },
-            });
+        createForm.transform(() => payload);
+        createForm.post(route("superadmin.subjects.store"), {
+            preserveScroll: true,
+            onSuccess: closeCreateModal,
+            onFinish: () => {
+                createForm.transform((data) => data);
+            },
+        });
     };
 
     const handleUpdate = (e) => {

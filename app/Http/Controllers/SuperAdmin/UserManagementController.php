@@ -246,6 +246,7 @@ class UserManagementController extends Controller
                         'middle_name' => $studentPayload['middle_name'] ?? null,
                         'personal_email' => $studentPayload['email'] ?? null,
                         'username' => $studentPayload['username'],
+                        'temporary_password' => $validated['password'],
                         'password' => Hash::make($validated['password']),
                         'department_id' => null,
                         'must_change_password' => true,
@@ -351,6 +352,9 @@ class UserManagementController extends Controller
             'last_name'            => $validated['last_name'],
             'middle_name'          => $validated['middle_name'] ?? null,
             'personal_email'       => $validated['email'] ?? null,
+            'temporary_password'   => $validated['role'] === 'student'
+                ? $validated['password']
+                : null,
             'password'             => Hash::make($validated['password']),
             'department_id'        => $validated['role'] === 'teacher'
                 ? $validated['department_id']
@@ -479,6 +483,9 @@ class UserManagementController extends Controller
         if (!empty($validated['password'])) {
             $user->password = Hash::make($validated['password']);
             $user->must_change_password = true;
+            $user->temporary_password = $validated['role'] === 'student'
+                ? $validated['password']
+                : null;
         }
 
         $user->save();
@@ -591,6 +598,9 @@ class UserManagementController extends Controller
             'password' => Hash::make($tempPassword),
             'must_change_password' => true,
             'password_changed_at' => null,
+            'temporary_password' => $passwordResetRequest->user->hasRole('student')
+                ? $tempPassword
+                : null,
         ]);
 
         $passwordResetRequest->update([

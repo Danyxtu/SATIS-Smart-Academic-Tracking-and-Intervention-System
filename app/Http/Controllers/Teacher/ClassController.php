@@ -1269,6 +1269,7 @@ class ClassController extends Controller
             'middle_name' => $middleName,
             'username' => $username,
             'personal_email' => $preferredPersonalEmail,
+            'temporary_password' => $plainPassword,
             'password' => Hash::make($plainPassword),
             'must_change_password' => true,
         ]);
@@ -1860,6 +1861,9 @@ class ClassController extends Controller
                         'strand' => $studentProfile?->strand ?? $subjectTeacher->strand,
                         'track' => $studentProfile?->track ?? $subjectTeacher->track,
                         'must_change_password' => $user?->must_change_password ?? true,
+                        'temporary_password' => ($user?->must_change_password ?? false)
+                            ? $user?->temporary_password
+                            : null,
                         'grades' => $enrollment->grades->groupBy('quarter')->map(function ($quarterGrades) {
                             return $quarterGrades->mapWithKeys(fn($grade) => [
                                 $grade->assignment_key ?: Str::slug($grade->assignment_name, '_') => $grade->score,

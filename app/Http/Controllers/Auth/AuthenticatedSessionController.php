@@ -55,6 +55,15 @@ class AuthenticatedSessionController extends Controller
         if ($user->must_change_password) {
             return redirect()->route('password.force-change');
         }
+
+        // Students must complete email setup and verification before dashboard access.
+        if (
+            $user->isStudent() &&
+            (! filled((string) $user->personal_email) || ! $user->hasVerifiedEmail())
+        ) {
+            return redirect()->route('verification.notice');
+        }
+
         // Always prioritize teacher dashboard if user has teacher role
         if ($user->isTeacher()) {
             return redirect()->route('teacher.dashboard');

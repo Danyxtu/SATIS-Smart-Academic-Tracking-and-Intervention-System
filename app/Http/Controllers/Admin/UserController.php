@@ -290,13 +290,15 @@ class UserController extends Controller
             'personal_email' => $validated['email'] ?? null,
             'password' => Hash::make($password),
             'created_by' => $admin->id,
-            'email_verified_at' => now(), // Users created by admin are considered verified
+            'email_verified_at' => now(),
         ];
 
         if ($validated['role'] === 'student') {
             $seed = trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? ''));
             $userData['username'] = User::generateUniqueUsername($seed);
+            $userData['temporary_password'] = $tempPassword;
             $userData['must_change_password'] = true;
+            $userData['email_verified_at'] = null;
         }
 
         // Assign department for teachers
@@ -609,6 +611,9 @@ class UserController extends Controller
             'password' => Hash::make($tempPassword),
             'must_change_password' => true,
             'password_changed_at' => null,
+            'temporary_password' => $passwordResetRequest->user->hasRole('student')
+                ? $tempPassword
+                : null,
         ]);
 
         // Update request status
