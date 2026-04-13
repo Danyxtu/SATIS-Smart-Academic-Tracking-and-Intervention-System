@@ -41,13 +41,15 @@ class AuthController extends Controller
         // Issue Sanctum token
         $token = $user->createToken('mobile-app')->plainTextToken;
 
-        $verificationState = $this->buildStudentVerificationState($user);
-
+        // Email verification is disabled; always treat as verified
         return response()->json([
             'token' => $token,
             'user' => $user,
             'must_change_password' => $user->must_change_password ?? false,
-            ...$verificationState,
+            'has_personal_email' => filled((string) $user->personal_email),
+            'email_verified' => true,
+            'requires_personal_email' => false,
+            'requires_email_verification' => false,
         ]);
     }
 
@@ -74,12 +76,14 @@ class AuthController extends Controller
         ]);
 
         $freshUser = $user->fresh();
-        $verificationState = $this->buildStudentVerificationState($freshUser);
-
+        // Email verification is disabled; always treat as verified
         return response()->json([
             'message' => 'Password changed successfully.',
             'user' => $freshUser,
-            ...$verificationState,
+            'has_personal_email' => filled((string) $freshUser->personal_email),
+            'email_verified' => true,
+            'requires_personal_email' => false,
+            'requires_email_verification' => false,
         ]);
     }
 
@@ -96,11 +100,13 @@ class AuthController extends Controller
             ], 403);
         }
 
-        $verificationState = $this->buildStudentVerificationState($user);
-
+        // Email verification is disabled; always treat as verified
         return response()->json([
             'user' => $user,
-            ...$verificationState,
+            'has_personal_email' => filled((string) $user->personal_email),
+            'email_verified' => true,
+            'requires_personal_email' => false,
+            'requires_email_verification' => false,
             'verification_expire_minutes' => (int) config('auth.verification.expire', 30),
         ]);
     }
@@ -136,33 +142,20 @@ class AuthController extends Controller
         if (filled($submittedEmail) && $submittedEmail !== $user->personal_email) {
             $user->forceFill([
                 'personal_email' => $submittedEmail,
-                'email_verified_at' => null,
+                'email_verified_at' => now(),
             ])->save();
 
             $user->refresh();
         }
 
-        if (! filled((string) $user->personal_email)) {
-            return response()->json([
-                'message' => 'Please enter a personal email before requesting verification.',
-                'errors' => [
-                    'email' => ['Personal email is required.'],
-                ],
-            ], 422);
-        }
-
-        if (! $user->hasVerifiedEmail()) {
-            $user->sendEmailVerificationNotification();
-        }
-
-        $verificationState = $this->buildStudentVerificationState($user->fresh());
-
+        // Email verification is disabled; always treat as verified
         return response()->json([
-            'message' => $verificationState['requires_email_verification']
-                ? 'Verification email sent. Please verify within 30 minutes.'
-                : 'Email is already verified.',
+            'message' => 'Email verification is not required. You may proceed.',
             'user' => $user->fresh(),
-            ...$verificationState,
+            'has_personal_email' => filled((string) $user->personal_email),
+            'email_verified' => true,
+            'requires_personal_email' => false,
+            'requires_email_verification' => false,
             'verification_expire_minutes' => (int) config('auth.verification.expire', 30),
         ]);
     }
@@ -187,17 +180,5 @@ class AuthController extends Controller
      *
      * @return array<string, bool>
      */
-    private function buildStudentVerificationState(User $user): array
-    {
-        $isStudent = $user->hasRole('student');
-        $hasPersonalEmail = filled((string) $user->personal_email);
-        $isEmailVerified = $hasPersonalEmail && $user->hasVerifiedEmail();
-
-        return [
-            'has_personal_email' => $hasPersonalEmail,
-            'email_verified' => $isEmailVerified,
-            'requires_personal_email' => $isStudent && ! $hasPersonalEmail,
-            'requires_email_verification' => $isStudent && ! $isEmailVerified,
-        ];
-    }
+    // Email verification is disabled; this method is no longer used.
 }

@@ -103,6 +103,7 @@ class TestUserSeeder extends Seeder
                     'username' => $testUser['username'],
                     'department_id' => $departmentId,
                     'password' => Hash::make('password'),
+                    'email_verified_at' => now(),
                 ]
             );
 
@@ -127,6 +128,7 @@ class TestUserSeeder extends Seeder
                     'username' => $teacherUser['username'],
                     'department_id' => $departmentId,
                     'password' => Hash::make('password'),
+                    'email_verified_at' => now(),
                 ]
             );
 
@@ -151,6 +153,7 @@ class TestUserSeeder extends Seeder
                 'username' => 'superadmin.test',
                 'department_id' => $superAdminDepartmentId,
                 'password' => Hash::make('password'),
+                'email_verified_at' => now(),
             ]
         );
 
