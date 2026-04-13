@@ -23,11 +23,11 @@ class DatabaseSeeder extends Seeder
             SchoolYearArchiveSeeder::class,
 
             // Optional subject/department/teacher/student data seeders. Comment in/out as needed.
-            // DepartmentSeeder::class,
-            // SubjectTypeSeeder::class,
-            // SubjectSeeder::class,
-            // TeacherSuperAdminSeeder::class,
-            // TestUserSeeder::class,
+            DepartmentSeeder::class,
+            SubjectTypeSeeder::class,
+            SubjectSeeder::class,
+            TeacherSuperAdminSeeder::class,
+            TestUserSeeder::class,
         ]);
     }
 }

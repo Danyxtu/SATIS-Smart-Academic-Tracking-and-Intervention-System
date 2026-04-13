@@ -15,7 +15,7 @@ class SuperAdminSeeder extends Seeder
     public function run(): void
     {
         $superAdmin = User::updateOrCreate(
-            ['personal_email' => 'superadmin@satis.edu'],
+            ['personal_email' => 'superadmin@gmail.com'],
             [
                 'first_name' => 'Super',
                 'last_name' => 'Admin',
