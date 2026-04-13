@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
-import { Head, Link, router, useForm } from "@inertiajs/react";
+import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
 import { Fragment } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import {
@@ -15,7 +15,12 @@ import {
     ChevronLeft,
     ChevronRight,
     Shield,
+    KeyRound,
+    QrCode,
+    Search,
+    RotateCcw,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 
 // Status Badge Component
 const StatusBadge = ({ status }) => {
@@ -69,8 +74,14 @@ const FilterTab = ({ label, count, isActive, onClick }) => (
 );
 
 // Approve Modal - Server generates 8-char password
-const ApproveModal = ({ isOpen, onClose, request, routePrefix }) => {
-    const { data, setData, post, processing, errors, reset } = useForm({
+const ApproveModal = ({
+    isOpen,
+    onClose,
+    request,
+    routePrefix,
+    onApprovedCredentials,
+}) => {
+    const { data, setData, post, processing, reset } = useForm({
         admin_notes: "",
     });
 
@@ -82,7 +93,14 @@ const ApproveModal = ({ isOpen, onClose, request, routePrefix }) => {
                 request?.id,
             ),
             {
-                onSuccess: () => {
+                onSuccess: (page) => {
+                    const credentials =
+                        page?.props?.flash?.password_reset_credentials ?? null;
+
+                    if (credentials) {
+                        onApprovedCredentials?.(credentials);
+                    }
+
                     reset();
                     onClose();
                 },
@@ -151,16 +169,17 @@ const ApproveModal = ({ isOpen, onClose, request, routePrefix }) => {
                                             />
                                             <div className="text-sm text-amber-700 dark:text-amber-400">
                                                 <p className="font-medium">
-                                                    Secure Email Reset
+                                                    Temporary Credentials
                                                 </p>
                                                 <p className="mt-1 text-xs">
                                                     A temporary 8-character
-                                                    password will be generated
-                                                    and sent to the user's email
-                                                    address. They will be
-                                                    required to create a new
-                                                    password on their next
-                                                    login.
+                                                    password will be generated.
+                                                    After approval, show the
+                                                    returned credentials QR and
+                                                    temporary password to the
+                                                    user. They will be required
+                                                    to create a new password on
+                                                    next login.
                                                 </p>
                                             </div>
                                         </div>
@@ -199,7 +218,7 @@ const ApproveModal = ({ isOpen, onClose, request, routePrefix }) => {
                                         >
                                             {processing
                                                 ? "Approving..."
-                                                : "Approve & Send Email"}
+                                                : "Approve Request"}
                                         </button>
                                     </div>
                                 </form>
@@ -327,14 +346,300 @@ const RejectModal = ({ isOpen, onClose, request, routePrefix }) => {
     );
 };
 
+const ResetCredentialsModal = ({ isOpen, onClose, credentials }) => {
+    const qrPayload = useMemo(() => {
+        const loginValue = String(credentials?.username || "").trim();
+        const passwordValue = String(credentials?.password || "").trim();
+
+        if (!loginValue || !passwordValue) {
+            return "";
+        }
+
+        return JSON.stringify({
+            type: "satis_student_credentials",
+            version: 1,
+            username: loginValue,
+            password: passwordValue,
+        });
+    }, [credentials]);
+
+    return (
+        <Transition.Root show={isOpen} as={Fragment}>
+            <Dialog as="div" className="relative z-50" onClose={onClose}>
+                <Transition.Child
+                    as={Fragment}
+                    enter="ease-out duration-300"
+                    enterFrom="opacity-0"
+                    enterTo="opacity-100"
+                    leave="ease-in duration-200"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                >
+                    <div className="fixed inset-0 bg-black/50 transition-opacity" />
+                </Transition.Child>
+
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex min-h-full items-end justify-center p-4 pb-10 sm:items-center">
+                        <Transition.Child
+                            as={Fragment}
+                            enter="ease-out duration-300"
+                            enterFrom="opacity-0 scale-95"
+                            enterTo="opacity-100 scale-100"
+                            leave="ease-in duration-200"
+                            leaveFrom="opacity-100 scale-100"
+                            leaveTo="opacity-0 scale-95"
+                        >
+                            <Dialog.Panel className="w-full max-w-lg transform max-h-[calc(100vh-6rem)] overflow-y-auto rounded-2xl bg-white dark:bg-gray-800 shadow-xl transition-all">
+                                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                    <div className="flex items-center justify-between">
+                                        <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                            <QrCode
+                                                size={20}
+                                                className="text-emerald-600"
+                                            />
+                                            New Temporary Credentials
+                                        </Dialog.Title>
+                                        <button
+                                            onClick={onClose}
+                                            className="z-10 text-gray-400 hover:text-gray-500"
+                                        >
+                                            <X size={20} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="p-6 space-y-4">
+                                    <div className="grid gap-3 md:grid-cols-[220px_1fr]">
+                                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white p-3 flex items-center justify-center">
+                                            {qrPayload ? (
+                                                <QRCodeSVG
+                                                    value={qrPayload}
+                                                    size={180}
+                                                    includeMargin
+                                                />
+                                            ) : (
+                                                <p className="text-xs text-gray-500">
+                                                    QR unavailable
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+                                                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                    Full Name
+                                                </p>
+                                                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                                    {credentials?.full_name ||
+                                                        "-"}
+                                                </p>
+                                            </div>
+
+                                            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+                                                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                    LRN
+                                                </p>
+                                                <p className="text-sm text-gray-700 dark:text-gray-300">
+                                                    {credentials?.lrn || "-"}
+                                                </p>
+                                            </div>
+
+                                            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+                                                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                    Username
+                                                </p>
+                                                <p className="font-mono text-sm text-gray-800 dark:text-gray-200 break-all">
+                                                    {credentials?.username ||
+                                                        "-"}
+                                                </p>
+                                            </div>
+
+                                            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                                                <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                                                    Temporary Password
+                                                </p>
+                                                <p className="font-mono text-sm text-amber-800 break-all">
+                                                    {credentials?.password ||
+                                                        "-"}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={onClose}
+                                            className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+                            </Dialog.Panel>
+                        </Transition.Child>
+                    </div>
+                </div>
+            </Dialog>
+        </Transition.Root>
+    );
+};
+
+const ResetStudentPasswordConfirmModal = ({
+    isOpen,
+    onClose,
+    student,
+    routePrefix,
+    onResetSuccess,
+}) => {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        lrn: "",
+    });
+
+    useEffect(() => {
+        setData("lrn", student?.lrn || "");
+    }, [student, setData]);
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+
+        post(
+            route(
+                `${routePrefix}.password-reset-requests.reset-student-by-lrn`,
+            ),
+            {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    const credentials =
+                        page?.props?.flash?.password_reset_credentials ?? null;
+
+                    if (credentials) {
+                        onResetSuccess?.(credentials);
+                    }
+
+                    reset();
+                    onClose();
+                },
+            },
+        );
+    };
+
+    return (
+        <Transition.Root show={isOpen} as={Fragment}>
+            <Dialog as="div" className="relative z-50" onClose={onClose}>
+                <Transition.Child
+                    as={Fragment}
+                    enter="ease-out duration-300"
+                    enterFrom="opacity-0"
+                    enterTo="opacity-100"
+                    leave="ease-in duration-200"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                >
+                    <div className="fixed inset-0 bg-black/50 transition-opacity" />
+                </Transition.Child>
+
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex min-h-full items-end justify-center p-4 pb-10 sm:items-center">
+                        <Transition.Child
+                            as={Fragment}
+                            enter="ease-out duration-300"
+                            enterFrom="opacity-0 scale-95"
+                            enterTo="opacity-100 scale-100"
+                            leave="ease-in duration-200"
+                            leaveFrom="opacity-100 scale-100"
+                            leaveTo="opacity-0 scale-95"
+                        >
+                            <Dialog.Panel className="w-full max-w-md transform max-h-[calc(100vh-6rem)] overflow-y-auto rounded-2xl bg-white dark:bg-gray-800 shadow-xl transition-all">
+                                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                    <div className="flex items-center justify-between">
+                                        <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                            <KeyRound
+                                                size={20}
+                                                className="text-emerald-600"
+                                            />
+                                            Confirm Student Password Reset
+                                        </Dialog.Title>
+                                        <button
+                                            onClick={onClose}
+                                            className="z-10 text-gray-400 hover:text-gray-500"
+                                        >
+                                            <X size={20} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <form
+                                    onSubmit={handleSubmit}
+                                    className="p-6 space-y-4"
+                                >
+                                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                                        You are about to reset the password for
+                                        this student account.
+                                    </div>
+
+                                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                            {student?.full_name ||
+                                                student?.student_name ||
+                                                "Student"}
+                                        </p>
+                                        <p className="text-xs text-gray-600 dark:text-gray-300">
+                                            LRN: {student?.lrn || "-"}
+                                        </p>
+                                        <p className="text-xs font-mono text-gray-600 dark:text-gray-300">
+                                            Username: {student?.username || "-"}
+                                        </p>
+                                    </div>
+
+                                    {(errors.lrn || errors.student_lrn) && (
+                                        <p className="text-sm text-red-600">
+                                            {errors.lrn || errors.student_lrn}
+                                        </p>
+                                    )}
+
+                                    <div className="flex justify-end gap-3 pt-2">
+                                        <button
+                                            type="button"
+                                            onClick={onClose}
+                                            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={processing || !data.lrn}
+                                            className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50"
+                                        >
+                                            {processing
+                                                ? "Resetting..."
+                                                : "Confirm Reset"}
+                                        </button>
+                                    </div>
+                                </form>
+                            </Dialog.Panel>
+                        </Transition.Child>
+                    </div>
+                </div>
+            </Dialog>
+        </Transition.Root>
+    );
+};
+
 // Main Component
 export function PasswordResetRequestsPage({
     requests,
     counts,
     currentStatus,
+    studentsInCurrentTerm = null,
+    studentSearch = null,
+    currentSchoolYear = null,
+    currentSemester = null,
     routePrefix = "admin",
     subtitle = "Review and process password reset requests from users",
 }) {
+    const page = usePage();
+    const flash = page?.props?.flash ?? {};
     const [approveModal, setApproveModal] = useState({
         isOpen: false,
         request: null,
@@ -343,12 +648,78 @@ export function PasswordResetRequestsPage({
         isOpen: false,
         request: null,
     });
+    const [credentialModal, setCredentialModal] = useState({
+        isOpen: false,
+        credentials: null,
+    });
+    const [manualResetModal, setManualResetModal] = useState({
+        isOpen: false,
+        student: null,
+    });
+
+    const isSuperAdminMode = routePrefix === "superadmin";
+    const consumedFlashCredentialSignatureRef = useRef(null);
+    const [studentLrnQuery, setStudentLrnQuery] = useState(
+        String(studentSearch?.lrn || ""),
+    );
+
+    useEffect(() => {
+        setStudentLrnQuery(String(studentSearch?.lrn || ""));
+    }, [studentSearch?.lrn]);
+
+    useEffect(() => {
+        const credentials = flash?.password_reset_credentials;
+
+        if (!credentials) {
+            return;
+        }
+
+        const signature = JSON.stringify(credentials);
+        if (consumedFlashCredentialSignatureRef.current === signature) {
+            return;
+        }
+
+        consumedFlashCredentialSignatureRef.current = signature;
+        setCredentialModal({
+            isOpen: true,
+            credentials,
+        });
+    }, [flash?.password_reset_credentials]);
 
     const handleStatusFilter = (status) => {
+        const nextQuery = { status };
+
+        if (isSuperAdminMode && studentLrnQuery.trim()) {
+            nextQuery.student_lrn = studentLrnQuery.trim();
+        }
+
+        router.get(route(`${routePrefix}.password-reset-requests`), nextQuery, {
+            preserveState: true,
+        });
+    };
+
+    const handleStudentSearchSubmit = (event) => {
+        event.preventDefault();
+
         router.get(
             route(`${routePrefix}.password-reset-requests`),
-            { status },
-            { preserveState: true },
+            {
+                status: currentStatus,
+                student_lrn: studentLrnQuery.trim() || undefined,
+            },
+            { preserveState: true, preserveScroll: true },
+        );
+    };
+
+    const clearStudentSearch = () => {
+        setStudentLrnQuery("");
+
+        router.get(
+            route(`${routePrefix}.password-reset-requests`),
+            {
+                status: currentStatus,
+            },
+            { preserveState: true, preserveScroll: true },
         );
     };
 
@@ -406,6 +777,142 @@ export function PasswordResetRequestsPage({
                     />
                 </div>
             </div>
+
+            {isSuperAdminMode && (
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 mb-6 space-y-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                                Reset Student by LRN
+                            </h2>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                Current term: {currentSchoolYear || "-"} •
+                                Semester {currentSemester || "-"}
+                            </p>
+                        </div>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                            <Search size={12} /> LRN Search
+                        </span>
+                    </div>
+
+                    <form
+                        onSubmit={handleStudentSearchSubmit}
+                        className="flex flex-col sm:flex-row gap-2"
+                    >
+                        <input
+                            type="text"
+                            value={studentLrnQuery}
+                            onChange={(event) =>
+                                setStudentLrnQuery(event.target.value)
+                            }
+                            className="w-full sm:flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                            placeholder="Search student LRN"
+                        />
+                        <div className="flex gap-2">
+                            <button
+                                type="submit"
+                                className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                            >
+                                Search
+                            </button>
+                            <button
+                                type="button"
+                                onClick={clearStudentSearch}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                            >
+                                <span className="inline-flex items-center gap-1">
+                                    <RotateCcw size={12} /> Clear
+                                </span>
+                            </button>
+                        </div>
+                    </form>
+
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        {(studentsInCurrentTerm?.data || []).length > 0 ? (
+                            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                                {studentsInCurrentTerm.data.map((student) => (
+                                    <div
+                                        key={student.id}
+                                        className="px-3 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                                                {student.full_name ||
+                                                    student.student_name}
+                                            </p>
+                                            <p className="text-xs text-gray-600 dark:text-gray-300">
+                                                LRN: {student.lrn || "-"}
+                                            </p>
+                                            <p className="text-xs font-mono text-gray-500 dark:text-gray-400 truncate">
+                                                Username:{" "}
+                                                {student.username || "-"}
+                                            </p>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setManualResetModal({
+                                                    isOpen: true,
+                                                    student,
+                                                })
+                                            }
+                                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                                        >
+                                            <KeyRound size={13} /> Reset
+                                            Password
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                                No students found for the current term and LRN
+                                filter.
+                            </div>
+                        )}
+                    </div>
+
+                    {studentsInCurrentTerm?.last_page > 1 && (
+                        <div className="flex items-center justify-between pt-1">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                Showing {studentsInCurrentTerm.from} to{" "}
+                                {studentsInCurrentTerm.to} of{" "}
+                                {studentsInCurrentTerm.total} students
+                            </p>
+                            <div className="flex items-center gap-1">
+                                {studentsInCurrentTerm.links.map(
+                                    (link, index) => (
+                                        <Link
+                                            key={`${link.label}-${index}`}
+                                            href={link.url || "#"}
+                                            className={`px-2 py-1 rounded text-xs ${
+                                                link.active
+                                                    ? "bg-emerald-600 text-white"
+                                                    : link.url
+                                                      ? "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                      : "text-gray-300 cursor-not-allowed"
+                                            }`}
+                                            preserveState
+                                            preserveScroll
+                                        >
+                                            {link.label
+                                                .replace(
+                                                    "&laquo; Previous",
+                                                    "Prev",
+                                                )
+                                                .replace(
+                                                    "Next &raquo;",
+                                                    "Next",
+                                                )}
+                                        </Link>
+                                    ),
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Requests List */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
@@ -579,12 +1086,41 @@ export function PasswordResetRequestsPage({
                 }
                 request={approveModal.request}
                 routePrefix={routePrefix}
+                onApprovedCredentials={(credentials) =>
+                    setCredentialModal({
+                        isOpen: true,
+                        credentials,
+                    })
+                }
             />
             <RejectModal
                 isOpen={rejectModal.isOpen}
                 onClose={() => setRejectModal({ isOpen: false, request: null })}
                 request={rejectModal.request}
                 routePrefix={routePrefix}
+            />
+
+            <ResetStudentPasswordConfirmModal
+                isOpen={manualResetModal.isOpen}
+                onClose={() =>
+                    setManualResetModal({ isOpen: false, student: null })
+                }
+                student={manualResetModal.student}
+                routePrefix={routePrefix}
+                onResetSuccess={(credentials) =>
+                    setCredentialModal({
+                        isOpen: true,
+                        credentials,
+                    })
+                }
+            />
+
+            <ResetCredentialsModal
+                isOpen={credentialModal.isOpen}
+                onClose={() =>
+                    setCredentialModal({ isOpen: false, credentials: null })
+                }
+                credentials={credentialModal.credentials}
             />
         </>
     );

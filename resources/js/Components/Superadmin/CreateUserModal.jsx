@@ -8,6 +8,7 @@ import {
     Info,
     Lock,
     Mail,
+    QrCode,
     RefreshCw,
     Save,
     Shield,
@@ -16,10 +17,12 @@ import {
     Users,
     X,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 
 const STEP_PROFILE = 1;
 const STEP_SECURITY = 2;
 const STEP_REVIEW = 3;
+const STEP_SUMMARY = 4;
 
 const TEACHER_MODE_SINGLE = "single";
 const TEACHER_MODE_MULTIPLE = "multiple";
@@ -47,6 +50,11 @@ const STEPS = [
         id: STEP_REVIEW,
         label: "Review",
         icon: CheckCircle,
+    },
+    {
+        id: STEP_SUMMARY,
+        label: "Summary",
+        icon: QrCode,
     },
 ];
 
@@ -166,7 +174,9 @@ const normalizeUsernameSeed = (value = "") =>
 
 const getInitialsPrefix = (firstName = "", lastName = "") => {
     const first = normalizeUsernameSeed(firstName).split(" ")[0] || "";
-    const lastTokens = normalizeUsernameSeed(lastName).split(" ").filter(Boolean);
+    const lastTokens = normalizeUsernameSeed(lastName)
+        .split(" ")
+        .filter(Boolean);
     const last = lastTokens[lastTokens.length - 1] || "";
 
     const firstInitial = first.slice(0, 1) || "x";
@@ -175,15 +185,15 @@ const getInitialsPrefix = (firstName = "", lastName = "") => {
     return `${firstInitial}${lastInitial}`;
 };
 
-const buildStudentUsername = ({
-    firstName,
-    lastName,
-    year,
-    sequence,
-}) => {
+const buildStudentUsername = ({ firstName, lastName, year, sequence }) => {
     const prefix = getInitialsPrefix(firstName, lastName);
-    const yearPart = String(year || new Date().getFullYear()).padStart(4, "0").slice(-4);
-    const sequencePart = String(Math.max(1, Number(sequence) || 1)).padStart(5, "0");
+    const yearPart = String(year || new Date().getFullYear())
+        .padStart(4, "0")
+        .slice(-4);
+    const sequencePart = String(Math.max(1, Number(sequence) || 1)).padStart(
+        5,
+        "0",
+    );
 
     return `${prefix}${yearPart}${sequencePart}`;
 };
@@ -241,6 +251,10 @@ const normalizeCsvHeader = (value = "") => {
         return "middle_name";
     }
 
+    if (["lrn", "learnerreferencenumber"].includes(normalized)) {
+        return "lrn";
+    }
+
     if (["email", "personalemail", "mail"].includes(normalized)) {
         return "email";
     }
@@ -265,13 +279,12 @@ const parseStudentCsv = (text = "") => {
     const firstNameIndex = headers.indexOf("first_name");
     const lastNameIndex = headers.indexOf("last_name");
     const middleNameIndex = headers.indexOf("middle_name");
-    const emailIndex = headers.indexOf("email");
+    const lrnIndex = headers.indexOf("lrn");
 
-    if (firstNameIndex === -1 || lastNameIndex === -1) {
+    if (firstNameIndex === -1 || lastNameIndex === -1 || lrnIndex === -1) {
         return {
             rows: [],
-            error:
-                "CSV headers must include first_name and last_name. Optional: middle_name, email.",
+            error: "CSV headers must include first_name, last_name, and lrn. Optional: middle_name.",
         };
     }
 
@@ -287,24 +300,16 @@ const parseStudentCsv = (text = "") => {
             middleNameIndex >= 0
                 ? String(row[middleNameIndex] || "").trim()
                 : "";
-        const email =
-            emailIndex >= 0 ? String(row[emailIndex] || "").trim().toLowerCase() : "";
+        const lrn = String(row[lrnIndex] || "").trim();
 
-        if (!firstName && !lastName && !middleName && !email) {
+        if (!firstName && !lastName && !middleName && !lrn) {
             continue;
         }
 
-        if (!firstName || !lastName) {
+        if (!firstName || !lastName || !lrn) {
             return {
                 rows: [],
-                error: `Row ${rowIndex + 1}: first_name and last_name are required.`,
-            };
-        }
-
-        if (email && !EMAIL_FORMAT.test(email)) {
-            return {
-                rows: [],
-                error: `Row ${rowIndex + 1}: email format is invalid.`,
+                error: `Row ${rowIndex + 1}: first_name, last_name, and lrn are required.`,
             };
         }
 
@@ -313,7 +318,7 @@ const parseStudentCsv = (text = "") => {
             first_name: firstName,
             last_name: lastName,
             middle_name: middleName,
-            email,
+            lrn,
             username: "",
         });
     }
@@ -348,7 +353,7 @@ function emptyStudentDraft() {
         first_name: "",
         last_name: "",
         middle_name: "",
-        email: "",
+        lrn: "",
     };
 }
 
@@ -378,6 +383,11 @@ export default function CreateUserModal({
     const [studentDraft, setStudentDraft] = useState(emptyStudentDraft());
     const [studentQueue, setStudentQueue] = useState([]);
     const [studentCsvFileName, setStudentCsvFileName] = useState("");
+    const [createdStudentCredentials, setCreatedStudentCredentials] = useState(
+        [],
+    );
+    const [selectedCreatedStudentId, setSelectedCreatedStudentId] =
+        useState("");
 
     const [clientErrors, setClientErrors] = useState({});
 
@@ -394,6 +404,7 @@ export default function CreateUserModal({
         first_name: "",
         last_name: "",
         middle_name: "",
+        lrn: "",
         email: "",
         username: "",
         password: "",
@@ -442,7 +453,8 @@ export default function CreateUserModal({
         () =>
             normalizedDepartments.find(
                 (department) =>
-                    String(department.id) === String(teacherDraft.department_id),
+                    String(department.id) ===
+                    String(teacherDraft.department_id),
             ) || null,
         [normalizedDepartments, teacherDraft.department_id],
     );
@@ -570,6 +582,8 @@ export default function CreateUserModal({
         setStudentDraft(emptyStudentDraft());
         setStudentQueue([]);
         setStudentCsvFileName("");
+        setCreatedStudentCredentials([]);
+        setSelectedCreatedStudentId("");
 
         setClientErrors({});
 
@@ -577,6 +591,7 @@ export default function CreateUserModal({
         setData("teacher_queue", []);
         setData("student_mode", STUDENT_MODE_SINGLE);
         setData("student_queue", []);
+        setData("lrn", "");
         setData("username", "");
         setData("password", generateRandomPassword());
     }, [open, reset, clearErrors, setData]);
@@ -610,11 +625,116 @@ export default function CreateUserModal({
                 first_name: queueItem.first_name,
                 last_name: queueItem.last_name,
                 middle_name: queueItem.middle_name || "",
-                email: queueItem.email || null,
+                lrn: queueItem.lrn || "",
                 username: queueItem.username,
             })),
         );
     }, [studentQueue, setData]);
+
+    const pendingStudentProfiles = useMemo(() => {
+        if (!isStudent) {
+            return [];
+        }
+
+        const generatedPassword = String(data.password || "");
+
+        if (studentMode === STUDENT_MODE_SINGLE) {
+            const username = String(data.username || "").trim();
+
+            if (!username) {
+                return [];
+            }
+
+            return [
+                {
+                    id: "single-student-review",
+                    first_name: String(data.first_name || "").trim(),
+                    middle_name: String(data.middle_name || "").trim(),
+                    last_name: String(data.last_name || "").trim(),
+                    full_name:
+                        [data.first_name, data.middle_name, data.last_name]
+                            .filter(Boolean)
+                            .join(" ") || "Student",
+                    lrn: String(data.lrn || "").trim(),
+                    username,
+                    password: generatedPassword,
+                },
+            ];
+        }
+
+        return studentQueue.map((queueItem) => ({
+            id: queueItem.id,
+            first_name: String(queueItem.first_name || "").trim(),
+            middle_name: String(queueItem.middle_name || "").trim(),
+            last_name: String(queueItem.last_name || "").trim(),
+            full_name:
+                [
+                    queueItem.first_name,
+                    queueItem.middle_name,
+                    queueItem.last_name,
+                ]
+                    .filter(Boolean)
+                    .join(" ") || "Student",
+            lrn: String(queueItem.lrn || "").trim(),
+            username: queueItem.username,
+            password: generatedPassword,
+        }));
+    }, [
+        isStudent,
+        data.password,
+        data.username,
+        data.first_name,
+        data.middle_name,
+        data.last_name,
+        data.lrn,
+        studentMode,
+        studentQueue,
+    ]);
+
+    useEffect(() => {
+        if (createdStudentCredentials.length === 0) {
+            setSelectedCreatedStudentId("");
+            return;
+        }
+
+        const selectedStillExists = createdStudentCredentials.some(
+            (credential) =>
+                String(credential.id) === String(selectedCreatedStudentId),
+        );
+
+        if (!selectedStillExists) {
+            setSelectedCreatedStudentId(
+                String(createdStudentCredentials[0].id),
+            );
+        }
+    }, [createdStudentCredentials, selectedCreatedStudentId]);
+
+    const selectedCreatedStudentCredential = useMemo(
+        () =>
+            createdStudentCredentials.find(
+                (credential) =>
+                    String(credential.id) === String(selectedCreatedStudentId),
+            ) ??
+            createdStudentCredentials[0] ??
+            null,
+        [createdStudentCredentials, selectedCreatedStudentId],
+    );
+
+    const selectedCreatedStudentQrPayload = useMemo(() => {
+        if (
+            !selectedCreatedStudentCredential?.username ||
+            !selectedCreatedStudentCredential?.password
+        ) {
+            return "";
+        }
+
+        return JSON.stringify({
+            type: "satis_student_credentials",
+            version: 1,
+            username: selectedCreatedStudentCredential.username,
+            password: selectedCreatedStudentCredential.password,
+        });
+    }, [selectedCreatedStudentCredential]);
 
     useEffect(() => {
         if (isStudent && studentMode === STUDENT_MODE_SINGLE) {
@@ -645,6 +765,7 @@ export default function CreateUserModal({
                     field === "first_name" ||
                     field === "last_name" ||
                     field === "middle_name" ||
+                    field === "lrn" ||
                     field === "email" ||
                     field === "username" ||
                     field === "department_id" ||
@@ -679,6 +800,8 @@ export default function CreateUserModal({
         setStudentDraft(emptyStudentDraft());
         setStudentQueue([]);
         setStudentCsvFileName("");
+        setCreatedStudentCredentials([]);
+        setSelectedCreatedStudentId("");
 
         setClientErrors({});
         onClose?.();
@@ -700,6 +823,10 @@ export default function CreateUserModal({
             setStudentDraft(emptyStudentDraft());
             setStudentQueue([]);
             setStudentCsvFileName("");
+            setCreatedStudentCredentials([]);
+            setSelectedCreatedStudentId("");
+            setData("email", "");
+            setData("lrn", "");
             return;
         }
 
@@ -707,7 +834,10 @@ export default function CreateUserModal({
         setStudentDraft(emptyStudentDraft());
         setStudentQueue([]);
         setStudentCsvFileName("");
+        setCreatedStudentCredentials([]);
+        setSelectedCreatedStudentId("");
         setData("student_queue", []);
+        setData("lrn", "");
         setData("username", "");
 
         setTeacherMode(TEACHER_MODE_SINGLE);
@@ -734,6 +864,8 @@ export default function CreateUserModal({
         setStudentDraft(emptyStudentDraft());
         setStudentQueue([]);
         setStudentCsvFileName("");
+        setCreatedStudentCredentials([]);
+        setSelectedCreatedStudentId("");
         setData("student_queue", []);
         setClientErrors({});
     };
@@ -772,7 +904,9 @@ export default function CreateUserModal({
         const firstName = String(teacherDraft.first_name || "").trim();
         const lastName = String(teacherDraft.last_name || "").trim();
         const middleName = String(teacherDraft.middle_name || "").trim();
-        const email = String(teacherDraft.email || "").trim().toLowerCase();
+        const email = String(teacherDraft.email || "")
+            .trim()
+            .toLowerCase();
         const departmentId = String(teacherDraft.department_id || "").trim();
         const assignAsAdmin = Boolean(teacherDraft.assign_as_admin);
 
@@ -857,7 +991,7 @@ export default function CreateUserModal({
         const firstName = String(studentDraft.first_name || "").trim();
         const lastName = String(studentDraft.last_name || "").trim();
         const middleName = String(studentDraft.middle_name || "").trim();
-        const email = String(studentDraft.email || "").trim().toLowerCase();
+        const lrn = String(studentDraft.lrn || "").trim();
 
         if (!firstName) {
             nextErrors.student_queue_first_name = "First name is required.";
@@ -867,19 +1001,16 @@ export default function CreateUserModal({
             nextErrors.student_queue_last_name = "Last name is required.";
         }
 
-        if (email && !EMAIL_FORMAT.test(email)) {
-            nextErrors.student_queue_email = "Enter a valid email address.";
-        }
-
-        if (email) {
-            const duplicateEmail = studentQueue.some(
-                (queueItem) =>
-                    String(queueItem.email || "").toLowerCase() === email,
+        if (!lrn) {
+            nextErrors.student_queue_lrn = "LRN is required.";
+        } else {
+            const duplicateLrn = studentQueue.some(
+                (queueItem) => String(queueItem.lrn || "").trim() === lrn,
             );
 
-            if (duplicateEmail) {
-                nextErrors.student_queue_email =
-                    "This email already exists in the student queue.";
+            if (duplicateLrn) {
+                nextErrors.student_queue_lrn =
+                    "This LRN already exists in the student queue.";
             }
         }
 
@@ -894,7 +1025,7 @@ export default function CreateUserModal({
             first_name: firstName,
             last_name: lastName,
             middle_name: middleName,
-            email,
+            lrn,
             username: "",
         };
     };
@@ -957,29 +1088,29 @@ export default function CreateUserModal({
             currentYearNumber,
         );
 
-        const duplicateEmailSet = new Set();
-        const hasDuplicateEmail = normalizedQueue.some((queueItem) => {
-            const email = String(queueItem.email || "").trim().toLowerCase();
+        const duplicateLrnSet = new Set();
+        const hasDuplicateLrn = normalizedQueue.some((queueItem) => {
+            const lrn = String(queueItem.lrn || "").trim();
 
-            if (!email) {
+            if (!lrn) {
                 return false;
             }
 
-            if (duplicateEmailSet.has(email)) {
+            if (duplicateLrnSet.has(lrn)) {
                 return true;
             }
 
-            duplicateEmailSet.add(email);
+            duplicateLrnSet.add(lrn);
             return false;
         });
 
-        if (hasDuplicateEmail) {
+        if (hasDuplicateLrn) {
             setStudentQueue([]);
             setStudentCsvFileName(file.name);
             setClientErrors((previousErrors) => ({
                 ...previousErrors,
                 student_csv:
-                    "CSV has duplicate email addresses. Keep one row per email.",
+                    "CSV has duplicate LRN values. Keep one row per LRN.",
             }));
             return;
         }
@@ -1019,6 +1150,15 @@ export default function CreateUserModal({
 
             if (
                 studentQueue.some(
+                    (queueItem) => !String(queueItem.lrn || "").trim(),
+                )
+            ) {
+                nextErrors.student_queue =
+                    "Every queued student must include an LRN.";
+            }
+
+            if (
+                studentQueue.some(
                     (queueItem) => !isValidStudentUsername(queueItem.username),
                 )
             ) {
@@ -1050,16 +1190,14 @@ export default function CreateUserModal({
             }
 
             if (!String(data.department_id || "").trim()) {
-                nextErrors.department_id = "Department is required for teachers.";
+                nextErrors.department_id =
+                    "Department is required for teachers.";
             }
         }
 
         if (role === "student" && studentMode === STUDENT_MODE_SINGLE) {
-            if (!String(data.email || "").trim()) {
-                nextErrors.email =
-                    "Email address is required for single student creation.";
-            } else if (!EMAIL_FORMAT.test(String(data.email || "").trim())) {
-                nextErrors.email = "Enter a valid email address.";
+            if (!String(data.lrn || "").trim()) {
+                nextErrors.lrn = "LRN is required.";
             }
 
             if (!String(data.username || "").trim()) {
@@ -1099,6 +1237,11 @@ export default function CreateUserModal({
     };
 
     const goBack = () => {
+        if (step === STEP_SUMMARY) {
+            closeModal();
+            return;
+        }
+
         if (step === STEP_PROFILE) {
             closeModal();
             return;
@@ -1150,7 +1293,7 @@ export default function CreateUserModal({
                     first_name: queueItem.first_name,
                     last_name: queueItem.last_name,
                     middle_name: queueItem.middle_name || "",
-                    email: queueItem.email || null,
+                    lrn: queueItem.lrn,
                     username: queueItem.username,
                 })),
             };
@@ -1171,7 +1314,7 @@ export default function CreateUserModal({
                 first_name: data.first_name,
                 last_name: data.last_name,
                 middle_name: data.middle_name,
-                email: data.email,
+                lrn: data.lrn,
                 username: data.username,
                 password: data.password,
                 role: "student",
@@ -1183,7 +1326,61 @@ export default function CreateUserModal({
 
         post(route("superadmin.users.store"), {
             preserveScroll: true,
-            onSuccess: () => {
+            preserveState: true,
+            onSuccess: (page) => {
+                if (isStudent) {
+                    const flashCredentials = Array.isArray(
+                        page?.props?.flash?.created_student_credentials,
+                    )
+                        ? page.props.flash.created_student_credentials
+                        : [];
+
+                    const sourceCredentials =
+                        flashCredentials.length > 0
+                            ? flashCredentials
+                            : pendingStudentProfiles;
+
+                    const normalizedCredentials = sourceCredentials.map(
+                        (credential, index) => ({
+                            id:
+                                credential.id ||
+                                credential.username ||
+                                `created-student-${index}`,
+                            first_name:
+                                credential.first_name ||
+                                credential.full_name ||
+                                "",
+                            middle_name: credential.middle_name || "",
+                            last_name: credential.last_name || "",
+                            full_name:
+                                credential.full_name ||
+                                [
+                                    credential.first_name,
+                                    credential.middle_name,
+                                    credential.last_name,
+                                ]
+                                    .filter(Boolean)
+                                    .join(" ") ||
+                                "Student",
+                            lrn: credential.lrn || "",
+                            username: credential.username || "",
+                            password:
+                                credential.password || data.password || "",
+                        }),
+                    );
+
+                    setCreatedStudentCredentials(normalizedCredentials);
+                    setSelectedCreatedStudentId(
+                        normalizedCredentials[0]
+                            ? String(normalizedCredentials[0].id)
+                            : "",
+                    );
+                    clearErrors();
+                    setClientErrors({});
+                    setStep(STEP_SUMMARY);
+                    return;
+                }
+
                 reset();
                 clearErrors();
                 setStep(STEP_PROFILE);
@@ -1196,6 +1393,8 @@ export default function CreateUserModal({
                 setStudentDraft(emptyStudentDraft());
                 setStudentQueue([]);
                 setStudentCsvFileName("");
+                setCreatedStudentCredentials([]);
+                setSelectedCreatedStudentId("");
 
                 setClientErrors({});
                 onClose?.();
@@ -1224,7 +1423,7 @@ export default function CreateUserModal({
                         type="button"
                         onClick={closeModal}
                         disabled={processing}
-                        className="absolute right-3 top-3 rounded-lg p-1.5 text-emerald-100 transition-colors hover:bg-white/15 hover:text-white disabled:opacity-60"
+                        className="absolute z-10 right-3 top-3 rounded-lg p-1.5 text-emerald-100 transition-colors hover:bg-white/15 hover:text-white disabled:opacity-60"
                     >
                         <X size={16} />
                     </button>
@@ -1238,7 +1437,8 @@ export default function CreateUserModal({
                                 Create User Wizard
                             </h2>
                             <p className="text-xs text-emerald-100">
-                                Step {step} of {STEPS.length}: {STEPS[step - 1].label}
+                                Step {step} of {STEPS.length}:{" "}
+                                {STEPS[step - 1].label}
                             </p>
                         </div>
                     </div>
@@ -1261,7 +1461,8 @@ export default function CreateUserModal({
                         <div className="space-y-4 rounded-xl border border-emerald-100 bg-white p-4">
                             <div>
                                 <label className="mb-2 block text-sm font-medium text-slate-700">
-                                    Role <span className="text-rose-500">*</span>
+                                    Role{" "}
+                                    <span className="text-rose-500">*</span>
                                 </label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {["teacher", "student"].map((role) => {
@@ -1273,7 +1474,9 @@ export default function CreateUserModal({
                                             <button
                                                 key={role}
                                                 type="button"
-                                                onClick={() => handleRoleChange(role)}
+                                                onClick={() =>
+                                                    handleRoleChange(role)
+                                                }
                                                 className={`flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-semibold transition-all ${
                                                     active
                                                         ? "border-emerald-400 bg-emerald-50 text-emerald-700"
@@ -1305,10 +1508,13 @@ export default function CreateUserModal({
                                         <button
                                             type="button"
                                             onClick={() =>
-                                                handleTeacherModeChange(TEACHER_MODE_SINGLE)
+                                                handleTeacherModeChange(
+                                                    TEACHER_MODE_SINGLE,
+                                                )
                                             }
                                             className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${
-                                                teacherMode === TEACHER_MODE_SINGLE
+                                                teacherMode ===
+                                                TEACHER_MODE_SINGLE
                                                     ? "border-emerald-400 bg-emerald-50 text-emerald-700"
                                                     : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
                                             }`}
@@ -1318,10 +1524,13 @@ export default function CreateUserModal({
                                         <button
                                             type="button"
                                             onClick={() =>
-                                                handleTeacherModeChange(TEACHER_MODE_MULTIPLE)
+                                                handleTeacherModeChange(
+                                                    TEACHER_MODE_MULTIPLE,
+                                                )
                                             }
                                             className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${
-                                                teacherMode === TEACHER_MODE_MULTIPLE
+                                                teacherMode ===
+                                                TEACHER_MODE_MULTIPLE
                                                     ? "border-emerald-400 bg-emerald-50 text-emerald-700"
                                                     : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
                                             }`}
@@ -1341,10 +1550,13 @@ export default function CreateUserModal({
                                         <button
                                             type="button"
                                             onClick={() =>
-                                                handleStudentModeChange(STUDENT_MODE_SINGLE)
+                                                handleStudentModeChange(
+                                                    STUDENT_MODE_SINGLE,
+                                                )
                                             }
                                             className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${
-                                                studentMode === STUDENT_MODE_SINGLE
+                                                studentMode ===
+                                                STUDENT_MODE_SINGLE
                                                     ? "border-emerald-400 bg-emerald-50 text-emerald-700"
                                                     : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
                                             }`}
@@ -1359,7 +1571,8 @@ export default function CreateUserModal({
                                                 )
                                             }
                                             className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${
-                                                studentMode === STUDENT_MODE_MULTIPLE
+                                                studentMode ===
+                                                STUDENT_MODE_MULTIPLE
                                                     ? "border-emerald-400 bg-emerald-50 text-emerald-700"
                                                     : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
                                             }`}
@@ -1369,7 +1582,9 @@ export default function CreateUserModal({
                                         <button
                                             type="button"
                                             onClick={() =>
-                                                handleStudentModeChange(STUDENT_MODE_CSV)
+                                                handleStudentModeChange(
+                                                    STUDENT_MODE_CSV,
+                                                )
                                             }
                                             className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${
                                                 studentMode === STUDENT_MODE_CSV
@@ -1453,35 +1668,54 @@ export default function CreateUserModal({
                                         />
                                     </Field>
 
-                                    <Field
-                                        label="Email Address"
-                                        icon={Mail}
-                                        required={
-                                            isTeacher ||
-                                            (isStudent &&
-                                                studentMode ===
-                                                    STUDENT_MODE_SINGLE)
-                                        }
-                                        optional={
-                                            isStudent &&
-                                            studentMode !== STUDENT_MODE_SINGLE
-                                        }
-                                        error={errors.email || clientErrors.email}
-                                    >
-                                        <input
-                                            type="email"
-                                            value={data.email}
-                                            onChange={(event) =>
-                                                setData("email", event.target.value)
+                                    {isStudent && (
+                                        <Field
+                                            label="LRN"
+                                            icon={Shield}
+                                            required
+                                            error={
+                                                errors.lrn || clientErrors.lrn
                                             }
-                                            placeholder={
-                                                isTeacher
-                                                    ? "teacher@school.edu"
-                                                    : "student@school.edu"
+                                        >
+                                            <input
+                                                type="text"
+                                                value={data.lrn || ""}
+                                                onChange={(event) =>
+                                                    setData(
+                                                        "lrn",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="Learner Reference Number"
+                                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-emerald-500 focus:bg-white focus:ring-emerald-500"
+                                            />
+                                        </Field>
+                                    )}
+
+                                    {isTeacher && (
+                                        <Field
+                                            label="Email Address"
+                                            icon={Mail}
+                                            required
+                                            error={
+                                                errors.email ||
+                                                clientErrors.email
                                             }
-                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-emerald-500 focus:bg-white focus:ring-emerald-500"
-                                        />
-                                    </Field>
+                                        >
+                                            <input
+                                                type="email"
+                                                value={data.email}
+                                                onChange={(event) =>
+                                                    setData(
+                                                        "email",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="teacher@school.edu"
+                                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-emerald-500 focus:bg-white focus:ring-emerald-500"
+                                            />
+                                        </Field>
+                                    )}
 
                                     {isStudent && (
                                         <Field
@@ -1501,8 +1735,7 @@ export default function CreateUserModal({
                                             />
                                             <p className="mt-1 text-[11px] text-slate-500">
                                                 Format: initials + year + user
-                                                number (example:
-                                                dd202300100).
+                                                number (example: dd202300100).
                                             </p>
                                             {!singleStudentUsernameValid && (
                                                 <p className="mt-1 text-xs text-rose-600">
@@ -1543,7 +1776,9 @@ export default function CreateUserModal({
                                                     (department) => (
                                                         <option
                                                             key={department.id}
-                                                            value={department.id}
+                                                            value={
+                                                                department.id
+                                                            }
                                                         >
                                                             {
                                                                 department.department_name
@@ -1579,10 +1814,11 @@ export default function CreateUserModal({
                                                 <div className="mt-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
                                                     <p className="text-xs text-amber-800">
                                                         No admin is currently
-                                                        assigned to the {" "}
+                                                        assigned to the{" "}
                                                         {
                                                             selectedDepartment?.department_name
-                                                        } department.
+                                                        }{" "}
+                                                        department.
                                                     </p>
                                                     <label className="mt-2 flex cursor-pointer items-start gap-2.5">
                                                         <input
@@ -1740,10 +1976,11 @@ export default function CreateUserModal({
                                                 {selectedDraftDepartment.department_admin ? (
                                                     <p className="mt-1 text-xs text-slate-700">
                                                         This department already
-                                                        has admin: {" "}
+                                                        has admin:{" "}
                                                         {selectedDraftDepartment
                                                             .department_admin
-                                                            ?.name || "Assigned admin"}
+                                                            ?.name ||
+                                                            "Assigned admin"}
                                                     </p>
                                                 ) : queueHasAdminForDraftDepartment ? (
                                                     <p className="mt-1 text-xs text-amber-700">
@@ -1835,7 +2072,8 @@ export default function CreateUserModal({
                                             </div>
                                         )}
 
-                                        {teacherQueueValidationErrors.length > 0 && (
+                                        {teacherQueueValidationErrors.length >
+                                            0 && (
                                             <div className="space-y-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
                                                 {teacherQueueValidationErrors.map(
                                                     (message, index) => (
@@ -1861,7 +2099,8 @@ export default function CreateUserModal({
 
                                         <div className="rounded-xl border border-slate-200 bg-white p-3">
                                             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                                Teacher Queue ({teacherQueue.length})
+                                                Teacher Queue (
+                                                {teacherQueue.length})
                                             </p>
                                             <div className="max-h-48 space-y-2 overflow-y-auto">
                                                 {teacherQueue.length === 0 ? (
@@ -1915,7 +2154,9 @@ export default function CreateUserModal({
                                                                     title="Remove"
                                                                 >
                                                                     <Trash2
-                                                                        size={13}
+                                                                        size={
+                                                                            13
+                                                                        }
                                                                     />
                                                                 </button>
                                                             </div>
@@ -1936,12 +2177,15 @@ export default function CreateUserModal({
                                                 : "Queue Student"}
                                         </p>
 
-                                        {studentMode === STUDENT_MODE_MULTIPLE ? (
+                                        {studentMode ===
+                                        STUDENT_MODE_MULTIPLE ? (
                                             <>
                                                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                                                     <input
                                                         type="text"
-                                                        value={studentDraft.first_name}
+                                                        value={
+                                                            studentDraft.first_name
+                                                        }
                                                         onChange={(event) =>
                                                             setStudentDraft(
                                                                 (
@@ -1961,7 +2205,9 @@ export default function CreateUserModal({
 
                                                     <input
                                                         type="text"
-                                                        value={studentDraft.last_name}
+                                                        value={
+                                                            studentDraft.last_name
+                                                        }
                                                         onChange={(event) =>
                                                             setStudentDraft(
                                                                 (
@@ -2002,21 +2248,21 @@ export default function CreateUserModal({
                                                     />
 
                                                     <input
-                                                        type="email"
-                                                        value={studentDraft.email}
+                                                        type="text"
+                                                        value={studentDraft.lrn}
                                                         onChange={(event) =>
                                                             setStudentDraft(
                                                                 (
                                                                     previousDraft,
                                                                 ) => ({
                                                                     ...previousDraft,
-                                                                    email: event
+                                                                    lrn: event
                                                                         .target
                                                                         .value,
                                                                 }),
                                                             )
                                                         }
-                                                        placeholder="Email address (optional)"
+                                                        placeholder="LRN"
                                                         className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                                                     />
                                                 </div>
@@ -2039,18 +2285,20 @@ export default function CreateUserModal({
                                                     <input
                                                         type="file"
                                                         accept=".csv,text/csv"
-                                                        onChange={handleStudentCsvUpload}
+                                                        onChange={
+                                                            handleStudentCsvUpload
+                                                        }
                                                         className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                                                     />
                                                     <p className="mt-2 text-xs text-slate-500">
                                                         Required headers:
-                                                        first_name, last_name.
-                                                        Optional:
-                                                        middle_name, email.
+                                                        first_name, last_name,
+                                                        lrn. Optional:
+                                                        middle_name.
                                                     </p>
                                                     {studentCsvFileName && (
                                                         <p className="mt-1 text-xs text-slate-600">
-                                                            Selected file: {" "}
+                                                            Selected file:{" "}
                                                             {studentCsvFileName}
                                                         </p>
                                                     )}
@@ -2060,7 +2308,7 @@ export default function CreateUserModal({
 
                                         {(clientErrors.student_queue_first_name ||
                                             clientErrors.student_queue_last_name ||
-                                            clientErrors.student_queue_email ||
+                                            clientErrors.student_queue_lrn ||
                                             clientErrors.student_queue ||
                                             clientErrors.student_csv) && (
                                             <div className="space-y-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
@@ -2078,10 +2326,10 @@ export default function CreateUserModal({
                                                         }
                                                     </p>
                                                 )}
-                                                {clientErrors.student_queue_email && (
+                                                {clientErrors.student_queue_lrn && (
                                                     <p className="text-xs text-rose-700">
                                                         {
-                                                            clientErrors.student_queue_email
+                                                            clientErrors.student_queue_lrn
                                                         }
                                                     </p>
                                                 )}
@@ -2102,7 +2350,8 @@ export default function CreateUserModal({
                                             </div>
                                         )}
 
-                                        {studentQueueValidationErrors.length > 0 && (
+                                        {studentQueueValidationErrors.length >
+                                            0 && (
                                             <div className="space-y-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
                                                 {studentQueueValidationErrors.map(
                                                     (message, index) => (
@@ -2119,7 +2368,8 @@ export default function CreateUserModal({
 
                                         <div className="rounded-xl border border-slate-200 bg-white p-3">
                                             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                                Student Queue ({studentQueue.length})
+                                                Student Queue (
+                                                {studentQueue.length})
                                             </p>
                                             <div className="max-h-52 space-y-2 overflow-y-auto">
                                                 {studentQueue.length === 0 ? (
@@ -2150,8 +2400,9 @@ export default function CreateUserModal({
                                                                         }
                                                                     </p>
                                                                     <p className="truncate text-xs text-slate-500">
-                                                                        {queueItem.email ||
-                                                                            "No email"}
+                                                                        LRN:{" "}
+                                                                        {queueItem.lrn ||
+                                                                            "-"}
                                                                     </p>
                                                                 </div>
                                                                 <button
@@ -2165,7 +2416,9 @@ export default function CreateUserModal({
                                                                     title="Remove"
                                                                 >
                                                                     <Trash2
-                                                                        size={13}
+                                                                        size={
+                                                                            13
+                                                                        }
                                                                     />
                                                                 </button>
                                                             </div>
@@ -2198,7 +2451,10 @@ export default function CreateUserModal({
                             <button
                                 type="button"
                                 onClick={() =>
-                                    setData("password", generateRandomPassword())
+                                    setData(
+                                        "password",
+                                        generateRandomPassword(),
+                                    )
                                 }
                                 className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
                             >
@@ -2252,63 +2508,99 @@ export default function CreateUserModal({
                                 </div>
                             </div>
 
-                            {isTeacher && teacherMode === TEACHER_MODE_MULTIPLE && (
-                                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                            {isTeacher &&
+                                teacherMode === TEACHER_MODE_MULTIPLE && (
+                                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                            Queued Teachers (
+                                            {teacherQueue.length})
+                                        </p>
+                                        {teacherQueue.length === 0 ? (
+                                            <p className="text-sm text-slate-500">
+                                                None
+                                            </p>
+                                        ) : (
+                                            <div className="mt-1.5 max-h-44 space-y-1.5 overflow-y-auto">
+                                                {teacherQueue.map(
+                                                    (queueItem) => (
+                                                        <p
+                                                            key={queueItem.id}
+                                                            className="rounded-md bg-white px-2.5 py-1.5 text-xs text-slate-700"
+                                                        >
+                                                            {
+                                                                queueItem.first_name
+                                                            }{" "}
+                                                            {
+                                                                queueItem.last_name
+                                                            }{" "}
+                                                            - {queueItem.email}{" "}
+                                                            -{" "}
+                                                            {
+                                                                queueItem.department_code
+                                                            }{" "}
+                                                            -{" "}
+                                                            {
+                                                                queueItem.department_name
+                                                            }
+                                                            {queueItem.assign_as_admin
+                                                                ? " (Assign as admin)"
+                                                                : ""}
+                                                        </p>
+                                                    ),
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                            {isStudent && (
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
                                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                        Queued Teachers ({teacherQueue.length})
+                                        Student Information (
+                                        {pendingStudentProfiles.length})
                                     </p>
-                                    {teacherQueue.length === 0 ? (
-                                        <p className="text-sm text-slate-500">None</p>
+
+                                    {pendingStudentProfiles.length === 0 ? (
+                                        <p className="mt-2 text-sm text-slate-500">
+                                            No student records available.
+                                        </p>
                                     ) : (
-                                        <div className="mt-1.5 max-h-44 space-y-1.5 overflow-y-auto">
-                                            {teacherQueue.map((queueItem) => (
-                                                <p
-                                                    key={queueItem.id}
-                                                    className="rounded-md bg-white px-2.5 py-1.5 text-xs text-slate-700"
-                                                >
-                                                    {queueItem.first_name}{" "}
-                                                    {queueItem.last_name} - {" "}
-                                                    {queueItem.email} - {" "}
-                                                    {queueItem.department_code} - {" "}
-                                                    {queueItem.department_name}
-                                                    {queueItem.assign_as_admin
-                                                        ? " (Assign as admin)"
-                                                        : ""}
-                                                </p>
-                                            ))}
+                                        <div className="mt-2 max-h-56 space-y-2 overflow-y-auto">
+                                            {pendingStudentProfiles.map(
+                                                (studentProfile) => (
+                                                    <div
+                                                        key={studentProfile.id}
+                                                        className="rounded-md border border-slate-200 bg-white px-3 py-2"
+                                                    >
+                                                        <p className="text-sm font-semibold text-slate-900">
+                                                            {[
+                                                                studentProfile.first_name,
+                                                                studentProfile.middle_name,
+                                                                studentProfile.last_name,
+                                                            ]
+                                                                .filter(Boolean)
+                                                                .join(" ")}
+                                                        </p>
+                                                        <p className="text-xs text-slate-600">
+                                                            LRN:{" "}
+                                                            {studentProfile.lrn ||
+                                                                "-"}
+                                                        </p>
+                                                        <p className="font-mono text-xs text-slate-600">
+                                                            Username:{" "}
+                                                            {
+                                                                studentProfile.username
+                                                            }
+                                                        </p>
+                                                    </div>
+                                                ),
+                                            )}
                                         </div>
                                     )}
                                 </div>
                             )}
 
-                            {isStudent && studentMode !== STUDENT_MODE_SINGLE && (
-                                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                        Queued Students ({studentQueue.length})
-                                    </p>
-                                    {studentQueue.length === 0 ? (
-                                        <p className="text-sm text-slate-500">None</p>
-                                    ) : (
-                                        <div className="mt-1.5 max-h-44 space-y-1.5 overflow-y-auto">
-                                            {studentQueue.map((queueItem) => (
-                                                <p
-                                                    key={queueItem.id}
-                                                    className="rounded-md bg-white px-2.5 py-1.5 text-xs text-slate-700"
-                                                >
-                                                    {queueItem.first_name}{" "}
-                                                    {queueItem.last_name} - {" "}
-                                                    {queueItem.username}
-                                                    {queueItem.email
-                                                        ? ` - ${queueItem.email}`
-                                                        : " - No email"}
-                                                </p>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {showSingleForm && (
+                            {showSingleForm && isTeacher && (
                                 <>
                                     <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                                         <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
@@ -2347,7 +2639,7 @@ export default function CreateUserModal({
                                                     : "None"}
                                             </p>
                                             <p className="mt-1 text-[11px] text-slate-500">
-                                                Admin: {" "}
+                                                Admin:{" "}
                                                 {selectedAdminName ||
                                                     (data.assign_as_admin
                                                         ? "Assign this teacher as admin"
@@ -2355,28 +2647,19 @@ export default function CreateUserModal({
                                             </p>
                                         </div>
                                     )}
-
-                                    {isStudent && (
-                                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                                Username
-                                            </p>
-                                            <p className="font-mono text-sm text-slate-800">
-                                                {data.username || "-"}
-                                            </p>
-                                        </div>
-                                    )}
                                 </>
                             )}
 
-                            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                    Generated Password
-                                </p>
-                                <p className="font-mono text-sm text-slate-800">
-                                    {data.password ? PASSWORD_MASK : "-"}
-                                </p>
-                            </div>
+                            {!isStudent && (
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                        Generated Password
+                                    </p>
+                                    <p className="font-mono text-sm text-slate-800">
+                                        {data.password ? PASSWORD_MASK : "-"}
+                                    </p>
+                                </div>
+                            )}
 
                             {serverErrorList.length > 0 && (
                                 <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
@@ -2394,6 +2677,104 @@ export default function CreateUserModal({
                             )}
                         </div>
                     )}
+
+                    {step === STEP_SUMMARY && (
+                        <div className="space-y-4 rounded-xl border border-emerald-100 bg-white p-4">
+                            <div>
+                                <p className="text-sm font-semibold text-slate-900">
+                                    Student Account Summary
+                                </p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                    Share these credentials with students and
+                                    let them scan their QR to log in.
+                                </p>
+                            </div>
+
+                            {createdStudentCredentials.length === 0 ? (
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                                    No created student credentials found.
+                                </div>
+                            ) : (
+                                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_260px]">
+                                    <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                                        {createdStudentCredentials.map(
+                                            (credential) => {
+                                                const isActive =
+                                                    String(credential.id) ===
+                                                    String(
+                                                        selectedCreatedStudentCredential?.id,
+                                                    );
+
+                                                return (
+                                                    <button
+                                                        key={String(
+                                                            credential.id,
+                                                        )}
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setSelectedCreatedStudentId(
+                                                                String(
+                                                                    credential.id,
+                                                                ),
+                                                            )
+                                                        }
+                                                        className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
+                                                            isActive
+                                                                ? "border-emerald-300 bg-emerald-50"
+                                                                : "border-slate-200 bg-white hover:border-slate-300"
+                                                        }`}
+                                                    >
+                                                        <p className="truncate text-sm font-semibold text-slate-900">
+                                                            {
+                                                                credential.full_name
+                                                            }
+                                                        </p>
+                                                        <p className="truncate text-xs text-slate-600">
+                                                            LRN:{" "}
+                                                            {credential.lrn ||
+                                                                "-"}
+                                                        </p>
+                                                    </button>
+                                                );
+                                            },
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-center rounded-lg border border-slate-200 bg-white p-3">
+                                            <QRCodeSVG
+                                                value={
+                                                    selectedCreatedStudentQrPayload
+                                                }
+                                                size={180}
+                                                includeMargin
+                                            />
+                                        </div>
+
+                                        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                            <p className="truncate text-sm font-semibold text-slate-900">
+                                                {selectedCreatedStudentCredential?.full_name ||
+                                                    "-"}
+                                            </p>
+                                            <p className="mt-1 text-xs text-slate-600">
+                                                LRN:{" "}
+                                                {selectedCreatedStudentCredential?.lrn ||
+                                                    "-"}
+                                            </p>
+                                            <p className="mt-1 truncate font-mono text-xs text-slate-700">
+                                                {selectedCreatedStudentCredential?.username ||
+                                                    "-"}
+                                            </p>
+                                            <p className="mt-1 truncate font-mono text-xs text-slate-700">
+                                                {selectedCreatedStudentCredential?.password ||
+                                                    "-"}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <div className="shrink-0 flex items-center justify-between border-t border-emerald-100 bg-white px-6 py-4">
@@ -2404,7 +2785,11 @@ export default function CreateUserModal({
                         className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
                     >
                         <ChevronLeft size={13} />
-                        {step === STEP_PROFILE ? "Cancel" : "Back"}
+                        {step === STEP_SUMMARY
+                            ? "Close"
+                            : step === STEP_PROFILE
+                              ? "Cancel"
+                              : "Back"}
                     </button>
 
                     {step < STEP_REVIEW ? (
@@ -2417,7 +2802,7 @@ export default function CreateUserModal({
                             Next
                             <ChevronRight size={13} />
                         </button>
-                    ) : (
+                    ) : step === STEP_REVIEW ? (
                         <button
                             type="button"
                             onClick={handleCreate}
@@ -2426,6 +2811,14 @@ export default function CreateUserModal({
                         >
                             <Save size={13} />
                             {processing ? "Creating..." : "Create User"}
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={closeModal}
+                            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
+                        >
+                            Done
                         </button>
                     )}
                 </div>

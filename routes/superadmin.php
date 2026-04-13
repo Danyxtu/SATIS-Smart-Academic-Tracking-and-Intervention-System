@@ -103,13 +103,21 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
         // Password Reset Requests Management (Teacher + Student)
         Route::get('/password-reset-requests', [UserManagementController::class, 'passwordResetRequests'])
             ->name('password-reset-requests');
+        Route::post('/password-reset-requests/reset-student-by-lrn', [UserManagementController::class, 'resetStudentPasswordByLrn'])
+            ->name('password-reset-requests.reset-student-by-lrn');
         Route::post('/password-reset-requests/{passwordResetRequest}/approve', [UserManagementController::class, 'approvePasswordResetRequest'])
             ->name('password-reset-requests.approve');
         Route::post('/password-reset-requests/{passwordResetRequest}/reject', [UserManagementController::class, 'rejectPasswordResetRequest'])
             ->name('password-reset-requests.reject');
 
-        // Admin Management
-        Route::resource('admins', SuperAdminAdminController::class);
+        // Admin Management (legacy)
+        Route::get('/admins', function () {
+            return redirect()->route('superadmin.users.index', [
+                'role' => 'admin',
+            ]);
+        })->name('admins.index');
+        Route::resource('admins', SuperAdminAdminController::class)
+            ->except(['index', 'create']);
         Route::post('/admins/{admin}/reset-password', [SuperAdminAdminController::class, 'resetPassword'])
             ->name('admins.reset-password');
         Route::post('/admins/{admin}/resend-credentials', [SuperAdminAdminController::class, 'resendCredentials'])

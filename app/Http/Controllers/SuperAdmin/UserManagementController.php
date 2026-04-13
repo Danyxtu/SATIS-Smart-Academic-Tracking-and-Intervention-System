@@ -3,15 +3,15 @@
 namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
-use App\Mail\TemporaryCredentials;
 use App\Models\PasswordResetRequest;
 use App\Models\Role;
+use App\Models\Student;
+use App\Models\SystemSetting;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
@@ -220,6 +220,7 @@ class UserManagementController extends Controller
                 'student_queue.*.first_name' => ['required', 'string', 'max:100'],
                 'student_queue.*.last_name' => ['required', 'string', 'max:100'],
                 'student_queue.*.middle_name' => ['nullable', 'string', 'max:100'],
+                'student_queue.*.lrn' => ['required', 'string', 'max:20', 'distinct', 'unique:students,lrn'],
                 'student_queue.*.email' => ['nullable', 'email', 'max:255', 'distinct', 'unique:users,personal_email'],
                 'student_queue.*.username' => ['required', 'string', 'regex:/^[a-z]{2}\d{4}\d{5}$/', 'distinct', 'unique:users,username'],
             ]);
@@ -238,7 +239,9 @@ class UserManagementController extends Controller
                 }
             }
 
-            DB::transaction(function () use ($validated, $superAdmin) {
+            $createdStudentCredentials = [];
+
+            DB::transaction(function () use ($validated, $superAdmin, &$createdStudentCredentials) {
                 foreach ($validated['student_queue'] as $studentPayload) {
                     $student = User::create([
                         'first_name' => $studentPayload['first_name'],
@@ -258,6 +261,29 @@ class UserManagementController extends Controller
                     if (! empty($roleIds)) {
                         $student->roles()->sync($roleIds);
                     }
+
+                    $studentName = trim(implode(' ', array_filter([
+                        $studentPayload['first_name'] ?? null,
+                        $studentPayload['middle_name'] ?? null,
+                        $studentPayload['last_name'] ?? null,
+                    ])));
+
+                    Student::create([
+                        'user_id' => $student->id,
+                        'student_name' => $studentName,
+                        'lrn' => (string) $studentPayload['lrn'],
+                    ]);
+
+                    $createdStudentCredentials[] = [
+                        'id' => $student->id,
+                        'first_name' => (string) ($studentPayload['first_name'] ?? ''),
+                        'middle_name' => (string) ($studentPayload['middle_name'] ?? ''),
+                        'last_name' => (string) ($studentPayload['last_name'] ?? ''),
+                        'full_name' => $studentName,
+                        'lrn' => (string) ($studentPayload['lrn'] ?? ''),
+                        'username' => (string) ($studentPayload['username'] ?? ''),
+                        'password' => (string) ($validated['password'] ?? ''),
+                    ];
                 }
             });
 
@@ -265,13 +291,15 @@ class UserManagementController extends Controller
             $label = $createdCount === 1 ? 'student' : 'students';
 
             return redirect()->route('superadmin.users.index')
-                ->with('success', "{$createdCount} {$label} created successfully.");
+                ->with('success', "{$createdCount} {$label} created successfully.")
+                ->with('created_student_credentials', $createdStudentCredentials);
         }
 
         $validated = $request->validate([
             'first_name'    => ['required', 'string', 'max:100'],
             'last_name'     => ['required', 'string', 'max:100'],
             'middle_name'   => ['nullable', 'string', 'max:100'],
+            'lrn'           => ['nullable', 'string', 'max:20', 'unique:students,lrn'],
             'email'         => ['nullable', 'email', 'unique:users,personal_email'],
             'username'      => ['nullable', 'string', 'regex:/^[a-z]{2}\d{4}\d{5}$/', 'unique:users,username'],
             'password'      => ['required', Password::min(8)],
@@ -312,9 +340,9 @@ class UserManagementController extends Controller
                 ]);
             }
 
-            if (empty($validated['email'])) {
+            if (empty($validated['lrn'])) {
                 return back()->withErrors([
-                    'email' => 'Email address is required for single student creation.',
+                    'lrn' => 'LRN is required for single student creation.',
                 ]);
             }
 
@@ -370,6 +398,33 @@ class UserManagementController extends Controller
         $roleIds = Role::whereIn('name', $assignedRoles)->pluck('id')->all();
         if (!empty($roleIds)) {
             $user->roles()->sync($roleIds);
+        }
+
+        if ($validated['role'] === 'student') {
+            $studentName = trim(implode(' ', array_filter([
+                $validated['first_name'] ?? null,
+                $validated['middle_name'] ?? null,
+                $validated['last_name'] ?? null,
+            ])));
+
+            Student::create([
+                'user_id' => $user->id,
+                'student_name' => $studentName,
+                'lrn' => (string) ($validated['lrn'] ?? ''),
+            ]);
+
+            return redirect()->route('superadmin.users.index')
+                ->with('success', 'User created successfully.')
+                ->with('created_student_credentials', [[
+                    'id' => $user->id,
+                    'first_name' => (string) ($validated['first_name'] ?? ''),
+                    'middle_name' => (string) ($validated['middle_name'] ?? ''),
+                    'last_name' => (string) ($validated['last_name'] ?? ''),
+                    'full_name' => $studentName,
+                    'lrn' => (string) ($validated['lrn'] ?? ''),
+                    'username' => (string) ($validated['username'] ?? ''),
+                    'password' => (string) ($validated['password'] ?? ''),
+                ]]);
         }
 
         return redirect()->route('superadmin.users.index')
@@ -505,6 +560,7 @@ class UserManagementController extends Controller
     public function passwordResetRequests(Request $request)
     {
         $status = $request->input('status', PasswordResetRequest::STATUS_PENDING);
+        $studentLrn = trim((string) $request->input('student_lrn', ''));
         $allowedStatuses = [
             PasswordResetRequest::STATUS_PENDING,
             PasswordResetRequest::STATUS_APPROVED,
@@ -555,10 +611,50 @@ class UserManagementController extends Controller
             'all' => (clone $this->teacherAndStudentPasswordResetRequestsQuery())->count(),
         ];
 
+        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
+        $currentSemester = (string) SystemSetting::getCurrentSemester();
+
+        $studentsInCurrentTerm = Student::query()
+            ->with([
+                'user:id,first_name,middle_name,last_name,username,status,must_change_password',
+            ])
+            ->whereHas('user.roles', function ($roleQuery) {
+                $roleQuery->where('name', 'student');
+            })
+            ->whereHas('user.enrollments.schoolClass', function ($classQuery) use ($currentSchoolYear, $currentSemester) {
+                $classQuery
+                    ->where('school_year', $currentSchoolYear)
+                    ->where('semester', $currentSemester);
+            })
+            ->when($studentLrn !== '', function ($query) use ($studentLrn) {
+                $query->where('lrn', 'like', "%{$studentLrn}%");
+            })
+            ->orderBy('student_name')
+            ->paginate(10, ['*'], 'students_page')
+            ->withQueryString();
+
+        $studentsInCurrentTerm->getCollection()->transform(function (Student $student) {
+            return [
+                'id' => $student->id,
+                'user_id' => $student->user_id,
+                'student_name' => $student->student_name,
+                'full_name' => $student->user?->name ?? $student->student_name,
+                'lrn' => $student->lrn,
+                'username' => $student->user?->username,
+                'status' => $student->user?->status,
+            ];
+        });
+
         return Inertia::render('SuperAdmin/PasswordResetRequests', [
             'requests' => $requests,
             'counts' => $counts,
             'currentStatus' => $status,
+            'studentsInCurrentTerm' => $studentsInCurrentTerm,
+            'studentSearch' => [
+                'lrn' => $studentLrn,
+            ],
+            'currentSchoolYear' => $currentSchoolYear,
+            'currentSemester' => $currentSemester,
         ]);
     }
 
@@ -581,18 +677,7 @@ class UserManagementController extends Controller
             'admin_notes' => ['nullable', 'string', 'max:500'],
         ]);
 
-        if (blank($passwordResetRequest->user->email)) {
-            return back()->withErrors([
-                'email' => 'Cannot approve this reset request because the user has no email on file.',
-            ]);
-        }
-
-        // Generate a random 8-character password.
-        $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
-        $tempPassword = '';
-        for ($i = 0; $i < 8; $i++) {
-            $tempPassword .= $chars[random_int(0, strlen($chars) - 1)];
-        }
+        $tempPassword = $this->generateTemporaryPassword();
 
         $passwordResetRequest->user->update([
             'password' => Hash::make($tempPassword),
@@ -610,14 +695,88 @@ class UserManagementController extends Controller
             'processed_at' => now(),
         ]);
 
-        Mail::to($passwordResetRequest->user->email)->send(new TemporaryCredentials(
-            user: $passwordResetRequest->user,
-            plainPassword: $tempPassword,
-            issuedBy: Auth::user(),
-            context: 'password reset',
-        ));
+        return back()
+            ->with('success', 'Password reset approved. Share the temporary credentials with the user.')
+            ->with('password_reset_credentials', $this->buildResetCredentialPayload(
+                $passwordResetRequest->user,
+                $tempPassword,
+                $passwordResetRequest->user->student,
+            ));
+    }
 
-        return back()->with('success', 'Password reset approved. Temporary credentials were sent via email.');
+    /**
+     * Reset a current-term student password by LRN.
+     */
+    public function resetStudentPasswordByLrn(Request $request)
+    {
+        $validated = $request->validate([
+            'lrn' => ['required', 'string', 'max:20'],
+        ]);
+
+        $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
+        $currentSemester = (string) SystemSetting::getCurrentSemester();
+
+        $student = Student::query()
+            ->with('user.roles:id,name')
+            ->where('lrn', trim((string) $validated['lrn']))
+            ->whereHas('user.roles', function ($roleQuery) {
+                $roleQuery->where('name', 'student');
+            })
+            ->whereHas('user.enrollments.schoolClass', function ($classQuery) use ($currentSchoolYear, $currentSemester) {
+                $classQuery
+                    ->where('school_year', $currentSchoolYear)
+                    ->where('semester', $currentSemester);
+            })
+            ->first();
+
+        if (!$student || !$student->user) {
+            return back()->withErrors([
+                'student_lrn' => 'No active student found for that LRN in the current school year and semester.',
+            ]);
+        }
+
+        $tempPassword = $this->generateTemporaryPassword();
+
+        $student->user->update([
+            'password' => Hash::make($tempPassword),
+            'must_change_password' => true,
+            'password_changed_at' => null,
+            'temporary_password' => $tempPassword,
+        ]);
+
+        return back()
+            ->with('success', 'Student password reset successfully.')
+            ->with('password_reset_credentials', $this->buildResetCredentialPayload(
+                $student->user,
+                $tempPassword,
+                $student,
+            ));
+    }
+
+    private function generateTemporaryPassword(int $length = 8): string
+    {
+        $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+        $tempPassword = '';
+
+        for ($i = 0; $i < $length; $i++) {
+            $tempPassword .= $chars[random_int(0, strlen($chars) - 1)];
+        }
+
+        return $tempPassword;
+    }
+
+    private function buildResetCredentialPayload(User $user, string $tempPassword, ?Student $student = null): array
+    {
+        $resolvedStudent = $student ?? $user->student;
+        $loginIdentifier = (string) ($user->username ?: $user->email ?: '');
+
+        return [
+            'user_id' => $user->id,
+            'full_name' => $user->name,
+            'lrn' => $resolvedStudent?->lrn,
+            'username' => $loginIdentifier,
+            'password' => $tempPassword,
+        ];
     }
 
     /**

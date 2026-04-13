@@ -114,10 +114,10 @@ export default function Dashboard({
             shadow: "shadow-emerald-500/30",
         },
         {
-            name: "Add Admin",
-            description: "Assign a department administrator",
+            name: "Manage Admin Users",
+            description: "Open User Management filtered to admins",
             icon: UserCog,
-            href: route("superadmin.admins.create"),
+            href: route("superadmin.users.index", { role: "admin" }),
             color: "from-green-500 to-emerald-600",
             shadow: "shadow-green-500/30",
         },
@@ -467,7 +467,9 @@ export default function Dashboard({
                                         </div>
                                     </div>
                                     <Link
-                                        href={route("superadmin.admins.index")}
+                                        href={route("superadmin.users.index", {
+                                            role: "admin",
+                                        })}
                                         className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:text-emerald-800"
                                     >
                                         View all <ArrowRight size={13} />
@@ -484,11 +486,13 @@ export default function Dashboard({
                                         </p>
                                         <Link
                                             href={route(
-                                                "superadmin.admins.create",
+                                                "superadmin.users.index",
+                                                { role: "admin" },
                                             )}
                                             className="text-sm font-semibold text-emerald-700 hover:text-emerald-800"
                                         >
-                                            Add your first admin
+                                            Add your first admin in User
+                                            Management
                                         </Link>
                                     </div>
                                 ) : (

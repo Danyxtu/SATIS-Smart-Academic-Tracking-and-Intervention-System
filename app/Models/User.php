@@ -223,6 +223,14 @@ implements MustVerifyEmailContract
         return $this->hasMany(User::class, 'created_by');
     }
 
+    /**
+     * Get class enrollments for this user.
+     */
+    public function enrollments(): HasMany
+    {
+        return $this->hasMany(Enrollment::class);
+    }
+
 
     public function roles()
     {

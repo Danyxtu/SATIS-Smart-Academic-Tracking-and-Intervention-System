@@ -90,6 +90,8 @@ class HandleInertiaRequests extends Middleware
                 'import_summary' => fn() => $request->session()->get('import_summary'),
                 'class_create_summary' => fn() => $request->session()->get('class_create_summary'),
                 'new_student_password' => fn() => $request->session()->get('new_student_password'),
+                'created_student_credentials' => fn() => $request->session()->get('created_student_credentials'),
+                'password_reset_credentials' => fn() => $request->session()->get('password_reset_credentials'),
                 'grade_update_summary' => fn() => $request->session()->get('grade_update_summary'),
                 'grade_import_summary' => fn() => $request->session()->get('grade_import_summary'),
             ],
