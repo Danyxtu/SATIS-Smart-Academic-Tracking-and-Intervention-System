@@ -21,6 +21,11 @@ use Inertia\Inertia;
 Route::get('/', function () {
     if (Auth::check()) {
         $user = Auth::user();
+
+        if ($user->hasRole('super_admin') && (! filled((string) $user->personal_email) || ! $user->hasVerifiedEmail())) {
+            return redirect()->route('verification.notice');
+        }
+
         // Always prioritize teacher dashboard if user has teacher role
         if ($user->hasRole('teacher')) {
             return redirect()->route('teacher.dashboard');
@@ -96,6 +101,11 @@ Route::middleware('auth')->group(function () {
 */
 Route::get('/redirect-after-login', function () {
     $user = Auth::user();
+
+    if ($user->hasRole('super_admin') && (! filled((string) $user->personal_email) || ! $user->hasVerifiedEmail())) {
+        return redirect()->route('verification.notice');
+    }
+
     // Always prioritize teacher dashboard if user has teacher role
     if ($user->hasRole('teacher')) {
         return redirect()->route('teacher.dashboard');

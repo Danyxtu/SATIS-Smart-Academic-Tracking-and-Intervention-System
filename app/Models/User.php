@@ -268,11 +268,15 @@ implements MustVerifyEmailContract
     }
 
     /**
-     * Enforce email verification for students while allowing existing
-     * non-student portal behavior to remain unchanged.
+     * Enforce email verification for students and super admins.
+     * Other non-student roles keep legacy behavior.
      */
     public function hasVerifiedEmail(): bool
     {
+        if ($this->isSuperAdmin()) {
+            return filled((string) $this->personal_email) && ! is_null($this->email_verified_at);
+        }
+
         if (! $this->isStudent()) {
             return true;
         }

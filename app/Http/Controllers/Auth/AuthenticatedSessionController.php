@@ -56,6 +56,15 @@ class AuthenticatedSessionController extends Controller
             return redirect()->route('password.force-change');
         }
 
+        // Super admins must set and verify personal email before portal access.
+        if (
+            $user->isSuperAdmin() &&
+            (! filled((string) $user->personal_email) || ! $user->hasVerifiedEmail())
+        ) {
+            return redirect()->route('verification.notice')
+                ->with('status', 'verification-email-required');
+        }
+
         // Students must complete email setup and verification before dashboard access.
         if (
             $user->isStudent() &&

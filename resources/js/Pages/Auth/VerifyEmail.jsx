@@ -52,7 +52,7 @@ export default function VerifyEmail({
             <div className="mb-6 text-sm text-gray-600 text-center bg-blue-50 p-4 rounded-xl border border-blue-100">
                 <Mail className="w-8 h-8 text-blue-500 mx-auto mb-3" />
                 {requiresEmailInput
-                    ? "Please enter your personal email first. We will send a verification link to activate your student dashboard access."
+                    ? "Please enter your personal email first. We will send a verification link to activate your account access."
                     : "Before getting started, verify your personal email by clicking the link we send. You can resend a new link anytime."}
                 <p className="mt-2 text-xs text-blue-700">
                     Verification links expire in {expiresInMinutes} minutes.
@@ -62,7 +62,7 @@ export default function VerifyEmail({
             {showEmailRequiredHint && (
                 <div className="mb-4 text-sm font-medium text-amber-700 text-center bg-amber-50 p-3 rounded-xl border border-amber-200">
                     A personal email is required before you can access the
-                    student dashboard.
+                    dashboard.
                 </div>
             )}
 

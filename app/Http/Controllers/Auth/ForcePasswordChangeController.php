@@ -45,6 +45,17 @@ class ForcePasswordChangeController extends Controller
         // Refresh the user model to ensure the session has updated data
         $user->refresh();
 
+        // Super admins must provide and verify personal email before portal access.
+        if (
+            $user->isSuperAdmin() &&
+            (! filled((string) $user->personal_email) || ! $user->hasVerifiedEmail())
+        ) {
+            return redirect()->route('verification.notice')->with(
+                'status',
+                'verification-email-required'
+            );
+        }
+
         // Redirect based on role priority for multi-role users.
         // Teacher should always land on teacher dashboard when present.
         if ($user->isTeacher()) {
