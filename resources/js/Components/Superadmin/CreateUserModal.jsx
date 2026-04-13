@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "@inertiajs/react";
 import {
     Check,
@@ -374,6 +374,8 @@ export default function CreateUserModal({
     departments,
     studentCount = 0,
 }) {
+    const wasOpenRef = useRef(false);
+
     const [step, setStep] = useState(STEP_PROFILE);
     const [teacherMode, setTeacherMode] = useState(TEACHER_MODE_SINGLE);
     const [teacherDraft, setTeacherDraft] = useState(emptyTeacherDraft());
@@ -566,34 +568,34 @@ export default function CreateUserModal({
     }, [isTeacher, teacherMode, studentMode]);
 
     useEffect(() => {
-        if (!open) {
-            return;
+        if (open && !wasOpenRef.current) {
+            reset();
+            clearErrors();
+            setStep(STEP_PROFILE);
+
+            setTeacherMode(TEACHER_MODE_SINGLE);
+            setTeacherDraft(emptyTeacherDraft());
+            setTeacherQueue([]);
+
+            setStudentMode(STUDENT_MODE_SINGLE);
+            setStudentDraft(emptyStudentDraft());
+            setStudentQueue([]);
+            setStudentCsvFileName("");
+            setCreatedStudentCredentials([]);
+            setSelectedCreatedStudentId("");
+
+            setClientErrors({});
+
+            setData("teacher_mode", TEACHER_MODE_SINGLE);
+            setData("teacher_queue", []);
+            setData("student_mode", STUDENT_MODE_SINGLE);
+            setData("student_queue", []);
+            setData("lrn", "");
+            setData("username", "");
+            setData("password", generateRandomPassword());
         }
 
-        reset();
-        clearErrors();
-        setStep(STEP_PROFILE);
-
-        setTeacherMode(TEACHER_MODE_SINGLE);
-        setTeacherDraft(emptyTeacherDraft());
-        setTeacherQueue([]);
-
-        setStudentMode(STUDENT_MODE_SINGLE);
-        setStudentDraft(emptyStudentDraft());
-        setStudentQueue([]);
-        setStudentCsvFileName("");
-        setCreatedStudentCredentials([]);
-        setSelectedCreatedStudentId("");
-
-        setClientErrors({});
-
-        setData("teacher_mode", TEACHER_MODE_SINGLE);
-        setData("teacher_queue", []);
-        setData("student_mode", STUDENT_MODE_SINGLE);
-        setData("student_queue", []);
-        setData("lrn", "");
-        setData("username", "");
-        setData("password", generateRandomPassword());
+        wasOpenRef.current = open;
     }, [open, reset, clearErrors, setData]);
 
     useEffect(() => {
@@ -748,11 +750,20 @@ export default function CreateUserModal({
     }, [isStudent, studentMode, singleStudentUsernamePreview, setData]);
 
     useEffect(() => {
-        if (!open || !errors || typeof errors !== "object") {
+        if (
+            !open ||
+            step === STEP_SUMMARY ||
+            !errors ||
+            typeof errors !== "object"
+        ) {
             return;
         }
 
         const errorKeys = Object.keys(errors);
+
+        if (errorKeys.length === 0) {
+            return;
+        }
 
         if (errorKeys.some((field) => field === "password")) {
             setStep(STEP_SECURITY);
@@ -781,7 +792,7 @@ export default function CreateUserModal({
         ) {
             setStep(STEP_PROFILE);
         }
-    }, [open, errors]);
+    }, [open, errors, step]);
 
     const closeModal = () => {
         if (processing) {
@@ -1375,9 +1386,9 @@ export default function CreateUserModal({
                             ? String(normalizedCredentials[0].id)
                             : "",
                     );
+                    setStep(STEP_SUMMARY);
                     clearErrors();
                     setClientErrors({});
-                    setStep(STEP_SUMMARY);
                     return;
                 }
 
