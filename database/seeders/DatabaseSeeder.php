@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
 
             // For development/testing: creates a superadmin with known credentials.
             SubjectTypeSeeder::class,
+            DepartmentSeeder::class,
             SubjectSeeder::class,
             SchoolYearArchiveSeeder::class,
             TestUserSeeder::class,

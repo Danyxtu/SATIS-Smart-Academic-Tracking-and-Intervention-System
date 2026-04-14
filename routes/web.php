@@ -124,7 +124,7 @@ Route::get('/redirect-after-login', function () {
         return redirect()->route('dashboard');
     }
     return redirect('/');
-})->middleware(['auth']);
+})->middleware(['auth'])->name('redirect-after-login');
 
 
 /*
