@@ -6,8 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 class EmailVerificationNotificationController extends Controller
 {
@@ -51,10 +54,29 @@ class EmailVerificationNotificationController extends Controller
         }
 
         if ($user->hasVerifiedEmail()) {
-            return redirect()->intended(route('redirect-after-login', absolute: false));
+            $redirectPath = Route::has('redirect-after-login')
+                ? route('redirect-after-login', absolute: false)
+                : '/';
+
+            return redirect()->intended($redirectPath);
         }
 
-        $user->sendEmailVerificationNotification();
+        try {
+            $user->sendEmailVerificationNotification();
+        } catch (Throwable $exception) {
+            Log::error('Failed to send verification email.', [
+                'user_id' => $user->id,
+                'personal_email' => $user->personal_email,
+                'mailer' => config('mail.default'),
+                'message' => $exception->getMessage(),
+            ]);
+
+            return back()
+                ->withErrors([
+                    'email' => 'We could not send the verification email right now. Please try again in a moment.',
+                ])
+                ->withInput();
+        }
 
         return back()->with('status', 'verification-link-sent');
     }

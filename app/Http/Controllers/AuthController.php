@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 class AuthController extends Controller
 {
@@ -155,7 +157,23 @@ class AuthController extends Controller
         }
 
         if (! $freshUser->hasVerifiedEmail()) {
-            $freshUser->sendEmailVerificationNotification();
+            try {
+                $freshUser->sendEmailVerificationNotification();
+            } catch (Throwable $exception) {
+                Log::error('Student verification email send failed (API).', [
+                    'user_id' => $freshUser->id,
+                    'personal_email' => $freshUser->personal_email,
+                    'mailer' => config('mail.default'),
+                    'message' => $exception->getMessage(),
+                ]);
+
+                return response()->json([
+                    'message' => 'Verification email could not be sent right now. Please try again later.',
+                    'user' => $freshUser,
+                    ...$this->accountReadinessFlags($freshUser),
+                    'verification_expire_minutes' => (int) config('auth.verification.expire', 30),
+                ], 503);
+            }
         }
 
         return response()->json([

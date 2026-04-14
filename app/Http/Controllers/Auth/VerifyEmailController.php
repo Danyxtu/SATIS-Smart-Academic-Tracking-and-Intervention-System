@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
+use Throwable;
 
 class VerifyEmailController extends Controller
 {
@@ -14,14 +17,29 @@ class VerifyEmailController extends Controller
      */
     public function __invoke(EmailVerificationRequest $request): RedirectResponse
     {
+        $redirectPath = Route::has('redirect-after-login')
+            ? route('redirect-after-login', absolute: false)
+            : '/';
+
         if ($request->user()->hasVerifiedEmail()) {
-            return redirect()->intended(route('redirect-after-login', absolute: false) . '?verified=1');
+            return redirect()->intended($redirectPath . '?verified=1');
         }
 
-        if ($request->user()->markEmailAsVerified()) {
-            event(new Verified($request->user()));
+        try {
+            if ($request->user()->markEmailAsVerified()) {
+                event(new Verified($request->user()));
+            }
+        } catch (Throwable $exception) {
+            Log::error('Email verification finalization failed.', [
+                'user_id' => $request->user()?->id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return redirect()->route('verification.notice')->withErrors([
+                'email' => 'We could not complete email verification right now. Please try again.',
+            ]);
         }
 
-        return redirect()->intended(route('redirect-after-login', absolute: false) . '?verified=1');
+        return redirect()->intended($redirectPath . '?verified=1');
     }
 }
