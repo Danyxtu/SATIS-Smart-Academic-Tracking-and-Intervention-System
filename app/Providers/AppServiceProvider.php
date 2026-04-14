@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
-use App\Models\User; // <-- Add this
+use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
@@ -23,6 +25,24 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Vite::prefetch(concurrency: 3);
+
+        VerifyEmail::toMailUsing(function ($notifiable, string $url): MailMessage {
+            $portalLabel = 'School Staff Portal';
+
+            if (method_exists($notifiable, 'hasRole') && $notifiable->hasRole('student')) {
+                $portalLabel = 'Student Portal';
+            }
+
+            return (new MailMessage)
+                ->subject('Verify Your Email Address - SATIS-FACTION')
+                ->view('emails.EmailVerificationMailTemplate', [
+                    'userName' => $notifiable->name ?? 'User',
+                    'verificationUrl' => $url,
+                    'expiresInMinutes' => (int) config('auth.verification.expire', 30),
+                    'portalLabel' => $portalLabel,
+                    'logoUrl' => url('/images/satis-logo.png'),
+                ]);
+        });
 
         Gate::define('access-super-admin-portal', function (User $user) {
             return $user->hasRole('super_admin');
