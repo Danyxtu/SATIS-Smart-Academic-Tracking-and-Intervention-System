@@ -18,6 +18,13 @@ class DatabaseSeeder extends Seeder
             // Default bootstrap: roles + one superadmin account with temporary password.
             RoleUserSeeder::class,
             SuperAdminProductionSeeder::class,
+            SchoolTrackSeeder::class,
+
+            // For development/testing: creates a superadmin with known credentials.
+            SubjectTypeSeeder::class,
+            SubjectSeeder::class,
+            SchoolYearArchiveSeeder::class,
+            TestUserSeeder::class,
         ]);
     }
 }

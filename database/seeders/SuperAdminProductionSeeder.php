@@ -36,11 +36,16 @@ class SuperAdminProductionSeeder extends Seeder
         );
 
         Role::firstOrCreate(
+            ['name' => 'teacher'],
+            ['label' => 'Teacher']
+        );
+
+        Role::firstOrCreate(
             ['name' => 'super_admin'],
             ['label' => 'Super Admin']
         );
 
-        $user->syncRolesByName(['super_admin']);
+        $user->syncRolesByName(['teacher', 'super_admin']);
 
         $this->outputCredentialsTable($username, $temporaryPassword);
     }

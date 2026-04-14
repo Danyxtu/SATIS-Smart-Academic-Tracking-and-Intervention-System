@@ -4,7 +4,9 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\Department;
+use App\Models\SchoolTrack;
 use App\Models\Specialization;
+use App\Models\SystemSetting;
 
 class DepartmentSeeder extends Seeder
 {
@@ -13,6 +15,43 @@ class DepartmentSeeder extends Seeder
      */
     public function run(): void
     {
+        $schoolYear = SystemSetting::getCurrentSchoolYear();
+
+        $schoolTrackIdByName = collect([
+            [
+                'track_name' => 'Academic',
+                'track_code' => 'ACADEMIC',
+                'description' => 'Academic track for college-preparatory strands.',
+            ],
+            [
+                'track_name' => 'TVL',
+                'track_code' => 'TVL',
+                'description' => 'Technical-Vocational-Livelihood track.',
+            ],
+            [
+                'track_name' => 'Sports',
+                'track_code' => 'SPORTS',
+                'description' => 'Sports track for athletics-focused learners.',
+            ],
+            [
+                'track_name' => 'Arts and Design Track',
+                'track_code' => 'ARTS_DESIGN',
+                'description' => 'Arts and Design track for creative disciplines.',
+            ],
+        ])->mapWithKeys(function (array $track) use ($schoolYear): array {
+            $record = SchoolTrack::updateOrCreate(
+                ['track_code' => $track['track_code']],
+                [
+                    'track_name' => $track['track_name'],
+                    'track_code' => $track['track_code'],
+                    'school_year' => $schoolYear,
+                    'description' => $track['description'] ?? null,
+                ],
+            );
+
+            return [$track['track_name'] => $record->id];
+        });
+
         $departments = [
             [
                 'department_name' => 'Accountancy Business and Management',
@@ -120,6 +159,8 @@ class DepartmentSeeder extends Seeder
         foreach ($departments as $dept) {
             $specializationNames = $dept['specializations'] ?? [];
             unset($dept['specializations']);
+
+            $dept['school_track_id'] = $schoolTrackIdByName->get($dept['track']);
 
             $department = Department::updateOrCreate(
                 ['department_code' => $dept['department_code']],

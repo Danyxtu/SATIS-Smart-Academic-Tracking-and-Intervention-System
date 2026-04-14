@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Department;
+use App\Models\Enrollment;
 use App\Models\SchoolClass;
 use App\Models\Section;
 use App\Models\Student;
@@ -11,6 +12,7 @@ use App\Models\Subject;
 use App\Models\SystemSetting;
 use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -75,7 +77,11 @@ class AcademicManagementController extends Controller
                 'teacher:id,first_name,middle_name,last_name,department_id',
                 'sectionRecord:id,department_id,section_name,section_code,cohort,grade_level,strand,track,is_active',
                 'sectionRecord.department:id,department_name,department_code',
-            ]);
+                'enrollments:id,user_id,class_id,q1_grade,q2_grade,final_grade,remarks',
+                'enrollments.user:id,first_name,middle_name,last_name,username,personal_email',
+                'enrollments.user.student:id,user_id,student_name,lrn',
+            ])
+            ->withCount('enrollments');
 
         if ($departmentId !== null && $departmentId > 0) {
             $sectionsQuery->where('department_id', $departmentId);
@@ -171,6 +177,26 @@ class AcademicManagementController extends Controller
 
         $classes->setCollection(
             $classes->getCollection()->map(function (SchoolClass $schoolClass) {
+                $students = $schoolClass->enrollments
+                    ->map(function (Enrollment $enrollment) {
+                        $studentProfile = $enrollment->user?->student;
+
+                        return [
+                            'enrollment_id' => (int) $enrollment->id,
+                            'student_user_id' => $enrollment->user_id ? (int) $enrollment->user_id : null,
+                            'student_name' => $enrollment->user?->name
+                                ?: $studentProfile?->student_name,
+                            'student_username' => $enrollment->user?->username,
+                            'student_lrn' => $studentProfile?->lrn,
+                            'q1_grade' => $enrollment->q1_grade,
+                            'q2_grade' => $enrollment->q2_grade,
+                            'final_grade' => $enrollment->final_grade,
+                            'remarks' => $enrollment->remarks,
+                            'passed' => Str::lower((string) $enrollment->remarks) === 'passed',
+                        ];
+                    })
+                    ->values();
+
                 return [
                     'id' => (int) $schoolClass->id,
                     'subject_id' => (int) $schoolClass->subject_id,
@@ -193,6 +219,8 @@ class AcademicManagementController extends Controller
                     'grade_level' => $schoolClass->sectionRecord?->grade_level,
                     'strand' => $schoolClass->sectionRecord?->strand,
                     'track' => $schoolClass->sectionRecord?->track,
+                    'students_total' => (int) ($schoolClass->enrollments_count ?? $students->count()),
+                    'students' => $students,
                     'school_year' => $schoolClass->school_year,
                     'color' => $schoolClass->color,
                     'department' => $schoolClass->sectionRecord?->department ? [
@@ -874,6 +902,367 @@ class AcademicManagementController extends Controller
             ->with('success', 'Section updated successfully.');
     }
 
+    public function sectionStudents(Section $section): JsonResponse
+    {
+        $students = Student::query()
+            ->with('user:id,first_name,middle_name,last_name,personal_email,department_id')
+            ->where('section_id', (int) $section->id)
+            ->orderBy('student_name')
+            ->get([
+                'id',
+                'user_id',
+                'student_name',
+                'lrn',
+                'grade_level',
+                'strand',
+                'track',
+                'section',
+                'section_id',
+            ]);
+
+        return response()->json([
+            'students' => $students
+                ->map(fn(Student $student) => $this->formatSectionStudentPayload($student))
+                ->values(),
+            'students_count' => $students->count(),
+        ]);
+    }
+
+    public function syncSectionStudents(Request $request, Section $section): JsonResponse
+    {
+        $validated = $request->validate([
+            'actions' => ['required', 'array', 'min:1'],
+            'actions.*.student_id' => ['required', 'integer', Rule::exists('students', 'id')],
+            'actions.*.operation' => ['required', 'string', Rule::in(['remove', 'reassign'])],
+            'actions.*.target_section_id' => ['nullable', 'integer', Rule::exists('sections', 'id')],
+        ]);
+
+        $actions = collect($validated['actions'] ?? [])
+            ->map(function (array $action): array {
+                return [
+                    'student_id' => (int) ($action['student_id'] ?? 0),
+                    'operation' => (string) ($action['operation'] ?? ''),
+                    'target_section_id' => isset($action['target_section_id'])
+                        ? (int) $action['target_section_id']
+                        : null,
+                ];
+            })
+            ->values();
+
+        $duplicateAction = $actions
+            ->groupBy('student_id')
+            ->first(fn($group) => $group->count() > 1);
+
+        if ($duplicateAction) {
+            throw ValidationException::withMessages([
+                'actions' => 'Only one action per student is allowed in a single save.',
+            ]);
+        }
+
+        $missingTargetAction = $actions->first(
+            fn(array $action) =>
+            $action['operation'] === 'reassign'
+                && (! isset($action['target_section_id']) || $action['target_section_id'] <= 0),
+        );
+
+        if ($missingTargetAction) {
+            throw ValidationException::withMessages([
+                'actions' => 'Each reassignment must include a destination section.',
+            ]);
+        }
+
+        $sameSectionAction = $actions->first(
+            fn(array $action) =>
+            $action['operation'] === 'reassign'
+                && (int) $action['target_section_id'] === (int) $section->id,
+        );
+
+        if ($sameSectionAction) {
+            throw ValidationException::withMessages([
+                'actions' => 'Please choose a different section for reassignment.',
+            ]);
+        }
+
+        $studentIds = $actions
+            ->pluck('student_id')
+            ->map(fn($studentId) => (int) $studentId)
+            ->unique()
+            ->values();
+
+        $studentsById = Student::query()
+            ->with('user:id,department_id')
+            ->whereIn('id', $studentIds)
+            ->get()
+            ->keyBy(fn(Student $student) => (int) $student->id);
+
+        $invalidStudentAction = $actions->first(function (array $action) use ($studentsById, $section): bool {
+            $student = $studentsById->get((int) $action['student_id']);
+
+            return ! $student || (int) ($student->section_id ?? 0) !== (int) $section->id;
+        });
+
+        if ($invalidStudentAction) {
+            throw ValidationException::withMessages([
+                'actions' => 'One or more selected students are no longer assigned to this section.',
+            ]);
+        }
+
+        $targetSectionIds = $actions
+            ->filter(fn(array $action) => $action['operation'] === 'reassign')
+            ->pluck('target_section_id')
+            ->map(fn($sectionId) => (int) $sectionId)
+            ->unique()
+            ->values();
+
+        $targetSectionsById = $targetSectionIds->isEmpty()
+            ? collect()
+            : Section::query()
+            ->whereIn('id', $targetSectionIds)
+            ->where('is_active', true)
+            ->get([
+                'id',
+                'department_id',
+                'section_name',
+                'grade_level',
+                'strand',
+                'track',
+            ])
+            ->keyBy(fn(Section $targetSection) => (int) $targetSection->id);
+
+        $missingTargetSectionAction = $actions->first(function (array $action) use ($targetSectionsById): bool {
+            if ($action['operation'] !== 'reassign') {
+                return false;
+            }
+
+            return ! $targetSectionsById->has((int) ($action['target_section_id'] ?? 0));
+        });
+
+        if ($missingTargetSectionAction) {
+            throw ValidationException::withMessages([
+                'actions' => 'One or more destination sections are invalid or inactive.',
+            ]);
+        }
+
+        DB::transaction(function () use ($actions, $studentsById, $targetSectionsById): void {
+            foreach ($actions as $action) {
+                $student = $studentsById->get((int) $action['student_id']);
+
+                if (! $student) {
+                    continue;
+                }
+
+                if ($action['operation'] === 'remove') {
+                    $student->update([
+                        'section_id' => null,
+                        'section' => null,
+                    ]);
+
+                    continue;
+                }
+
+                $targetSection = $targetSectionsById->get(
+                    (int) ($action['target_section_id'] ?? 0),
+                );
+
+                if (! $targetSection) {
+                    continue;
+                }
+
+                $student->update([
+                    'section_id' => (int) $targetSection->id,
+                    'section' => $targetSection->section_name,
+                    'grade_level' => $targetSection->grade_level,
+                    'strand' => $targetSection->strand,
+                    'track' => $targetSection->track,
+                ]);
+
+                if (
+                    $student->user
+                    && (int) ($student->user->department_id ?? 0)
+                    !== (int) $targetSection->department_id
+                ) {
+                    $student->user->update([
+                        'department_id' => (int) $targetSection->department_id,
+                    ]);
+                }
+            }
+        });
+
+        $updatedStudents = Student::query()
+            ->with('user:id,first_name,middle_name,last_name,personal_email,department_id')
+            ->where('section_id', (int) $section->id)
+            ->orderBy('student_name')
+            ->get([
+                'id',
+                'user_id',
+                'student_name',
+                'lrn',
+                'grade_level',
+                'strand',
+                'track',
+                'section',
+                'section_id',
+            ]);
+
+        return response()->json([
+            'message' => 'Section students updated successfully.',
+            'students' => $updatedStudents
+                ->map(fn(Student $student) => $this->formatSectionStudentPayload($student))
+                ->values(),
+            'students_count' => $updatedStudents->count(),
+        ]);
+    }
+
+    public function sectionClasses(Section $section): JsonResponse
+    {
+        $classes = SchoolClass::query()
+            ->with([
+                'subject:id,subject_name,subject_code',
+                'teacher:id,first_name,middle_name,last_name',
+            ])
+            ->where('section_id', (int) $section->id)
+            ->orderByDesc('created_at')
+            ->get([
+                'id',
+                'subject_id',
+                'section_id',
+                'teacher_id',
+                'school_year',
+                'grade_level',
+                'strand',
+                'track',
+                'color',
+                'semester',
+                'created_at',
+            ]);
+
+        return response()->json([
+            'classes' => $classes
+                ->map(fn(SchoolClass $schoolClass) => $this->formatSectionClassPayload($schoolClass))
+                ->values(),
+            'classes_count' => $classes->count(),
+        ]);
+    }
+
+    public function syncSectionClasses(Request $request, Section $section): JsonResponse
+    {
+        if (! $section->is_active) {
+            throw ValidationException::withMessages([
+                'class_queue' => 'Cannot add classes to an inactive section.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'class_queue' => ['required', 'array', 'min:1', 'max:100'],
+            'class_queue.*.subject_id' => ['required', 'integer', Rule::exists('subjects', 'id')],
+            'class_queue.*.teacher_id' => ['required', 'integer', Rule::exists('users', 'id')],
+            'class_queue.*.school_year' => ['required', 'string', 'max:9', 'regex:/^\d{4}-\d{4}$/'],
+            'class_queue.*.color' => ['nullable', 'string', Rule::in(self::COLOR_OPTIONS)],
+        ]);
+
+        $queueItems = collect($validated['class_queue'] ?? [])
+            ->map(function (array $item): array {
+                return [
+                    'subject_id' => (int) ($item['subject_id'] ?? 0),
+                    'teacher_id' => (int) ($item['teacher_id'] ?? 0),
+                    'school_year' => $this->normalizeText((string) ($item['school_year'] ?? '')),
+                    'color' => $item['color'] ?? 'indigo',
+                ];
+            })
+            ->values();
+
+        $duplicateQueueExists = $queueItems
+            ->groupBy(fn(array $item) => $item['subject_id'] . '|' . $item['school_year'])
+            ->contains(fn($group) => $group->count() > 1);
+
+        if ($duplicateQueueExists) {
+            throw ValidationException::withMessages([
+                'class_queue' => 'Duplicate queue entries found. A subject can only be added once per school year for this section.',
+            ]);
+        }
+
+        $createdOutcome = DB::transaction(function () use ($queueItems, $section): array {
+            $created = 0;
+            $autoEnrolled = 0;
+            $sectionStudentUserIds = $this->resolveSectionStudentUserIds((int) $section->id);
+
+            foreach ($queueItems as $index => $item) {
+                $this->ensureTeacherAssignable(
+                    (int) $item['teacher_id'],
+                    (int) $section->department_id,
+                    "class_queue.{$index}.teacher_id",
+                );
+
+                $this->ensureUniqueClassAssignment(
+                    (int) $item['subject_id'],
+                    (int) $section->id,
+                    $item['school_year'],
+                    null,
+                    "class_queue.{$index}.subject_id",
+                );
+
+                $schoolClass = SchoolClass::create([
+                    'subject_id' => (int) $item['subject_id'],
+                    'section_id' => (int) $section->id,
+                    'teacher_id' => (int) $item['teacher_id'],
+                    'school_year' => $item['school_year'],
+                    'grade_level' => $section->grade_level ?? '12',
+                    'section' => $section->section_code ?: $section->section_name,
+                    'strand' => $section->strand,
+                    'track' => $section->track,
+                    'color' => $item['color'] ?? 'indigo',
+                    'semester' => (string) SystemSetting::getCurrentSemester(),
+                ]);
+
+                $autoEnrolled += $this->autoEnrollUsersToClass(
+                    $schoolClass,
+                    $sectionStudentUserIds,
+                );
+
+                $created++;
+            }
+
+            return [
+                'created' => $created,
+                'auto_enrolled' => $autoEnrolled,
+            ];
+        });
+
+        $createdCount = (int) ($createdOutcome['created'] ?? 0);
+        $autoEnrolledCount = (int) ($createdOutcome['auto_enrolled'] ?? 0);
+
+        $updatedClasses = SchoolClass::query()
+            ->with([
+                'subject:id,subject_name,subject_code',
+                'teacher:id,first_name,middle_name,last_name',
+            ])
+            ->where('section_id', (int) $section->id)
+            ->orderByDesc('created_at')
+            ->get([
+                'id',
+                'subject_id',
+                'section_id',
+                'teacher_id',
+                'school_year',
+                'grade_level',
+                'strand',
+                'track',
+                'color',
+                'semester',
+                'created_at',
+            ]);
+
+        return response()->json([
+            'message' => $createdCount . ' class' . ($createdCount === 1 ? '' : 'es') . ' created successfully.',
+            'created_count' => $createdCount,
+            'auto_enrolled_count' => $autoEnrolledCount,
+            'classes' => $updatedClasses
+                ->map(fn(SchoolClass $schoolClass) => $this->formatSectionClassPayload($schoolClass))
+                ->values(),
+            'classes_count' => $updatedClasses->count(),
+        ]);
+    }
+
     /**
      * @return array<string, array<int, mixed>>
      */
@@ -894,6 +1283,49 @@ class AcademicManagementController extends Controller
             'new_students.*.middle_name' => ['nullable', 'string', 'max:255'],
             'new_students.*.lrn' => ['required', 'string', 'max:20', 'distinct', Rule::unique('students', 'lrn')],
             'new_students.*.personal_email' => ['nullable', 'email', 'max:255', Rule::unique('users', 'personal_email')],
+        ];
+    }
+
+    /**
+     * @return array<string, int|string|null>
+     */
+    private function formatSectionStudentPayload(Student $student): array
+    {
+        return [
+            'id' => (int) $student->id,
+            'user_id' => $student->user_id ? (int) $student->user_id : null,
+            'student_name' => $student->student_name,
+            'name' => $student->user?->name ?: $student->student_name,
+            'lrn' => $student->lrn,
+            'grade_level' => $student->grade_level,
+            'strand' => $student->strand,
+            'track' => $student->track,
+            'section' => $student->section,
+            'section_id' => $student->section_id ? (int) $student->section_id : null,
+            'personal_email' => $student->user?->personal_email,
+        ];
+    }
+
+    /**
+     * @return array<string, int|string|null>
+     */
+    private function formatSectionClassPayload(SchoolClass $schoolClass): array
+    {
+        return [
+            'id' => (int) $schoolClass->id,
+            'subject_id' => (int) $schoolClass->subject_id,
+            'subject_name' => $schoolClass->subject?->subject_name,
+            'subject_code' => $schoolClass->subject?->subject_code,
+            'teacher_id' => (int) $schoolClass->teacher_id,
+            'teacher_name' => $schoolClass->teacher?->name,
+            'section_id' => (int) $schoolClass->section_id,
+            'school_year' => $schoolClass->school_year,
+            'grade_level' => $schoolClass->grade_level,
+            'strand' => $schoolClass->strand,
+            'track' => $schoolClass->track,
+            'color' => $schoolClass->color,
+            'semester' => $schoolClass->semester,
+            'created_at' => $schoolClass->created_at?->toIso8601String(),
         ];
     }
 
@@ -941,13 +1373,25 @@ class AcademicManagementController extends Controller
                 ]);
             }
 
-            $createdCount = DB::transaction(function () use ($queueItems) {
+            $createdOutcome = DB::transaction(function () use ($queueItems) {
                 $sectionLookup = Section::query()
                     ->whereIn('id', $queueItems->pluck('section_id')->unique()->values())
                     ->get()
                     ->keyBy(fn(Section $section) => (int) $section->id);
 
                 $created = 0;
+                $autoEnrolled = 0;
+                $sectionStudentUserIdsLookup = Student::query()
+                    ->whereIn('section_id', $sectionLookup->keys()->values())
+                    ->whereNotNull('user_id')
+                    ->get(['section_id', 'user_id'])
+                    ->groupBy(fn(Student $student) => (int) $student->section_id)
+                    ->map(fn($group) => $group
+                        ->pluck('user_id')
+                        ->map(fn($userId) => (int) $userId)
+                        ->filter(fn($userId) => $userId > 0)
+                        ->unique()
+                        ->values());
 
                 foreach ($queueItems as $index => $item) {
                     $section = $sectionLookup->get((int) $item['section_id']);
@@ -972,7 +1416,7 @@ class AcademicManagementController extends Controller
                         "class_queue.{$index}.section_id",
                     );
 
-                    SchoolClass::create([
+                    $schoolClass = SchoolClass::create([
                         'subject_id' => (int) $item['subject_id'],
                         'section_id' => (int) $item['section_id'],
                         'teacher_id' => (int) $item['teacher_id'],
@@ -985,15 +1429,34 @@ class AcademicManagementController extends Controller
                         'semester' => (string) SystemSetting::getCurrentSemester(),
                     ]);
 
+                    $autoEnrolled += $this->autoEnrollUsersToClass(
+                        $schoolClass,
+                        $sectionStudentUserIdsLookup->get(
+                            (int) $section->id,
+                            collect(),
+                        ),
+                    );
+
                     $created++;
                 }
 
-                return $created;
+                return [
+                    'created' => $created,
+                    'auto_enrolled' => $autoEnrolled,
+                ];
             });
+
+            $createdCount = (int) ($createdOutcome['created'] ?? 0);
+            $autoEnrolledCount = (int) ($createdOutcome['auto_enrolled'] ?? 0);
+            $successMessage = $createdCount . ' class' . ($createdCount === 1 ? '' : 'es') . ' created successfully.';
+
+            if ($autoEnrolledCount > 0) {
+                $successMessage .= ' ' . $autoEnrolledCount . ' student' . ($autoEnrolledCount === 1 ? '' : 's') . ' auto-enrolled.';
+            }
 
             return redirect()
                 ->route('superadmin.academic-management.index', ['tab' => 'classes'])
-                ->with('success', $createdCount . ' class' . ($createdCount === 1 ? '' : 'es') . ' created successfully.');
+                ->with('success', $successMessage);
         }
 
         $validated = $request->validate($this->classValidationRules());
@@ -1007,7 +1470,7 @@ class AcademicManagementController extends Controller
             $validated['school_year'],
         );
 
-        SchoolClass::create([
+        $schoolClass = SchoolClass::create([
             'subject_id' => (int) $validated['subject_id'],
             'section_id' => (int) $validated['section_id'],
             'teacher_id' => (int) $validated['teacher_id'],
@@ -1020,9 +1483,20 @@ class AcademicManagementController extends Controller
             'semester' => (string) SystemSetting::getCurrentSemester(),
         ]);
 
+        $autoEnrolledCount = $this->autoEnrollUsersToClass(
+            $schoolClass,
+            $this->resolveSectionStudentUserIds((int) $section->id),
+        );
+
+        $successMessage = 'Class created successfully.';
+
+        if ($autoEnrolledCount > 0) {
+            $successMessage .= ' ' . $autoEnrolledCount . ' student' . ($autoEnrolledCount === 1 ? '' : 's') . ' auto-enrolled.';
+        }
+
         return redirect()
             ->route('superadmin.academic-management.index', ['tab' => 'classes'])
-            ->with('success', 'Class created successfully.');
+            ->with('success', $successMessage);
     }
 
     public function updateClass(Request $request, SchoolClass $schoolClass): RedirectResponse
@@ -1192,6 +1666,47 @@ class AcademicManagementController extends Controller
                 $field => 'This section already has the selected subject for the given school year.',
             ]);
         }
+    }
+
+    private function resolveSectionStudentUserIds(int $sectionId)
+    {
+        return Student::query()
+            ->where('section_id', $sectionId)
+            ->whereNotNull('user_id')
+            ->pluck('user_id')
+            ->map(fn($userId) => (int) $userId)
+            ->filter(fn($userId) => $userId > 0)
+            ->unique()
+            ->values();
+    }
+
+    private function autoEnrollUsersToClass(SchoolClass $schoolClass, $studentUserIds): int
+    {
+        if (! $studentUserIds || $studentUserIds->isEmpty()) {
+            return 0;
+        }
+
+        $autoEnrolledCount = 0;
+
+        foreach ($studentUserIds as $studentUserId) {
+            $enrollment = Enrollment::firstOrCreate(
+                [
+                    'user_id' => (int) $studentUserId,
+                    'class_id' => (int) $schoolClass->id,
+                ],
+                [
+                    'risk_status' => 'low',
+                    'current_grade' => null,
+                    'current_attendance_rate' => null,
+                ],
+            );
+
+            if ($enrollment->wasRecentlyCreated) {
+                $autoEnrolledCount++;
+            }
+        }
+
+        return $autoEnrolledCount;
     }
 
     private function normalizeText(string $value): string

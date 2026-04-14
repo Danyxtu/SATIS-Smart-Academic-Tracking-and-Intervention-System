@@ -7,6 +7,13 @@ export default function SectionDetailModal({
     loading = false,
     error = "",
     row,
+    mode = "view",
+    onSaved,
+    departments = [],
+    teachers = [],
+    subjects = [],
+    sectionOptions = [],
+    currentSchoolYear = "",
 }) {
     return (
         <ManagementDetailModal
@@ -17,6 +24,13 @@ export default function SectionDetailModal({
             loading={loading}
             error={error}
             row={row}
+            sectionManageMode={mode}
+            onSectionSaved={onSaved}
+            departmentOptions={departments}
+            teacherOptions={teachers}
+            subjectOptions={subjects}
+            sectionOptions={sectionOptions}
+            currentSchoolYear={currentSchoolYear}
         />
     );
 }

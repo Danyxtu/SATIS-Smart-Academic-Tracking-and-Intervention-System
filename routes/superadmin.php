@@ -10,6 +10,7 @@ use App\Http\Controllers\SuperAdmin\SubjectController;
 use App\Http\Controllers\SuperAdmin\AcademicManagementController;
 use App\Http\Controllers\SuperAdmin\AuditLogController;
 use App\Http\Controllers\SuperAdmin\ArchiveController;
+use App\Http\Controllers\SuperAdmin\SchoolTrackController;
 use App\Http\Controllers\SuperAdmin\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
@@ -59,6 +60,8 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
             ->name('departments.unassigned-teachers');
         Route::get('/departments/{department}/teachers', [DepartmentController::class, 'departmentTeachers'])
             ->name('departments.teachers');
+        Route::post('/departments/{department}/teachers', [DepartmentController::class, 'storeDepartmentTeacher'])
+            ->name('departments.teachers.store');
         Route::post('/departments', [DepartmentController::class, 'store'])
             ->name('departments.store');
         Route::get('/departments/{department}', [DepartmentController::class, 'show'])
@@ -71,6 +74,16 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
             ->name('departments.destroy');
         Route::post('/departments/{department}/toggle-status', [DepartmentController::class, 'toggleStatus'])
             ->name('departments.toggle-status');
+
+        // School Track Management
+        Route::get('/school-tracks', [SchoolTrackController::class, 'index'])
+            ->name('school-tracks.index');
+        Route::post('/school-tracks', [SchoolTrackController::class, 'store'])
+            ->name('school-tracks.store');
+        Route::put('/school-tracks/{schoolTrack}', [SchoolTrackController::class, 'update'])
+            ->name('school-tracks.update');
+        Route::delete('/school-tracks/{schoolTrack}', [SchoolTrackController::class, 'destroy'])
+            ->name('school-tracks.destroy');
 
         // Subject Management
         Route::resource('subjects', SubjectController::class)
@@ -85,6 +98,14 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
             ->name('academic-management.sections.recreate-grade11');
         Route::post('/academic-management/sections/assign-adviser', [AcademicManagementController::class, 'assignAdviserToSections'])
             ->name('academic-management.sections.assign-adviser');
+        Route::get('/academic-management/sections/{section}/students', [AcademicManagementController::class, 'sectionStudents'])
+            ->name('academic-management.sections.students.index');
+        Route::post('/academic-management/sections/{section}/students/sync', [AcademicManagementController::class, 'syncSectionStudents'])
+            ->name('academic-management.sections.students.sync');
+        Route::get('/academic-management/sections/{section}/classes', [AcademicManagementController::class, 'sectionClasses'])
+            ->name('academic-management.sections.classes.index');
+        Route::post('/academic-management/sections/{section}/classes/sync', [AcademicManagementController::class, 'syncSectionClasses'])
+            ->name('academic-management.sections.classes.sync');
         Route::put('/academic-management/sections/{section}', [AcademicManagementController::class, 'updateSection'])
             ->name('academic-management.sections.update');
         Route::delete('/academic-management/sections/{section}', [AcademicManagementController::class, 'destroySection'])

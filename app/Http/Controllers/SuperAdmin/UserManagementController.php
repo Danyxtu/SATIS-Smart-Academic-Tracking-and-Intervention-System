@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SuperAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\PasswordResetRequest;
 use App\Models\Role;
+use App\Models\Section;
 use App\Models\Student;
 use App\Models\SystemSetting;
 use App\Models\User;
@@ -112,9 +113,41 @@ class UserManagementController extends Controller
                 return $department;
             });
 
+        $sections = Section::query()
+            ->with('department:id,department_name,department_code')
+            ->where('is_active', true)
+            ->orderBy('school_year', 'desc')
+            ->orderBy('grade_level')
+            ->orderBy('section_name')
+            ->get()
+            ->map(function (Section $section) {
+                $departmentCode = $section->department?->department_code;
+                $specialization = $section->track ?: ($section->strand ?: $departmentCode);
+
+                return [
+                    'id' => (int) $section->id,
+                    'department_id' => $section->department_id ? (int) $section->department_id : null,
+                    'department_name' => $section->department?->department_name,
+                    'department_code' => $section->department?->department_code,
+                    'section_name' => $section->section_name,
+                    'section_code' => $section->section_code,
+                    'grade_level' => $section->grade_level,
+                    'strand' => $section->strand,
+                    'track' => $section->track,
+                    'school_year' => $section->school_year,
+                    'section_full_label' => satis_section_full_label(
+                        $section->grade_level,
+                        $specialization,
+                        $section->section_name,
+                    ),
+                ];
+            })
+            ->values();
+
         return Inertia::render('SuperAdmin/UserManagement/Index', [
             'users'       => $users,
             'departments' => $departments,
+            'sections'    => $sections,
             'filters'     => $request->only('search', 'role'),
             'roleCounts'  => $roleCounts,
             'studentCreationBaseCount' => $studentCreationBaseCount,
@@ -215,6 +248,7 @@ class UserManagementController extends Controller
             $validated = $request->validate([
                 'role' => ['required', 'in:student'],
                 'student_mode' => ['required', 'in:multiple,csv'],
+                'section_id' => ['required', 'exists:sections,id'],
                 'password' => ['required', Password::min(8)],
                 'student_queue' => ['required', 'array', 'min:1'],
                 'student_queue.*.first_name' => ['required', 'string', 'max:100'],
@@ -239,9 +273,11 @@ class UserManagementController extends Controller
                 }
             }
 
+            $selectedSection = Section::query()->findOrFail((int) $validated['section_id']);
+
             $createdStudentCredentials = [];
 
-            DB::transaction(function () use ($validated, $superAdmin, &$createdStudentCredentials) {
+            DB::transaction(function () use ($validated, $selectedSection, $superAdmin, &$createdStudentCredentials) {
                 foreach ($validated['student_queue'] as $studentPayload) {
                     $student = User::create([
                         'first_name' => $studentPayload['first_name'],
@@ -272,7 +308,7 @@ class UserManagementController extends Controller
                         'user_id' => $student->id,
                         'student_name' => $studentName,
                         'lrn' => (string) $studentPayload['lrn'],
-                    ]);
+                    ] + $this->buildStudentSectionAttributes($selectedSection));
 
                     $createdStudentCredentials[] = [
                         'id' => $student->id,
@@ -306,6 +342,7 @@ class UserManagementController extends Controller
             'role'          => ['required', 'in:teacher,student'],
             'teacher_mode'  => ['nullable', 'in:single,multiple'],
             'student_mode'  => ['nullable', 'in:single,multiple,csv'],
+            'section_id'    => ['nullable', 'exists:sections,id'],
             'assign_as_admin' => ['nullable', 'boolean'],
             'department_id' => ['nullable', 'exists:departments,id'],
         ]);
@@ -340,6 +377,12 @@ class UserManagementController extends Controller
                 ]);
             }
 
+            if (empty($validated['section_id'])) {
+                return back()->withErrors([
+                    'section_id' => 'Section assignment is required for students.',
+                ]);
+            }
+
             if (empty($validated['lrn'])) {
                 return back()->withErrors([
                     'lrn' => 'LRN is required for single student creation.',
@@ -363,6 +406,11 @@ class UserManagementController extends Controller
                     'username' => 'Username format must follow initials + current year + 5-digit number (example: dd202300100).',
                 ]);
             }
+        }
+
+        $selectedSection = null;
+        if ($validated['role'] === 'student') {
+            $selectedSection = Section::query()->findOrFail((int) $validated['section_id']);
         }
 
         if ($validated['role'] === 'teacher') {
@@ -411,7 +459,7 @@ class UserManagementController extends Controller
                 'user_id' => $user->id,
                 'student_name' => $studentName,
                 'lrn' => (string) ($validated['lrn'] ?? ''),
-            ]);
+            ] + $this->buildStudentSectionAttributes($selectedSection));
 
             return redirect()->route('superadmin.users.index')
                 ->with('success', 'User created successfully.')
@@ -429,6 +477,21 @@ class UserManagementController extends Controller
 
         return redirect()->route('superadmin.users.index')
             ->with('success', 'User created successfully.');
+    }
+
+    private function buildStudentSectionAttributes(?Section $section): array
+    {
+        if (! $section) {
+            return [];
+        }
+
+        return [
+            'grade_level' => $section->grade_level,
+            'section' => $section->section_name,
+            'section_id' => (int) $section->id,
+            'strand' => $section->strand,
+            'track' => $section->track,
+        ];
     }
 
     private function isValidStudentUsernameForName(string $username, string $firstName, string $lastName): bool

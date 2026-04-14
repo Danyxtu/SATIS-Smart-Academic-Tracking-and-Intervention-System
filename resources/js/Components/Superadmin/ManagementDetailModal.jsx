@@ -1,6 +1,8 @@
-import { useForm } from "@inertiajs/react";
+import axios from "axios";
+import { router, useForm } from "@inertiajs/react";
 import { useEffect, useMemo, useState } from "react";
 import {
+    ArrowRightLeft,
     BookOpen,
     Building2,
     CheckCircle,
@@ -10,14 +12,15 @@ import {
     Save,
     Search,
     Shield,
+    Trash2,
     User,
+    UserMinus,
     UserPlus,
     Users,
     X,
 } from "lucide-react";
 import Modal from "@/Components/Modal";
-
-const TRACK_OPTIONS = ["Academic", "TVL"];
+import DepartmentDeleteConfirmModal from "@/Components/Superadmin/DepartmentDeleteConfirmModal";
 
 const ROLE_LABELS = {
     super_admin: "Super Admin",
@@ -25,6 +28,16 @@ const ROLE_LABELS = {
     teacher: "Teacher",
     student: "Student",
 };
+
+const SECTION_CLASS_COLOR_OPTIONS = [
+    "indigo",
+    "blue",
+    "red",
+    "green",
+    "amber",
+    "purple",
+    "teal",
+];
 
 function formatDateTime(value) {
     if (!value) return "-";
@@ -138,6 +151,207 @@ function formatJson(value) {
     }
 }
 
+function normalizeTrackOptions(trackOptions = []) {
+    if (!Array.isArray(trackOptions) || trackOptions.length === 0) {
+        return [];
+    }
+
+    return trackOptions
+        .map((option) => {
+            if (typeof option === "string") {
+                return {
+                    value: option,
+                    label: option,
+                };
+            }
+
+            if (option && typeof option === "object") {
+                const value =
+                    option.value || option.id || option.track_id || "";
+                const label =
+                    option.label || option.track_name || option.name || value;
+
+                if (!value) {
+                    return null;
+                }
+
+                return {
+                    value: String(value),
+                    label,
+                };
+            }
+
+            return null;
+        })
+        .filter(Boolean);
+}
+
+function normalizeDepartmentOptions(departmentOptions = []) {
+    if (!Array.isArray(departmentOptions) || departmentOptions.length === 0) {
+        return [];
+    }
+
+    return departmentOptions
+        .map((option) => {
+            if (!option || typeof option !== "object") {
+                return null;
+            }
+
+            const value =
+                option.value ||
+                option.id ||
+                option.department_id ||
+                option.departmentId ||
+                "";
+            const label =
+                option.label ||
+                option.name ||
+                option.department_name ||
+                option.departmentName ||
+                "";
+            const code =
+                option.code ||
+                option.department_code ||
+                option.departmentCode ||
+                "";
+
+            if (!value || !label) {
+                return null;
+            }
+
+            return {
+                value: String(value),
+                label: String(label),
+                code: String(code || ""),
+            };
+        })
+        .filter(Boolean);
+}
+
+function normalizeSectionOptions(sectionOptions = []) {
+    if (!Array.isArray(sectionOptions) || sectionOptions.length === 0) {
+        return [];
+    }
+
+    return sectionOptions
+        .map((option) => {
+            if (!option || typeof option !== "object") {
+                return null;
+            }
+
+            const value = option.value || option.id || option.section_id || "";
+            const sectionName =
+                option.section_name || option.name || option.label || "";
+
+            if (!value || !sectionName) {
+                return null;
+            }
+
+            const department =
+                option.department && typeof option.department === "object"
+                    ? option.department
+                    : {};
+
+            return {
+                value: String(value),
+                section_name: String(sectionName),
+                section_full_label:
+                    option.section_full_label || option.full_label || "",
+                section_code: option.section_code || option.code || "",
+                grade_level: option.grade_level || "",
+                strand: option.strand || "",
+                track: option.track || "",
+                department_name:
+                    option.department_name || department.department_name || "",
+                department_code:
+                    option.department_code || department.department_code || "",
+            };
+        })
+        .filter(Boolean);
+}
+
+function normalizeSubjectOptions(subjectOptions = []) {
+    if (!Array.isArray(subjectOptions) || subjectOptions.length === 0) {
+        return [];
+    }
+
+    return subjectOptions
+        .map((option) => {
+            if (!option || typeof option !== "object") {
+                return null;
+            }
+
+            const id = option.id || option.value || option.subject_id || "";
+            const subjectName = option.subject_name || option.name || "";
+
+            if (!id || !subjectName) {
+                return null;
+            }
+
+            return {
+                id: String(id),
+                subject_name: String(subjectName),
+                subject_code: option.subject_code || option.code || "",
+            };
+        })
+        .filter(Boolean);
+}
+
+function classSubjectOptionLabel(subject) {
+    const subjectCode = subject?.subject_code || "-";
+    const subjectName = subject?.subject_name || "Unnamed Subject";
+
+    return `[${subject?.id || "-"}] ${subjectCode} - ${subjectName}`;
+}
+
+function classTeacherOptionLabel(teacher) {
+    const teacherName = teacher?.name || "Unnamed Teacher";
+    const departmentCode = teacher?.department?.department_code || "N/A";
+
+    return `[${teacher?.id || "-"}] ${teacherName} - ${departmentCode}`;
+}
+
+function normalizeWhitespace(value) {
+    return String(value || "")
+        .trim()
+        .replace(/\s+/g, " ");
+}
+
+function normalizePersonRoles(roles) {
+    if (!Array.isArray(roles)) {
+        return [];
+    }
+
+    return roles
+        .map((role) => {
+            if (!role) {
+                return "";
+            }
+
+            if (typeof role === "string") {
+                return role;
+            }
+
+            if (typeof role === "object") {
+                return role.name || role.role || "";
+            }
+
+            return "";
+        })
+        .filter(Boolean)
+        .map((role) => String(role));
+}
+
+function isSuperAdminPerson(person) {
+    if (person?.is_superadmin === true) {
+        return true;
+    }
+
+    return normalizePersonRoles(person?.roles || person?.role_names).includes(
+        "super_admin",
+    );
+}
+
 function FieldRow({ label, value, mono = false }) {
     return (
         <div className="flex items-center justify-between gap-4 border-b border-emerald-200 py-2.5 last:border-b-0">
@@ -218,17 +432,103 @@ export default function ManagementDetailModal({
     row,
     departmentManageMode = "view",
     onDepartmentSaved,
+    onDepartmentDeleted,
+    sectionManageMode = "view",
+    onSectionSaved,
+    trackOptions = [],
+    departmentOptions = [],
+    teacherOptions = [],
+    subjectOptions = [],
+    sectionOptions = [],
+    currentSchoolYear = "",
 }) {
     const [panel, setPanel] = useState("info");
     const [deptEditMode, setDeptEditMode] = useState(false);
+    const [sectionEditMode, setSectionEditMode] = useState(false);
     const [deptTeachers, setDeptTeachers] = useState([]);
     const [deptTeachersLoaded, setDeptTeachersLoaded] = useState(false);
     const [deptTeachersLoading, setDeptTeachersLoading] = useState(false);
     const [deptTeacherSearch, setDeptTeacherSearch] = useState("");
     const [deptSpecializationInput, setDeptSpecializationInput] = useState("");
+    const [deptAssignMode, setDeptAssignMode] = useState("assign");
+    const [deptCreateTeacher, setDeptCreateTeacher] = useState({
+        first_name: "",
+        middle_name: "",
+        last_name: "",
+        email: "",
+    });
+    const [deptCreateTeacherErrors, setDeptCreateTeacherErrors] = useState({});
+    const [deptCreateTeacherSubmitting, setDeptCreateTeacherSubmitting] =
+        useState(false);
+    const [deptReassignTeacherId, setDeptReassignTeacherId] = useState(null);
+    const [deptReassignSearch, setDeptReassignSearch] = useState("");
+    const [deptPersistedDepartment, setDeptPersistedDepartment] =
+        useState(null);
+    const [departmentDeleting, setDepartmentDeleting] = useState(false);
+    const [showDepartmentDeleteModal, setShowDepartmentDeleteModal] =
+        useState(false);
+    const [departmentDeleteError, setDepartmentDeleteError] = useState("");
+    const [sectionPersistedData, setSectionPersistedData] = useState(null);
+    const [sectionClasses, setSectionClasses] = useState([]);
+    const [sectionClassesLoaded, setSectionClassesLoaded] = useState(false);
+    const [sectionClassesLoading, setSectionClassesLoading] = useState(false);
+    const [sectionClassesError, setSectionClassesError] = useState("");
+    const [sectionClassesMode, setSectionClassesMode] = useState("list");
+    const [sectionClassDraft, setSectionClassDraft] = useState({
+        subject_id: "",
+        teacher_id: "",
+        school_year: "",
+        color: "indigo",
+    });
+    const [sectionClassSubjectSearch, setSectionClassSubjectSearch] =
+        useState("");
+    const [sectionClassTeacherSearch, setSectionClassTeacherSearch] =
+        useState("");
+    const [sectionClassQueue, setSectionClassQueue] = useState([]);
+    const [sectionClassNotice, setSectionClassNotice] = useState("");
+    const [sectionClassSaveError, setSectionClassSaveError] = useState("");
+    const [sectionClassSyncing, setSectionClassSyncing] = useState(false);
+    const [sectionStudents, setSectionStudents] = useState([]);
+    const [sectionStudentsLoaded, setSectionStudentsLoaded] = useState(false);
+    const [sectionStudentsLoading, setSectionStudentsLoading] = useState(false);
+    const [sectionStudentsError, setSectionStudentsError] = useState("");
+    const [sectionStudentsEditMode, setSectionStudentsEditMode] =
+        useState(false);
+    const [sectionStudentSearch, setSectionStudentSearch] = useState("");
+    const [selectedSectionStudentId, setSelectedSectionStudentId] =
+        useState(null);
+    const [sectionStudentActions, setSectionStudentActions] = useState({});
+    const [sectionStudentReassigningId, setSectionStudentReassigningId] =
+        useState(null);
+    const [sectionStudentSectionSearch, setSectionStudentSectionSearch] =
+        useState("");
+    const [sectionStudentsSyncing, setSectionStudentsSyncing] = useState(false);
+    const [sectionStudentsSaveError, setSectionStudentsSaveError] =
+        useState("");
 
     const isDepartmentTab = activeTab === "departments";
+    const isSectionTab = activeTab === "sections";
     const isDepartmentCreateMode = departmentManageMode === "create";
+
+    const resolvedTrackOptions = useMemo(
+        () => normalizeTrackOptions(trackOptions),
+        [trackOptions],
+    );
+
+    const resolvedDepartmentOptions = useMemo(
+        () => normalizeDepartmentOptions(departmentOptions),
+        [departmentOptions],
+    );
+
+    const resolvedSubjectOptions = useMemo(
+        () => normalizeSubjectOptions(subjectOptions),
+        [subjectOptions],
+    );
+
+    const resolvedSectionOptions = useMemo(
+        () => normalizeSectionOptions(sectionOptions),
+        [sectionOptions],
+    );
 
     const {
         data: deptData,
@@ -241,12 +541,34 @@ export default function ManagementDetailModal({
     } = useForm({
         department_name: "",
         department_code: "",
-        track: "Academic",
+        school_track_id: "",
         description: "",
         is_active: true,
         specialization_names: [],
         teacher_ids: [],
         admin_id: "",
+        reassign_teacher_department_ids: {},
+    });
+
+    const {
+        data: sectionData,
+        setData: setSectionData,
+        put: putSection,
+        processing: sectionSaving,
+        errors: sectionErrors,
+        clearErrors: clearSectionErrors,
+    } = useForm({
+        department_id: "",
+        section_name: "",
+        section_code: "",
+        cohort: "",
+        grade_level: "",
+        strand: "",
+        track: "",
+        school_year: "",
+        description: "",
+        advisor_teacher_id: "",
+        is_active: true,
     });
 
     const sourceDepartment = useMemo(() => {
@@ -259,6 +581,7 @@ export default function ManagementDetailModal({
             name: row?.department_name,
             code: row?.department_code,
             track: row?.track,
+            school_track_id: row?.school_track_id,
             description: row?.description,
             is_active: row?.is_active,
             classes_count: row?.classes_count,
@@ -316,6 +639,7 @@ export default function ManagementDetailModal({
             name: merged.name ?? merged.department_name ?? "",
             code: merged.code ?? merged.department_code ?? "",
             track: merged.track || "Academic",
+            school_track_id: merged.school_track_id ?? null,
             description: merged.description || "",
             is_active: merged.is_active ?? true,
             classes_count: asNumber(merged.classes_count, 0),
@@ -327,6 +651,482 @@ export default function ManagementDetailModal({
             teachers,
         };
     }, [isDepartmentTab, payload, row]);
+
+    const sourceSection = useMemo(() => {
+        if (!isSectionTab) {
+            return null;
+        }
+
+        const fallback = {
+            id: row?.id,
+            section_name: row?.section_name,
+            section_full_label: row?.section_full_label,
+            section_code: row?.section_code,
+            department_id: row?.department_id ?? row?.department?.id,
+            department_name:
+                row?.department_name || row?.department?.department_name,
+            department_code:
+                row?.department_code || row?.department?.department_code,
+            cohort: row?.cohort,
+            grade_level: row?.grade_level,
+            strand: row?.strand,
+            track: row?.track,
+            school_year: row?.school_year,
+            description: row?.description,
+            advisor_teacher_id: row?.advisor_teacher_id,
+            advisor_teacher_name:
+                row?.advisor_teacher_name || row?.advisor_name,
+            is_active: row?.is_active,
+            students_count: row?.students_count,
+            classes_count: row?.classes_count,
+        };
+
+        const incoming = payload?.section || {};
+        const merged = {
+            ...fallback,
+            ...incoming,
+        };
+
+        const department =
+            merged.department && typeof merged.department === "object"
+                ? merged.department
+                : {};
+        const sectionClasses = Array.isArray(payload?.classes)
+            ? payload.classes
+            : Array.isArray(merged.classes)
+              ? merged.classes
+              : [];
+
+        return {
+            id: merged.id ?? null,
+            section_name: merged.section_name || "",
+            section_full_label: merged.section_full_label || "",
+            section_code: merged.section_code || "",
+            department_id: merged.department_id ?? department.id ?? null,
+            department_name:
+                merged.department_name || department.department_name || "",
+            department_code:
+                merged.department_code || department.department_code || "",
+            cohort: merged.cohort || "",
+            grade_level: merged.grade_level || "",
+            strand: merged.strand || "",
+            track: merged.track || "",
+            school_year: merged.school_year || "",
+            description: merged.description || "",
+            advisor_teacher_id:
+                merged.advisor_teacher_id ?? merged.advisor_teacher?.id ?? null,
+            advisor_teacher_name:
+                merged.advisor_teacher_name ||
+                merged.advisor_name ||
+                merged.adviser_name ||
+                merged.advisor_teacher?.name ||
+                "",
+            is_active: merged.is_active ?? true,
+            students_count: asNumber(merged.students_count, 0),
+            classes_count: asNumber(
+                merged.classes_count,
+                sectionClasses.length,
+            ),
+            classes: sectionClasses,
+        };
+    }, [isSectionTab, payload, row]);
+
+    const activeDepartment = deptPersistedDepartment || sourceDepartment;
+    const activeSection = sectionPersistedData || sourceSection;
+    const sourceDepartmentSyncKey = useMemo(() => {
+        if (!sourceDepartment) {
+            return "";
+        }
+
+        const specializationKey = Array.isArray(
+            sourceDepartment.specializations,
+        )
+            ? sourceDepartment.specializations.join("|")
+            : "";
+        const adminKey = Array.isArray(sourceDepartment.admins)
+            ? sourceDepartment.admins
+                  .map((admin) => String(admin.id || ""))
+                  .sort()
+                  .join("|")
+            : "";
+        const teacherKey = Array.isArray(sourceDepartment.teachers)
+            ? sourceDepartment.teachers
+                  .map((teacher) => String(teacher.id || ""))
+                  .sort()
+                  .join("|")
+            : "";
+
+        return [
+            sourceDepartment.id ?? "",
+            sourceDepartment.name ?? "",
+            sourceDepartment.code ?? "",
+            sourceDepartment.track ?? "",
+            sourceDepartment.school_track_id ?? "",
+            sourceDepartment.description ?? "",
+            sourceDepartment.is_active ? "1" : "0",
+            sourceDepartment.admins_count ?? "",
+            sourceDepartment.teachers_count ?? "",
+            sourceDepartment.students_count ?? "",
+            specializationKey,
+            adminKey,
+            teacherKey,
+        ].join("::");
+    }, [sourceDepartment]);
+
+    const sourceSectionSyncKey = useMemo(() => {
+        if (!sourceSection) {
+            return "";
+        }
+
+        return [
+            sourceSection.id ?? "",
+            sourceSection.section_name ?? "",
+            sourceSection.section_code ?? "",
+            sourceSection.department_id ?? "",
+            sourceSection.cohort ?? "",
+            sourceSection.grade_level ?? "",
+            sourceSection.strand ?? "",
+            sourceSection.track ?? "",
+            sourceSection.school_year ?? "",
+            sourceSection.description ?? "",
+            sourceSection.advisor_teacher_id ?? "",
+            sourceSection.is_active ? "1" : "0",
+            sourceSection.classes_count ?? "",
+            sourceSection.students_count ?? "",
+        ].join("::");
+    }, [sourceSection]);
+
+    const sectionTeacherPool = useMemo(
+        () => (Array.isArray(teacherOptions) ? teacherOptions : []),
+        [teacherOptions],
+    );
+
+    const sectionAdviserOptions = useMemo(() => {
+        const selectedDepartmentId = String(
+            sectionData.department_id || activeSection?.department_id || "",
+        );
+
+        const byId = new Map();
+
+        sectionTeacherPool.forEach((teacher) => {
+            if (!teacher?.id) {
+                return;
+            }
+
+            const teacherDepartmentId =
+                teacher.department_id || teacher.department?.id;
+
+            if (
+                selectedDepartmentId &&
+                String(teacherDepartmentId || "") !== selectedDepartmentId
+            ) {
+                return;
+            }
+
+            byId.set(String(teacher.id), teacher);
+        });
+
+        const currentAdviserId =
+            sectionData.advisor_teacher_id || activeSection?.advisor_teacher_id;
+
+        if (currentAdviserId && !byId.has(String(currentAdviserId))) {
+            const fallbackTeacher = sectionTeacherPool.find(
+                (teacher) => String(teacher.id) === String(currentAdviserId),
+            ) || {
+                id: currentAdviserId,
+                name: activeSection?.advisor_teacher_name || "Current adviser",
+            };
+
+            byId.set(String(fallbackTeacher.id), fallbackTeacher);
+        }
+
+        return Array.from(byId.values());
+    }, [
+        sectionTeacherPool,
+        sectionData.department_id,
+        sectionData.advisor_teacher_id,
+        activeSection?.department_id,
+        activeSection?.advisor_teacher_id,
+        activeSection?.advisor_teacher_name,
+    ]);
+
+    const reassignableDepartmentOptions = useMemo(
+        () =>
+            resolvedDepartmentOptions.filter(
+                (department) =>
+                    String(department.value) !== String(activeDepartment?.id),
+            ),
+        [resolvedDepartmentOptions, activeDepartment?.id],
+    );
+
+    const filteredReassignDepartmentOptions = useMemo(() => {
+        const keyword = String(deptReassignSearch || "")
+            .trim()
+            .toLowerCase();
+
+        if (!keyword) {
+            return reassignableDepartmentOptions;
+        }
+
+        return reassignableDepartmentOptions.filter((department) => {
+            const searchable =
+                `${department.label} ${department.code}`.toLowerCase();
+
+            return searchable.includes(keyword);
+        });
+    }, [reassignableDepartmentOptions, deptReassignSearch]);
+
+    const sectionClassTeacherOptions = useMemo(() => {
+        const selectedDepartmentId = String(activeSection?.department_id || "");
+
+        return sectionTeacherPool.filter((teacher) => {
+            if (!teacher?.id) {
+                return false;
+            }
+
+            if (!selectedDepartmentId) {
+                return true;
+            }
+
+            const teacherDepartmentId =
+                teacher.department_id || teacher.department?.id;
+
+            return String(teacherDepartmentId || "") === selectedDepartmentId;
+        });
+    }, [sectionTeacherPool, activeSection?.department_id]);
+
+    const sectionClassSubjectLookup = useMemo(() => {
+        const lookup = new Map();
+
+        resolvedSubjectOptions.forEach((subject) => {
+            lookup.set(classSubjectOptionLabel(subject), subject);
+        });
+
+        return lookup;
+    }, [resolvedSubjectOptions]);
+
+    const sectionClassTeacherLookup = useMemo(() => {
+        const lookup = new Map();
+
+        sectionClassTeacherOptions.forEach((teacher) => {
+            lookup.set(classTeacherOptionLabel(teacher), teacher);
+        });
+
+        return lookup;
+    }, [sectionClassTeacherOptions]);
+
+    const selectedSectionClassSubject = useMemo(
+        () =>
+            resolvedSubjectOptions.find(
+                (subject) =>
+                    String(subject.id) === String(sectionClassDraft.subject_id),
+            ) || null,
+        [resolvedSubjectOptions, sectionClassDraft.subject_id],
+    );
+
+    const selectedSectionClassTeacher = useMemo(
+        () =>
+            sectionClassTeacherOptions.find(
+                (teacher) =>
+                    String(teacher.id) === String(sectionClassDraft.teacher_id),
+            ) || null,
+        [sectionClassTeacherOptions, sectionClassDraft.teacher_id],
+    );
+
+    const sectionClassQueueKeySet = useMemo(
+        () =>
+            new Set(
+                sectionClassQueue.map((item) =>
+                    `${item.subject_id}|${item.school_year}`.toLowerCase(),
+                ),
+            ),
+        [sectionClassQueue],
+    );
+
+    const sectionClassDraftDuplicateMessage = useMemo(() => {
+        const subjectId = String(sectionClassDraft.subject_id || "").trim();
+        const schoolYear = normalizeWhitespace(sectionClassDraft.school_year);
+
+        if (!subjectId || !schoolYear) {
+            return "";
+        }
+
+        const queueKey = `${subjectId}|${schoolYear}`.toLowerCase();
+
+        if (sectionClassQueueKeySet.has(queueKey)) {
+            return "Duplicate queue entry: this subject and school year is already queued for the selected section.";
+        }
+
+        return "";
+    }, [
+        sectionClassDraft.subject_id,
+        sectionClassDraft.school_year,
+        sectionClassQueueKeySet,
+    ]);
+
+    const sectionClassesCount = sectionClassesLoaded
+        ? sectionClasses.length
+        : asNumber(
+              activeSection?.classes_count,
+              Array.isArray(activeSection?.classes)
+                  ? activeSection.classes.length
+                  : 0,
+          );
+
+    const sectionClassDisplayItems = sectionClassesLoaded
+        ? sectionClasses
+        : Array.isArray(activeSection?.classes)
+          ? activeSection.classes
+          : [];
+
+    const canAddSectionClassToQueue = useMemo(() => {
+        const schoolYear = normalizeWhitespace(sectionClassDraft.school_year);
+        const matchedSubject = sectionClassSubjectLookup.get(
+            sectionClassSubjectSearch,
+        );
+        const matchedTeacher = sectionClassTeacherLookup.get(
+            sectionClassTeacherSearch,
+        );
+
+        const isSubjectExactMatch =
+            Boolean(matchedSubject) &&
+            String(matchedSubject.id) === String(sectionClassDraft.subject_id);
+        const isTeacherExactMatch =
+            Boolean(matchedTeacher) &&
+            String(matchedTeacher.id) === String(sectionClassDraft.teacher_id);
+
+        return (
+            isSubjectExactMatch &&
+            isTeacherExactMatch &&
+            /^\d{4}-\d{4}$/.test(schoolYear) &&
+            !sectionClassDraftDuplicateMessage &&
+            !sectionClassSyncing
+        );
+    }, [
+        sectionClassDraft.subject_id,
+        sectionClassDraft.teacher_id,
+        sectionClassDraft.school_year,
+        sectionClassSubjectLookup,
+        sectionClassTeacherLookup,
+        sectionClassSubjectSearch,
+        sectionClassTeacherSearch,
+        sectionClassDraftDuplicateMessage,
+        sectionClassSyncing,
+    ]);
+
+    const sectionStudentActionEntries = useMemo(
+        () =>
+            Object.entries(sectionStudentActions || {})
+                .map(([studentId, details]) => ({
+                    student_id: Number(studentId),
+                    operation: details?.action,
+                    target_section_id: details?.target_section_id
+                        ? Number(details.target_section_id)
+                        : null,
+                }))
+                .filter(
+                    (entry) =>
+                        entry.student_id > 0 &&
+                        (entry.operation === "remove" ||
+                            entry.operation === "reassign"),
+                ),
+        [sectionStudentActions],
+    );
+
+    const sectionStudentsCount = sectionStudentsLoaded
+        ? sectionStudents.length
+        : asNumber(activeSection?.students_count, 0);
+
+    const sectionStudentsProjectedCount = Math.max(
+        0,
+        sectionStudentsCount - sectionStudentActionEntries.length,
+    );
+
+    const sectionStudentsHasInvalidActions = sectionStudentActionEntries.some(
+        (entry) => entry.operation === "reassign" && !entry.target_section_id,
+    );
+
+    const sectionStudentReassignOptions = useMemo(
+        () =>
+            resolvedSectionOptions.filter(
+                (option) =>
+                    String(option.value) !== String(activeSection?.id || ""),
+            ),
+        [resolvedSectionOptions, activeSection?.id],
+    );
+
+    const filteredSectionStudentReassignOptions = useMemo(() => {
+        const keyword = String(sectionStudentSectionSearch || "")
+            .trim()
+            .toLowerCase();
+
+        if (!keyword) {
+            return sectionStudentReassignOptions;
+        }
+
+        return sectionStudentReassignOptions.filter((option) => {
+            const searchable = [
+                option.section_full_label,
+                option.section_name,
+                option.section_code,
+                option.grade_level,
+                option.strand,
+                option.track,
+                option.department_name,
+                option.department_code,
+            ]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase();
+
+            return searchable.includes(keyword);
+        });
+    }, [sectionStudentReassignOptions, sectionStudentSectionSearch]);
+
+    const filteredSectionStudents = useMemo(() => {
+        const keyword = String(sectionStudentSearch || "")
+            .trim()
+            .toLowerCase();
+
+        if (!keyword) {
+            return sectionStudents;
+        }
+
+        return sectionStudents.filter((student) => {
+            const searchable = [
+                student.name,
+                student.student_name,
+                student.personal_email,
+                student.lrn,
+                student.grade_level,
+                student.strand,
+                student.track,
+                student.section,
+            ]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase();
+
+            return searchable.includes(keyword);
+        });
+    }, [sectionStudents, sectionStudentSearch]);
+
+    const selectedSectionStudent = useMemo(() => {
+        if (!sectionStudents.length) {
+            return null;
+        }
+
+        const fromSelection = sectionStudents.find(
+            (student) =>
+                String(student.id) === String(selectedSectionStudentId || ""),
+        );
+
+        if (fromSelection) {
+            return fromSelection;
+        }
+
+        return filteredSectionStudents[0] || sectionStudents[0] || null;
+    }, [sectionStudents, filteredSectionStudents, selectedSectionStudentId]);
 
     const hydrateDepartmentForm = (department) => {
         if (!department) {
@@ -344,16 +1144,48 @@ export default function ManagementDetailModal({
         const adminId = department.admins[0]?.id
             ? String(department.admins[0].id)
             : "";
+        const selectedTrackId = department.school_track_id
+            ? String(department.school_track_id)
+            : resolvedTrackOptions.find(
+                  (option) => option.label === department.track,
+              )?.value ||
+              resolvedTrackOptions[0]?.value ||
+              "";
 
         setDeptData({
             department_name: department.name || "",
             department_code: department.code || "",
-            track: department.track || "Academic",
+            school_track_id: selectedTrackId,
             description: department.description || "",
             is_active: department.is_active ?? true,
             specialization_names: department.specializations || [],
             teacher_ids: teacherIds,
             admin_id: adminId,
+            reassign_teacher_department_ids: {},
+        });
+    };
+
+    const hydrateSectionForm = (section) => {
+        if (!section) {
+            return;
+        }
+
+        setSectionData({
+            department_id: section.department_id
+                ? String(section.department_id)
+                : "",
+            section_name: section.section_name || "",
+            section_code: section.section_code || "",
+            cohort: section.cohort || "",
+            grade_level: section.grade_level || "",
+            strand: section.strand || "",
+            track: section.track || "",
+            school_year: section.school_year || currentSchoolYear || "",
+            description: section.description || "",
+            advisor_teacher_id: section.advisor_teacher_id
+                ? String(section.advisor_teacher_id)
+                : "",
+            is_active: section.is_active ?? true,
         });
     };
 
@@ -362,6 +1194,7 @@ export default function ManagementDetailModal({
             return;
         }
 
+        setDeptPersistedDepartment(null);
         hydrateDepartmentForm(sourceDepartment);
         setDeptEditMode(
             departmentManageMode === "edit" ||
@@ -372,13 +1205,28 @@ export default function ManagementDetailModal({
         setDeptTeachersLoading(false);
         setDeptTeacherSearch("");
         setDeptSpecializationInput("");
+        setDeptAssignMode("assign");
+        setDeptCreateTeacher({
+            first_name: "",
+            middle_name: "",
+            last_name: "",
+            email: "",
+        });
+        setDeptCreateTeacherErrors({});
+        setDeptCreateTeacherSubmitting(false);
+        setDeptReassignTeacherId(null);
+        setDeptReassignSearch("");
+        setDepartmentDeleting(false);
+        setShowDepartmentDeleteModal(false);
+        setDepartmentDeleteError("");
         clearDepartmentErrors();
     }, [
         show,
         isDepartmentTab,
-        sourceDepartment,
+        sourceDepartmentSyncKey,
         departmentManageMode,
         clearDepartmentErrors,
+        resolvedTrackOptions,
     ]);
 
     useEffect(() => {
@@ -395,11 +1243,11 @@ export default function ManagementDetailModal({
             setDeptTeachersLoading(true);
 
             try {
-                if (sourceDepartment?.id) {
+                if (activeDepartment?.id) {
                     const response = await fetch(
                         route(
                             "superadmin.departments.teachers",
-                            sourceDepartment.id,
+                            activeDepartment.id,
                         ),
                     );
                     const payloadData = await response.json();
@@ -432,14 +1280,286 @@ export default function ManagementDetailModal({
         isDepartmentTab,
         panel,
         deptTeachersLoaded,
-        sourceDepartment?.id,
+        activeDepartment?.id,
     ]);
 
     useEffect(() => {
-        setPanel("info");
-    }, [activeTab, show, payload]);
+        if (!show || !isSectionTab) {
+            return;
+        }
 
-    const data = useMemo(() => {
+        setSectionPersistedData(null);
+        setSectionClasses([]);
+        setSectionClassesLoaded(false);
+        setSectionClassesLoading(false);
+        setSectionClassesError("");
+        setSectionClassesMode("list");
+        setSectionClassDraft({
+            subject_id: "",
+            teacher_id: "",
+            school_year: sourceSection?.school_year || currentSchoolYear || "",
+            color: "indigo",
+        });
+        setSectionClassSubjectSearch("");
+        setSectionClassTeacherSearch("");
+        setSectionClassQueue([]);
+        setSectionClassNotice("");
+        setSectionClassSaveError("");
+        setSectionClassSyncing(false);
+        setSectionStudents([]);
+        setSectionStudentsLoaded(false);
+        setSectionStudentsLoading(false);
+        setSectionStudentsError("");
+        setSectionStudentsEditMode(false);
+        setSectionStudentSearch("");
+        setSelectedSectionStudentId(null);
+        setSectionStudentActions({});
+        setSectionStudentReassigningId(null);
+        setSectionStudentSectionSearch("");
+        setSectionStudentsSyncing(false);
+        setSectionStudentsSaveError("");
+        hydrateSectionForm(sourceSection);
+        setSectionEditMode(sectionManageMode === "edit");
+        clearSectionErrors();
+
+        if (sectionManageMode === "edit") {
+            setPanel("info");
+        }
+    }, [
+        show,
+        isSectionTab,
+        sourceSectionSyncKey,
+        sectionManageMode,
+        clearSectionErrors,
+        currentSchoolYear,
+        sourceSection?.school_year,
+    ]);
+
+    useEffect(() => {
+        if (
+            !show ||
+            !isSectionTab ||
+            !activeSection?.id ||
+            sectionClassesLoaded ||
+            sectionClassesLoading
+        ) {
+            return;
+        }
+
+        const loadSectionClasses = async () => {
+            setSectionClassesLoading(true);
+            setSectionClassesError("");
+
+            try {
+                const response = await axios.get(
+                    route(
+                        "superadmin.academic-management.sections.classes.index",
+                        activeSection.id,
+                    ),
+                );
+
+                const list = Array.isArray(response?.data?.classes)
+                    ? response.data.classes
+                    : [];
+                const responseCount = Number(
+                    response?.data?.classes_count ?? response?.data?.count,
+                );
+                const normalizedCount = Number.isFinite(responseCount)
+                    ? responseCount
+                    : list.length;
+
+                setSectionClasses(list);
+
+                setSectionPersistedData((previous) =>
+                    previous
+                        ? {
+                              ...previous,
+                              classes_count: normalizedCount,
+                              classes: list,
+                          }
+                        : previous,
+                );
+            } catch {
+                setSectionClasses([]);
+                setSectionClassesError(
+                    "Unable to load section classes right now.",
+                );
+            } finally {
+                setSectionClassesLoaded(true);
+                setSectionClassesLoading(false);
+            }
+        };
+
+        loadSectionClasses();
+    }, [
+        show,
+        isSectionTab,
+        activeSection?.id,
+        sectionClassesLoaded,
+        sectionClassesLoading,
+    ]);
+
+    useEffect(() => {
+        if (
+            !show ||
+            !isSectionTab ||
+            !activeSection?.id ||
+            sectionStudentsLoaded ||
+            sectionStudentsLoading
+        ) {
+            return;
+        }
+
+        const loadSectionStudents = async () => {
+            setSectionStudentsLoading(true);
+            setSectionStudentsError("");
+
+            try {
+                const response = await axios.get(
+                    route(
+                        "superadmin.academic-management.sections.students.index",
+                        activeSection.id,
+                    ),
+                );
+
+                const list = Array.isArray(response?.data?.students)
+                    ? response.data.students
+                    : [];
+                const responseCount = Number(
+                    response?.data?.students_count ?? response?.data?.count,
+                );
+                const normalizedCount = Number.isFinite(responseCount)
+                    ? responseCount
+                    : list.length;
+
+                setSectionStudents(list);
+                setSelectedSectionStudentId((currentId) => {
+                    const keepCurrent = list.some(
+                        (student) =>
+                            String(student.id) === String(currentId || ""),
+                    );
+
+                    if (keepCurrent) {
+                        return currentId;
+                    }
+
+                    return list[0]?.id ? String(list[0].id) : null;
+                });
+
+                setSectionPersistedData((previous) =>
+                    previous
+                        ? {
+                              ...previous,
+                              students_count: normalizedCount,
+                          }
+                        : previous,
+                );
+            } catch {
+                setSectionStudents([]);
+                setSectionStudentsError(
+                    "Unable to load section students right now.",
+                );
+            } finally {
+                setSectionStudentsLoaded(true);
+                setSectionStudentsLoading(false);
+            }
+        };
+
+        loadSectionStudents();
+    }, [
+        show,
+        isSectionTab,
+        activeSection?.id,
+        sectionStudentsLoaded,
+        sectionStudentsLoading,
+    ]);
+
+    useEffect(() => {
+        if (!show || !isSectionTab || panel === "students") {
+            return;
+        }
+
+        setSectionStudentReassigningId(null);
+        setSectionStudentSectionSearch("");
+    }, [show, isSectionTab, panel]);
+
+    useEffect(() => {
+        if (!show || !isSectionTab) {
+            return;
+        }
+
+        const selectedId = selectedSectionStudent?.id
+            ? String(selectedSectionStudent.id)
+            : null;
+        const currentId = selectedSectionStudentId
+            ? String(selectedSectionStudentId)
+            : null;
+
+        if (selectedId !== currentId) {
+            setSelectedSectionStudentId(selectedId);
+        }
+    }, [
+        show,
+        isSectionTab,
+        selectedSectionStudent?.id,
+        selectedSectionStudentId,
+    ]);
+
+    useEffect(() => {
+        if (!show || !isSectionTab) {
+            return;
+        }
+
+        setSectionClassSubjectSearch(
+            selectedSectionClassSubject
+                ? classSubjectOptionLabel(selectedSectionClassSubject)
+                : "",
+        );
+    }, [
+        show,
+        isSectionTab,
+        selectedSectionClassSubject?.id,
+        selectedSectionClassSubject?.subject_code,
+        selectedSectionClassSubject?.subject_name,
+    ]);
+
+    useEffect(() => {
+        if (!show || !isSectionTab) {
+            return;
+        }
+
+        if (sectionClassDraft.teacher_id && !selectedSectionClassTeacher) {
+            setSectionClassDraft((previous) => ({
+                ...previous,
+                teacher_id: "",
+            }));
+            setSectionClassTeacherSearch("");
+            return;
+        }
+
+        setSectionClassTeacherSearch(
+            selectedSectionClassTeacher
+                ? classTeacherOptionLabel(selectedSectionClassTeacher)
+                : "",
+        );
+    }, [
+        show,
+        isSectionTab,
+        sectionClassDraft.teacher_id,
+        selectedSectionClassTeacher?.id,
+        selectedSectionClassTeacher?.name,
+        selectedSectionClassTeacher?.department?.department_code,
+    ]);
+
+    useEffect(() => {
+        if (isDepartmentTab) {
+            return;
+        }
+
+        setPanel("info");
+    }, [activeTab, show, payload, isDepartmentTab]);
+
+    const data = (() => {
         if (activeTab === "students") {
             const student = payload?.student || {
                 user_id: row?.student_user_id,
@@ -1393,14 +2513,23 @@ export default function ManagementDetailModal({
         }
 
         if (activeTab === "sections") {
-            const section = payload?.section || row || {};
-            const sectionClasses = Array.isArray(payload?.classes)
-                ? payload.classes
-                : [];
+            const section = activeSection || payload?.section || row || {};
+            const sectionClasses = Array.isArray(section?.classes)
+                ? section.classes
+                : Array.isArray(payload?.classes)
+                  ? payload.classes
+                  : [];
             const departmentName =
-                section.department?.department_name || section.department_name;
+                section.department_name || section.department?.department_name;
             const departmentCode =
-                section.department?.department_code || section.department_code;
+                section.department_code || section.department?.department_code;
+            const sectionStatusLabel = sectionEditMode
+                ? sectionData.is_active
+                    ? "Active"
+                    : "Inactive"
+                : section.is_active
+                  ? "Active"
+                  : "Inactive";
 
             return {
                 identity: {
@@ -1429,56 +2558,379 @@ export default function ManagementDetailModal({
                             <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
                                 Section profile
                             </p>
-                            <div className="rounded-md bg-emerald-50 px-4">
-                                <FieldRow
-                                    label="Section"
-                                    value={
-                                        section.section_full_label ||
-                                        section.section_name
-                                    }
-                                />
-                                <FieldRow
-                                    label="Code"
-                                    value={section.section_code}
-                                    mono
-                                />
-                                <FieldRow
-                                    label="Department"
-                                    value={
-                                        departmentName
-                                            ? `${departmentName} (${departmentCode || "-"})`
-                                            : departmentCode || "-"
-                                    }
-                                />
-                                <FieldRow
-                                    label="Cohort"
-                                    value={section.cohort || "-"}
-                                />
-                                <FieldRow
-                                    label="Grade"
-                                    value={section.grade_level || "-"}
-                                />
-                                <FieldRow
-                                    label="Strand / Track"
-                                    value={
-                                        [section.strand, section.track]
-                                            .filter(Boolean)
-                                            .join(" · ") || "-"
-                                    }
-                                />
-                                <FieldRow
-                                    label="School year"
-                                    value={section.school_year || "-"}
-                                />
-                                <FieldRow
-                                    label="Adviser"
-                                    value={
-                                        section.advisor_teacher_name ||
-                                        section.advisor_name ||
-                                        "Not assigned"
-                                    }
-                                />
-                            </div>
+                            {sectionEditMode ? (
+                                <div className="rounded-md bg-emerald-50 p-3">
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        <div>
+                                            <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                                Department
+                                            </p>
+                                            <select
+                                                value={
+                                                    sectionData.department_id
+                                                }
+                                                onChange={(event) => {
+                                                    const selectedDepartmentId =
+                                                        event.target.value;
+                                                    const selectedDepartment =
+                                                        resolvedDepartmentOptions.find(
+                                                            (option) =>
+                                                                String(
+                                                                    option.value,
+                                                                ) ===
+                                                                String(
+                                                                    selectedDepartmentId,
+                                                                ),
+                                                        ) || null;
+
+                                                    setSectionData(
+                                                        "department_id",
+                                                        selectedDepartmentId,
+                                                    );
+                                                    setSectionData(
+                                                        "advisor_teacher_id",
+                                                        "",
+                                                    );
+
+                                                    if (
+                                                        !sectionData.strand &&
+                                                        selectedDepartment?.code
+                                                    ) {
+                                                        setSectionData(
+                                                            "strand",
+                                                            selectedDepartment.code,
+                                                        );
+                                                    }
+                                                }}
+                                                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            >
+                                                <option value="">
+                                                    Select department
+                                                </option>
+                                                {resolvedDepartmentOptions.map(
+                                                    (option) => (
+                                                        <option
+                                                            key={option.value}
+                                                            value={option.value}
+                                                        >
+                                                            {option.code
+                                                                ? `${option.code} - ${option.label}`
+                                                                : option.label}
+                                                        </option>
+                                                    ),
+                                                )}
+                                            </select>
+                                            {sectionErrors.department_id && (
+                                                <p className="mt-1 text-[11px] text-rose-600">
+                                                    {
+                                                        sectionErrors.department_id
+                                                    }
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                                Section Name
+                                            </p>
+                                            <input
+                                                type="text"
+                                                value={sectionData.section_name}
+                                                onChange={(event) =>
+                                                    setSectionData(
+                                                        "section_name",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            />
+                                            {sectionErrors.section_name && (
+                                                <p className="mt-1 text-[11px] text-rose-600">
+                                                    {sectionErrors.section_name}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                                Adviser Teacher
+                                            </p>
+                                            <select
+                                                value={
+                                                    sectionData.advisor_teacher_id
+                                                }
+                                                onChange={(event) =>
+                                                    setSectionData(
+                                                        "advisor_teacher_id",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                disabled={
+                                                    !sectionData.department_id
+                                                }
+                                                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500 disabled:opacity-60"
+                                            >
+                                                <option value="">
+                                                    {sectionData.department_id
+                                                        ? "Unassigned (N/A)"
+                                                        : "Select department first"}
+                                                </option>
+                                                {sectionAdviserOptions.map(
+                                                    (teacher) => (
+                                                        <option
+                                                            key={teacher.id}
+                                                            value={teacher.id}
+                                                        >
+                                                            {teacher.name ||
+                                                                teacher.teacher_name ||
+                                                                personName(
+                                                                    teacher,
+                                                                )}
+                                                        </option>
+                                                    ),
+                                                )}
+                                            </select>
+                                            {sectionErrors.advisor_teacher_id && (
+                                                <p className="mt-1 text-[11px] text-rose-600">
+                                                    {
+                                                        sectionErrors.advisor_teacher_id
+                                                    }
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                                Section Code
+                                            </p>
+                                            <input
+                                                type="text"
+                                                value={sectionData.section_code}
+                                                onChange={(event) =>
+                                                    setSectionData(
+                                                        "section_code",
+                                                        event.target.value.toUpperCase(),
+                                                    )
+                                                }
+                                                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            />
+                                            {sectionErrors.section_code && (
+                                                <p className="mt-1 text-[11px] text-rose-600">
+                                                    {sectionErrors.section_code}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                                Cohort
+                                            </p>
+                                            <input
+                                                type="text"
+                                                value={sectionData.cohort}
+                                                onChange={(event) =>
+                                                    setSectionData(
+                                                        "cohort",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            />
+                                            {sectionErrors.cohort && (
+                                                <p className="mt-1 text-[11px] text-rose-600">
+                                                    {sectionErrors.cohort}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                                Grade Level
+                                            </p>
+                                            <input
+                                                type="text"
+                                                value={sectionData.grade_level}
+                                                onChange={(event) =>
+                                                    setSectionData(
+                                                        "grade_level",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            />
+                                            {sectionErrors.grade_level && (
+                                                <p className="mt-1 text-[11px] text-rose-600">
+                                                    {sectionErrors.grade_level}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                                Strand
+                                            </p>
+                                            <input
+                                                type="text"
+                                                value={sectionData.strand}
+                                                onChange={(event) =>
+                                                    setSectionData(
+                                                        "strand",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            />
+                                            {sectionErrors.strand && (
+                                                <p className="mt-1 text-[11px] text-rose-600">
+                                                    {sectionErrors.strand}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                                Track
+                                            </p>
+                                            <input
+                                                type="text"
+                                                value={sectionData.track}
+                                                onChange={(event) =>
+                                                    setSectionData(
+                                                        "track",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            />
+                                            {sectionErrors.track && (
+                                                <p className="mt-1 text-[11px] text-rose-600">
+                                                    {sectionErrors.track}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                                School Year
+                                            </p>
+                                            <input
+                                                type="text"
+                                                value={sectionData.school_year}
+                                                onChange={(event) =>
+                                                    setSectionData(
+                                                        "school_year",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            />
+                                            {sectionErrors.school_year && (
+                                                <p className="mt-1 text-[11px] text-rose-600">
+                                                    {sectionErrors.school_year}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="sm:col-span-2">
+                                            <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                                Description
+                                            </p>
+                                            <textarea
+                                                value={sectionData.description}
+                                                onChange={(event) =>
+                                                    setSectionData(
+                                                        "description",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                rows={3}
+                                                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            />
+                                            {sectionErrors.description && (
+                                                <p className="mt-1 text-[11px] text-rose-600">
+                                                    {sectionErrors.description}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="sm:col-span-2">
+                                            <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={
+                                                        sectionData.is_active
+                                                    }
+                                                    onChange={(event) =>
+                                                        setSectionData(
+                                                            "is_active",
+                                                            event.target
+                                                                .checked,
+                                                        )
+                                                    }
+                                                    className="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                                                />
+                                                Active Section
+                                            </label>
+                                            {sectionErrors.is_active && (
+                                                <p className="mt-1 text-[11px] text-rose-600">
+                                                    {sectionErrors.is_active}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="rounded-md bg-emerald-50 px-4">
+                                    <FieldRow
+                                        label="Section"
+                                        value={
+                                            section.section_full_label ||
+                                            section.section_name
+                                        }
+                                    />
+                                    <FieldRow
+                                        label="Code"
+                                        value={section.section_code}
+                                        mono
+                                    />
+                                    <FieldRow
+                                        label="Department"
+                                        value={
+                                            departmentName
+                                                ? `${departmentName} (${departmentCode || "-"})`
+                                                : departmentCode || "-"
+                                        }
+                                    />
+                                    <FieldRow
+                                        label="Cohort"
+                                        value={section.cohort || "-"}
+                                    />
+                                    <FieldRow
+                                        label="Grade"
+                                        value={section.grade_level || "-"}
+                                    />
+                                    <FieldRow
+                                        label="Strand / Track"
+                                        value={
+                                            [section.strand, section.track]
+                                                .filter(Boolean)
+                                                .join(" · ") || "-"
+                                        }
+                                    />
+                                    <FieldRow
+                                        label="School year"
+                                        value={section.school_year || "-"}
+                                    />
+                                    <FieldRow
+                                        label="Adviser"
+                                        value={
+                                            section.advisor_teacher_name ||
+                                            section.advisor_name ||
+                                            "Not assigned"
+                                        }
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -1495,9 +2947,7 @@ export default function ManagementDetailModal({
                             />
                             <SummaryCard
                                 label="Status"
-                                value={
-                                    section.is_active ? "Active" : "Inactive"
-                                }
+                                value={sectionStatusLabel}
                                 muted
                             />
                         </div>
@@ -1561,7 +3011,11 @@ export default function ManagementDetailModal({
 
             const students = Array.isArray(payload?.students)
                 ? payload.students
-                : [];
+                : Array.isArray(classInfo?.students)
+                  ? classInfo.students
+                  : Array.isArray(row?.students)
+                    ? row.students
+                    : [];
             const passed = students.filter((entry) => {
                 if (typeof entry?.passed === "boolean") {
                     return entry.passed;
@@ -1869,7 +3323,7 @@ export default function ManagementDetailModal({
                 </div>
             ),
         };
-    }, [activeTab, payload, row, isDepartmentCreateMode]);
+    })();
 
     const departmentSpecializationErrors = Object.entries(departmentErrors)
         .filter(
@@ -1892,11 +3346,11 @@ export default function ManagementDetailModal({
         };
 
         deptTeachers.forEach(register);
-        sourceDepartment?.teachers?.forEach(register);
-        sourceDepartment?.admins?.forEach(register);
+        activeDepartment?.teachers?.forEach(register);
+        activeDepartment?.admins?.forEach(register);
 
         return Array.from(peopleMap.values());
-    }, [deptTeachers, sourceDepartment]);
+    }, [deptTeachers, activeDepartment]);
 
     const departmentSelectedTeachers = useMemo(
         () =>
@@ -1936,23 +3390,75 @@ export default function ManagementDetailModal({
         );
     }, [deptData.admin_id, departmentSelectedTeachers, departmentKnownPeople]);
 
+    const departmentTeacherReassignmentMap = useMemo(
+        () => deptData.reassign_teacher_department_ids || {},
+        [deptData.reassign_teacher_department_ids],
+    );
+
+    const departmentReassignedTeacherIdSet = useMemo(
+        () =>
+            new Set(
+                Object.entries(departmentTeacherReassignmentMap)
+                    .filter(([, departmentId]) => Boolean(departmentId))
+                    .map(([teacherId]) => String(teacherId)),
+            ),
+        [departmentTeacherReassignmentMap],
+    );
+
+    const departmentAdminOptionTeachers = useMemo(
+        () =>
+            departmentSelectedTeachers.filter(
+                (teacher) =>
+                    !departmentReassignedTeacherIdSet.has(String(teacher.id)),
+            ),
+        [departmentSelectedTeachers, departmentReassignedTeacherIdSet],
+    );
+
+    useEffect(() => {
+        if (!deptData.admin_id) {
+            return;
+        }
+
+        const selectedAdmin = departmentSelectedTeachers.find(
+            (teacher) => String(teacher.id) === String(deptData.admin_id),
+        );
+
+        if (selectedAdmin && isSuperAdminPerson(selectedAdmin)) {
+            setDeptData("admin_id", "");
+        }
+    }, [deptData.admin_id, departmentSelectedTeachers, setDeptData]);
+
+    useEffect(() => {
+        if (!deptData.admin_id) {
+            return;
+        }
+
+        if (departmentReassignedTeacherIdSet.has(String(deptData.admin_id))) {
+            setDeptData("admin_id", "");
+        }
+    }, [deptData.admin_id, departmentReassignedTeacherIdSet, setDeptData]);
+
     const sourceAdminIdSet = new Set(
-        (sourceDepartment?.admins || []).map((admin) => String(admin.id)),
+        (activeDepartment?.admins || []).map((admin) => String(admin.id)),
     );
 
     const departmentMembersAdmins = deptEditMode
         ? departmentSelectedAdmin
             ? [departmentSelectedAdmin]
             : []
-        : sourceDepartment?.admins || [];
+        : activeDepartment?.admins || [];
 
     const departmentMembersTeachers = deptEditMode
         ? departmentSelectedTeachers.filter(
               (teacher) => String(teacher.id) !== String(deptData.admin_id),
           )
-        : (sourceDepartment?.teachers || []).filter(
+        : (activeDepartment?.teachers || []).filter(
               (teacher) => !sourceAdminIdSet.has(String(teacher.id)),
           );
+
+    const hasSuperAdminInAdminOptions = departmentAdminOptionTeachers.some(
+        (teacher) => isSuperAdminPerson(teacher),
+    );
 
     const departmentFilteredTeachers = useMemo(
         () =>
@@ -1999,6 +3505,9 @@ export default function ManagementDetailModal({
 
     const toggleDepartmentTeacher = (teacherId) => {
         const teacherKey = String(teacherId);
+        const wasSelected = (deptData.teacher_ids || []).some(
+            (id) => String(id) === teacherKey,
+        );
         const nextTeacherIds = (deptData.teacher_ids || []).some(
             (id) => String(id) === teacherKey,
         )
@@ -2016,42 +3525,1808 @@ export default function ManagementDetailModal({
         if (!adminStillSelected) {
             setDeptData("admin_id", "");
         }
+
+        if (wasSelected) {
+            const nextReassignmentMap = {
+                ...(deptData.reassign_teacher_department_ids || {}),
+            };
+
+            delete nextReassignmentMap[teacherKey];
+            setDeptData("reassign_teacher_department_ids", nextReassignmentMap);
+        }
+    };
+
+    const demoteDepartmentAdmin = () => {
+        setDeptData("admin_id", "");
+    };
+
+    const removeDepartmentTeacher = (teacherId) => {
+        const teacherKey = String(teacherId);
+
+        setDeptData(
+            "teacher_ids",
+            (deptData.teacher_ids || []).filter(
+                (id) => String(id) !== teacherKey,
+            ),
+        );
+
+        if (String(deptData.admin_id) === teacherKey) {
+            setDeptData("admin_id", "");
+        }
+
+        const nextReassignmentMap = {
+            ...(deptData.reassign_teacher_department_ids || {}),
+        };
+
+        delete nextReassignmentMap[teacherKey];
+        setDeptData("reassign_teacher_department_ids", nextReassignmentMap);
+
+        if (String(deptReassignTeacherId) === teacherKey) {
+            setDeptReassignTeacherId(null);
+            setDeptReassignSearch("");
+        }
+    };
+
+    const setDepartmentTeacherReassignment = (teacherId, departmentId) => {
+        const teacherKey = String(teacherId);
+
+        setDeptData("reassign_teacher_department_ids", {
+            ...(deptData.reassign_teacher_department_ids || {}),
+            [teacherKey]: String(departmentId),
+        });
+    };
+
+    const setDeptCreateTeacherField = (field, value) => {
+        setDeptCreateTeacher((previous) => ({
+            ...previous,
+            [field]: value,
+        }));
+
+        setDeptCreateTeacherErrors((previous) => {
+            if (!previous[field]) {
+                return previous;
+            }
+
+            const nextErrors = {
+                ...previous,
+            };
+
+            delete nextErrors[field];
+
+            return nextErrors;
+        });
+    };
+
+    const handleCreateDepartmentTeacher = async (event) => {
+        event.preventDefault();
+
+        const assignPanelEditable = deptEditMode || panel === "assign";
+
+        if (
+            !activeDepartment?.id ||
+            !assignPanelEditable ||
+            deptCreateTeacherSubmitting
+        ) {
+            return;
+        }
+
+        setDeptCreateTeacherSubmitting(true);
+        setDeptCreateTeacherErrors({});
+
+        try {
+            const response = await axios.post(
+                route(
+                    "superadmin.departments.teachers.store",
+                    activeDepartment.id,
+                ),
+                deptCreateTeacher,
+                {
+                    headers: {
+                        Accept: "application/json",
+                    },
+                },
+            );
+            const createdTeacher = response?.data?.teacher || null;
+
+            if (createdTeacher?.id) {
+                setDeptTeachers((previous) => {
+                    const byId = new Map(
+                        previous.map((teacher) => [
+                            String(teacher.id),
+                            teacher,
+                        ]),
+                    );
+
+                    byId.set(String(createdTeacher.id), createdTeacher);
+
+                    return Array.from(byId.values());
+                });
+                setDeptTeachersLoaded(true);
+
+                const alreadySelected = (deptData.teacher_ids || []).some(
+                    (id) => String(id) === String(createdTeacher.id),
+                );
+
+                if (!alreadySelected) {
+                    setDeptData("teacher_ids", [
+                        ...(deptData.teacher_ids || []),
+                        createdTeacher.id,
+                    ]);
+                }
+
+                setDeptAssignMode("assign");
+                setDeptTeacherSearch("");
+                setDeptTeachersLoaded(false);
+                onDepartmentSaved?.(activeDepartment.id);
+            }
+
+            setDeptCreateTeacher({
+                first_name: "",
+                middle_name: "",
+                last_name: "",
+                email: "",
+            });
+        } catch (requestError) {
+            const status = requestError?.response?.status;
+            const responsePayload = requestError?.response?.data || {};
+
+            if (status === 422) {
+                const validationErrors = responsePayload?.errors || {};
+
+                setDeptCreateTeacherErrors(
+                    Object.fromEntries(
+                        Object.entries(validationErrors).map(
+                            ([field, messages]) => [
+                                field,
+                                Array.isArray(messages)
+                                    ? messages[0]
+                                    : messages,
+                            ],
+                        ),
+                    ),
+                );
+
+                return;
+            }
+
+            if (status === 419) {
+                setDeptCreateTeacherErrors({
+                    _form: "Your session has expired. Please refresh the page and try again.",
+                });
+
+                return;
+            }
+
+            setDeptCreateTeacherErrors({
+                _form:
+                    responsePayload?.message ||
+                    "Unable to create teacher. Please try again.",
+            });
+        } finally {
+            setDeptCreateTeacherSubmitting(false);
+        }
     };
 
     const exitDepartmentEditMode = () => {
-        if (!sourceDepartment) {
+        if (!activeDepartment) {
             setDeptEditMode(false);
             return;
         }
 
-        hydrateDepartmentForm(sourceDepartment);
+        hydrateDepartmentForm(activeDepartment);
         clearDepartmentErrors();
         setDeptEditMode(false);
-        setPanel("info");
+        setDeptReassignTeacherId(null);
+        setDeptReassignSearch("");
     };
 
     const handleDepartmentSave = () => {
-        const isCreate = isDepartmentCreateMode || !sourceDepartment?.id;
+        const isCreate = isDepartmentCreateMode || !activeDepartment?.id;
         const endpoint = isCreate
             ? route("superadmin.departments.store")
-            : route("superadmin.departments.update", sourceDepartment.id);
+            : route("superadmin.departments.update", activeDepartment.id);
 
         const submit = isCreate ? postDepartment : putDepartment;
 
         submit(endpoint, {
             preserveScroll: true,
             onSuccess: () => {
+                const trackLabel =
+                    resolvedTrackOptions.find(
+                        (option) =>
+                            String(option.value) ===
+                            String(deptData.school_track_id),
+                    )?.label ||
+                    activeDepartment?.track ||
+                    "";
+
+                const reassignedTeacherIdSet = new Set(
+                    Object.entries(
+                        deptData.reassign_teacher_department_ids || {},
+                    )
+                        .filter(([, departmentId]) => Boolean(departmentId))
+                        .map(([teacherId]) => String(teacherId)),
+                );
+
+                const selectedTeachersSnapshot = departmentSelectedTeachers
+                    .filter(
+                        (teacher) =>
+                            !reassignedTeacherIdSet.has(String(teacher.id)),
+                    )
+                    .map((teacher) => ({
+                        ...teacher,
+                        roles: normalizePersonRoles(teacher?.roles),
+                        is_superadmin: isSuperAdminPerson(teacher),
+                    }));
+
+                const selectedAdminSnapshot =
+                    departmentSelectedAdmin &&
+                    !reassignedTeacherIdSet.has(
+                        String(departmentSelectedAdmin.id),
+                    ) &&
+                    !isSuperAdminPerson(departmentSelectedAdmin)
+                        ? {
+                              ...departmentSelectedAdmin,
+                              roles: normalizePersonRoles(
+                                  departmentSelectedAdmin?.roles,
+                              ),
+                              is_superadmin: isSuperAdminPerson(
+                                  departmentSelectedAdmin,
+                              ),
+                          }
+                        : null;
+
+                setDeptPersistedDepartment((previous) => ({
+                    ...(previous || activeDepartment || {}),
+                    name: deptData.department_name || "",
+                    code: deptData.department_code || "",
+                    track: trackLabel,
+                    school_track_id:
+                        deptData.school_track_id ||
+                        previous?.school_track_id ||
+                        activeDepartment?.school_track_id ||
+                        null,
+                    description: deptData.description || "",
+                    is_active: Boolean(deptData.is_active),
+                    specializations: [...(deptData.specialization_names || [])],
+                    students_count:
+                        previous?.students_count ||
+                        activeDepartment?.students_count ||
+                        0,
+                    admins: selectedAdminSnapshot
+                        ? [selectedAdminSnapshot]
+                        : [],
+                    teachers: selectedTeachersSnapshot,
+                    admins_count: selectedAdminSnapshot ? 1 : 0,
+                    teachers_count: selectedTeachersSnapshot.filter(
+                        (teacher) =>
+                            String(teacher.id) !==
+                            String(selectedAdminSnapshot?.id || ""),
+                    ).length,
+                }));
+
                 setDeptEditMode(false);
-                onDepartmentSaved?.();
-                onClose?.();
+                setDeptReassignTeacherId(null);
+                setDeptReassignSearch("");
+                setDeptTeachersLoaded(false);
+                onDepartmentSaved?.(activeDepartment?.id);
             },
         });
     };
 
+    const departmentDeleteBlockedReason = useMemo(() => {
+        if (
+            !isDepartmentTab ||
+            !activeDepartment?.id ||
+            isDepartmentCreateMode
+        ) {
+            return "";
+        }
+
+        const adminCount = asNumber(
+            activeDepartment?.admins_count,
+            Array.isArray(activeDepartment?.admins)
+                ? activeDepartment.admins.length
+                : 0,
+        );
+        const teacherCount = asNumber(
+            activeDepartment?.teachers_count,
+            Array.isArray(activeDepartment?.teachers)
+                ? activeDepartment.teachers.length
+                : 0,
+        );
+
+        if (adminCount > 0 || teacherCount > 0) {
+            return "Cannot delete department with assigned admins or teachers.";
+        }
+
+        return "";
+    }, [isDepartmentTab, activeDepartment, isDepartmentCreateMode]);
+
+    const openDepartmentDeleteModal = () => {
+        if (
+            !isDepartmentTab ||
+            !activeDepartment?.id ||
+            isDepartmentCreateMode ||
+            departmentDeleting
+        ) {
+            return;
+        }
+
+        if (departmentDeleteBlockedReason) {
+            return;
+        }
+
+        setDepartmentDeleteError("");
+        setShowDepartmentDeleteModal(true);
+    };
+
+    const closeDepartmentDeleteModal = () => {
+        if (departmentDeleting) {
+            return;
+        }
+
+        setShowDepartmentDeleteModal(false);
+        setDepartmentDeleteError("");
+    };
+
+    const confirmDepartmentDelete = () => {
+        if (
+            !isDepartmentTab ||
+            !activeDepartment?.id ||
+            isDepartmentCreateMode ||
+            departmentDeleting
+        ) {
+            return;
+        }
+
+        setDepartmentDeleteError("");
+        setDepartmentDeleting(true);
+
+        router.delete(
+            route("superadmin.departments.destroy", activeDepartment.id),
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: (page) => {
+                    const flashError = page?.props?.flash?.error;
+
+                    if (flashError) {
+                        setDepartmentDeleteError(flashError);
+                        return;
+                    }
+
+                    setShowDepartmentDeleteModal(false);
+                    setDepartmentDeleteError("");
+                    onDepartmentDeleted?.(activeDepartment.id);
+                    onClose?.();
+                },
+                onError: () => {
+                    setDepartmentDeleteError(
+                        "Unable to delete department right now. Please try again.",
+                    );
+                },
+                onFinish: () => {
+                    setDepartmentDeleting(false);
+                },
+            },
+        );
+    };
+
+    const exitSectionEditMode = () => {
+        if (!activeSection) {
+            setSectionEditMode(false);
+            return;
+        }
+
+        hydrateSectionForm(activeSection);
+        clearSectionErrors();
+        setSectionEditMode(false);
+    };
+
+    const handleSectionSave = () => {
+        if (!activeSection?.id) {
+            return;
+        }
+
+        putSection(
+            route(
+                "superadmin.academic-management.sections.update",
+                activeSection.id,
+            ),
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    const selectedDepartment = resolvedDepartmentOptions.find(
+                        (option) =>
+                            String(option.value) ===
+                            String(sectionData.department_id),
+                    );
+                    const selectedAdviser = sectionAdviserOptions.find(
+                        (teacher) =>
+                            String(teacher.id) ===
+                            String(sectionData.advisor_teacher_id),
+                    );
+
+                    setSectionPersistedData((previous) => ({
+                        ...(previous || activeSection || {}),
+                        department_id: sectionData.department_id || null,
+                        department_name:
+                            selectedDepartment?.label ||
+                            activeSection.department_name ||
+                            "",
+                        department_code:
+                            selectedDepartment?.code ||
+                            activeSection.department_code ||
+                            "",
+                        section_name: sectionData.section_name || "",
+                        section_full_label: sectionData.section_name || "",
+                        section_code: sectionData.section_code || "",
+                        cohort: sectionData.cohort || "",
+                        grade_level: sectionData.grade_level || "",
+                        strand: sectionData.strand || "",
+                        track: sectionData.track || "",
+                        school_year: sectionData.school_year || "",
+                        description: sectionData.description || "",
+                        advisor_teacher_id:
+                            sectionData.advisor_teacher_id || null,
+                        advisor_teacher_name: sectionData.advisor_teacher_id
+                            ? selectedAdviser?.name ||
+                              selectedAdviser?.teacher_name ||
+                              personName(selectedAdviser) ||
+                              activeSection.advisor_teacher_name ||
+                              "Assigned adviser"
+                            : "Not assigned",
+                        is_active: Boolean(sectionData.is_active),
+                        students_count:
+                            previous?.students_count ||
+                            activeSection.students_count ||
+                            0,
+                        classes_count:
+                            previous?.classes_count ||
+                            activeSection.classes_count ||
+                            0,
+                        classes:
+                            previous?.classes || activeSection.classes || [],
+                    }));
+
+                    setSectionEditMode(false);
+                    onSectionSaved?.(activeSection.id);
+                },
+            },
+        );
+    };
+
+    const retrySectionClassesLoad = () => {
+        if (sectionClassesLoading) {
+            return;
+        }
+
+        setSectionClassesLoaded(false);
+        setSectionClassesError("");
+    };
+
+    const resetSectionClassQueueComposer = () => {
+        setSectionClassDraft({
+            subject_id: "",
+            teacher_id: "",
+            school_year: activeSection?.school_year || currentSchoolYear || "",
+            color: "indigo",
+        });
+        setSectionClassSubjectSearch("");
+        setSectionClassTeacherSearch("");
+    };
+
+    const removeQueuedSectionClass = (queueId) => {
+        setSectionClassQueue((previous) =>
+            previous.filter((item) => item.queue_id !== queueId),
+        );
+        setSectionClassNotice("");
+        setSectionClassSaveError("");
+    };
+
+    const addSectionClassToQueue = () => {
+        setSectionClassNotice("");
+        setSectionClassSaveError("");
+
+        if (!activeSection?.id) {
+            setSectionClassNotice(
+                "Select a valid section before adding class entries.",
+            );
+            return;
+        }
+
+        const matchedSubject = sectionClassSubjectLookup.get(
+            sectionClassSubjectSearch,
+        );
+
+        if (
+            !matchedSubject ||
+            String(matchedSubject.id) !== String(sectionClassDraft.subject_id)
+        ) {
+            setSectionClassNotice(
+                "Subject input must exactly match one of the loaded options.",
+            );
+            return;
+        }
+
+        const matchedTeacher = sectionClassTeacherLookup.get(
+            sectionClassTeacherSearch,
+        );
+
+        if (
+            !matchedTeacher ||
+            String(matchedTeacher.id) !== String(sectionClassDraft.teacher_id)
+        ) {
+            setSectionClassNotice(
+                "Teacher input must exactly match one of the loaded options.",
+            );
+            return;
+        }
+
+        const schoolYear = normalizeWhitespace(sectionClassDraft.school_year);
+
+        if (!/^\d{4}-\d{4}$/.test(schoolYear)) {
+            setSectionClassNotice("School year must be in YYYY-YYYY format.");
+            return;
+        }
+
+        if (sectionClassDraftDuplicateMessage) {
+            setSectionClassNotice(sectionClassDraftDuplicateMessage);
+            return;
+        }
+
+        const queueItem = {
+            queue_id: crypto.randomUUID(),
+            section_id: Number(activeSection.id),
+            section_name:
+                activeSection.section_full_label ||
+                activeSection.section_name ||
+                "Section",
+            section_code: activeSection.section_code || "",
+            subject_id: Number(matchedSubject.id),
+            subject_name: matchedSubject.subject_name,
+            subject_code: matchedSubject.subject_code || "",
+            teacher_id: Number(matchedTeacher.id),
+            teacher_name: matchedTeacher.name || personName(matchedTeacher),
+            school_year: schoolYear,
+            color: sectionClassDraft.color || "indigo",
+        };
+
+        setSectionClassQueue((previous) => [...previous, queueItem]);
+        setSectionClassNotice(
+            `Queued: ${queueItem.subject_name} for ${queueItem.section_name}.`,
+        );
+        resetSectionClassQueueComposer();
+    };
+
+    const handleSectionClassesSave = async () => {
+        if (!activeSection?.id || sectionClassQueue.length === 0) {
+            setSectionClassSaveError(
+                "Add at least one class to queue before saving changes.",
+            );
+            return;
+        }
+
+        setSectionClassSaveError("");
+        setSectionClassSyncing(true);
+
+        try {
+            const payloadQueue = sectionClassQueue.map((item) => ({
+                subject_id: item.subject_id,
+                teacher_id: item.teacher_id,
+                school_year: item.school_year,
+                color: item.color,
+            }));
+
+            const response = await axios.post(
+                route(
+                    "superadmin.academic-management.sections.classes.sync",
+                    activeSection.id,
+                ),
+                {
+                    class_queue: payloadQueue,
+                },
+            );
+
+            const list = Array.isArray(response?.data?.classes)
+                ? response.data.classes
+                : [];
+            const responseCount = Number(
+                response?.data?.classes_count ?? response?.data?.count,
+            );
+            const normalizedCount = Number.isFinite(responseCount)
+                ? responseCount
+                : list.length;
+
+            setSectionClasses(list);
+            setSectionClassesLoaded(true);
+            setSectionClassQueue([]);
+            setSectionClassNotice("");
+            resetSectionClassQueueComposer();
+
+            setSectionPersistedData((previous) => ({
+                ...(previous || activeSection || {}),
+                classes_count: normalizedCount,
+                classes: list,
+            }));
+
+            onSectionSaved?.(activeSection.id);
+        } catch (requestError) {
+            const status = requestError?.response?.status;
+            const responsePayload = requestError?.response?.data || {};
+
+            if (status === 422) {
+                const validationErrors = responsePayload?.errors || {};
+                const firstError = Object.values(validationErrors)
+                    .flat()
+                    .find(Boolean);
+
+                setSectionClassSaveError(
+                    firstError ||
+                        responsePayload?.message ||
+                        "Unable to save queued classes.",
+                );
+                return;
+            }
+
+            setSectionClassSaveError(
+                responsePayload?.message || "Unable to save queued classes.",
+            );
+        } finally {
+            setSectionClassSyncing(false);
+        }
+    };
+
+    const clearSectionStudentAction = (studentId) => {
+        const studentKey = String(studentId);
+
+        setSectionStudentActions((previous) => {
+            if (!previous?.[studentKey]) {
+                return previous;
+            }
+
+            const next = { ...previous };
+            delete next[studentKey];
+
+            return next;
+        });
+
+        setSectionStudentsSaveError("");
+    };
+
+    const toggleSectionStudentRemove = (studentId) => {
+        const studentKey = String(studentId);
+
+        setSectionStudentActions((previous) => {
+            const existing = previous?.[studentKey];
+
+            if (existing?.action === "remove") {
+                const next = { ...previous };
+                delete next[studentKey];
+                return next;
+            }
+
+            return {
+                ...previous,
+                [studentKey]: {
+                    action: "remove",
+                },
+            };
+        });
+
+        setSectionStudentReassigningId((current) =>
+            current === studentKey ? null : current,
+        );
+        setSectionStudentsSaveError("");
+    };
+
+    const toggleSectionStudentReassign = (studentId) => {
+        const studentKey = String(studentId);
+
+        setSectionStudentActions((previous) => {
+            const existing = previous?.[studentKey];
+
+            if (existing?.action === "reassign") {
+                return previous;
+            }
+
+            return {
+                ...previous,
+                [studentKey]: {
+                    action: "reassign",
+                    target_section_id: "",
+                },
+            };
+        });
+
+        setSectionStudentReassigningId((current) =>
+            current === studentKey ? null : studentKey,
+        );
+        setSectionStudentSectionSearch("");
+        setSectionStudentsSaveError("");
+    };
+
+    const selectSectionStudentReassignTarget = (studentId, targetSectionId) => {
+        const studentKey = String(studentId);
+
+        setSectionStudentActions((previous) => ({
+            ...previous,
+            [studentKey]: {
+                action: "reassign",
+                target_section_id: String(targetSectionId || ""),
+            },
+        }));
+
+        setSectionStudentReassigningId(null);
+        setSectionStudentSectionSearch("");
+        setSectionStudentsSaveError("");
+    };
+
+    const retrySectionStudentsLoad = () => {
+        if (sectionStudentsLoading) {
+            return;
+        }
+
+        setSectionStudentsLoaded(false);
+        setSectionStudentsError("");
+    };
+
+    const exitSectionStudentsEditMode = () => {
+        setSectionStudentsEditMode(false);
+        setSectionStudentActions({});
+        setSectionStudentReassigningId(null);
+        setSectionStudentSectionSearch("");
+        setSectionStudentsSaveError("");
+    };
+
+    const handleSectionStudentsSave = async () => {
+        if (!activeSection?.id || sectionStudentActionEntries.length === 0) {
+            exitSectionStudentsEditMode();
+            return;
+        }
+
+        if (sectionStudentsHasInvalidActions) {
+            setSectionStudentsSaveError(
+                "Choose a target section for every student marked for reassignment.",
+            );
+            return;
+        }
+
+        setSectionStudentsSyncing(true);
+        setSectionStudentsSaveError("");
+
+        try {
+            const response = await axios.post(
+                route(
+                    "superadmin.academic-management.sections.students.sync",
+                    activeSection.id,
+                ),
+                {
+                    actions: sectionStudentActionEntries,
+                },
+            );
+
+            const list = Array.isArray(response?.data?.students)
+                ? response.data.students
+                : [];
+            const responseCount = Number(
+                response?.data?.students_count ?? response?.data?.count,
+            );
+            const normalizedCount = Number.isFinite(responseCount)
+                ? responseCount
+                : list.length;
+
+            setSectionStudents(list);
+            setSelectedSectionStudentId((currentId) => {
+                const keepCurrent = list.some(
+                    (student) => String(student.id) === String(currentId || ""),
+                );
+
+                if (keepCurrent) {
+                    return currentId;
+                }
+
+                return list[0]?.id ? String(list[0].id) : null;
+            });
+
+            setSectionPersistedData((previous) => ({
+                ...(previous || activeSection || {}),
+                students_count: normalizedCount,
+            }));
+
+            setSectionStudentsLoaded(true);
+            setSectionStudentActions({});
+            setSectionStudentReassigningId(null);
+            setSectionStudentSectionSearch("");
+            setSectionStudentsEditMode(false);
+            onSectionSaved?.(activeSection.id);
+        } catch (requestError) {
+            const status = requestError?.response?.status;
+            const responsePayload = requestError?.response?.data || {};
+
+            if (status === 422) {
+                const validationErrors = responsePayload?.errors || {};
+                const firstError = Object.values(validationErrors)
+                    .flat()
+                    .find(Boolean);
+
+                setSectionStudentsSaveError(
+                    firstError ||
+                        responsePayload?.message ||
+                        "Unable to save section student changes.",
+                );
+
+                return;
+            }
+
+            setSectionStudentsSaveError(
+                responsePayload?.message ||
+                    "Unable to save section student changes.",
+            );
+        } finally {
+            setSectionStudentsSyncing(false);
+        }
+    };
+
+    const renderSectionStudentsPanel = () => {
+        if (sectionStudentsLoading) {
+            return (
+                <div className="rounded-lg border border-emerald-200 bg-white px-4 py-6 text-sm text-emerald-700">
+                    Loading section students...
+                </div>
+            );
+        }
+
+        if (sectionStudentsError) {
+            return (
+                <div className="space-y-3">
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                        {sectionStudentsError}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={retrySectionStudentsLoad}
+                        className="rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700"
+                    >
+                        Retry
+                    </button>
+                </div>
+            );
+        }
+
+        const pendingActionsCount = sectionStudentActionEntries.length;
+
+        return (
+            <div className="space-y-3">
+                <div className="rounded-md border border-emerald-200 bg-white p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                            <p className="text-xs font-semibold text-slate-800">
+                                Students in this section
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                                Search students in real time and open a banner
+                                to view full details.
+                            </p>
+                        </div>
+                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
+                            {sectionStudentsEditMode
+                                ? `${pendingActionsCount} pending`
+                                : `${sectionStudentsCount} total`}
+                        </span>
+                    </div>
+
+                    <div className="relative mt-3">
+                        <Search
+                            size={14}
+                            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-slate-400"
+                        />
+                        <input
+                            type="text"
+                            value={sectionStudentSearch}
+                            onChange={(event) =>
+                                setSectionStudentSearch(event.target.value)
+                            }
+                            placeholder="Search name, username, email, LRN, grade..."
+                            className="w-full rounded-md border border-emerald-200 bg-white py-2 pr-3 pl-9 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                        />
+                    </div>
+
+                    {sectionStudentsEditMode && (
+                        <p className="mt-2 text-[11px] text-slate-500">
+                            Mark students for removal or reassignment, then use
+                            Save Changes.
+                        </p>
+                    )}
+
+                    {sectionStudentsSaveError && (
+                        <p className="mt-2 text-[11px] text-rose-600">
+                            {sectionStudentsSaveError}
+                        </p>
+                    )}
+                </div>
+
+                {sectionStudents.length === 0 ? (
+                    <EmptyCard message="No students are currently assigned to this section." />
+                ) : (
+                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+                        <div className="space-y-2 rounded-md border border-emerald-200 bg-white p-3">
+                            {filteredSectionStudents.length === 0 ? (
+                                <p className="py-8 text-center text-xs text-slate-500">
+                                    No students match your search.
+                                </p>
+                            ) : (
+                                filteredSectionStudents.map((student) => {
+                                    const studentKey = String(student.id);
+                                    const actionDetails =
+                                        sectionStudentActions[studentKey];
+                                    const actionTarget =
+                                        actionDetails?.action === "reassign"
+                                            ? sectionStudentReassignOptions.find(
+                                                  (option) =>
+                                                      String(option.value) ===
+                                                      String(
+                                                          actionDetails.target_section_id ||
+                                                              "",
+                                                      ),
+                                              )
+                                            : null;
+                                    const isSelected =
+                                        String(
+                                            selectedSectionStudentId || "",
+                                        ) === studentKey;
+
+                                    return (
+                                        <div
+                                            key={studentKey}
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() =>
+                                                setSelectedSectionStudentId(
+                                                    studentKey,
+                                                )
+                                            }
+                                            onKeyDown={(event) => {
+                                                if (
+                                                    event.key === "Enter" ||
+                                                    event.key === " "
+                                                ) {
+                                                    event.preventDefault();
+                                                    setSelectedSectionStudentId(
+                                                        studentKey,
+                                                    );
+                                                }
+                                            }}
+                                            className={`rounded-md border p-3 text-left transition ${
+                                                isSelected
+                                                    ? "border-emerald-400 bg-emerald-50"
+                                                    : "border-emerald-200 bg-white hover:border-emerald-300 hover:bg-emerald-50"
+                                            }`}
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-xs font-semibold text-slate-900">
+                                                        {student.name ||
+                                                            "Unnamed student"}
+                                                    </p>
+                                                    <p className="truncate text-[11px] text-slate-500">
+                                                        {student.user_id
+                                                            ? `User #${student.user_id}`
+                                                            : "No linked user"}
+                                                    </p>
+                                                    <p className="truncate text-[11px] text-slate-500">
+                                                        {student.personal_email ||
+                                                            "-"}
+                                                    </p>
+                                                </div>
+
+                                                {actionDetails?.action ===
+                                                "remove" ? (
+                                                    <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+                                                        Remove
+                                                    </span>
+                                                ) : actionDetails?.action ===
+                                                  "reassign" ? (
+                                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                                                        Reassign
+                                                    </span>
+                                                ) : null}
+                                            </div>
+
+                                            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
+                                                <span className="rounded bg-slate-100 px-2 py-0.5">
+                                                    LRN: {student.lrn || "-"}
+                                                </span>
+                                                <span className="rounded bg-slate-100 px-2 py-0.5">
+                                                    Grade{" "}
+                                                    {student.grade_level || "-"}
+                                                </span>
+                                                {student.strand && (
+                                                    <span className="rounded bg-slate-100 px-2 py-0.5">
+                                                        {student.strand}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {actionTarget && (
+                                                <p className="mt-2 text-[11px] text-amber-700">
+                                                    Target:{" "}
+                                                    {actionTarget.section_full_label ||
+                                                        actionTarget.section_name}
+                                                    {actionTarget.section_code
+                                                        ? ` (${actionTarget.section_code})`
+                                                        : ""}
+                                                </p>
+                                            )}
+
+                                            {sectionStudentsEditMode && (
+                                                <>
+                                                    <div className="mt-2 flex flex-wrap gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={(
+                                                                event,
+                                                            ) => {
+                                                                event.stopPropagation();
+                                                                toggleSectionStudentRemove(
+                                                                    student.id,
+                                                                );
+                                                            }}
+                                                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                                                                actionDetails?.action ===
+                                                                "remove"
+                                                                    ? "border-rose-300 bg-rose-100 text-rose-700"
+                                                                    : "border-emerald-200 bg-white text-slate-700 hover:bg-slate-50"
+                                                            }`}
+                                                        >
+                                                            <UserMinus
+                                                                size={12}
+                                                            />
+                                                            Remove
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={(
+                                                                event,
+                                                            ) => {
+                                                                event.stopPropagation();
+                                                                toggleSectionStudentReassign(
+                                                                    student.id,
+                                                                );
+                                                            }}
+                                                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                                                                actionDetails?.action ===
+                                                                "reassign"
+                                                                    ? "border-amber-300 bg-amber-100 text-amber-700"
+                                                                    : "border-emerald-200 bg-white text-slate-700 hover:bg-slate-50"
+                                                            }`}
+                                                        >
+                                                            <ArrowRightLeft
+                                                                size={12}
+                                                            />
+                                                            Reassign
+                                                        </button>
+
+                                                        {actionDetails && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={(
+                                                                    event,
+                                                                ) => {
+                                                                    event.stopPropagation();
+                                                                    clearSectionStudentAction(
+                                                                        student.id,
+                                                                    );
+                                                                    if (
+                                                                        sectionStudentReassigningId ===
+                                                                        studentKey
+                                                                    ) {
+                                                                        setSectionStudentReassigningId(
+                                                                            null,
+                                                                        );
+                                                                        setSectionStudentSectionSearch(
+                                                                            "",
+                                                                        );
+                                                                    }
+                                                                }}
+                                                                className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                                                            >
+                                                                <X size={12} />
+                                                                Clear
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    {sectionStudentReassigningId ===
+                                                        studentKey && (
+                                                        <div
+                                                            className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 p-2"
+                                                            onClick={(event) =>
+                                                                event.stopPropagation()
+                                                            }
+                                                        >
+                                                            <div className="relative mb-2">
+                                                                <Search
+                                                                    size={12}
+                                                                    className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-slate-400"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    value={
+                                                                        sectionStudentSectionSearch
+                                                                    }
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        setSectionStudentSectionSearch(
+                                                                            event
+                                                                                .target
+                                                                                .value,
+                                                                        )
+                                                                    }
+                                                                    placeholder="Filter sections"
+                                                                    className="w-full rounded-md border border-emerald-200 bg-white py-1.5 pr-2 pl-8 text-[11px] focus:border-emerald-500 focus:ring-emerald-500"
+                                                                />
+                                                            </div>
+
+                                                            <div className="max-h-32 space-y-1 overflow-y-auto">
+                                                                {filteredSectionStudentReassignOptions.length ===
+                                                                0 ? (
+                                                                    <p className="px-1 py-2 text-[11px] text-slate-500">
+                                                                        No
+                                                                        matching
+                                                                        sections.
+                                                                    </p>
+                                                                ) : (
+                                                                    filteredSectionStudentReassignOptions.map(
+                                                                        (
+                                                                            option,
+                                                                        ) => {
+                                                                            const optionLabel =
+                                                                                option.section_full_label ||
+                                                                                option.section_name;
+                                                                            const optionMeta =
+                                                                                [
+                                                                                    option.section_code
+                                                                                        ? `Code ${option.section_code}`
+                                                                                        : null,
+                                                                                    option.grade_level
+                                                                                        ? `Grade ${option.grade_level}`
+                                                                                        : null,
+                                                                                    option.department_code ||
+                                                                                        null,
+                                                                                ]
+                                                                                    .filter(
+                                                                                        Boolean,
+                                                                                    )
+                                                                                    .join(
+                                                                                        " • ",
+                                                                                    );
+                                                                            const isOptionSelected =
+                                                                                String(
+                                                                                    actionDetails?.target_section_id ||
+                                                                                        "",
+                                                                                ) ===
+                                                                                String(
+                                                                                    option.value,
+                                                                                );
+
+                                                                            return (
+                                                                                <button
+                                                                                    key={`section-target-${studentKey}-${option.value}`}
+                                                                                    type="button"
+                                                                                    onClick={() =>
+                                                                                        selectSectionStudentReassignTarget(
+                                                                                            student.id,
+                                                                                            option.value,
+                                                                                        )
+                                                                                    }
+                                                                                    className={`w-full rounded-md border px-2 py-1.5 text-left transition ${
+                                                                                        isOptionSelected
+                                                                                            ? "border-amber-300 bg-amber-100"
+                                                                                            : "border-emerald-200 bg-white hover:bg-emerald-100"
+                                                                                    }`}
+                                                                                >
+                                                                                    <p className="text-[11px] font-semibold text-slate-800">
+                                                                                        {
+                                                                                            optionLabel
+                                                                                        }
+                                                                                    </p>
+                                                                                    {optionMeta && (
+                                                                                        <p className="text-[10px] text-slate-500">
+                                                                                            {
+                                                                                                optionMeta
+                                                                                            }
+                                                                                        </p>
+                                                                                    )}
+                                                                                </button>
+                                                                            );
+                                                                        },
+                                                                    )
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        <div className="rounded-md border border-emerald-200 bg-white p-3">
+                            {!selectedSectionStudent ? (
+                                <p className="py-8 text-center text-xs text-slate-500">
+                                    Select a student banner to view details.
+                                </p>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div>
+                                        <p className="text-sm font-semibold text-slate-900">
+                                            {selectedSectionStudent.name ||
+                                                "Unnamed student"}
+                                        </p>
+                                        <p className="text-xs text-slate-500">
+                                            {selectedSectionStudent.user_id
+                                                ? `User #${selectedSectionStudent.user_id}`
+                                                : "No linked user"}
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-md bg-emerald-50 px-4">
+                                        <FieldRow
+                                            label="LRN"
+                                            value={
+                                                selectedSectionStudent.lrn ||
+                                                "-"
+                                            }
+                                            mono
+                                        />
+                                        <FieldRow
+                                            label="Email"
+                                            value={
+                                                selectedSectionStudent.personal_email ||
+                                                "-"
+                                            }
+                                        />
+                                        <FieldRow
+                                            label="Grade"
+                                            value={
+                                                selectedSectionStudent.grade_level ||
+                                                "-"
+                                            }
+                                        />
+                                        <FieldRow
+                                            label="Strand"
+                                            value={
+                                                selectedSectionStudent.strand ||
+                                                "-"
+                                            }
+                                        />
+                                        <FieldRow
+                                            label="Track"
+                                            value={
+                                                selectedSectionStudent.track ||
+                                                "-"
+                                            }
+                                        />
+                                        <FieldRow
+                                            label="Current section"
+                                            value={
+                                                selectedSectionStudent.section ||
+                                                "-"
+                                            }
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <SummaryCard label="Current" value={sectionStudentsCount} />
+                    <SummaryCard
+                        label="Pending Actions"
+                        value={pendingActionsCount}
+                    />
+                    <SummaryCard
+                        label="Projected Remaining"
+                        value={sectionStudentsProjectedCount}
+                        muted
+                    />
+                </div>
+            </div>
+        );
+    };
+
+    const renderSectionClassesPanel = () => {
+        if (sectionClassesLoading) {
+            return (
+                <div className="rounded-lg border border-emerald-200 bg-white px-4 py-6 text-sm text-emerald-700">
+                    Loading section classes...
+                </div>
+            );
+        }
+
+        if (sectionClassesError) {
+            return (
+                <div className="space-y-3">
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                        {sectionClassesError}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={retrySectionClassesLoad}
+                        className="rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700"
+                    >
+                        Retry
+                    </button>
+                </div>
+            );
+        }
+
+        return (
+            <div className="space-y-3">
+                <div className="rounded-md border border-emerald-200 bg-white p-3">
+                    <div className="inline-flex w-full overflow-hidden rounded-md border border-emerald-200 bg-emerald-50 p-1">
+                        <button
+                            type="button"
+                            onClick={() => setSectionClassesMode("list")}
+                            className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition ${
+                                sectionClassesMode === "list"
+                                    ? "bg-white text-emerald-700 shadow-sm"
+                                    : "text-slate-600 hover:bg-white/70"
+                            }`}
+                        >
+                            Classes ({sectionClassesCount})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setSectionClassesMode("add")}
+                            className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition ${
+                                sectionClassesMode === "add"
+                                    ? "bg-white text-emerald-700 shadow-sm"
+                                    : "text-slate-600 hover:bg-white/70"
+                            }`}
+                        >
+                            Add Class ({sectionClassQueue.length})
+                        </button>
+                    </div>
+
+                    {sectionClassSaveError && (
+                        <p className="mt-2 text-[11px] text-rose-600">
+                            {sectionClassSaveError}
+                        </p>
+                    )}
+
+                    {sectionClassNotice && (
+                        <p className="mt-2 text-[11px] text-amber-700">
+                            {sectionClassNotice}
+                        </p>
+                    )}
+                </div>
+
+                {sectionClassesMode === "list" ? (
+                    sectionClassDisplayItems.length === 0 ? (
+                        <EmptyCard message="No class records were provided for this section." />
+                    ) : (
+                        <div className="space-y-3">
+                            {sectionClassDisplayItems.map((entry) => (
+                                <div
+                                    key={`${entry.id || entry.class_id || entry.subject_code || entry.subject_name}`}
+                                    className="rounded-lg border border-emerald-200 bg-white p-3"
+                                >
+                                    <div className="mb-1 flex items-center gap-2">
+                                        <span className="rounded bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-700">
+                                            {entry.subject_code || "N/A"}
+                                        </span>
+                                        <span className="text-[10px] text-slate-500">
+                                            {entry.semester
+                                                ? `Sem ${entry.semester}`
+                                                : "Sem -"}
+                                        </span>
+                                    </div>
+                                    <p className="text-[13px] font-semibold text-slate-900">
+                                        {entry.subject_name ||
+                                            "Unknown Subject"}
+                                    </p>
+                                    <p className="mt-1 text-[11px] text-slate-600">
+                                        Teacher: {entry.teacher_name || "-"}
+                                    </p>
+                                    <p className="mt-1 text-[11px] text-slate-500">
+                                        {entry.school_year || "-"}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    )
+                ) : (
+                    <div className="space-y-3">
+                        <div className="rounded-md border border-emerald-200 bg-white p-3">
+                            <p className="text-xs font-semibold text-slate-800">
+                                Add class to queue
+                            </p>
+                            <p className="mt-1 text-[11px] text-slate-500">
+                                Subject and teacher inputs must exactly match
+                                the loaded options before queueing.
+                            </p>
+
+                            <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                                <div>
+                                    <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                        Subject
+                                    </p>
+                                    <input
+                                        type="text"
+                                        list="section-class-subject-options"
+                                        value={sectionClassSubjectSearch}
+                                        onChange={(event) => {
+                                            const nextValue =
+                                                event.target.value;
+                                            setSectionClassSubjectSearch(
+                                                nextValue,
+                                            );
+
+                                            const matchedSubject =
+                                                sectionClassSubjectLookup.get(
+                                                    nextValue,
+                                                ) || null;
+
+                                            setSectionClassDraft(
+                                                (previous) => ({
+                                                    ...previous,
+                                                    subject_id: matchedSubject
+                                                        ? String(
+                                                              matchedSubject.id,
+                                                          )
+                                                        : "",
+                                                }),
+                                            );
+                                            setSectionClassNotice("");
+                                            setSectionClassSaveError("");
+                                        }}
+                                        placeholder="Type to search subject"
+                                        className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                    />
+                                    <datalist id="section-class-subject-options">
+                                        {resolvedSubjectOptions.map(
+                                            (subject) => (
+                                                <option
+                                                    key={`section-class-subject-${subject.id}`}
+                                                    value={classSubjectOptionLabel(
+                                                        subject,
+                                                    )}
+                                                />
+                                            ),
+                                        )}
+                                    </datalist>
+                                </div>
+
+                                <div>
+                                    <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                        Teacher
+                                    </p>
+                                    <input
+                                        type="text"
+                                        list="section-class-teacher-options"
+                                        value={sectionClassTeacherSearch}
+                                        onChange={(event) => {
+                                            const nextValue =
+                                                event.target.value;
+                                            setSectionClassTeacherSearch(
+                                                nextValue,
+                                            );
+
+                                            const matchedTeacher =
+                                                sectionClassTeacherLookup.get(
+                                                    nextValue,
+                                                ) || null;
+
+                                            setSectionClassDraft(
+                                                (previous) => ({
+                                                    ...previous,
+                                                    teacher_id: matchedTeacher
+                                                        ? String(
+                                                              matchedTeacher.id,
+                                                          )
+                                                        : "",
+                                                }),
+                                            );
+                                            setSectionClassNotice("");
+                                            setSectionClassSaveError("");
+                                        }}
+                                        placeholder={
+                                            sectionClassTeacherOptions.length >
+                                            0
+                                                ? "Type to search teacher"
+                                                : "No teacher options for section"
+                                        }
+                                        className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                        disabled={
+                                            sectionClassTeacherOptions.length ===
+                                            0
+                                        }
+                                    />
+                                    <datalist id="section-class-teacher-options">
+                                        {sectionClassTeacherOptions.map(
+                                            (teacher) => (
+                                                <option
+                                                    key={`section-class-teacher-${teacher.id}`}
+                                                    value={classTeacherOptionLabel(
+                                                        teacher,
+                                                    )}
+                                                />
+                                            ),
+                                        )}
+                                    </datalist>
+                                </div>
+
+                                <div>
+                                    <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                        School Year
+                                    </p>
+                                    <input
+                                        type="text"
+                                        value={sectionClassDraft.school_year}
+                                        onChange={(event) =>
+                                            setSectionClassDraft(
+                                                (previous) => ({
+                                                    ...previous,
+                                                    school_year:
+                                                        event.target.value,
+                                                }),
+                                            )
+                                        }
+                                        placeholder="e.g., 2026-2027"
+                                        className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                        Color Tag
+                                    </p>
+                                    <select
+                                        value={sectionClassDraft.color}
+                                        onChange={(event) =>
+                                            setSectionClassDraft(
+                                                (previous) => ({
+                                                    ...previous,
+                                                    color: event.target.value,
+                                                }),
+                                            )
+                                        }
+                                        className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                    >
+                                        {SECTION_CLASS_COLOR_OPTIONS.map(
+                                            (color) => (
+                                                <option
+                                                    key={`section-class-color-${color}`}
+                                                    value={color}
+                                                >
+                                                    {color
+                                                        .charAt(0)
+                                                        .toUpperCase() +
+                                                        color.slice(1)}
+                                                </option>
+                                            ),
+                                        )}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {sectionClassDraftDuplicateMessage && (
+                                <p className="mt-2 text-[11px] text-rose-600">
+                                    {sectionClassDraftDuplicateMessage}
+                                </p>
+                            )}
+
+                            <div className="mt-3 flex justify-end">
+                                <button
+                                    type="button"
+                                    onClick={addSectionClassToQueue}
+                                    disabled={!canAddSectionClassToQueue}
+                                    className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    <UserPlus size={13} />
+                                    Add to Queue
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="rounded-md border border-emerald-200 bg-white p-3">
+                            <div className="mb-2 flex items-center justify-between">
+                                <p className="text-xs font-semibold text-slate-800">
+                                    Queue Summary
+                                </p>
+                                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
+                                    {sectionClassQueue.length} queued
+                                </span>
+                            </div>
+
+                            {sectionClassQueue.length === 0 ? (
+                                <p className="rounded-md border border-dashed border-emerald-200 bg-emerald-50 px-3 py-5 text-center text-xs text-slate-500">
+                                    Queue is empty. Build an entry and add it to
+                                    queue.
+                                </p>
+                            ) : (
+                                <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
+                                    {sectionClassQueue.map((item) => (
+                                        <div
+                                            key={item.queue_id}
+                                            className="rounded-md border border-emerald-200 bg-emerald-50 p-3"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-xs font-semibold text-slate-900">
+                                                        {item.subject_name}
+                                                    </p>
+                                                    <p className="mt-0.5 truncate text-[11px] text-slate-600">
+                                                        {item.subject_code ||
+                                                            "-"}
+                                                    </p>
+                                                    <p className="mt-0.5 truncate text-[11px] text-slate-600">
+                                                        {item.teacher_name}
+                                                    </p>
+                                                    <p className="mt-1 text-[10px] text-slate-500">
+                                                        {item.school_year} •{" "}
+                                                        {item.color}
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        removeQueuedSectionClass(
+                                                            item.queue_id,
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        sectionClassSyncing
+                                                    }
+                                                    className="rounded-md border border-rose-200 bg-white p-1.5 text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
+                                                    title="Remove queued class"
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <SummaryCard label="Current" value={sectionClassesCount} />
+                    <SummaryCard
+                        label="Queued"
+                        value={sectionClassQueue.length}
+                    />
+                    <SummaryCard
+                        label="After Save"
+                        value={sectionClassesCount + sectionClassQueue.length}
+                        muted
+                    />
+                </div>
+            </div>
+        );
+    };
+
     const renderDepartmentPanel = () => {
-        if (!sourceDepartment) {
+        if (!activeDepartment) {
             return (
                 <EmptyCard message="Department details are unavailable for this record." />
+            );
+        }
+
+        if (panel === "specializations") {
+            return (
+                <div className="space-y-3">
+                    <div className="rounded-md border border-emerald-200 bg-white p-3">
+                        <p className="mb-2 text-xs text-slate-500">
+                            View and manage all strands and specializations for
+                            this department.
+                        </p>
+
+                        {deptEditMode && (
+                            <div className="mb-3 flex gap-2">
+                                <input
+                                    type="text"
+                                    value={deptSpecializationInput}
+                                    onChange={(event) =>
+                                        setDeptSpecializationInput(
+                                            event.target.value,
+                                        )
+                                    }
+                                    onKeyDown={(event) => {
+                                        if (event.key === "Enter") {
+                                            event.preventDefault();
+                                            addDepartmentSpecialization();
+                                        }
+                                    }}
+                                    placeholder="Add strand/specialization"
+                                    className="flex-1 rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={addDepartmentSpecialization}
+                                    className="rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700"
+                                >
+                                    Add
+                                </button>
+                            </div>
+                        )}
+
+                        {(deptData.specialization_names || []).length === 0 ? (
+                            <EmptyCard message="No strand/specialization assigned yet." />
+                        ) : (
+                            <div className="space-y-2">
+                                {(deptData.specialization_names || []).map(
+                                    (item) => (
+                                        <div
+                                            key={item}
+                                            className="flex items-center justify-between gap-3 rounded-md border border-emerald-200 bg-gradient-to-r from-emerald-50 to-emerald-100 px-3 py-2"
+                                        >
+                                            <p className="text-sm font-semibold text-emerald-900">
+                                                {item}
+                                            </p>
+
+                                            {deptEditMode && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        removeDepartmentSpecialization(
+                                                            item,
+                                                        )
+                                                    }
+                                                    className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-emerald-300 bg-white text-emerald-700"
+                                                >
+                                                    <X size={11} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ),
+                                )}
+                            </div>
+                        )}
+
+                        {departmentSpecializationErrors.length > 0 && (
+                            <div className="mt-2 space-y-0.5">
+                                {departmentSpecializationErrors.map(
+                                    (message, index) => (
+                                        <p
+                                            key={`${message}-${index}`}
+                                            className="text-[11px] text-rose-600"
+                                        >
+                                            {message}
+                                        </p>
+                                    ),
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <SummaryCard
+                            label="Strand/Specialization"
+                            value={(deptData.specialization_names || []).length}
+                        />
+                        <SummaryCard
+                            label="Teachers"
+                            value={departmentMembersTeachers.length}
+                        />
+                        <SummaryCard
+                            label="Admins"
+                            value={departmentMembersAdmins.length}
+                            muted
+                        />
+                    </div>
+                </div>
             );
         }
 
@@ -2088,7 +5363,7 @@ export default function ManagementDetailModal({
                                                     <div className="flex h-7 w-7 items-center justify-center rounded-md bg-violet-100 text-[10px] font-bold text-violet-700">
                                                         {personInitials(admin)}
                                                     </div>
-                                                    <div className="min-w-0">
+                                                    <div className="min-w-0 flex-1">
                                                         <p className="truncate text-xs font-semibold text-slate-800">
                                                             {personName(admin)}
                                                         </p>
@@ -2096,6 +5371,21 @@ export default function ManagementDetailModal({
                                                             {personEmail(admin)}
                                                         </p>
                                                     </div>
+
+                                                    {deptEditMode && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={
+                                                                demoteDepartmentAdmin
+                                                            }
+                                                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-violet-300 bg-violet-50 text-violet-700 transition hover:bg-violet-100"
+                                                            title="Demote admin"
+                                                        >
+                                                            <UserMinus
+                                                                size={13}
+                                                            />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             ),
                                         )}
@@ -2120,30 +5410,221 @@ export default function ManagementDetailModal({
                                 ) : (
                                     <div className="space-y-1.5">
                                         {departmentMembersTeachers.map(
-                                            (teacher) => (
-                                                <div
-                                                    key={`dept-teacher-${teacher.id}`}
-                                                    className="flex items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2"
-                                                >
-                                                    <div className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-100 text-[10px] font-bold text-emerald-700">
-                                                        {personInitials(
-                                                            teacher,
-                                                        )}
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <p className="truncate text-xs font-semibold text-slate-800">
-                                                            {personName(
-                                                                teacher,
+                                            (teacher) => {
+                                                const teacherKey = String(
+                                                    teacher.id,
+                                                );
+                                                const reassignedDepartmentId =
+                                                    departmentTeacherReassignmentMap[
+                                                        teacherKey
+                                                    ] || "";
+                                                const reassignedDepartment =
+                                                    reassignableDepartmentOptions.find(
+                                                        (departmentOption) =>
+                                                            String(
+                                                                departmentOption.value,
+                                                            ) ===
+                                                            String(
+                                                                reassignedDepartmentId,
+                                                            ),
+                                                    );
+
+                                                return (
+                                                    <div
+                                                        key={`dept-teacher-${teacher.id}`}
+                                                        className="space-y-1.5"
+                                                    >
+                                                        <div className="flex items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+                                                            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-100 text-[10px] font-bold text-emerald-700">
+                                                                {personInitials(
+                                                                    teacher,
+                                                                )}
+                                                            </div>
+                                                            <div className="min-w-0 flex-1">
+                                                                <p className="truncate text-xs font-semibold text-slate-800">
+                                                                    {personName(
+                                                                        teacher,
+                                                                    )}
+                                                                </p>
+                                                                <p className="truncate text-[11px] text-slate-500">
+                                                                    {personEmail(
+                                                                        teacher,
+                                                                    )}
+                                                                </p>
+
+                                                                {reassignedDepartment && (
+                                                                    <p className="mt-1 text-[11px] font-semibold text-indigo-700">
+                                                                        Assign
+                                                                        to -&gt;{" "}
+                                                                        {
+                                                                            reassignedDepartment.label
+                                                                        }{" "}
+                                                                        (
+                                                                        {reassignedDepartment.code ||
+                                                                            "-"}
+                                                                        )
+                                                                    </p>
+                                                                )}
+                                                            </div>
+
+                                                            {deptEditMode && (
+                                                                <div className="flex items-center gap-1">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            const isOpen =
+                                                                                String(
+                                                                                    deptReassignTeacherId,
+                                                                                ) ===
+                                                                                teacherKey;
+
+                                                                            setDeptReassignTeacherId(
+                                                                                isOpen
+                                                                                    ? null
+                                                                                    : teacher.id,
+                                                                            );
+                                                                            setDeptReassignSearch(
+                                                                                "",
+                                                                            );
+                                                                        }}
+                                                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-indigo-300 bg-indigo-50 text-indigo-700 transition hover:bg-indigo-100"
+                                                                        title="Reassign teacher"
+                                                                    >
+                                                                        <ArrowRightLeft
+                                                                            size={
+                                                                                13
+                                                                            }
+                                                                        />
+                                                                    </button>
+
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            removeDepartmentTeacher(
+                                                                                teacher.id,
+                                                                            )
+                                                                        }
+                                                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-rose-300 bg-rose-50 text-rose-700 transition hover:bg-rose-100"
+                                                                        title="Unassign teacher"
+                                                                    >
+                                                                        <Trash2
+                                                                            size={
+                                                                                13
+                                                                            }
+                                                                        />
+                                                                    </button>
+                                                                </div>
                                                             )}
-                                                        </p>
-                                                        <p className="truncate text-[11px] text-slate-500">
-                                                            {personEmail(
-                                                                teacher,
+                                                        </div>
+
+                                                        {deptEditMode &&
+                                                            String(
+                                                                deptReassignTeacherId,
+                                                            ) ===
+                                                                teacherKey && (
+                                                                <div className="rounded-xl border border-indigo-200 bg-white p-3 shadow-sm">
+                                                                    <p className="text-xs font-semibold text-indigo-700">
+                                                                        Reassign
+                                                                        teacher
+                                                                        to
+                                                                        another
+                                                                        department
+                                                                    </p>
+                                                                    <p className="mt-0.5 text-[11px] text-slate-500">
+                                                                        Select
+                                                                        destination
+                                                                        department
+                                                                        for this
+                                                                        teacher.
+                                                                    </p>
+
+                                                                    <div className="relative mt-2">
+                                                                        <Search
+                                                                            size={
+                                                                                13
+                                                                            }
+                                                                            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            value={
+                                                                                deptReassignSearch
+                                                                            }
+                                                                            onChange={(
+                                                                                event,
+                                                                            ) =>
+                                                                                setDeptReassignSearch(
+                                                                                    event
+                                                                                        .target
+                                                                                        .value,
+                                                                                )
+                                                                            }
+                                                                            placeholder="Search department name or code"
+                                                                            className="w-full rounded-lg border border-indigo-200 bg-indigo-50 py-2 pl-8 pr-3 text-xs focus:border-indigo-500 focus:bg-white focus:ring-indigo-500"
+                                                                        />
+                                                                    </div>
+
+                                                                    <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-indigo-100 bg-indigo-50/50 p-2">
+                                                                        {filteredReassignDepartmentOptions.length ===
+                                                                        0 ? (
+                                                                            <p className="px-1 py-1 text-xs text-slate-500">
+                                                                                No
+                                                                                department
+                                                                                matched
+                                                                                your
+                                                                                search.
+                                                                            </p>
+                                                                        ) : (
+                                                                            filteredReassignDepartmentOptions.map(
+                                                                                (
+                                                                                    departmentOption,
+                                                                                ) => (
+                                                                                    <button
+                                                                                        key={`${teacher.id}-${departmentOption.value}`}
+                                                                                        type="button"
+                                                                                        onClick={() => {
+                                                                                            setDepartmentTeacherReassignment(
+                                                                                                teacher.id,
+                                                                                                departmentOption.value,
+                                                                                            );
+                                                                                            setDeptReassignTeacherId(
+                                                                                                null,
+                                                                                            );
+                                                                                            setDeptReassignSearch(
+                                                                                                "",
+                                                                                            );
+                                                                                        }}
+                                                                                        className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs transition ${
+                                                                                            String(
+                                                                                                reassignedDepartmentId,
+                                                                                            ) ===
+                                                                                            String(
+                                                                                                departmentOption.value,
+                                                                                            )
+                                                                                                ? "bg-indigo-100 text-indigo-800"
+                                                                                                : "bg-white text-slate-700 hover:bg-indigo-100"
+                                                                                        }`}
+                                                                                    >
+                                                                                        <span className="font-semibold">
+                                                                                            {
+                                                                                                departmentOption.label
+                                                                                            }
+                                                                                        </span>
+                                                                                        <span className="font-mono text-[10px]">
+                                                                                            {
+                                                                                                departmentOption.code
+                                                                                            }
+                                                                                        </span>
+                                                                                    </button>
+                                                                                ),
+                                                                            )
+                                                                        )}
+                                                                    </div>
+                                                                </div>
                                                             )}
-                                                        </p>
                                                     </div>
-                                                </div>
-                                            ),
+                                                );
+                                            },
                                         )}
                                     </div>
                                 )}
@@ -2157,107 +5638,343 @@ export default function ManagementDetailModal({
         if (panel === "assign") {
             return (
                 <div className="space-y-3">
-                    {!deptEditMode && (
-                        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                            Click the floating edit button to modify teacher and
-                            admin assignments.
+                    <div className="w-full rounded-md border border-emerald-200 bg-white p-1">
+                        <div className="grid grid-cols-2 gap-1">
+                            <button
+                                type="button"
+                                onClick={() => setDeptAssignMode("assign")}
+                                className={`rounded-md px-3 py-2 text-xs font-semibold transition ${
+                                    deptAssignMode === "assign"
+                                        ? "bg-emerald-600 text-white"
+                                        : "text-slate-600 hover:bg-emerald-50"
+                                }`}
+                            >
+                                Assign Teacher/Admin
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setDeptAssignMode("create")}
+                                className={`rounded-md px-3 py-2 text-xs font-semibold transition ${
+                                    deptAssignMode === "create"
+                                        ? "bg-emerald-600 text-white"
+                                        : "text-slate-600 hover:bg-emerald-50"
+                                }`}
+                            >
+                                Create Teacher
+                            </button>
                         </div>
-                    )}
-
-                    <div className="relative">
-                        <Search
-                            size={14}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                        />
-                        <input
-                            type="text"
-                            value={deptTeacherSearch}
-                            onChange={(event) =>
-                                setDeptTeacherSearch(event.target.value)
-                            }
-                            placeholder="Search teachers..."
-                            className="w-full rounded-md border border-emerald-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-emerald-500 focus:ring-emerald-500"
-                        />
                     </div>
 
-                    {deptTeachersLoading ? (
-                        <div className="rounded-md border border-emerald-200 bg-white px-3 py-4 text-xs text-emerald-700">
-                            Loading teachers...
-                        </div>
-                    ) : departmentFilteredTeachers.length === 0 ? (
-                        <EmptyCard message="No available teachers found." />
-                    ) : (
-                        <div className="max-h-56 space-y-1.5 overflow-y-auto">
-                            {departmentFilteredTeachers.map((teacher) => {
-                                const teacherKey = String(teacher.id);
-                                const checked = (
-                                    deptData.teacher_ids || []
-                                ).some((id) => String(id) === teacherKey);
-                                const isAdmin =
-                                    String(deptData.admin_id) === teacherKey;
+                    {deptAssignMode === "assign" ? (
+                        <>
+                            <div className="relative">
+                                <Search
+                                    size={14}
+                                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                                />
+                                <input
+                                    type="text"
+                                    value={deptTeacherSearch}
+                                    onChange={(event) =>
+                                        setDeptTeacherSearch(event.target.value)
+                                    }
+                                    placeholder="Search teachers..."
+                                    className="w-full rounded-md border border-emerald-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-emerald-500 focus:ring-emerald-500"
+                                />
+                            </div>
 
-                                return (
-                                    <label
-                                        key={`assign-teacher-${teacher.id}`}
-                                        className={`flex items-center gap-3 rounded-md border px-3 py-2 ${
-                                            checked
-                                                ? "border-emerald-300 bg-emerald-50"
-                                                : "border-emerald-200 bg-white"
-                                        } ${deptEditMode ? "cursor-pointer" : "opacity-80"}`}
+                            {deptTeachersLoading ? (
+                                <div className="rounded-md border border-emerald-200 bg-white px-3 py-4 text-xs text-emerald-700">
+                                    Loading teachers...
+                                </div>
+                            ) : departmentFilteredTeachers.length === 0 ? (
+                                <EmptyCard message="No available teachers found." />
+                            ) : (
+                                <div className="max-h-56 space-y-1.5 overflow-y-auto">
+                                    {departmentFilteredTeachers.map(
+                                        (teacher) => {
+                                            const teacherKey = String(
+                                                teacher.id,
+                                            );
+                                            const checked = (
+                                                deptData.teacher_ids || []
+                                            ).some(
+                                                (id) =>
+                                                    String(id) === teacherKey,
+                                            );
+                                            const isAdmin =
+                                                String(deptData.admin_id) ===
+                                                teacherKey;
+
+                                            return (
+                                                <label
+                                                    key={`assign-teacher-${teacher.id}`}
+                                                    className={`flex items-center gap-3 rounded-md border px-3 py-2 ${
+                                                        checked
+                                                            ? "border-emerald-300 bg-emerald-50"
+                                                            : "border-emerald-200 bg-white"
+                                                    } ${deptEditMode ? "cursor-pointer" : "opacity-80"}`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={checked}
+                                                        onChange={() =>
+                                                            toggleDepartmentTeacher(
+                                                                teacher.id,
+                                                            )
+                                                        }
+                                                        disabled={
+                                                            !(
+                                                                deptEditMode ||
+                                                                panel ===
+                                                                    "assign"
+                                                            )
+                                                        }
+                                                        className="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                                                    />
+                                                    <div className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-100 text-[10px] font-bold text-emerald-700">
+                                                        {personInitials(
+                                                            teacher,
+                                                        )}
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="truncate text-xs font-semibold text-slate-800">
+                                                            {personName(
+                                                                teacher,
+                                                            )}
+                                                        </p>
+                                                        <p className="truncate text-[11px] text-slate-500">
+                                                            {personEmail(
+                                                                teacher,
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                    {isAdmin && (
+                                                        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">
+                                                            Admin
+                                                        </span>
+                                                    )}
+                                                </label>
+                                            );
+                                        },
+                                    )}
+                                </div>
+                            )}
+
+                            {departmentSelectedTeachers.length > 0 && (
+                                <div className="rounded-md border border-violet-200 bg-violet-50 p-3">
+                                    <p className="mb-2 text-xs font-semibold text-violet-700">
+                                        Department Admin
+                                    </p>
+                                    <select
+                                        value={deptData.admin_id}
+                                        onChange={(event) =>
+                                            setDeptData(
+                                                "admin_id",
+                                                event.target.value,
+                                            )
+                                        }
+                                        disabled={
+                                            !(
+                                                deptEditMode ||
+                                                panel === "assign"
+                                            )
+                                        }
+                                        className="w-full rounded-md border border-violet-200 bg-white px-3 py-2 text-xs focus:border-violet-500 focus:ring-violet-500 disabled:opacity-60"
                                     >
+                                        <option value="">- No admin -</option>
+                                        {departmentAdminOptionTeachers.map(
+                                            (teacher) => {
+                                                const disabledOption =
+                                                    isSuperAdminPerson(teacher);
+
+                                                return (
+                                                    <option
+                                                        key={teacher.id}
+                                                        value={teacher.id}
+                                                        disabled={
+                                                            disabledOption
+                                                        }
+                                                    >
+                                                        {personName(teacher)}
+                                                        {disabledOption
+                                                            ? " (Super Admin)"
+                                                            : ""}
+                                                    </option>
+                                                );
+                                            },
+                                        )}
+                                    </select>
+
+                                    {hasSuperAdminInAdminOptions && (
+                                        <p className="mt-2 text-[11px] font-semibold text-rose-600">
+                                            superadmin cannot be admin of a
+                                            department
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="space-y-3 rounded-md border border-emerald-200 bg-white p-3">
+                            <div>
+                                <p className="text-sm font-semibold text-slate-900">
+                                    Create Teacher in this Department
+                                </p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                    New teacher accounts created here are
+                                    directly assigned to this selected
+                                    department and receive temporary credentials
+                                    through email.
+                                </p>
+                            </div>
+
+                            {deptCreateTeacherErrors._form && (
+                                <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                    {deptCreateTeacherErrors._form}
+                                </div>
+                            )}
+
+                            <form
+                                onSubmit={handleCreateDepartmentTeacher}
+                                className="space-y-3"
+                            >
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    <div>
+                                        <label className="mb-1 block text-[11px] font-semibold text-emerald-700">
+                                            First Name
+                                        </label>
                                         <input
-                                            type="checkbox"
-                                            checked={checked}
-                                            onChange={() =>
-                                                toggleDepartmentTeacher(
-                                                    teacher.id,
+                                            type="text"
+                                            value={deptCreateTeacher.first_name}
+                                            onChange={(event) =>
+                                                setDeptCreateTeacherField(
+                                                    "first_name",
+                                                    event.target.value,
                                                 )
                                             }
-                                            disabled={!deptEditMode}
-                                            className="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                                            disabled={
+                                                !(
+                                                    deptEditMode ||
+                                                    panel === "assign"
+                                                )
+                                            }
+                                            className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500 disabled:opacity-60"
                                         />
-                                        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-100 text-[10px] font-bold text-emerald-700">
-                                            {personInitials(teacher)}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="truncate text-xs font-semibold text-slate-800">
-                                                {personName(teacher)}
+                                        {deptCreateTeacherErrors.first_name && (
+                                            <p className="mt-1 text-[11px] text-rose-600">
+                                                {
+                                                    deptCreateTeacherErrors.first_name
+                                                }
                                             </p>
-                                            <p className="truncate text-[11px] text-slate-500">
-                                                {personEmail(teacher)}
-                                            </p>
-                                        </div>
-                                        {isAdmin && (
-                                            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">
-                                                Admin
-                                            </span>
                                         )}
-                                    </label>
-                                );
-                            })}
-                        </div>
-                    )}
+                                    </div>
 
-                    {departmentSelectedTeachers.length > 0 && (
-                        <div className="rounded-md border border-violet-200 bg-violet-50 p-3">
-                            <p className="mb-2 text-xs font-semibold text-violet-700">
-                                Department Admin
-                            </p>
-                            <select
-                                value={deptData.admin_id}
-                                onChange={(event) =>
-                                    setDeptData("admin_id", event.target.value)
-                                }
-                                disabled={!deptEditMode}
-                                className="w-full rounded-md border border-violet-200 bg-white px-3 py-2 text-xs focus:border-violet-500 focus:ring-violet-500 disabled:opacity-60"
-                            >
-                                <option value="">- No admin -</option>
-                                {departmentSelectedTeachers.map((teacher) => (
-                                    <option key={teacher.id} value={teacher.id}>
-                                        {personName(teacher)}
-                                    </option>
-                                ))}
-                            </select>
+                                    <div>
+                                        <label className="mb-1 block text-[11px] font-semibold text-emerald-700">
+                                            Middle Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={
+                                                deptCreateTeacher.middle_name
+                                            }
+                                            onChange={(event) =>
+                                                setDeptCreateTeacherField(
+                                                    "middle_name",
+                                                    event.target.value,
+                                                )
+                                            }
+                                            disabled={
+                                                !(
+                                                    deptEditMode ||
+                                                    panel === "assign"
+                                                )
+                                            }
+                                            className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500 disabled:opacity-60"
+                                        />
+                                        {deptCreateTeacherErrors.middle_name && (
+                                            <p className="mt-1 text-[11px] text-rose-600">
+                                                {
+                                                    deptCreateTeacherErrors.middle_name
+                                                }
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-1 block text-[11px] font-semibold text-emerald-700">
+                                            Last Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={deptCreateTeacher.last_name}
+                                            onChange={(event) =>
+                                                setDeptCreateTeacherField(
+                                                    "last_name",
+                                                    event.target.value,
+                                                )
+                                            }
+                                            disabled={
+                                                !(
+                                                    deptEditMode ||
+                                                    panel === "assign"
+                                                )
+                                            }
+                                            className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500 disabled:opacity-60"
+                                        />
+                                        {deptCreateTeacherErrors.last_name && (
+                                            <p className="mt-1 text-[11px] text-rose-600">
+                                                {
+                                                    deptCreateTeacherErrors.last_name
+                                                }
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-1 block text-[11px] font-semibold text-emerald-700">
+                                            Email
+                                        </label>
+                                        <input
+                                            type="email"
+                                            value={deptCreateTeacher.email}
+                                            onChange={(event) =>
+                                                setDeptCreateTeacherField(
+                                                    "email",
+                                                    event.target.value,
+                                                )
+                                            }
+                                            disabled={
+                                                !(
+                                                    deptEditMode ||
+                                                    panel === "assign"
+                                                )
+                                            }
+                                            required
+                                            className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500 disabled:opacity-60"
+                                        />
+                                        {deptCreateTeacherErrors.email && (
+                                            <p className="mt-1 text-[11px] text-rose-600">
+                                                {deptCreateTeacherErrors.email}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={
+                                        !(deptEditMode || panel === "assign") ||
+                                        deptCreateTeacherSubmitting
+                                    }
+                                    className="w-full rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                                >
+                                    {deptCreateTeacherSubmitting
+                                        ? "Creating Teacher..."
+                                        : "Create Teacher"}
+                                </button>
+                            </form>
                         </div>
                     )}
                 </div>
@@ -2286,7 +6003,7 @@ export default function ManagementDetailModal({
                                 />
                             ) : (
                                 <p className="text-sm font-semibold text-slate-900">
-                                    {sourceDepartment.name || "-"}
+                                    {activeDepartment.name || "-"}
                                 </p>
                             )}
                             {departmentErrors.department_name && (
@@ -2314,7 +6031,7 @@ export default function ManagementDetailModal({
                                 />
                             ) : (
                                 <p className="font-mono text-sm font-semibold text-slate-900">
-                                    {sourceDepartment.code || "-"}
+                                    {activeDepartment.code || "-"}
                                 </p>
                             )}
                             {departmentErrors.department_code && (
@@ -2330,26 +6047,37 @@ export default function ManagementDetailModal({
                             </p>
                             {deptEditMode ? (
                                 <select
-                                    value={deptData.track}
+                                    value={deptData.school_track_id}
                                     onChange={(event) =>
-                                        setDeptData("track", event.target.value)
+                                        setDeptData(
+                                            "school_track_id",
+                                            event.target.value,
+                                        )
                                     }
                                     className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
                                 >
-                                    {TRACK_OPTIONS.map((option) => (
-                                        <option key={option} value={option}>
-                                            {option}
+                                    {resolvedTrackOptions.length === 0 && (
+                                        <option value="">
+                                            No tracks available
+                                        </option>
+                                    )}
+                                    {resolvedTrackOptions.map((option) => (
+                                        <option
+                                            key={option.value}
+                                            value={option.value}
+                                        >
+                                            {option.label}
                                         </option>
                                     ))}
                                 </select>
                             ) : (
                                 <p className="text-sm font-semibold text-slate-900">
-                                    {sourceDepartment.track || "-"}
+                                    {activeDepartment.track || "-"}
                                 </p>
                             )}
-                            {departmentErrors.track && (
+                            {departmentErrors.school_track_id && (
                                 <p className="mt-1 text-[11px] text-rose-600">
-                                    {departmentErrors.track}
+                                    {departmentErrors.school_track_id}
                                 </p>
                             )}
                         </div>
@@ -2376,13 +6104,13 @@ export default function ManagementDetailModal({
                             ) : (
                                 <span
                                     className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                                        sourceDepartment.is_active
+                                        activeDepartment.is_active
                                             ? "bg-emerald-100 text-emerald-700"
                                             : "bg-slate-100 text-slate-600"
                                     }`}
                                 >
                                     <CheckCircle size={11} />
-                                    {sourceDepartment.is_active
+                                    {activeDepartment.is_active
                                         ? "Active"
                                         : "Inactive"}
                                 </span>
@@ -2408,91 +6136,9 @@ export default function ManagementDetailModal({
                             />
                         ) : (
                             <p className="text-xs text-slate-700">
-                                {sourceDepartment.description ||
+                                {activeDepartment.description ||
                                     "No description"}
                             </p>
-                        )}
-                    </div>
-
-                    <div className="mt-3">
-                        <p className="mb-1 text-[11px] font-semibold text-emerald-700">
-                            Specializations
-                        </p>
-
-                        {deptEditMode && (
-                            <div className="mb-2 flex gap-2">
-                                <input
-                                    type="text"
-                                    value={deptSpecializationInput}
-                                    onChange={(event) =>
-                                        setDeptSpecializationInput(
-                                            event.target.value,
-                                        )
-                                    }
-                                    onKeyDown={(event) => {
-                                        if (event.key === "Enter") {
-                                            event.preventDefault();
-                                            addDepartmentSpecialization();
-                                        }
-                                    }}
-                                    placeholder="Add specialization"
-                                    className="flex-1 rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={addDepartmentSpecialization}
-                                    className="rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700"
-                                >
-                                    Add
-                                </button>
-                            </div>
-                        )}
-
-                        {(deptData.specialization_names || []).length === 0 ? (
-                            <p className="text-xs text-slate-500">
-                                No specializations assigned.
-                            </p>
-                        ) : (
-                            <div className="flex flex-wrap gap-1.5">
-                                {(deptData.specialization_names || []).map(
-                                    (item) => (
-                                        <span
-                                            key={item}
-                                            className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700"
-                                        >
-                                            {item}
-                                            {deptEditMode && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        removeDepartmentSpecialization(
-                                                            item,
-                                                        )
-                                                    }
-                                                    className="text-emerald-700"
-                                                >
-                                                    <X size={11} />
-                                                </button>
-                                            )}
-                                        </span>
-                                    ),
-                                )}
-                            </div>
-                        )}
-
-                        {departmentSpecializationErrors.length > 0 && (
-                            <div className="mt-1 space-y-0.5">
-                                {departmentSpecializationErrors.map(
-                                    (message, index) => (
-                                        <p
-                                            key={`${message}-${index}`}
-                                            className="text-[11px] text-rose-600"
-                                        >
-                                            {message}
-                                        </p>
-                                    ),
-                                )}
-                            </div>
                         )}
                     </div>
                 </div>
@@ -2508,7 +6154,7 @@ export default function ManagementDetailModal({
                     />
                     <SummaryCard
                         label="Students"
-                        value={sourceDepartment.students_count}
+                        value={activeDepartment.students_count}
                         muted
                     />
                 </div>
@@ -2541,180 +6187,462 @@ export default function ManagementDetailModal({
                   : User;
 
     return (
-        <Modal show={show} onClose={onClose} maxWidth="3xl">
-            <div className="h-[calc(100vh-7rem)] max-h-[calc(100vh-7rem)] min-h-0 overflow-hidden">
-                <div className="flex h-full min-h-0 flex-col md:flex-row">
-                    <aside className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden border-b border-emerald-200 md:h-full md:w-[220px] md:border-b-0 md:border-r">
-                        <div className="bg-emerald-600 px-4 py-4">
-                            <div className="mb-2 inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-200 text-sm font-semibold text-emerald-900">
-                                {initials(data.identity.title)}
-                            </div>
-                            <p className="text-sm font-semibold text-emerald-50">
-                                {data.identity.title}
-                            </p>
-                            <p className="mt-0.5 truncate text-[11px] text-emerald-300">
-                                {data.identity.subtitle}
-                            </p>
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                                {data.identity.tags.map((tag) => (
-                                    <span
-                                        key={tag}
-                                        className="rounded-full bg-emerald-700 px-2 py-0.5 text-[10px] font-semibold text-emerald-200"
-                                    >
-                                        {tag}
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto px-3 py-3">
-                            <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                                Menu
-                            </p>
-                            {isDepartmentTab ? (
-                                <div className="space-y-1">
-                                    <SidebarButton
-                                        active={panel === "info"}
-                                        onClick={() => setPanel("info")}
-                                        icon={Building2}
-                                        label="Department Information"
-                                    />
-                                    <SidebarButton
-                                        active={panel === "members"}
-                                        onClick={() => setPanel("members")}
-                                        icon={Users}
-                                        label="Teachers & Admin"
-                                        count={
-                                            departmentMembersAdmins.length +
-                                            departmentMembersTeachers.length
-                                        }
-                                    />
-                                    <SidebarButton
-                                        active={panel === "assign"}
-                                        onClick={() => setPanel("assign")}
-                                        icon={UserPlus}
-                                        label="Assign Teachers & Admin"
-                                        count={
-                                            (deptData.teacher_ids || []).length
-                                        }
-                                    />
+        <>
+            <Modal
+                show={show}
+                onClose={onClose}
+                maxWidth="3xl"
+                closeable={!isDepartmentTab}
+            >
+                <div className="h-[calc(100vh-7rem)] max-h-[calc(100vh-7rem)] min-h-0 overflow-hidden">
+                    <div className="flex h-full min-h-0 flex-col md:flex-row">
+                        <aside className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden border-b border-emerald-200 md:h-full md:w-[220px] md:border-b-0 md:border-r">
+                            <div className="bg-emerald-600 px-4 py-4">
+                                <div className="mb-2 inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-200 text-sm font-semibold text-emerald-900">
+                                    {initials(data.identity.title)}
                                 </div>
-                            ) : (
-                                <div className="space-y-1">
-                                    <SidebarButton
-                                        active={panel === "info"}
-                                        onClick={() => setPanel("info")}
-                                        icon={primaryIcon}
-                                        label={data.infoLabel}
-                                    />
-                                    <SidebarButton
-                                        active={panel === "secondary"}
-                                        onClick={() => setPanel("secondary")}
-                                        icon={secondaryIcon}
-                                        label={data.secondaryLabel}
-                                        count={data.secondaryCount}
-                                    />
+                                <p className="text-sm font-semibold text-emerald-50">
+                                    {data.identity.title}
+                                </p>
+                                <p className="mt-0.5 truncate text-[11px] text-emerald-300">
+                                    {data.identity.subtitle}
+                                </p>
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {data.identity.tags.map((tag) => (
+                                        <span
+                                            key={tag}
+                                            className="rounded-full bg-emerald-700 px-2 py-0.5 text-[10px] font-semibold text-emerald-200"
+                                        >
+                                            {tag}
+                                        </span>
+                                    ))}
                                 </div>
-                            )}
-                        </div>
-
-                        <div className="border-t border-emerald-200 px-3 py-3">
-                            <div className="rounded-md bg-emerald-50 px-3 py-2.5">
-                                <p className="text-[10px] text-emerald-700">
-                                    {data.identity.keyLabel}
-                                </p>
-                                <p className="mt-0.5 truncate font-mono text-xs font-semibold text-emerald-900">
-                                    {data.identity.keyValue}
-                                </p>
                             </div>
-                        </div>
-                    </aside>
 
-                    <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white">
-                        <div className="flex items-start justify-between gap-3 border-b border-emerald-200 px-5 py-4">
-                            <div>
-                                <p className="text-[15px] font-semibold text-slate-900">
-                                    {data.headerTitle}
+                            <div className="flex-1 overflow-y-auto px-3 py-3">
+                                <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                    Menu
                                 </p>
-                                <p className="text-xs text-slate-500">
-                                    {data.headerSubtitle}
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
-                            >
-                                <X size={14} />
-                            </button>
-                        </div>
+                                {isDepartmentTab ? (
+                                    <div className="space-y-1">
+                                        <SidebarButton
+                                            active={panel === "info"}
+                                            onClick={() => setPanel("info")}
+                                            icon={Building2}
+                                            label="Department Information"
+                                        />
+                                        <SidebarButton
+                                            active={panel === "specializations"}
+                                            onClick={() =>
+                                                setPanel("specializations")
+                                            }
+                                            icon={Layers}
+                                            label="Strand/Specialization"
+                                            count={
+                                                (
+                                                    deptData.specialization_names ||
+                                                    []
+                                                ).length
+                                            }
+                                        />
+                                        <SidebarButton
+                                            active={panel === "members"}
+                                            onClick={() => setPanel("members")}
+                                            icon={Users}
+                                            label="Teachers & Admin"
+                                            count={
+                                                departmentMembersAdmins.length +
+                                                departmentMembersTeachers.length
+                                            }
+                                        />
+                                        <SidebarButton
+                                            active={panel === "assign"}
+                                            onClick={() => setPanel("assign")}
+                                            icon={UserPlus}
+                                            label="Add/Assign Teacher & Admin"
+                                            count={
+                                                (deptData.teacher_ids || [])
+                                                    .length
+                                            }
+                                        />
+                                    </div>
+                                ) : isSectionTab ? (
+                                    <div className="space-y-1">
+                                        <SidebarButton
+                                            active={panel === "info"}
+                                            onClick={() => setPanel("info")}
+                                            icon={Layers}
+                                            label="Section info"
+                                        />
+                                        <SidebarButton
+                                            active={panel === "secondary"}
+                                            onClick={() => {
+                                                if (sectionEditMode) {
+                                                    exitSectionEditMode();
+                                                }
 
-                        <div className="min-h-0 flex-1 overflow-y-auto bg-emerald-50 p-4 pb-8">
-                            {loading && (
-                                <div className="rounded-lg border border-emerald-200 bg-white px-4 py-6 text-sm text-emerald-700">
-                                    Loading details...
-                                </div>
-                            )}
+                                                setPanel("secondary");
+                                            }}
+                                            icon={BookOpen}
+                                            label="Classes"
+                                            count={data.secondaryCount}
+                                        />
+                                        <SidebarButton
+                                            active={panel === "students"}
+                                            onClick={() => {
+                                                if (sectionEditMode) {
+                                                    exitSectionEditMode();
+                                                }
 
-                            {!loading && error && (
-                                <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                                    {error}
-                                </div>
-                            )}
-
-                            {!loading && !error && (
-                                <>
-                                    {isDepartmentTab
-                                        ? renderDepartmentPanel()
-                                        : panel === "info"
-                                          ? data.infoPanel
-                                          : data.secondaryPanel}
-                                </>
-                            )}
-                        </div>
-
-                        {isDepartmentTab && !loading && !error && (
-                            <div className="pointer-events-none absolute right-5 bottom-5 z-20 flex items-center gap-2">
-                                {!deptEditMode ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setDeptEditMode(true);
-                                            setPanel("info");
-                                        }}
-                                        className="pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg transition hover:bg-emerald-700"
-                                        title="Edit department"
-                                    >
-                                        <Pencil size={18} />
-                                    </button>
+                                                setPanel("students");
+                                            }}
+                                            icon={Users}
+                                            label="Students"
+                                            count={sectionStudentsCount}
+                                        />
+                                    </div>
                                 ) : (
+                                    <div className="space-y-1">
+                                        <SidebarButton
+                                            active={panel === "info"}
+                                            onClick={() => setPanel("info")}
+                                            icon={primaryIcon}
+                                            label={data.infoLabel}
+                                        />
+                                        <SidebarButton
+                                            active={panel === "secondary"}
+                                            onClick={() =>
+                                                setPanel("secondary")
+                                            }
+                                            icon={secondaryIcon}
+                                            label={data.secondaryLabel}
+                                            count={data.secondaryCount}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="border-t border-emerald-200 px-3 py-3">
+                                <div className="rounded-md bg-emerald-50 px-3 py-2.5">
+                                    <p className="text-[10px] text-emerald-700">
+                                        {data.identity.keyLabel}
+                                    </p>
+                                    <p className="mt-0.5 truncate font-mono text-xs font-semibold text-emerald-900">
+                                        {data.identity.keyValue}
+                                    </p>
+                                </div>
+                            </div>
+                        </aside>
+
+                        <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white">
+                            <div className="flex items-start justify-between gap-3 border-b border-emerald-200 px-5 py-4">
+                                <div>
+                                    <p className="text-[15px] font-semibold text-slate-900">
+                                        {data.headerTitle}
+                                    </p>
+                                    <p className="text-xs text-slate-500">
+                                        {data.headerSubtitle}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
+                                >
+                                    <X size={14} />
+                                </button>
+                            </div>
+
+                            <div className="min-h-0 flex-1 overflow-y-auto bg-emerald-50 p-4 pb-8">
+                                {loading && (
+                                    <div className="rounded-lg border border-emerald-200 bg-white px-4 py-6 text-sm text-emerald-700">
+                                        Loading details...
+                                    </div>
+                                )}
+
+                                {!loading && error && (
+                                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                                        {error}
+                                    </div>
+                                )}
+
+                                {!loading && !error && (
                                     <>
-                                        <button
-                                            type="button"
-                                            onClick={exitDepartmentEditMode}
-                                            disabled={departmentSaving}
-                                            className="pointer-events-auto rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={handleDepartmentSave}
-                                            disabled={departmentSaving}
-                                            className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg transition hover:bg-emerald-700 disabled:opacity-60"
-                                        >
-                                            <Save size={13} />
-                                            {departmentSaving
-                                                ? "Saving..."
-                                                : "Save Changes"}
-                                        </button>
+                                        {isDepartmentTab
+                                            ? renderDepartmentPanel()
+                                            : isSectionTab &&
+                                                panel === "students"
+                                              ? renderSectionStudentsPanel()
+                                              : isSectionTab &&
+                                                  panel === "secondary"
+                                                ? renderSectionClassesPanel()
+                                                : panel === "info"
+                                                  ? data.infoPanel
+                                                  : data.secondaryPanel}
                                     </>
                                 )}
                             </div>
-                        )}
-                    </section>
+
+                            {(isDepartmentTab || isSectionTab) &&
+                                !loading &&
+                                !error && (
+                                    <div className="pointer-events-none absolute right-5 bottom-5 z-20 flex items-center gap-2">
+                                        {isDepartmentTab &&
+                                        !(
+                                            deptEditMode || panel === "assign"
+                                        ) ? (
+                                            <>
+                                                {!isDepartmentCreateMode &&
+                                                    activeDepartment?.id && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={
+                                                                openDepartmentDeleteModal
+                                                            }
+                                                            disabled={
+                                                                departmentDeleting ||
+                                                                Boolean(
+                                                                    departmentDeleteBlockedReason,
+                                                                )
+                                                            }
+                                                            title={
+                                                                departmentDeleteBlockedReason ||
+                                                                "Delete department"
+                                                            }
+                                                            className={`pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full text-white shadow-lg transition ${
+                                                                departmentDeleteBlockedReason ||
+                                                                departmentDeleting
+                                                                    ? "cursor-not-allowed bg-rose-300"
+                                                                    : "bg-rose-600 hover:bg-rose-700"
+                                                            }`}
+                                                        >
+                                                            <Trash2 size={18} />
+                                                        </button>
+                                                    )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setDeptEditMode(true);
+                                                    }}
+                                                    disabled={
+                                                        departmentDeleting
+                                                    }
+                                                    className="pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    title="Edit department"
+                                                >
+                                                    <Pencil size={18} />
+                                                </button>
+                                            </>
+                                        ) : isDepartmentTab ? (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={
+                                                        exitDepartmentEditMode
+                                                    }
+                                                    disabled={
+                                                        departmentSaving ||
+                                                        departmentDeleting
+                                                    }
+                                                    className="pointer-events-auto rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={
+                                                        handleDepartmentSave
+                                                    }
+                                                    disabled={
+                                                        departmentSaving ||
+                                                        departmentDeleting
+                                                    }
+                                                    className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg transition hover:bg-emerald-700 disabled:opacity-60"
+                                                >
+                                                    <Save size={13} />
+                                                    {departmentSaving
+                                                        ? "Saving..."
+                                                        : "Save Changes"}
+                                                </button>
+                                            </>
+                                        ) : isSectionTab &&
+                                          panel === "students" ? (
+                                            !sectionStudentsEditMode ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSectionEditMode(
+                                                            false,
+                                                        );
+                                                        setSectionStudentsEditMode(
+                                                            true,
+                                                        );
+                                                        setSectionStudentsSaveError(
+                                                            "",
+                                                        );
+                                                    }}
+                                                    disabled={
+                                                        sectionStudentsLoading
+                                                    }
+                                                    className="pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    title="Edit students"
+                                                >
+                                                    <Pencil size={18} />
+                                                </button>
+                                            ) : (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={
+                                                            exitSectionStudentsEditMode
+                                                        }
+                                                        disabled={
+                                                            sectionStudentsSyncing
+                                                        }
+                                                        className="pointer-events-auto rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={
+                                                            handleSectionStudentsSave
+                                                        }
+                                                        disabled={
+                                                            sectionStudentsSyncing ||
+                                                            sectionStudentActionEntries.length ===
+                                                                0 ||
+                                                            sectionStudentsHasInvalidActions
+                                                        }
+                                                        className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    >
+                                                        <Save size={13} />
+                                                        {sectionStudentsSyncing
+                                                            ? "Saving..."
+                                                            : "Save Changes"}
+                                                    </button>
+                                                </>
+                                            )
+                                        ) : isSectionTab &&
+                                          panel === "secondary" ? (
+                                            sectionClassesMode === "add" ? (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSectionClassesMode(
+                                                                "list",
+                                                            );
+                                                            setSectionClassQueue(
+                                                                [],
+                                                            );
+                                                            setSectionClassNotice(
+                                                                "",
+                                                            );
+                                                            setSectionClassSaveError(
+                                                                "",
+                                                            );
+                                                            resetSectionClassQueueComposer();
+                                                        }}
+                                                        disabled={
+                                                            sectionClassSyncing
+                                                        }
+                                                        className="pointer-events-auto rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={
+                                                            handleSectionClassesSave
+                                                        }
+                                                        disabled={
+                                                            sectionClassSyncing ||
+                                                            sectionClassQueue.length ===
+                                                                0
+                                                        }
+                                                        className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    >
+                                                        <Save size={13} />
+                                                        {sectionClassSyncing
+                                                            ? "Saving..."
+                                                            : "Save Changes"}
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSectionClassesMode(
+                                                            "add",
+                                                        );
+                                                        setSectionClassSaveError(
+                                                            "",
+                                                        );
+                                                    }}
+                                                    className="pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg transition hover:bg-emerald-700"
+                                                    title="Add classes"
+                                                >
+                                                    <UserPlus size={18} />
+                                                </button>
+                                            )
+                                        ) : !sectionEditMode ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setPanel("info");
+                                                    setSectionEditMode(true);
+                                                }}
+                                                className="pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg transition hover:bg-emerald-700"
+                                                title="Edit section"
+                                            >
+                                                <Pencil size={18} />
+                                            </button>
+                                        ) : (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={
+                                                        exitSectionEditMode
+                                                    }
+                                                    disabled={sectionSaving}
+                                                    className="pointer-events-auto rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSectionSave}
+                                                    disabled={sectionSaving}
+                                                    className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg transition hover:bg-emerald-700 disabled:opacity-60"
+                                                >
+                                                    <Save size={13} />
+                                                    {sectionSaving
+                                                        ? "Saving..."
+                                                        : "Save Changes"}
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                        </section>
+                    </div>
                 </div>
-            </div>
-        </Modal>
+            </Modal>
+
+            <DepartmentDeleteConfirmModal
+                show={Boolean(
+                    show && isDepartmentTab && showDepartmentDeleteModal,
+                )}
+                onClose={closeDepartmentDeleteModal}
+                onConfirm={confirmDepartmentDelete}
+                departmentName={
+                    activeDepartment?.name || activeDepartment?.code || ""
+                }
+                blockedReason={departmentDeleteBlockedReason}
+                error={departmentDeleteError}
+                deleting={departmentDeleting}
+            />
+        </>
     );
 }

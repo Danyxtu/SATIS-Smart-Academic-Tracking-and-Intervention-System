@@ -100,6 +100,7 @@ const getRoleConfig = (role) =>
 export default function Index({
     users,
     departments,
+    sections = [],
     filters,
     roleCounts = {},
     studentCreationBaseCount = 0,
@@ -573,6 +574,7 @@ export default function Index({
                 open={createModal}
                 onClose={() => setCreateModal(false)}
                 departments={departments}
+                sections={sections}
                 studentCount={Number(studentCreationBaseCount || 0)}
             />
 

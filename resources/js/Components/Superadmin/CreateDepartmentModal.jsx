@@ -22,7 +22,6 @@ const STEP_DETAILS = 1;
 const STEP_SPECIALIZATIONS = 2;
 const STEP_ASSIGNMENTS = 3;
 const STEP_REVIEW = 4;
-const FALLBACK_TRACK_OPTIONS = ["Academic", "TVL"];
 
 const STEPS = [
     {
@@ -85,10 +84,7 @@ function FieldError({ error }) {
 
 function normalizeTrackOptions(trackOptions = []) {
     if (!Array.isArray(trackOptions) || trackOptions.length === 0) {
-        return FALLBACK_TRACK_OPTIONS.map((option) => ({
-            value: option,
-            label: option,
-        }));
+        return [];
     }
 
     return trackOptions
@@ -148,7 +144,7 @@ export default function CreateDepartmentModal({
     onClose,
     onSuccess,
     trackOptions = [],
-    initialTrack = "Academic",
+    initialTrack = "",
 }) {
     const [step, setStep] = useState(STEP_DETAILS);
     const [specializationInput, setSpecializationInput] = useState("");
@@ -170,13 +166,13 @@ export default function CreateDepartmentModal({
             return initialTrack;
         }
 
-        return resolvedTrackOptions[0]?.value || "Academic";
+        return resolvedTrackOptions[0]?.value || "";
     }, [resolvedTrackOptions, initialTrack]);
 
     const { data, setData, post, processing, errors, clearErrors } = useForm({
         department_name: "",
         department_code: "",
-        track: "Academic",
+        school_track_id: "",
         description: "",
         is_active: true,
         specialization_names: [],
@@ -249,7 +245,7 @@ export default function CreateDepartmentModal({
 
         setData("department_name", "");
         setData("department_code", "");
-        setData("track", resolvedInitialTrack);
+        setData("school_track_id", resolvedInitialTrack);
         setData("description", "");
         setData("is_active", true);
         setData("specialization_names", []);
@@ -300,7 +296,7 @@ export default function CreateDepartmentModal({
                 (key) =>
                     key === "department_name" ||
                     key === "department_code" ||
-                    key === "track" ||
+                    key === "school_track_id" ||
                     key === "description",
             )
         ) {
@@ -400,6 +396,10 @@ export default function CreateDepartmentModal({
 
         if (!data.department_code.trim()) {
             nextClientErrors.department_code = "Department code is required.";
+        }
+
+        if (!String(data.school_track_id || "").trim()) {
+            nextClientErrors.school_track_id = "School track is required.";
         }
 
         setClientErrors(nextClientErrors);
@@ -560,12 +560,20 @@ export default function CreateDepartmentModal({
                                         Track
                                     </label>
                                     <select
-                                        value={data.track}
+                                        value={data.school_track_id}
                                         onChange={(event) =>
-                                            setData("track", event.target.value)
+                                            setData(
+                                                "school_track_id",
+                                                event.target.value,
+                                            )
                                         }
                                         className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-emerald-500 focus:bg-white focus:ring-emerald-500"
                                     >
+                                        {resolvedTrackOptions.length === 0 && (
+                                            <option value="">
+                                                No tracks available
+                                            </option>
+                                        )}
                                         {resolvedTrackOptions.map((option) => (
                                             <option
                                                 key={option.value}
@@ -575,7 +583,12 @@ export default function CreateDepartmentModal({
                                             </option>
                                         ))}
                                     </select>
-                                    <FieldError error={errors.track} />
+                                    <FieldError
+                                        error={
+                                            errors.school_track_id ||
+                                            clientErrors.school_track_id
+                                        }
+                                    />
                                 </div>
                             </div>
 
@@ -873,7 +886,11 @@ export default function CreateDepartmentModal({
                                         Track
                                     </p>
                                     <p className="text-sm font-semibold text-slate-900">
-                                        {data.track || "-"}
+                                        {resolvedTrackOptions.find(
+                                            (option) =>
+                                                String(option.value) ===
+                                                String(data.school_track_id),
+                                        )?.label || "-"}
                                     </p>
                                 </div>
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">

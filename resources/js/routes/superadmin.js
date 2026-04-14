@@ -1,6 +1,7 @@
 import {
     House,
     Building2,
+    GitBranch,
     Users,
     Settings,
     BookOpen,
@@ -20,6 +21,11 @@ export const superAdminRoutes = [
         label: "Departments",
         path: "superadmin.departments.index",
         icon: Building2,
+    },
+    {
+        label: "School Tracks Management",
+        path: "superadmin.school-tracks.index",
+        icon: GitBranch,
     },
     {
         label: "Subject Management",

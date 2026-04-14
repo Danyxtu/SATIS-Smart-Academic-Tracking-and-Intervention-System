@@ -19,10 +19,11 @@ import {
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
-const STEP_PROFILE = 1;
-const STEP_SECURITY = 2;
-const STEP_REVIEW = 3;
-const STEP_SUMMARY = 4;
+const STEP_USER_SELECTION = 1;
+const STEP_PROFILE = 2;
+const STEP_SECURITY = 3;
+const STEP_REVIEW = 4;
+const STEP_SUMMARY = 5;
 
 const TEACHER_MODE_SINGLE = "single";
 const TEACHER_MODE_MULTIPLE = "multiple";
@@ -31,11 +32,18 @@ const STUDENT_MODE_SINGLE = "single";
 const STUDENT_MODE_MULTIPLE = "multiple";
 const STUDENT_MODE_CSV = "csv";
 
+const STUDENT_GRADE_LEVEL_OPTIONS = ["11", "12"];
+
 const PASSWORD_MASK = "********";
 const STUDENT_USERNAME_FORMAT = /^[a-z]{2}\d{4}\d{5}$/;
 const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const STEPS = [
+    {
+        id: STEP_USER_SELECTION,
+        label: "User Selection",
+        icon: Users,
+    },
     {
         id: STEP_PROFILE,
         label: "Profile",
@@ -58,19 +66,38 @@ const STEPS = [
     },
 ];
 
-function WizardStep({ step, currentStep }) {
+function WizardStep({
+    step,
+    currentStep,
+    maxVisitedStep,
+    onNavigate,
+    disableNavigation,
+}) {
     const Icon = step.icon;
     const isActive = currentStep === step.id;
-    const isDone = currentStep > step.id;
+    const isVisited = step.id <= maxVisitedStep;
+    const isDone = maxVisitedStep > step.id;
+    const isClickable =
+        isVisited &&
+        !disableNavigation &&
+        !isActive &&
+        step.id !== STEP_SUMMARY;
 
     return (
-        <div
-            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+        <button
+            type="button"
+            onClick={() => onNavigate?.(step.id)}
+            disabled={!isClickable}
+            className={`inline-flex items-center gap-2 rounded-full text-xs font-semibold transition-all ${
                 isActive
-                    ? "bg-emerald-100 text-emerald-700"
-                    : isDone
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-slate-50 text-slate-400"
+                    ? "scale-105 bg-emerald-100 px-4 py-1.5 text-emerald-700 shadow-sm"
+                    : isVisited
+                      ? "bg-emerald-50 px-4 py-1.5 text-emerald-700"
+                      : "bg-slate-50 px-3 py-1 text-slate-400"
+            } ${
+                isClickable
+                    ? "cursor-pointer hover:bg-emerald-100 hover:text-emerald-700"
+                    : "cursor-default"
             }`}
         >
             <span
@@ -82,7 +109,7 @@ function WizardStep({ step, currentStep }) {
             </span>
             <Icon size={12} />
             <span>{step.label}</span>
-        </div>
+        </button>
     );
 }
 
@@ -162,6 +189,29 @@ const findDepartmentFromSearch = (departments, value) => {
             );
         }) || null
     );
+};
+
+const normalizeSectionSearch = (value = "") =>
+    String(value).trim().toLowerCase();
+
+const formatSectionOptionLabel = (section) => {
+    if (section?.section_full_label) {
+        return section.section_full_label;
+    }
+
+    const specialization =
+        section?.track || section?.strand || section?.department_code || "";
+
+    return [section?.grade_level, specialization, section?.section_name]
+        .filter(Boolean)
+        .join(" - ");
+};
+
+const normalizeGradeLevelValue = (value = "") => {
+    const normalized = String(value || "").trim();
+    const matched = normalized.match(/(11|12)/);
+
+    return matched?.[1] || "";
 };
 
 const normalizeUsernameSeed = (value = "") =>
@@ -372,11 +422,14 @@ export default function CreateUserModal({
     open,
     onClose,
     departments,
+    sections = [],
     studentCount = 0,
 }) {
     const wasOpenRef = useRef(false);
+    const studentSectionPickerRef = useRef(null);
 
-    const [step, setStep] = useState(STEP_PROFILE);
+    const [step, setStep] = useState(STEP_USER_SELECTION);
+    const [maxVisitedStep, setMaxVisitedStep] = useState(STEP_USER_SELECTION);
     const [teacherMode, setTeacherMode] = useState(TEACHER_MODE_SINGLE);
     const [teacherDraft, setTeacherDraft] = useState(emptyTeacherDraft());
     const [teacherQueue, setTeacherQueue] = useState([]);
@@ -384,6 +437,9 @@ export default function CreateUserModal({
     const [studentMode, setStudentMode] = useState(STUDENT_MODE_SINGLE);
     const [studentDraft, setStudentDraft] = useState(emptyStudentDraft());
     const [studentQueue, setStudentQueue] = useState([]);
+    const [studentSectionSearch, setStudentSectionSearch] = useState("");
+    const [showStudentSectionOptions, setShowStudentSectionOptions] =
+        useState(false);
     const [studentCsvFileName, setStudentCsvFileName] = useState("");
     const [createdStudentCredentials, setCreatedStudentCredentials] = useState(
         [],
@@ -410,18 +466,25 @@ export default function CreateUserModal({
         email: "",
         username: "",
         password: "",
-        role: "student",
+        role: "",
+        grade_level: "",
         assign_as_admin: false,
         department_id: "",
         teacher_mode: TEACHER_MODE_SINGLE,
         teacher_queue: [],
         student_mode: STUDENT_MODE_SINGLE,
+        section_id: "",
         student_queue: [],
     });
 
     const normalizedDepartments = useMemo(
         () => (Array.isArray(departments) ? departments : []),
         [departments],
+    );
+
+    const normalizedSections = useMemo(
+        () => (Array.isArray(sections) ? sections : []),
+        [sections],
     );
 
     const isTeacher = data.role === "teacher";
@@ -443,6 +506,58 @@ export default function CreateUserModal({
                 : null,
         [isTeacher, data.department_id, normalizedDepartments],
     );
+
+    const selectedStudentSection = useMemo(
+        () =>
+            isStudent && data.section_id
+                ? (normalizedSections.find(
+                      (section) =>
+                          String(section.id) === String(data.section_id),
+                  ) ?? null)
+                : null,
+        [isStudent, data.section_id, normalizedSections],
+    );
+
+    const selectedStudentGradeLevel = useMemo(
+        () => normalizeGradeLevelValue(data.grade_level),
+        [data.grade_level],
+    );
+
+    const filteredStudentSections = useMemo(() => {
+        const normalizedSearch = normalizeSectionSearch(studentSectionSearch);
+
+        const sectionsByGrade = selectedStudentGradeLevel
+            ? normalizedSections.filter(
+                  (section) =>
+                      normalizeGradeLevelValue(section.grade_level) ===
+                      selectedStudentGradeLevel,
+              )
+            : normalizedSections;
+
+        if (!normalizedSearch) {
+            return sectionsByGrade;
+        }
+
+        return sectionsByGrade.filter((section) => {
+            const searchTargets = [
+                formatSectionOptionLabel(section),
+                section.section_name,
+                section.section_code,
+                section.grade_level,
+                section.track,
+                section.strand,
+                section.department_name,
+                section.department_code,
+                section.school_year,
+            ]
+                .map((value) => normalizeSectionSearch(value))
+                .filter(Boolean);
+
+            return searchTargets.some((value) =>
+                value.includes(normalizedSearch),
+            );
+        });
+    }, [normalizedSections, selectedStudentGradeLevel, studentSectionSearch]);
 
     const selectedAdmin = selectedDepartment?.department_admin ?? null;
     const selectedAdminName =
@@ -571,7 +686,8 @@ export default function CreateUserModal({
         if (open && !wasOpenRef.current) {
             reset();
             clearErrors();
-            setStep(STEP_PROFILE);
+            setStep(STEP_USER_SELECTION);
+            setMaxVisitedStep(STEP_USER_SELECTION);
 
             setTeacherMode(TEACHER_MODE_SINGLE);
             setTeacherDraft(emptyTeacherDraft());
@@ -580,6 +696,8 @@ export default function CreateUserModal({
             setStudentMode(STUDENT_MODE_SINGLE);
             setStudentDraft(emptyStudentDraft());
             setStudentQueue([]);
+            setStudentSectionSearch("");
+            setShowStudentSectionOptions(false);
             setStudentCsvFileName("");
             setCreatedStudentCredentials([]);
             setSelectedCreatedStudentId("");
@@ -589,6 +707,8 @@ export default function CreateUserModal({
             setData("teacher_mode", TEACHER_MODE_SINGLE);
             setData("teacher_queue", []);
             setData("student_mode", STUDENT_MODE_SINGLE);
+            setData("grade_level", "");
+            setData("section_id", "");
             setData("student_queue", []);
             setData("lrn", "");
             setData("username", "");
@@ -597,6 +717,53 @@ export default function CreateUserModal({
 
         wasOpenRef.current = open;
     }, [open, reset, clearErrors, setData]);
+
+    useEffect(() => {
+        setMaxVisitedStep((previousMaxVisitedStep) =>
+            Math.max(previousMaxVisitedStep, step),
+        );
+    }, [step]);
+
+    useEffect(() => {
+        if (!showStudentSectionOptions) {
+            return undefined;
+        }
+
+        const handleClickOutside = (event) => {
+            if (!studentSectionPickerRef.current) {
+                return;
+            }
+
+            if (!studentSectionPickerRef.current.contains(event.target)) {
+                setShowStudentSectionOptions(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [showStudentSectionOptions]);
+
+    useEffect(() => {
+        if (!isStudent) {
+            setShowStudentSectionOptions(false);
+            return;
+        }
+
+        if (!data.section_id) {
+            return;
+        }
+
+        if (!selectedStudentSection) {
+            return;
+        }
+
+        setStudentSectionSearch(
+            formatSectionOptionLabel(selectedStudentSection),
+        );
+    }, [isStudent, data.section_id, selectedStudentSection]);
 
     useEffect(() => {
         setData("teacher_mode", teacherMode);
@@ -778,7 +945,9 @@ export default function CreateUserModal({
                     field === "middle_name" ||
                     field === "lrn" ||
                     field === "email" ||
+                    field === "grade_level" ||
                     field === "username" ||
+                    field === "section_id" ||
                     field === "department_id" ||
                     field === "assign_as_admin" ||
                     field === "role" ||
@@ -801,7 +970,8 @@ export default function CreateUserModal({
 
         reset();
         clearErrors();
-        setStep(STEP_PROFILE);
+        setStep(STEP_USER_SELECTION);
+        setMaxVisitedStep(STEP_USER_SELECTION);
 
         setTeacherMode(TEACHER_MODE_SINGLE);
         setTeacherDraft(emptyTeacherDraft());
@@ -810,6 +980,8 @@ export default function CreateUserModal({
         setStudentMode(STUDENT_MODE_SINGLE);
         setStudentDraft(emptyStudentDraft());
         setStudentQueue([]);
+        setStudentSectionSearch("");
+        setShowStudentSectionOptions(false);
         setStudentCsvFileName("");
         setCreatedStudentCredentials([]);
         setSelectedCreatedStudentId("");
@@ -833,23 +1005,31 @@ export default function CreateUserModal({
             setStudentMode(STUDENT_MODE_SINGLE);
             setStudentDraft(emptyStudentDraft());
             setStudentQueue([]);
+            setStudentSectionSearch("");
+            setShowStudentSectionOptions(false);
             setStudentCsvFileName("");
             setCreatedStudentCredentials([]);
             setSelectedCreatedStudentId("");
             setData("email", "");
             setData("lrn", "");
+            setData("grade_level", "");
+            setData("section_id", "");
             return;
         }
 
         setStudentMode(STUDENT_MODE_SINGLE);
         setStudentDraft(emptyStudentDraft());
         setStudentQueue([]);
+        setStudentSectionSearch("");
+        setShowStudentSectionOptions(false);
         setStudentCsvFileName("");
         setCreatedStudentCredentials([]);
         setSelectedCreatedStudentId("");
         setData("student_queue", []);
         setData("lrn", "");
         setData("username", "");
+        setData("grade_level", "");
+        setData("section_id", "");
 
         setTeacherMode(TEACHER_MODE_SINGLE);
         setTeacherDraft(emptyTeacherDraft());
@@ -877,8 +1057,78 @@ export default function CreateUserModal({
         setStudentCsvFileName("");
         setCreatedStudentCredentials([]);
         setSelectedCreatedStudentId("");
+        setShowStudentSectionOptions(false);
         setData("student_queue", []);
         setClientErrors({});
+    };
+
+    const handleStudentGradeLevelChange = (gradeLevel) => {
+        setData("grade_level", gradeLevel);
+
+        if (!selectedStudentSection) {
+            return;
+        }
+
+        if (
+            normalizeGradeLevelValue(selectedStudentSection.grade_level) !==
+            gradeLevel
+        ) {
+            setData("section_id", "");
+            setStudentSectionSearch("");
+        }
+    };
+
+    const handleStudentSectionSearchChange = (value) => {
+        setStudentSectionSearch(value);
+        setShowStudentSectionOptions(true);
+
+        const normalizedInput = normalizeSectionSearch(value);
+
+        if (!normalizedInput) {
+            setData("section_id", "");
+            return;
+        }
+
+        const matchedSection = normalizedSections.find(
+            (section) =>
+                normalizeSectionSearch(formatSectionOptionLabel(section)) ===
+                normalizedInput,
+        );
+
+        if (!matchedSection) {
+            setData("section_id", "");
+            return;
+        }
+
+        const matchedSectionGradeLevel = normalizeGradeLevelValue(
+            matchedSection.grade_level,
+        );
+
+        if (
+            selectedStudentGradeLevel &&
+            matchedSectionGradeLevel !== selectedStudentGradeLevel
+        ) {
+            setData("section_id", "");
+            return;
+        }
+
+        setData("section_id", String(matchedSection.id));
+
+        if (matchedSectionGradeLevel) {
+            setData("grade_level", matchedSectionGradeLevel);
+        }
+    };
+
+    const selectStudentSection = (section) => {
+        setData("section_id", String(section.id));
+        setStudentSectionSearch(formatSectionOptionLabel(section));
+        const matchedSectionGradeLevel = normalizeGradeLevelValue(
+            section.grade_level,
+        );
+        if (matchedSectionGradeLevel) {
+            setData("grade_level", matchedSectionGradeLevel);
+        }
+        setShowStudentSectionOptions(false);
     };
 
     const handleTeacherDraftDepartmentSearchChange = (value) => {
@@ -1143,6 +1393,10 @@ export default function CreateUserModal({
             nextErrors.role = "Role is required.";
         }
 
+        if (role === "student" && !selectedStudentGradeLevel) {
+            nextErrors.grade_level = "Grade level is required for students.";
+        }
+
         if (role === "teacher" && teacherMode === TEACHER_MODE_MULTIPLE) {
             if (teacherQueue.length === 0) {
                 nextErrors.teacher_queue =
@@ -1154,6 +1408,11 @@ export default function CreateUserModal({
         }
 
         if (role === "student" && studentMode !== STUDENT_MODE_SINGLE) {
+            if (!String(data.section_id || "").trim()) {
+                nextErrors.section_id =
+                    "Section assignment is required for student creation.";
+            }
+
             if (studentQueue.length === 0) {
                 nextErrors.student_queue =
                     "Add at least one student in queue before proceeding.";
@@ -1207,6 +1466,11 @@ export default function CreateUserModal({
         }
 
         if (role === "student" && studentMode === STUDENT_MODE_SINGLE) {
+            if (!String(data.section_id || "").trim()) {
+                nextErrors.section_id =
+                    "Section assignment is required for student creation.";
+            }
+
             if (!String(data.lrn || "").trim()) {
                 nextErrors.lrn = "LRN is required.";
             }
@@ -1235,6 +1499,19 @@ export default function CreateUserModal({
     };
 
     const goNext = () => {
+        if (step === STEP_USER_SELECTION) {
+            if (!data.role) {
+                setClientErrors({
+                    role: "Select whether you are creating a teacher or student.",
+                });
+                return;
+            }
+
+            setClientErrors({});
+            setStep(STEP_PROFILE);
+            return;
+        }
+
         if (step === STEP_PROFILE && !validateProfileStep()) {
             return;
         }
@@ -1253,12 +1530,31 @@ export default function CreateUserModal({
             return;
         }
 
-        if (step === STEP_PROFILE) {
+        if (step === STEP_USER_SELECTION) {
             closeModal();
             return;
         }
 
-        setStep((previousStep) => Math.max(previousStep - 1, STEP_PROFILE));
+        setStep((previousStep) =>
+            Math.max(previousStep - 1, STEP_USER_SELECTION),
+        );
+    };
+
+    const handleVisitedStepNavigation = (targetStep) => {
+        if (processing || step === STEP_SUMMARY) {
+            return;
+        }
+
+        if (targetStep > maxVisitedStep) {
+            return;
+        }
+
+        if (targetStep === step) {
+            return;
+        }
+
+        setStep(targetStep);
+        setClientErrors({});
     };
 
     const handleCreate = () => {
@@ -1299,6 +1595,8 @@ export default function CreateUserModal({
             payload = {
                 role: "student",
                 student_mode: studentMode,
+                grade_level: selectedStudentGradeLevel || null,
+                section_id: Number(data.section_id),
                 password: data.password,
                 student_queue: studentQueue.map((queueItem) => ({
                     first_name: queueItem.first_name,
@@ -1330,6 +1628,8 @@ export default function CreateUserModal({
                 password: data.password,
                 role: "student",
                 student_mode: STUDENT_MODE_SINGLE,
+                grade_level: selectedStudentGradeLevel || null,
+                section_id: Number(data.section_id),
             };
         }
 
@@ -1394,7 +1694,8 @@ export default function CreateUserModal({
 
                 reset();
                 clearErrors();
-                setStep(STEP_PROFILE);
+                setStep(STEP_USER_SELECTION);
+                setMaxVisitedStep(STEP_USER_SELECTION);
 
                 setTeacherMode(TEACHER_MODE_SINGLE);
                 setTeacherDraft(emptyTeacherDraft());
@@ -1462,54 +1763,85 @@ export default function CreateUserModal({
                                 key={wizardStep.id}
                                 step={wizardStep}
                                 currentStep={step}
+                                maxVisitedStep={maxVisitedStep}
+                                onNavigate={handleVisitedStepNavigation}
+                                disableNavigation={
+                                    processing || step === STEP_SUMMARY
+                                }
                             />
                         ))}
                     </div>
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-y-auto bg-emerald-50/40 px-6 py-5">
-                    {step === STEP_PROFILE && (
+                    {step === STEP_USER_SELECTION && (
                         <div className="space-y-4 rounded-xl border border-emerald-100 bg-white p-4">
                             <div>
-                                <label className="mb-2 block text-sm font-medium text-slate-700">
-                                    Role{" "}
-                                    <span className="text-rose-500">*</span>
-                                </label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {["teacher", "student"].map((role) => {
-                                        const cfg = getRoleConfig(role);
-                                        const Icon = cfg.icon;
-                                        const active = data.role === role;
-
-                                        return (
-                                            <button
-                                                key={role}
-                                                type="button"
-                                                onClick={() =>
-                                                    handleRoleChange(role)
-                                                }
-                                                className={`flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-semibold transition-all ${
-                                                    active
-                                                        ? "border-emerald-400 bg-emerald-50 text-emerald-700"
-                                                        : "border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300"
-                                                }`}
-                                            >
-                                                <span
-                                                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
-                                                        active
-                                                            ? "bg-emerald-600 text-white"
-                                                            : "bg-slate-300 text-slate-600"
-                                                    }`}
-                                                >
-                                                    <Icon size={14} />
-                                                </span>
-                                                {cfg.label}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                <p className="text-base font-semibold text-slate-900">
+                                    User Selection
+                                </p>
+                                <p className="mt-1 text-sm text-slate-500">
+                                    Choose which account type you want to
+                                    create.
+                                </p>
                             </div>
 
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                {["teacher", "student"].map((role) => {
+                                    const cfg = getRoleConfig(role);
+                                    const Icon = cfg.icon;
+                                    const isSelected = data.role === role;
+
+                                    return (
+                                        <button
+                                            key={role}
+                                            type="button"
+                                            onClick={() => {
+                                                handleRoleChange(role);
+                                                setStep(STEP_PROFILE);
+                                            }}
+                                            className={`rounded-xl border p-4 text-left transition-all ${
+                                                isSelected
+                                                    ? "border-emerald-400 bg-emerald-50 shadow-sm"
+                                                    : "border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40"
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <span
+                                                    className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${
+                                                        isSelected
+                                                            ? "bg-emerald-600 text-white"
+                                                            : "bg-slate-100 text-slate-600"
+                                                    }`}
+                                                >
+                                                    <Icon size={18} />
+                                                </span>
+                                                <div>
+                                                    <p className="text-sm font-semibold text-slate-900">
+                                                        {cfg.label}
+                                                    </p>
+                                                    <p className="text-xs text-slate-500">
+                                                        {role === "teacher"
+                                                            ? "Manage department-linked teacher accounts"
+                                                            : "Create student credentials and QR access"}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {(clientErrors.role || errors.role) && (
+                                <p className="text-xs text-rose-600">
+                                    {clientErrors.role || errors.role}
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    {step === STEP_PROFILE && (
+                        <div className="space-y-4 rounded-xl border border-emerald-100 bg-white p-4">
                             {isTeacher && (
                                 <div>
                                     <label className="mb-2 block text-sm font-medium text-slate-700">
@@ -1606,6 +1938,58 @@ export default function CreateUserModal({
                                             Add via CSV
                                         </button>
                                     </div>
+                                </div>
+                            )}
+
+                            {isStudent && (
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                                        Grade Level{" "}
+                                        <span className="text-rose-500">*</span>
+                                    </label>
+
+                                    <div className="grid w-full grid-cols-2 gap-2">
+                                        {STUDENT_GRADE_LEVEL_OPTIONS.map(
+                                            (gradeLevel) => {
+                                                const isActive =
+                                                    selectedStudentGradeLevel ===
+                                                    gradeLevel;
+
+                                                return (
+                                                    <button
+                                                        key={gradeLevel}
+                                                        type="button"
+                                                        onClick={() =>
+                                                            handleStudentGradeLevelChange(
+                                                                gradeLevel,
+                                                            )
+                                                        }
+                                                        className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                                                            isActive
+                                                                ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                                                                : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
+                                                        }`}
+                                                    >
+                                                        Grade {gradeLevel}
+                                                    </button>
+                                                );
+                                            },
+                                        )}
+                                    </div>
+
+                                    <p className="mt-1 text-[11px] text-slate-500">
+                                        Pick grade level first so section
+                                        options stay aligned.
+                                    </p>
+
+                                    {(errors.grade_level ||
+                                        clientErrors.grade_level) && (
+                                        <p className="mt-1.5 flex items-center gap-1 text-xs text-rose-600">
+                                            <Info size={12} />
+                                            {errors.grade_level ||
+                                                clientErrors.grade_level}
+                                        </p>
+                                    )}
                                 </div>
                             )}
 
@@ -2440,6 +2824,104 @@ export default function CreateUserModal({
                                         </div>
                                     </div>
                                 )}
+
+                            {isStudent && (
+                                <Field
+                                    label="Section Assignment"
+                                    icon={Shield}
+                                    required
+                                    error={
+                                        errors.section_id ||
+                                        clientErrors.section_id
+                                    }
+                                >
+                                    <div
+                                        ref={studentSectionPickerRef}
+                                        className="relative"
+                                    >
+                                        <input
+                                            type="text"
+                                            value={studentSectionSearch}
+                                            onFocus={() =>
+                                                setShowStudentSectionOptions(
+                                                    true,
+                                                )
+                                            }
+                                            onChange={(event) =>
+                                                handleStudentSectionSearchChange(
+                                                    event.target.value,
+                                                )
+                                            }
+                                            placeholder={
+                                                selectedStudentGradeLevel
+                                                    ? "Click to view sections or type to search"
+                                                    : "Select grade level first"
+                                            }
+                                            disabled={
+                                                !selectedStudentGradeLevel
+                                            }
+                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-emerald-500 focus:bg-white focus:ring-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                        />
+
+                                        {showStudentSectionOptions &&
+                                            selectedStudentGradeLevel && (
+                                                <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
+                                                    {filteredStudentSections.length ===
+                                                    0 ? (
+                                                        <p className="px-2.5 py-2 text-xs text-slate-500">
+                                                            No sections matched
+                                                            your filters.
+                                                        </p>
+                                                    ) : (
+                                                        filteredStudentSections.map(
+                                                            (section) => (
+                                                                <button
+                                                                    key={
+                                                                        section.id
+                                                                    }
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        selectStudentSection(
+                                                                            section,
+                                                                        )
+                                                                    }
+                                                                    className="w-full rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-emerald-50"
+                                                                >
+                                                                    <p className="text-sm font-medium text-slate-800">
+                                                                        {formatSectionOptionLabel(
+                                                                            section,
+                                                                        )}
+                                                                    </p>
+                                                                    <p className="mt-0.5 text-[11px] text-slate-500">
+                                                                        {section.department_code
+                                                                            ? `${section.department_code} • `
+                                                                            : ""}
+                                                                        {section.school_year ||
+                                                                            ""}
+                                                                    </p>
+                                                                </button>
+                                                            ),
+                                                        )
+                                                    )}
+                                                </div>
+                                            )}
+                                    </div>
+
+                                    <p className="mt-1 text-[11px] text-slate-500">
+                                        Uses full label format: Grade -
+                                        Specialization - Section.
+                                    </p>
+
+                                    {selectedStudentSection && (
+                                        <p className="mt-1 text-xs text-slate-600">
+                                            Assigned to:{" "}
+                                            {formatSectionOptionLabel(
+                                                selectedStudentSection,
+                                            )}
+                                        </p>
+                                    )}
+                                </Field>
+                            )}
                         </div>
                     )}
 
@@ -2565,50 +3047,80 @@ export default function CreateUserModal({
                                 )}
 
                             {isStudent && (
-                                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
-                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                        Student Information (
-                                        {pendingStudentProfiles.length})
-                                    </p>
-
-                                    {pendingStudentProfiles.length === 0 ? (
-                                        <p className="mt-2 text-sm text-slate-500">
-                                            No student records available.
+                                <>
+                                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                            Grade Level
                                         </p>
-                                    ) : (
-                                        <div className="mt-2 max-h-56 space-y-2 overflow-y-auto">
-                                            {pendingStudentProfiles.map(
-                                                (studentProfile) => (
-                                                    <div
-                                                        key={studentProfile.id}
-                                                        className="rounded-md border border-slate-200 bg-white px-3 py-2"
-                                                    >
-                                                        <p className="text-sm font-semibold text-slate-900">
-                                                            {[
-                                                                studentProfile.first_name,
-                                                                studentProfile.middle_name,
-                                                                studentProfile.last_name,
-                                                            ]
-                                                                .filter(Boolean)
-                                                                .join(" ")}
-                                                        </p>
-                                                        <p className="text-xs text-slate-600">
-                                                            LRN:{" "}
-                                                            {studentProfile.lrn ||
-                                                                "-"}
-                                                        </p>
-                                                        <p className="font-mono text-xs text-slate-600">
-                                                            Username:{" "}
-                                                            {
-                                                                studentProfile.username
+                                        <p className="text-sm font-semibold text-slate-900">
+                                            {selectedStudentGradeLevel
+                                                ? `Grade ${selectedStudentGradeLevel}`
+                                                : "None"}
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                            Assigned Section
+                                        </p>
+                                        <p className="text-sm font-semibold text-slate-900">
+                                            {selectedStudentSection
+                                                ? formatSectionOptionLabel(
+                                                      selectedStudentSection,
+                                                  )
+                                                : "None"}
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                            Student Information (
+                                            {pendingStudentProfiles.length})
+                                        </p>
+
+                                        {pendingStudentProfiles.length === 0 ? (
+                                            <p className="mt-2 text-sm text-slate-500">
+                                                No student records available.
+                                            </p>
+                                        ) : (
+                                            <div className="mt-2 max-h-56 space-y-2 overflow-y-auto">
+                                                {pendingStudentProfiles.map(
+                                                    (studentProfile) => (
+                                                        <div
+                                                            key={
+                                                                studentProfile.id
                                                             }
-                                                        </p>
-                                                    </div>
-                                                ),
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
+                                                            className="rounded-md border border-slate-200 bg-white px-3 py-2"
+                                                        >
+                                                            <p className="text-sm font-semibold text-slate-900">
+                                                                {[
+                                                                    studentProfile.first_name,
+                                                                    studentProfile.middle_name,
+                                                                    studentProfile.last_name,
+                                                                ]
+                                                                    .filter(
+                                                                        Boolean,
+                                                                    )
+                                                                    .join(" ")}
+                                                            </p>
+                                                            <p className="text-xs text-slate-600">
+                                                                LRN:{" "}
+                                                                {studentProfile.lrn ||
+                                                                    "-"}
+                                                            </p>
+                                                            <p className="font-mono text-xs text-slate-600">
+                                                                Username:{" "}
+                                                                {
+                                                                    studentProfile.username
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                    ),
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
                             )}
 
                             {showSingleForm && isTeacher && (
@@ -2798,7 +3310,7 @@ export default function CreateUserModal({
                         <ChevronLeft size={13} />
                         {step === STEP_SUMMARY
                             ? "Close"
-                            : step === STEP_PROFILE
+                            : step === STEP_USER_SELECTION
                               ? "Cancel"
                               : "Back"}
                     </button>

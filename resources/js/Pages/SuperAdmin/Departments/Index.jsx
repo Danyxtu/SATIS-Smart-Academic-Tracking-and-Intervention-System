@@ -4,29 +4,81 @@ import {
     Building2,
     Plus,
     Search,
+    Trash2,
     Users,
     GraduationCap,
     UserCog,
     X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import DepartmentDetailModal from "@/Components/Superadmin/DepartmentDetailModal";
+import DepartmentDeleteConfirmModal from "@/Components/Superadmin/DepartmentDeleteConfirmModal";
 import CreateDepartmentModal from "@/Components/Superadmin/CreateDepartmentModal";
 
 export default function Index({ departments, filters, trackOptions = [] }) {
     const [search, setSearch] = useState(filters.search || "");
     const [status, setStatus] = useState(filters.status || "");
-    const [activeTrack, setActiveTrack] = useState(filters.track || "Academic");
+    const [activeTrack, setActiveTrack] = useState(filters.track || "all");
     const [selectedDepartment, setSelectedDepartment] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [departmentModalMode, setDepartmentModalMode] = useState("view");
+    const [departmentPendingDelete, setDepartmentPendingDelete] =
+        useState(null);
+    const [departmentDeleting, setDepartmentDeleting] = useState(false);
+    const [departmentDeleteError, setDepartmentDeleteError] = useState("");
+
+    const resolvedTrackOptions = useMemo(() => {
+        if (!Array.isArray(trackOptions)) {
+            return [];
+        }
+
+        return trackOptions
+            .map((option) => {
+                if (typeof option === "string") {
+                    return {
+                        value: option,
+                        label: option,
+                    };
+                }
+
+                if (option && typeof option === "object") {
+                    const value =
+                        option.value || option.id || option.track_id || "";
+                    const label =
+                        option.label ||
+                        option.track_name ||
+                        option.name ||
+                        value;
+
+                    if (!value) {
+                        return null;
+                    }
+
+                    return {
+                        value: String(value),
+                        label,
+                    };
+                }
+
+                return null;
+            })
+            .filter(Boolean);
+    }, [trackOptions]);
+
+    const preferredCreateTrack = useMemo(() => {
+        if (activeTrack && activeTrack !== "all") {
+            return activeTrack;
+        }
+
+        return resolvedTrackOptions[0]?.value || "";
+    }, [activeTrack, resolvedTrackOptions]);
 
     useEffect(() => {
         setSearch(filters.search || "");
         setStatus(filters.status || "");
-        setActiveTrack(filters.track || "Academic");
+        setActiveTrack(filters.track || "all");
     }, [filters.search, filters.status, filters.track]);
 
     const openModal = (dept) => {
@@ -69,6 +121,119 @@ export default function Index({ departments, filters, trackOptions = [] }) {
             {},
             { preserveState: true },
         );
+    };
+
+    const getDepartmentDeleteBlockedReason = (department) => {
+        const adminCount = Number(department?.admins_count || 0);
+        const teacherCount = Number(department?.teachers_count || 0);
+
+        if (adminCount > 0 || teacherCount > 0) {
+            return "Cannot delete department with assigned admins or teachers.";
+        }
+
+        return "";
+    };
+
+    const handleDeleteDepartment = (department) => {
+        if (!department?.id) {
+            return;
+        }
+
+        const blockedReason = getDepartmentDeleteBlockedReason(department);
+        if (blockedReason) {
+            return;
+        }
+
+        setDepartmentDeleteError("");
+        setDepartmentPendingDelete(department);
+    };
+
+    const closeDepartmentDeleteModal = () => {
+        if (departmentDeleting) {
+            return;
+        }
+
+        setDepartmentPendingDelete(null);
+        setDepartmentDeleteError("");
+    };
+
+    const confirmDeleteDepartment = () => {
+        if (!departmentPendingDelete?.id || departmentDeleting) {
+            return;
+        }
+
+        setDepartmentDeleteError("");
+        setDepartmentDeleting(true);
+
+        router.delete(
+            route("superadmin.departments.destroy", departmentPendingDelete.id),
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: (page) => {
+                    const flashError = page?.props?.flash?.error;
+
+                    if (flashError) {
+                        setDepartmentDeleteError(flashError);
+                        return;
+                    }
+
+                    const deletedId = departmentPendingDelete.id;
+
+                    setDepartmentPendingDelete(null);
+                    setDepartmentDeleteError("");
+
+                    if (String(selectedDepartment?.id) === String(deletedId)) {
+                        closeModal();
+                    }
+                },
+                onError: () => {
+                    setDepartmentDeleteError(
+                        "Unable to delete department right now. Please try again.",
+                    );
+                },
+                onFinish: () => {
+                    setDepartmentDeleting(false);
+                },
+            },
+        );
+    };
+
+    const handleDepartmentDeleted = (departmentId = null) => {
+        if (!departmentId) {
+            closeModal();
+            return;
+        }
+
+        if (String(selectedDepartment?.id) === String(departmentId)) {
+            closeModal();
+        }
+    };
+
+    const handleDepartmentSaved = (departmentId = null) => {
+        const targetDepartmentId = departmentId ?? selectedDepartment?.id;
+
+        router.reload({
+            only: ["departments"],
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (!targetDepartmentId) {
+                    return;
+                }
+
+                const refreshedDepartments =
+                    page?.props?.departments?.data || [];
+
+                const refreshedDepartment = refreshedDepartments.find(
+                    (department) =>
+                        String(department.id) === String(targetDepartmentId),
+                );
+
+                if (refreshedDepartment) {
+                    setSelectedDepartment(refreshedDepartment);
+                }
+            },
+        });
     };
 
     // Summary stats from current page data
@@ -123,32 +288,35 @@ export default function Index({ departments, filters, trackOptions = [] }) {
                 {/* ── Search & Filter Bar ──────────────────────────────── */}
                 <div className="rounded-2xl bg-white border border-slate-100 shadow-sm px-5 py-4">
                     <div className="mb-3 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
-                        {(trackOptions.length > 0
-                            ? trackOptions
-                            : ["Academic", "TVL"]
-                        ).map((track) => (
+                        {[
+                            {
+                                value: "all",
+                                label: "All",
+                            },
+                            ...resolvedTrackOptions,
+                        ].map((track) => (
                             <button
-                                key={track}
+                                key={track.value}
                                 type="button"
                                 onClick={() => {
-                                    setActiveTrack(track);
+                                    setActiveTrack(track.value);
                                     router.get(
                                         route("superadmin.departments.index"),
                                         {
                                             search,
                                             status,
-                                            track,
+                                            track: track.value,
                                         },
                                         { preserveState: true },
                                     );
                                 }}
                                 className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition-all ${
-                                    activeTrack === track
+                                    activeTrack === track.value
                                         ? "bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-200"
                                         : "text-slate-500 hover:text-slate-700"
                                 }`}
                             >
-                                {track}
+                                {track.label}
                             </button>
                         ))}
                     </div>
@@ -305,8 +473,7 @@ export default function Index({ departments, filters, trackOptions = [] }) {
                                                     </p>
                                                 )}
                                                 <p className="text-[11px] text-slate-500 mt-0.5 truncate">
-                                                    Track:{" "}
-                                                    {dept.track || "Academic"}
+                                                    Track: {dept.track || "-"}
                                                 </p>
                                                 <p className="text-[11px] text-slate-500 truncate">
                                                     {Array.isArray(
@@ -405,6 +572,37 @@ export default function Index({ departments, filters, trackOptions = [] }) {
                                             className="col-span-3 flex items-center justify-end gap-1.5"
                                             onClick={(e) => e.stopPropagation()}
                                         >
+                                            {(() => {
+                                                const deleteBlockedReason =
+                                                    getDepartmentDeleteBlockedReason(
+                                                        dept,
+                                                    );
+
+                                                return (
+                                                    <button
+                                                        onClick={() =>
+                                                            handleDeleteDepartment(
+                                                                dept,
+                                                            )
+                                                        }
+                                                        disabled={Boolean(
+                                                            deleteBlockedReason,
+                                                        )}
+                                                        title={
+                                                            deleteBlockedReason ||
+                                                            "Delete department"
+                                                        }
+                                                        className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                                                            deleteBlockedReason
+                                                                ? "cursor-not-allowed bg-slate-100 text-slate-400"
+                                                                : "bg-rose-50 text-rose-700 hover:bg-rose-100"
+                                                        }`}
+                                                    >
+                                                        <Trash2 size={12} />
+                                                        Delete
+                                                    </button>
+                                                );
+                                            })()}
                                             <button
                                                 onClick={() => openModal(dept)}
                                                 className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
@@ -475,7 +673,7 @@ export default function Index({ departments, filters, trackOptions = [] }) {
                                   id: selectedDepartment.id,
                                   name: selectedDepartment.department_name,
                                   code: selectedDepartment.department_code,
-                                  track: selectedDepartment.track || "Academic",
+                                  track: selectedDepartment.track || "",
                                   description:
                                       selectedDepartment.description || null,
                                   is_active: Boolean(
@@ -506,7 +704,7 @@ export default function Index({ departments, filters, trackOptions = [] }) {
                                   id: null,
                                   name: "",
                                   code: "",
-                                  track: activeTrack || "Academic",
+                                  track: "",
                                   description: "",
                                   is_active: true,
                                   specializations: [],
@@ -521,15 +719,39 @@ export default function Index({ departments, filters, trackOptions = [] }) {
                 error=""
                 row={selectedDepartment}
                 mode={departmentModalMode}
-                onSaved={() => router.reload({ only: ["departments"] })}
+                onSaved={handleDepartmentSaved}
+                onDeleted={handleDepartmentDeleted}
+                trackOptions={resolvedTrackOptions}
+                departmentOptions={departments?.data || []}
+            />
+
+            <DepartmentDeleteConfirmModal
+                show={Boolean(departmentPendingDelete)}
+                onClose={closeDepartmentDeleteModal}
+                onConfirm={confirmDeleteDepartment}
+                departmentName={
+                    departmentPendingDelete?.department_name ||
+                    departmentPendingDelete?.name ||
+                    departmentPendingDelete?.department_code ||
+                    ""
+                }
+                blockedReason={
+                    departmentPendingDelete
+                        ? getDepartmentDeleteBlockedReason(
+                              departmentPendingDelete,
+                          )
+                        : ""
+                }
+                error={departmentDeleteError}
+                deleting={departmentDeleting}
             />
 
             <CreateDepartmentModal
                 isOpen={showCreateModal}
                 onClose={closeCreateModal}
                 onSuccess={() => router.reload({ only: ["departments"] })}
-                trackOptions={trackOptions}
-                initialTrack={activeTrack || "Academic"}
+                trackOptions={resolvedTrackOptions}
+                initialTrack={preferredCreateTrack}
             />
         </>
     );

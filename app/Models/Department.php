@@ -16,6 +16,7 @@ class Department extends Model
         'department_name',
         'department_code',
         'track',
+        'school_track_id',
         'description',
         'is_active',
     ];
@@ -30,6 +31,14 @@ class Department extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Get the school track this department belongs to.
+     */
+    public function schoolTrack(): BelongsTo
+    {
+        return $this->belongsTo(SchoolTrack::class);
     }
 
     /**

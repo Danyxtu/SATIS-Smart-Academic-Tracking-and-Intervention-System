@@ -37,394 +37,6 @@ function buildClassQueueKey(sectionId, subjectId, schoolYear) {
     ).toLowerCase()}`;
 }
 
-function SectionFormModal({
-    isOpen,
-    mode,
-    data,
-    setData,
-    errors,
-    processing,
-    onClose,
-    onSubmit,
-    departments = [],
-    teachers = [],
-}) {
-    if (!isOpen) {
-        return null;
-    }
-
-    const isEdit = mode === "edit";
-
-    const availableAdviserTeachers = data.department_id
-        ? teachers.filter(
-              (teacher) =>
-                  Number(teacher.department_id) === Number(data.department_id),
-          )
-        : [];
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-end justify-center p-2 sm:items-center sm:p-4">
-            <div
-                className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
-                onClick={onClose}
-            />
-
-            <div className="relative max-h-[calc(100vh-1rem)] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-slate-200 sm:max-h-[90vh]">
-                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-6 sm:py-5">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 ring-1 ring-emerald-200">
-                            <Layers size={16} className="text-emerald-600" />
-                        </div>
-                        <div>
-                            <h2 className="text-base font-semibold text-slate-900">
-                                {isEdit ? "Edit Section" : "Add Section"}
-                            </h2>
-                            <p className="text-xs text-slate-500">
-                                {isEdit
-                                    ? "Update section details across departments"
-                                    : "Create a new section record"}
-                            </p>
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        disabled={processing}
-                        className="z-10 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
-                    >
-                        <X size={16} />
-                    </button>
-                </div>
-
-                <form onSubmit={onSubmit}>
-                    <div className="space-y-3 px-4 py-4 sm:space-y-4 sm:px-6 sm:py-5">
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div>
-                                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                    Department{" "}
-                                    <span className="text-rose-500">*</span>
-                                </label>
-                                <select
-                                    value={data.department_id}
-                                    onChange={(event) => {
-                                        const selectedDepartmentId =
-                                            event.target.value;
-                                        const selectedDepartment =
-                                            departments.find(
-                                                (department) =>
-                                                    String(department.id) ===
-                                                    selectedDepartmentId,
-                                            ) || null;
-
-                                        setData(
-                                            "department_id",
-                                            selectedDepartmentId,
-                                        );
-
-                                        setData("advisor_teacher_id", "");
-
-                                        if (
-                                            !data.strand &&
-                                            selectedDepartment
-                                        ) {
-                                            setData(
-                                                "strand",
-                                                selectedDepartment.department_code ||
-                                                    "",
-                                            );
-                                        }
-                                    }}
-                                    className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
-                                        errors.department_id
-                                            ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
-                                    }`}
-                                >
-                                    <option value="">Select department</option>
-                                    {departments.map((department) => (
-                                        <option
-                                            key={department.id}
-                                            value={department.id}
-                                        >
-                                            {department.department_code} -{" "}
-                                            {department.department_name}
-                                        </option>
-                                    ))}
-                                </select>
-                                <FieldError message={errors.department_id} />
-                            </div>
-
-                            <div>
-                                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                    Section Name{" "}
-                                    <span className="text-rose-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={data.section_name}
-                                    onChange={(event) =>
-                                        setData(
-                                            "section_name",
-                                            event.target.value,
-                                        )
-                                    }
-                                    placeholder="e.g., 11 ABM Einstein"
-                                    className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
-                                        errors.section_name
-                                            ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
-                                    }`}
-                                />
-                                <FieldError message={errors.section_name} />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                Adviser Teacher
-                            </label>
-                            <select
-                                value={data.advisor_teacher_id}
-                                onChange={(event) =>
-                                    setData(
-                                        "advisor_teacher_id",
-                                        event.target.value,
-                                    )
-                                }
-                                disabled={!data.department_id}
-                                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
-                                    errors.advisor_teacher_id
-                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                        : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
-                                }`}
-                            >
-                                <option value="">
-                                    {data.department_id
-                                        ? "Unassigned (N/A)"
-                                        : "Select department first"}
-                                </option>
-                                {availableAdviserTeachers.map((teacher) => (
-                                    <option key={teacher.id} value={teacher.id}>
-                                        {teacher.name}
-                                    </option>
-                                ))}
-                            </select>
-                            <FieldError message={errors.advisor_teacher_id} />
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                            <div>
-                                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                    Section Code
-                                </label>
-                                <input
-                                    type="text"
-                                    value={data.section_code}
-                                    onChange={(event) =>
-                                        setData(
-                                            "section_code",
-                                            event.target.value.toUpperCase(),
-                                        )
-                                    }
-                                    placeholder="Auto-generated if empty"
-                                    className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
-                                        errors.section_code
-                                            ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
-                                    }`}
-                                />
-                                <FieldError message={errors.section_code} />
-                            </div>
-
-                            <div>
-                                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                    Cohort{" "}
-                                    <span className="text-rose-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={data.cohort}
-                                    onChange={(event) =>
-                                        setData("cohort", event.target.value)
-                                    }
-                                    placeholder="e.g., 2026"
-                                    className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
-                                        errors.cohort
-                                            ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
-                                    }`}
-                                />
-                                <FieldError message={errors.cohort} />
-                            </div>
-
-                            <div>
-                                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                    Grade Level
-                                </label>
-                                <input
-                                    type="text"
-                                    value={data.grade_level}
-                                    onChange={(event) =>
-                                        setData(
-                                            "grade_level",
-                                            event.target.value,
-                                        )
-                                    }
-                                    placeholder="e.g., Grade 11"
-                                    className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
-                                        errors.grade_level
-                                            ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
-                                    }`}
-                                />
-                                <FieldError message={errors.grade_level} />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                            <div>
-                                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                    Strand
-                                </label>
-                                <input
-                                    type="text"
-                                    value={data.strand}
-                                    onChange={(event) =>
-                                        setData("strand", event.target.value)
-                                    }
-                                    placeholder="e.g., ABM"
-                                    className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
-                                        errors.strand
-                                            ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
-                                    }`}
-                                />
-                                <FieldError message={errors.strand} />
-                            </div>
-
-                            <div>
-                                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                    Track
-                                </label>
-                                <input
-                                    type="text"
-                                    value={data.track}
-                                    onChange={(event) =>
-                                        setData("track", event.target.value)
-                                    }
-                                    placeholder="e.g., Academic"
-                                    className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
-                                        errors.track
-                                            ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
-                                    }`}
-                                />
-                                <FieldError message={errors.track} />
-                            </div>
-
-                            <div>
-                                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                    School Year
-                                </label>
-                                <input
-                                    type="text"
-                                    value={data.school_year}
-                                    onChange={(event) =>
-                                        setData(
-                                            "school_year",
-                                            event.target.value,
-                                        )
-                                    }
-                                    placeholder="e.g., 2026-2027"
-                                    className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
-                                        errors.school_year
-                                            ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                            : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
-                                    }`}
-                                />
-                                <FieldError message={errors.school_year} />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                Description
-                            </label>
-                            <textarea
-                                value={data.description}
-                                onChange={(event) =>
-                                    setData("description", event.target.value)
-                                }
-                                rows={3}
-                                placeholder="Optional section notes"
-                                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 ${
-                                    errors.description
-                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                        : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
-                                }`}
-                            />
-                            <FieldError message={errors.description} />
-                        </div>
-
-                        <label className="inline-flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
-                            <input
-                                type="checkbox"
-                                checked={Boolean(data.is_active)}
-                                onChange={(event) =>
-                                    setData("is_active", event.target.checked)
-                                }
-                                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                            />
-                            Section is active and available for class
-                            assignments
-                        </label>
-                        <FieldError message={errors.is_active} />
-                    </div>
-
-                    <div className="flex flex-col-reverse gap-2.5 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6 sm:py-4">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            disabled={processing}
-                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={processing}
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-60 sm:w-auto"
-                        >
-                            {processing && (
-                                <svg
-                                    className="h-3.5 w-3.5 animate-spin"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                >
-                                    <circle
-                                        className="opacity-25"
-                                        cx="12"
-                                        cy="12"
-                                        r="10"
-                                        stroke="currentColor"
-                                        strokeWidth="4"
-                                    />
-                                    <path
-                                        className="opacity-75"
-                                        fill="currentColor"
-                                        d="M4 12a8 8 0 018-8v8z"
-                                    />
-                                </svg>
-                            )}
-                            {isEdit ? "Save Changes" : "Create Section"}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-}
-
 function ClassFormModal({
     isOpen,
     mode,
@@ -1012,23 +624,6 @@ export default function Index({
         [colorOptions],
     );
 
-    const defaultSectionState = useMemo(
-        () => ({
-            department_id: "",
-            section_name: "",
-            section_code: "",
-            cohort: String(new Date().getFullYear()),
-            grade_level: "",
-            strand: "",
-            track: "",
-            school_year: currentSchoolYear || "",
-            description: "",
-            advisor_teacher_id: "",
-            is_active: true,
-        }),
-        [currentSchoolYear],
-    );
-
     const defaultClassState = useMemo(
         () => ({
             subject_id: "",
@@ -1049,8 +644,6 @@ export default function Index({
     );
 
     const [showSectionWizard, setShowSectionWizard] = useState(false);
-    const [showSectionModal, setShowSectionModal] = useState(false);
-    const [sectionToEdit, setSectionToEdit] = useState(null);
     const [showRestorePrompt, setShowRestorePrompt] = useState(false);
     const [restoreProcessing, setRestoreProcessing] = useState(false);
 
@@ -1061,6 +654,7 @@ export default function Index({
         open: false,
         tab: "",
         row: null,
+        mode: "view",
     });
     const [classQueue, setClassQueue] = useState([]);
     const [classQueueNotice, setClassQueueNotice] = useState("");
@@ -1071,15 +665,6 @@ export default function Index({
     const [deleteProcessing, setDeleteProcessing] = useState(false);
 
     const [showAssignAdviserModal, setShowAssignAdviserModal] = useState(false);
-
-    const {
-        data: sectionData,
-        setData: setSectionData,
-        put: putSection,
-        processing: sectionProcessing,
-        errors: sectionErrors,
-        clearErrors: clearSectionErrors,
-    } = useForm(defaultSectionState);
 
     const {
         data: classData,
@@ -1411,51 +996,9 @@ export default function Index({
     };
 
     const openEditSectionModal = (section) => {
-        setSectionToEdit(section);
-        clearSectionErrors();
-        setSectionData({
-            department_id: section.department_id
-                ? String(section.department_id)
-                : "",
-            section_name: section.section_name || "",
-            section_code: section.section_code || "",
-            cohort: section.cohort || "",
-            grade_level: section.grade_level || "",
-            strand: section.strand || "",
-            track: section.track || "",
-            school_year: section.school_year || currentSchoolYear || "",
-            description: section.description || "",
-            advisor_teacher_id: section.advisor_teacher_id
-                ? String(section.advisor_teacher_id)
-                : "",
-            is_active: Boolean(section.is_active),
+        openDetailModal("sections", section, {
+            mode: "edit",
         });
-        setShowSectionModal(true);
-    };
-
-    const closeSectionModal = () => {
-        setShowSectionModal(false);
-        setSectionToEdit(null);
-        clearSectionErrors();
-    };
-
-    const handleSectionSubmit = (event) => {
-        event.preventDefault();
-
-        if (!sectionToEdit) {
-            return;
-        }
-
-        putSection(
-            route(
-                "superadmin.academic-management.sections.update",
-                sectionToEdit.id,
-            ),
-            {
-                preserveScroll: true,
-                onSuccess: closeSectionModal,
-            },
-        );
     };
 
     const sectionCreateSummary = flash?.section_create_summary || null;
@@ -1578,11 +1121,12 @@ export default function Index({
         setDeleteTarget({ type, item });
     };
 
-    const openDetailModal = (tabKey, item) => {
+    const openDetailModal = (tabKey, item, options = {}) => {
         setDetailModal({
             open: true,
             tab: tabKey,
             row: item,
+            mode: options.mode === "edit" ? "edit" : "view",
         });
     };
 
@@ -1591,6 +1135,7 @@ export default function Index({
             open: false,
             tab: "",
             row: null,
+            mode: "view",
         });
     };
 
@@ -2441,6 +1986,14 @@ export default function Index({
                                                         .filter(Boolean)
                                                         .join(" • ") || "-"}
                                                 </p>
+                                                <p className="mt-0.5 text-[11px] text-slate-500">
+                                                    {Number(
+                                                        item.students_total ??
+                                                            item.students_count ??
+                                                            0,
+                                                    )}{" "}
+                                                    students
+                                                </p>
                                             </div>
 
                                             <div
@@ -2559,6 +2112,14 @@ export default function Index({
                                                 <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700">
                                                     {item.teacher_name || "N/A"}
                                                 </span>
+                                                <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700">
+                                                    {Number(
+                                                        item.students_total ??
+                                                            item.students_count ??
+                                                            0,
+                                                    )}{" "}
+                                                    students
+                                                </span>
                                             </div>
 
                                             <p className="text-xs text-slate-500">
@@ -2588,28 +2149,45 @@ export default function Index({
                 loading={false}
                 error=""
                 row={detailModal.row}
+                mode={detailModal.mode}
+                onSaved={(sectionId) => {
+                    const updatedRow = sectionRows.find(
+                        (section) => String(section.id) === String(sectionId),
+                    );
+
+                    if (!updatedRow) {
+                        return;
+                    }
+
+                    setDetailModal((previous) => ({
+                        ...previous,
+                        row: updatedRow,
+                        mode: "view",
+                    }));
+                }}
+                departments={departments}
+                teachers={teachers}
+                subjects={subjects}
+                sectionOptions={sectionOptions}
+                currentSchoolYear={currentSchoolYear}
             />
 
             <ClassDetailModal
                 show={detailModal.open && detailModal.tab === "classes"}
                 onClose={closeDetailModal}
-                payload={detailModal.row ? { class: detailModal.row } : null}
+                payload={
+                    detailModal.row
+                        ? {
+                              class: detailModal.row,
+                              students: Array.isArray(detailModal.row.students)
+                                  ? detailModal.row.students
+                                  : [],
+                          }
+                        : null
+                }
                 loading={false}
                 error=""
                 row={detailModal.row}
-            />
-
-            <SectionFormModal
-                isOpen={showSectionModal}
-                mode="edit"
-                data={sectionData}
-                setData={setSectionData}
-                errors={sectionErrors}
-                processing={sectionProcessing}
-                onClose={closeSectionModal}
-                onSubmit={handleSectionSubmit}
-                departments={departments}
-                teachers={teachers}
             />
 
             <AddSectionWizardModal

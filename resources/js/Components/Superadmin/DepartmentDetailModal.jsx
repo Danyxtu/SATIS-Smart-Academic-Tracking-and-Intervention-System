@@ -9,6 +9,9 @@ export default function DepartmentDetailModal({
     row,
     mode = "view",
     onSaved,
+    onDeleted,
+    trackOptions = [],
+    departmentOptions = [],
 }) {
     return (
         <ManagementDetailModal
@@ -21,6 +24,9 @@ export default function DepartmentDetailModal({
             row={row}
             departmentManageMode={mode}
             onDepartmentSaved={onSaved}
+            onDepartmentDeleted={onDeleted}
+            trackOptions={trackOptions}
+            departmentOptions={departmentOptions}
         />
     );
 }
