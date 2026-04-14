@@ -41,15 +41,13 @@ class AuthController extends Controller
         // Issue Sanctum token
         $token = $user->createToken('mobile-app')->plainTextToken;
 
-        // Email verification is disabled; always treat as verified
+        $accountReadiness = $this->accountReadinessFlags($user);
+
         return response()->json([
             'token' => $token,
             'user' => $user,
             'must_change_password' => $user->must_change_password ?? false,
-            'has_personal_email' => filled((string) $user->personal_email),
-            'email_verified' => true,
-            'requires_personal_email' => false,
-            'requires_email_verification' => false,
+            ...$accountReadiness,
         ]);
     }
 
@@ -76,14 +74,12 @@ class AuthController extends Controller
         ]);
 
         $freshUser = $user->fresh();
-        // Email verification is disabled; always treat as verified
+        $accountReadiness = $this->accountReadinessFlags($freshUser);
+
         return response()->json([
             'message' => 'Password changed successfully.',
             'user' => $freshUser,
-            'has_personal_email' => filled((string) $freshUser->personal_email),
-            'email_verified' => true,
-            'requires_personal_email' => false,
-            'requires_email_verification' => false,
+            ...$accountReadiness,
         ]);
     }
 
@@ -100,13 +96,12 @@ class AuthController extends Controller
             ], 403);
         }
 
-        // Email verification is disabled; always treat as verified
+        $freshUser = $user->fresh();
+        $accountReadiness = $this->accountReadinessFlags($freshUser);
+
         return response()->json([
-            'user' => $user,
-            'has_personal_email' => filled((string) $user->personal_email),
-            'email_verified' => true,
-            'requires_personal_email' => false,
-            'requires_email_verification' => false,
+            'user' => $freshUser,
+            ...$accountReadiness,
             'verification_expire_minutes' => (int) config('auth.verification.expire', 30),
         ]);
     }
@@ -142,20 +137,33 @@ class AuthController extends Controller
         if (filled($submittedEmail) && $submittedEmail !== $user->personal_email) {
             $user->forceFill([
                 'personal_email' => $submittedEmail,
-                'email_verified_at' => now(),
+                'email_verified_at' => null,
             ])->save();
 
             $user->refresh();
         }
 
-        // Email verification is disabled; always treat as verified
+        $freshUser = $user->fresh();
+
+        if (! filled((string) $freshUser->personal_email)) {
+            return response()->json([
+                'message' => 'A personal email is required before requesting verification.',
+                'user' => $freshUser,
+                ...$this->accountReadinessFlags($freshUser),
+                'verification_expire_minutes' => (int) config('auth.verification.expire', 30),
+            ], 422);
+        }
+
+        if (! $freshUser->hasVerifiedEmail()) {
+            $freshUser->sendEmailVerificationNotification();
+        }
+
         return response()->json([
-            'message' => 'Email verification is not required. You may proceed.',
-            'user' => $user->fresh(),
-            'has_personal_email' => filled((string) $user->personal_email),
-            'email_verified' => true,
-            'requires_personal_email' => false,
-            'requires_email_verification' => false,
+            'message' => $freshUser->hasVerifiedEmail()
+                ? 'Email is already verified. You may proceed.'
+                : 'A verification link has been sent to your personal email.',
+            'user' => $freshUser,
+            ...$this->accountReadinessFlags($freshUser),
             'verification_expire_minutes' => (int) config('auth.verification.expire', 30),
         ]);
     }
@@ -176,9 +184,23 @@ class AuthController extends Controller
     }
 
     /**
-     * Build account-readiness flags for student-first mobile auth flow.
+     * Build account-readiness flags used by mobile auth responses.
      *
      * @return array<string, bool>
      */
-    // Email verification is disabled; this method is no longer used.
+    private function accountReadinessFlags(User $user): array
+    {
+        $requiresVerification = $user->hasRole('student') || $user->hasRole('super_admin');
+        $hasPersonalEmail = filled((string) $user->personal_email);
+        $isEmailVerified = $requiresVerification
+            ? ($hasPersonalEmail && $user->hasVerifiedEmail())
+            : true;
+
+        return [
+            'has_personal_email' => $hasPersonalEmail,
+            'email_verified' => $isEmailVerified,
+            'requires_personal_email' => $requiresVerification && ! $hasPersonalEmail,
+            'requires_email_verification' => $requiresVerification && $hasPersonalEmail && ! $isEmailVerified,
+        ];
+    }
 }

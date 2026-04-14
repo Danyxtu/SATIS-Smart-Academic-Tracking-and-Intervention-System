@@ -15,19 +15,9 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            // Core production bootstrap seeders (keep enabled).
+            // Default bootstrap: roles + one superadmin account with temporary password.
             RoleUserSeeder::class,
             SuperAdminProductionSeeder::class,
-
-            // Keep archive seeding enabled for production readiness.
-            SchoolYearArchiveSeeder::class,
-
-            // Optional subject/department/teacher/student data seeders. Comment in/out as needed.
-            DepartmentSeeder::class,
-            SubjectTypeSeeder::class,
-            SubjectSeeder::class,
-            TeacherSuperAdminSeeder::class,
-            TestUserSeeder::class,
         ]);
     }
 }

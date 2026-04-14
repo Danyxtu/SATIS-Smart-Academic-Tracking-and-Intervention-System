@@ -15,14 +15,14 @@ class SuperAdminProductionSeeder extends Seeder
      */
     public function run(): void
     {
-        $username = 'superadmin.prod';
+        $username = 'superadmin';
         $temporaryPassword = $this->generateTemporaryPassword();
 
         $user = User::query()->updateOrCreate(
             ['username' => $username],
             [
-                'first_name' => 'Production',
-                'last_name' => 'Super Admin',
+                'first_name' => 'Super',
+                'last_name' => 'Admin',
                 'middle_name' => null,
                 'personal_email' => null,
                 'temporary_password' => $temporaryPassword,
@@ -36,21 +36,13 @@ class SuperAdminProductionSeeder extends Seeder
         );
 
         Role::firstOrCreate(
-            ['name' => 'teacher'],
-            ['label' => 'Teacher']
-        );
-
-        Role::firstOrCreate(
             ['name' => 'super_admin'],
             ['label' => 'Super Admin']
         );
 
-        $user->syncRolesByName(['teacher', 'super_admin']);
+        $user->syncRolesByName(['super_admin']);
 
-        $this->command?->warn('Store these credentials securely.');
         $this->outputCredentialsTable($username, $temporaryPassword);
-        $this->command?->info('Personal email is intentionally empty for this seeded account.');
-        $this->command?->info('This account is forced to set a new password on first login.');
     }
 
     private function generateTemporaryPassword(): string
@@ -61,7 +53,7 @@ class SuperAdminProductionSeeder extends Seeder
     private function outputCredentialsTable(string $username, string $temporaryPassword): void
     {
         $this->command?->table(
-            ['Username', 'Password'],
+            ['Username', 'Temporary Password'],
             [[
                 $username,
                 $temporaryPassword,
