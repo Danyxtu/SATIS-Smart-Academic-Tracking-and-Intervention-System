@@ -263,7 +263,7 @@ class UserController extends Controller
 
         // Require LRN for student role
         if ($request->role === 'student') {
-            $rules['lrn'] = 'required|string|max:20|unique:students,lrn';
+            $rules['lrn'] = 'required|string|size:12|unique:students,lrn';
         }
 
         // Only require password for non-student roles

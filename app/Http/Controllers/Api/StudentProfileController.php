@@ -53,7 +53,7 @@ class StudentProfileController extends Controller
                 Rule::unique(User::class, 'personal_email')->ignore($user->id),
             ],
             'student_name' => ['nullable', 'string', 'max:255'],
-            'lrn' => ['nullable', 'string', 'max:20'],
+            'lrn' => ['nullable', 'string', 'size:12'],
             'grade_level' => ['nullable', 'string', Rule::in(satis_grade_level_options())],
             'section' => ['nullable', 'string', 'max:50'],
             'strand' => ['nullable', 'string', 'max:100'],

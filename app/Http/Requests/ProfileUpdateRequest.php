@@ -37,7 +37,7 @@ class ProfileUpdateRequest extends FormRequest
             ],
             // Student-specific fields (optional)
             'student_name' => ['nullable', 'string', 'max:255'],
-            'lrn' => ['nullable', 'string', 'max:20'],
+            'lrn' => ['nullable', 'string', 'size:12'],
             'grade_level' => ['nullable', 'string', 'max:50'],
             'section' => ['nullable', 'string', 'max:50'],
             'strand' => ['nullable', 'string', 'max:100'],

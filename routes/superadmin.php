@@ -154,5 +154,8 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
         Route::put('/settings/enrollment', [SettingsController::class, 'updateEnrollment'])->name('settings.enrollment');
         Route::put('/settings/grading', [SettingsController::class, 'updateGrading'])->name('settings.grading');
         Route::put('/settings/school-info', [SettingsController::class, 'updateSchoolInfo'])->name('settings.school-info');
+        Route::post('/settings/school-personnel', [SettingsController::class, 'storeSchoolPersonnel'])->name('settings.school-personnel.store');
+        Route::put('/settings/school-personnel/{schoolPersonnel}', [SettingsController::class, 'updateSchoolPersonnel'])->name('settings.school-personnel.update');
+        Route::delete('/settings/school-personnel/{schoolPersonnel}', [SettingsController::class, 'destroySchoolPersonnel'])->name('settings.school-personnel.destroy');
         Route::post('/settings/rollover', [SettingsController::class, 'rollover'])->name('settings.rollover');
     });

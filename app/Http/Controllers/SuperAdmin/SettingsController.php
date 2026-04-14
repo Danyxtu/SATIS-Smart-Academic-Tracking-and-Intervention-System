@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Department;
 use App\Models\Enrollment;
 use App\Models\SchoolClass;
+use App\Models\SchoolPersonnel;
 use App\Models\Section;
 use App\Models\Student;
 use App\Models\SystemSetting;
@@ -15,6 +16,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -26,6 +28,29 @@ class SettingsController extends Controller
     public function index(): Response
     {
         $settings = SystemSetting::all()->mapWithKeys(fn($s) => [$s->key => $s->value]);
+
+        $schoolPersonnel = SchoolPersonnel::query()
+            ->orderByRaw("CASE position WHEN 'Principal' THEN 1 WHEN 'Guidance Counselor' THEN 2 ELSE 3 END")
+            ->orderBy('last_name')
+            ->get([
+                'id',
+                'position',
+                'first_name',
+                'middle_name',
+                'last_name',
+                'email',
+                'phone_number',
+            ])
+            ->map(fn(SchoolPersonnel $person) => [
+                'id' => (int) $person->id,
+                'position' => (string) $person->position,
+                'first_name' => (string) $person->first_name,
+                'middle_name' => $person->middle_name,
+                'last_name' => (string) $person->last_name,
+                'email' => $person->email,
+                'phone_number' => $person->phone_number,
+            ])
+            ->values();
 
         // Generate school year options (current year - 2 to current year + 2)
         $currentYear = (int) date('Y');
@@ -50,6 +75,7 @@ class SettingsController extends Controller
                 'school_name'           => $settings['school_name'] ?? '',
                 'school_address'        => $settings['school_address'] ?? '',
             ],
+            'schoolPersonnel' => $schoolPersonnel,
             'schoolYears' => $schoolYearOptions,
             'syStats'     => $syStats,
         ]);
@@ -177,6 +203,40 @@ class SettingsController extends Controller
         cache()->forget('system_setting_school_address');
 
         return back()->with('success', 'School information updated successfully.');
+    }
+
+    /**
+     * Store school personnel.
+     */
+    public function storeSchoolPersonnel(Request $request): RedirectResponse
+    {
+        $validated = $this->validateSchoolPersonnelPayload($request);
+
+        SchoolPersonnel::query()->create($validated);
+
+        return back()->with('success', 'School personnel added successfully.');
+    }
+
+    /**
+     * Update school personnel.
+     */
+    public function updateSchoolPersonnel(Request $request, SchoolPersonnel $schoolPersonnel): RedirectResponse
+    {
+        $validated = $this->validateSchoolPersonnelPayload($request, (int) $schoolPersonnel->id);
+
+        $schoolPersonnel->update($validated);
+
+        return back()->with('success', 'School personnel updated successfully.');
+    }
+
+    /**
+     * Delete school personnel.
+     */
+    public function destroySchoolPersonnel(SchoolPersonnel $schoolPersonnel): RedirectResponse
+    {
+        $schoolPersonnel->delete();
+
+        return back()->with('success', 'School personnel removed successfully.');
     }
 
     /**
@@ -442,6 +502,39 @@ class SettingsController extends Controller
             'departments_list' => $departments,
             'admins'           => User::whereHas('roles', fn($q) => $q->where('name', 'admin'))->count(),
         ];
+    }
+
+    private function validateSchoolPersonnelPayload(Request $request, ?int $ignoreId = null): array
+    {
+        $position = trim((string) $request->input('position', ''));
+        $firstName = trim((string) $request->input('first_name', ''));
+        $middleName = trim((string) $request->input('middle_name', ''));
+        $lastName = trim((string) $request->input('last_name', ''));
+        $email = trim((string) $request->input('email', ''));
+        $phoneNumber = trim((string) $request->input('phone_number', ''));
+
+        $request->merge([
+            'position' => $position,
+            'first_name' => $firstName,
+            'middle_name' => $middleName !== '' ? $middleName : null,
+            'last_name' => $lastName,
+            'email' => $email !== '' ? $email : null,
+            'phone_number' => $phoneNumber !== '' ? $phoneNumber : null,
+        ]);
+
+        $emailUniqueRule = Rule::unique('school_personnels', 'email');
+        if ($ignoreId !== null) {
+            $emailUniqueRule = $emailUniqueRule->ignore($ignoreId);
+        }
+
+        return $request->validate([
+            'position' => ['required', 'string', 'max:100'],
+            'first_name' => ['required', 'string', 'max:120'],
+            'middle_name' => ['nullable', 'string', 'max:120'],
+            'last_name' => ['required', 'string', 'max:120'],
+            'email' => ['nullable', 'email', 'max:255', $emailUniqueRule],
+            'phone_number' => ['nullable', 'string', 'max:30'],
+        ]);
     }
 
     /**

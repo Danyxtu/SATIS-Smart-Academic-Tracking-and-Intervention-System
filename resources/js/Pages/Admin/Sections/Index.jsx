@@ -39,6 +39,7 @@ const STEPS = [
 ];
 
 const GRADE_LEVEL_OPTIONS = ["11", "12"];
+const LRN_LENGTH = 12;
 
 function WizardStep({ step, currentStep }) {
     const isActive = currentStep === step.id;
@@ -382,6 +383,11 @@ export default function Index({
             return;
         }
 
+        if (lrn.length !== LRN_LENGTH) {
+            setWizardNotice(`LRN must be exactly ${LRN_LENGTH} characters.`);
+            return;
+        }
+
         if (newStudentsQueue.some((student) => student.lrn === lrn)) {
             setWizardNotice(`LRN ${lrn} is already in the new student queue.`);
             return;
@@ -438,6 +444,13 @@ export default function Index({
             if (!firstName || !lastName || !lrn) {
                 parseErrors.push(
                     `Line ${index + 1}: First name, last name, and lrn are required.`,
+                );
+                return;
+            }
+
+            if (lrn.length !== LRN_LENGTH) {
+                parseErrors.push(
+                    `Line ${index + 1}: lrn must be exactly ${LRN_LENGTH} characters.`,
                 );
                 return;
             }
@@ -1317,6 +1330,8 @@ export default function Index({
                                                             )
                                                         }
                                                         placeholder="LRN"
+                                                        minLength={LRN_LENGTH}
+                                                        maxLength={LRN_LENGTH}
                                                         className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:border-indigo-500 focus:ring-indigo-500"
                                                     />
                                                     <input

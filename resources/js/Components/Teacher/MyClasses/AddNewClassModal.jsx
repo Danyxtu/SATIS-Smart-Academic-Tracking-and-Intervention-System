@@ -2619,6 +2619,9 @@ const AddNewClassModal = ({
                                                                         )
                                                                     }
                                                                     placeholder="LRN (12 digits)"
+                                                                    minLength={
+                                                                        12
+                                                                    }
                                                                     className="rounded-lg border-gray-300 text-sm"
                                                                     maxLength={
                                                                         12

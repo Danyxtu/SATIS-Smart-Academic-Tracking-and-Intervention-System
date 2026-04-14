@@ -37,6 +37,7 @@ const STUDENT_GRADE_LEVEL_OPTIONS = ["11", "12"];
 const PASSWORD_MASK = "********";
 const STUDENT_USERNAME_FORMAT = /^[a-z]{2}\d{4}\d{5}$/;
 const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const LRN_LENGTH = 12;
 
 const STEPS = [
     {
@@ -360,6 +361,13 @@ const parseStudentCsv = (text = "") => {
             return {
                 rows: [],
                 error: `Row ${rowIndex + 1}: first_name, last_name, and lrn are required.`,
+            };
+        }
+
+        if (lrn.length !== LRN_LENGTH) {
+            return {
+                rows: [],
+                error: `Row ${rowIndex + 1}: lrn must be exactly ${LRN_LENGTH} characters.`,
             };
         }
 
@@ -1264,6 +1272,8 @@ export default function CreateUserModal({
 
         if (!lrn) {
             nextErrors.student_queue_lrn = "LRN is required.";
+        } else if (lrn.length !== LRN_LENGTH) {
+            nextErrors.student_queue_lrn = `LRN must be exactly ${LRN_LENGTH} characters.`;
         } else {
             const duplicateLrn = studentQueue.some(
                 (queueItem) => String(queueItem.lrn || "").trim() === lrn,
@@ -1429,6 +1439,16 @@ export default function CreateUserModal({
 
             if (
                 studentQueue.some(
+                    (queueItem) =>
+                        String(queueItem.lrn || "").trim().length !==
+                        LRN_LENGTH,
+                )
+            ) {
+                nextErrors.student_queue = `Every queued student LRN must be exactly ${LRN_LENGTH} characters.`;
+            }
+
+            if (
+                studentQueue.some(
                     (queueItem) => !isValidStudentUsername(queueItem.username),
                 )
             ) {
@@ -1473,6 +1493,8 @@ export default function CreateUserModal({
 
             if (!String(data.lrn || "").trim()) {
                 nextErrors.lrn = "LRN is required.";
+            } else if (String(data.lrn || "").trim().length !== LRN_LENGTH) {
+                nextErrors.lrn = `LRN must be exactly ${LRN_LENGTH} characters.`;
             }
 
             if (!String(data.username || "").trim()) {
@@ -2082,6 +2104,8 @@ export default function CreateUserModal({
                                                     )
                                                 }
                                                 placeholder="Learner Reference Number"
+                                                minLength={LRN_LENGTH}
+                                                maxLength={LRN_LENGTH}
                                                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-emerald-500 focus:bg-white focus:ring-emerald-500"
                                             />
                                         </Field>
@@ -2658,6 +2682,8 @@ export default function CreateUserModal({
                                                             )
                                                         }
                                                         placeholder="LRN"
+                                                        minLength={LRN_LENGTH}
+                                                        maxLength={LRN_LENGTH}
                                                         className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                                                     />
                                                 </div>

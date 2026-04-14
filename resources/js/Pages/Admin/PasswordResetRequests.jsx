@@ -807,6 +807,8 @@ export function PasswordResetRequestsPage({
                             }
                             className="w-full sm:flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                             placeholder="Search student LRN"
+                            minLength={12}
+                            maxLength={12}
                         />
                         <div className="flex gap-2">
                             <button

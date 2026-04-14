@@ -39,6 +39,7 @@ const WIZARD_STEPS = [
 ];
 
 const GRADE_LEVEL_OPTIONS = ["11", "12"];
+const LRN_LENGTH = 12;
 
 const normalizeSpecializationOption = (value = "") => String(value).trim();
 
@@ -306,6 +307,13 @@ const parseStudentsFromCsvText = (csvText, existingLrns = new Set()) => {
         if (!firstName || !lastName || !lrn) {
             parseErrors.push(
                 `Line ${lineNumber}: first_name, last_name, and lrn are required.`,
+            );
+            continue;
+        }
+
+        if (lrn.length !== LRN_LENGTH) {
+            parseErrors.push(
+                `Line ${lineNumber}: lrn must be exactly ${LRN_LENGTH} characters.`,
             );
             continue;
         }
@@ -885,6 +893,11 @@ export default function AddSectionWizardModal({
             return;
         }
 
+        if (lrn.length !== LRN_LENGTH) {
+            setWizardNotice(`LRN must be exactly ${LRN_LENGTH} characters.`);
+            return;
+        }
+
         if (newStudentsQueue.some((student) => student.lrn === lrn)) {
             setWizardNotice(`LRN ${lrn} already exists in the queue.`);
             return;
@@ -941,6 +954,13 @@ export default function AddSectionWizardModal({
             if (!firstName || !lastName || !lrn) {
                 parseErrors.push(
                     `Line ${index + 1}: first name, last name, and lrn are required.`,
+                );
+                return;
+            }
+
+            if (lrn.length !== LRN_LENGTH) {
+                parseErrors.push(
+                    `Line ${index + 1}: lrn must be exactly ${LRN_LENGTH} characters.`,
                 );
                 return;
             }
@@ -1633,6 +1653,8 @@ export default function AddSectionWizardModal({
                                                     )
                                                 }
                                                 placeholder="LRN"
+                                                minLength={LRN_LENGTH}
+                                                maxLength={LRN_LENGTH}
                                                 className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                                             />
                                             <input

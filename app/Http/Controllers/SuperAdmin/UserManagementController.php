@@ -254,7 +254,7 @@ class UserManagementController extends Controller
                 'student_queue.*.first_name' => ['required', 'string', 'max:100'],
                 'student_queue.*.last_name' => ['required', 'string', 'max:100'],
                 'student_queue.*.middle_name' => ['nullable', 'string', 'max:100'],
-                'student_queue.*.lrn' => ['required', 'string', 'max:20', 'distinct', 'unique:students,lrn'],
+                'student_queue.*.lrn' => ['required', 'string', 'size:12', 'distinct', 'unique:students,lrn'],
                 'student_queue.*.email' => ['nullable', 'email', 'max:255', 'distinct', 'unique:users,personal_email'],
                 'student_queue.*.username' => ['required', 'string', 'regex:/^[a-z]{2}\d{4}\d{5}$/', 'distinct', 'unique:users,username'],
             ]);
@@ -335,7 +335,7 @@ class UserManagementController extends Controller
             'first_name'    => ['required', 'string', 'max:100'],
             'last_name'     => ['required', 'string', 'max:100'],
             'middle_name'   => ['nullable', 'string', 'max:100'],
-            'lrn'           => ['nullable', 'string', 'max:20', 'unique:students,lrn'],
+            'lrn'           => ['nullable', 'string', 'size:12', 'unique:students,lrn'],
             'email'         => ['nullable', 'email', 'unique:users,personal_email'],
             'username'      => ['nullable', 'string', 'regex:/^[a-z]{2}\d{4}\d{5}$/', 'unique:users,username'],
             'password'      => ['required', Password::min(8)],
@@ -773,7 +773,7 @@ class UserManagementController extends Controller
     public function resetStudentPasswordByLrn(Request $request)
     {
         $validated = $request->validate([
-            'lrn' => ['required', 'string', 'max:20'],
+            'lrn' => ['required', 'string', 'size:12'],
         ]);
 
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();

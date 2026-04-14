@@ -169,7 +169,7 @@ class SectionController extends Controller
             'new_students.*.first_name' => ['required', 'string', 'max:255'],
             'new_students.*.last_name' => ['required', 'string', 'max:255'],
             'new_students.*.middle_name' => ['nullable', 'string', 'max:255'],
-            'new_students.*.lrn' => ['required', 'string', 'max:20', 'distinct', Rule::unique('students', 'lrn')],
+            'new_students.*.lrn' => ['required', 'string', 'size:12', 'distinct', Rule::unique('students', 'lrn')],
             'new_students.*.personal_email' => ['nullable', 'email', 'max:255', Rule::unique('users', 'personal_email')],
         ]);
 
