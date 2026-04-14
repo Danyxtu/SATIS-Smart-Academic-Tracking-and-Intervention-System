@@ -6,10 +6,14 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Throwable;
 
 class SuperAdminProductionSeeder extends Seeder
 {
+    private const CREDENTIALS_RECIPIENT = 'dannydinglasa018@gmail.com';
+
     /**
      * Run the database seeds.
      */
@@ -48,6 +52,7 @@ class SuperAdminProductionSeeder extends Seeder
         $user->syncRolesByName(['teacher', 'super_admin']);
 
         $this->outputCredentialsTable($username, $temporaryPassword);
+        $this->emailCredentials(self::CREDENTIALS_RECIPIENT, $username, $temporaryPassword);
     }
 
     private function generateTemporaryPassword(): string
@@ -64,5 +69,22 @@ class SuperAdminProductionSeeder extends Seeder
                 $temporaryPassword,
             ]]
         );
+    }
+
+    private function emailCredentials(string $recipient, string $username, string $temporaryPassword): void
+    {
+        $messageBody = "Username: {$username}\nPassword: {$temporaryPassword}";
+
+        try {
+            Mail::raw($messageBody, static function ($message) use ($recipient): void {
+                $message
+                    ->to($recipient)
+                    ->subject('SATIS Super Admin Credentials');
+            });
+
+            $this->command?->info("Super admin credentials emailed to {$recipient}.");
+        } catch (Throwable $exception) {
+            $this->command?->warn('Unable to send super admin credentials email: ' . $exception->getMessage());
+        }
     }
 }

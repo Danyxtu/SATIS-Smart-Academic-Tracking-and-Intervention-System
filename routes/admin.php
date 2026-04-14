@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Admin\UserController as AdminUserController;
-use App\Http\Controllers\Admin\TeacherRegistrationController as AdminTeacherRegistrationController;
 use App\Http\Controllers\Admin\SectionController as AdminSectionController;
 use App\Http\Controllers\Admin\ClassController as AdminClassController;
 use Illuminate\Support\Facades\Route;
@@ -68,14 +67,4 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('password-reset-requests.approve');
         Route::post('/password-reset-requests/{passwordResetRequest}/reject', [AdminUserController::class, 'rejectPasswordResetRequest'])
             ->name('password-reset-requests.reject');
-
-        // Teacher Registration Management
-        Route::get('/teacher-registrations', [AdminTeacherRegistrationController::class, 'index'])
-            ->name('teacher-registrations.index');
-        Route::post('/teacher-registrations/{registration}/approve', [AdminTeacherRegistrationController::class, 'approve'])
-            ->name('teacher-registrations.approve');
-        Route::post('/teacher-registrations/{registration}/reject', [AdminTeacherRegistrationController::class, 'reject'])
-            ->name('teacher-registrations.reject');
-        Route::get('/teacher-registrations/{registration}/document', [AdminTeacherRegistrationController::class, 'downloadDocument'])
-            ->name('teacher-registrations.document');
     });

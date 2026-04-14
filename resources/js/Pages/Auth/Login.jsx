@@ -7,7 +7,7 @@ import PrimaryButton from "@/Components/PrimaryButton";
 import TextInput from "@/Components/TextInput";
 import GuestLayout from "@/Layouts/GuestLayout";
 import { Head, Link, useForm } from "@inertiajs/react";
-import { Eye, EyeClosed, LogIn, Sparkles, UserPlus } from "lucide-react";
+import { Eye, EyeClosed, LogIn, Sparkles } from "lucide-react";
 import { useState } from "react";
 
 export default function Login({ status, canResetPassword }) {
@@ -164,20 +164,6 @@ export default function Login({ status, canResetPassword }) {
                                 </Link>
                             </div>
                         )}
-
-                        {/* Teacher Registration Link */}
-                        <div className="mt-2.5 border-t border-gray-200 pt-2.5 text-center">
-                            <p className="mb-1 text-xs text-gray-500">
-                                Are you a teacher?
-                            </p>
-                            <Link
-                                href={route("teacher.registration.create")}
-                                className="inline-flex items-center gap-1.5 text-xs font-medium text-primary transition-colors duration-200 hover:text-pink-500"
-                            >
-                                <UserPlus className="h-3.5 w-3.5" />
-                                Register as a Teacher
-                            </Link>
-                        </div>
                     </div>
                 </form>
             </GuestLayout>
