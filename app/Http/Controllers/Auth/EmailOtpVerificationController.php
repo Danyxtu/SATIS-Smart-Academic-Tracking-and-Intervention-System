@@ -36,7 +36,7 @@ class EmailOtpVerificationController extends Controller
         );
 
         if ($record->wasRecentlyCreated || $now->greaterThanOrEqualTo($record->resend_available_at)) {
-            \Mail::to($request->email)->send(new \App\Mail\OtpMail($otp));
+            Mail::to($request->email)->send(new \App\Mail\OtpMail($otp));
         } else {
             $seconds = $record->resend_available_at->diffInSeconds($now);
             return response()->json(['message' => 'Please wait before resending.', 'resend_in' => $seconds], 429);

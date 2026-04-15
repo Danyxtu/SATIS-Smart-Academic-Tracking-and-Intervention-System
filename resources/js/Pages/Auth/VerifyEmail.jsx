@@ -13,51 +13,45 @@ export default function VerifyEmail({
     retryAfterSeconds = 0,
     cooldownSeconds = 180,
 }) {
-    const { data, setData, post, processing, errors } = useForm({
-        email: currentEmail || "",
-    });
-    const [retryAfter, setRetryAfter] = useState(
-        Math.max(0, Number(retryAfterSeconds) || 0),
-    );
+    // Remove useForm and duplicate retryAfter/setRetryAfter
+    const [email, setEmail] = useState(currentEmail || "");
+    const [otp, setOtp] = useState("");
+    const [retryAfter, setRetryAfter] = useState(Math.max(0, Number(retryAfterSeconds) || 0));
+    const [cooldown, setCooldown] = useState(Number(cooldownSeconds) || 180);
+    const [sending, setSending] = useState(false);
+    const [verifying, setVerifying] = useState(false);
+    const [message, setMessage] = useState("");
+    const [error, setError] = useState("");
 
-        const [email, setEmail] = useState(currentEmail || "");
-        const [otp, setOtp] = useState("");
-        const [retryAfter, setRetryAfter] = useState(Math.max(0, Number(retryAfterSeconds) || 0));
-        const [cooldown, setCooldown] = useState(Number(cooldownSeconds) || 180);
-        const [sending, setSending] = useState(false);
-        const [verifying, setVerifying] = useState(false);
-        const [message, setMessage] = useState("");
-        const [error, setError] = useState("");
+    const cooldownMinutes = Math.max(1, Math.ceil((Number(cooldown) || 180) / 60));
+    const isCooldownActive = retryAfter > 0;
 
-        const cooldownMinutes = Math.max(1, Math.ceil((Number(cooldown) || 180) / 60));
-        const isCooldownActive = retryAfter > 0;
+    const formatRetryAfter = (seconds) => {
+        const totalSeconds = Math.max(0, Number(seconds) || 0);
+        const minutes = Math.floor(totalSeconds / 60);
+        const remainderSeconds = String(totalSeconds % 60).padStart(2, "0");
+        return `${minutes}:${remainderSeconds}`;
+    };
 
-        const formatRetryAfter = (seconds) => {
-            const totalSeconds = Math.max(0, Number(seconds) || 0);
-            const minutes = Math.floor(totalSeconds / 60);
-            const remainderSeconds = String(totalSeconds % 60).padStart(2, "0");
-            return `${minutes}:${remainderSeconds}`;
-        };
+    useEffect(() => {
+        setEmail(currentEmail || "");
+    }, [currentEmail]);
 
-        useEffect(() => {
-            setEmail(currentEmail || "");
-        }, [currentEmail]);
+    useEffect(() => {
+        setRetryAfter(Math.max(0, Number(retryAfterSeconds) || 0));
+        setCooldown(Number(cooldownSeconds) || 180);
+    }, [retryAfterSeconds, cooldownSeconds]);
 
-        useEffect(() => {
-            setRetryAfter(Math.max(0, Number(retryAfterSeconds) || 0));
-            setCooldown(Number(cooldownSeconds) || 180);
-        }, [retryAfterSeconds, cooldownSeconds]);
+    useEffect(() => {
+        if (retryAfter <= 0) return;
+        const countdownId = window.setInterval(() => {
+            setRetryAfter((previousValue) => (previousValue <= 1 ? 0 : previousValue - 1));
+        }, 1000);
+        return () => window.clearInterval(countdownId);
+    }, [retryAfter]);
 
-        useEffect(() => {
-            if (retryAfter <= 0) return;
-            const countdownId = window.setInterval(() => {
-                setRetryAfter((previousValue) => (previousValue <= 1 ? 0 : previousValue - 1));
-            }, 1000);
-            return () => window.clearInterval(countdownId);
-        }, [retryAfter]);
-
-        const handleSendOtp = async (e) => {
-            e.preventDefault();
+    const handleSendOtp = async (e) => {
+        e.preventDefault();
             setError("");
             setMessage("");
             if (isCooldownActive) {
@@ -119,15 +113,8 @@ export default function VerifyEmail({
                 setError("Failed to verify OTP.");
             }
         };
-    }, [retryAfter]);
+    // End of useEffect for retryAfter
 
-    const submit = (e) => {
-        e.preventDefault();
-
-        post(route("verification.send"), {
-            preserveScroll: true,
-        });
-    };
 
     const showEmailRequiredHint = status === "verification-email-required";
 
