@@ -1,8 +1,10 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
 
 test('email verification screen can be rendered', function () {
@@ -77,4 +79,33 @@ test('verification link clicked while logged out is resumed after login', functi
 
     Event::assertDispatched(Verified::class);
     expect($user->fresh()->email_verified_at)->not->toBeNull();
+});
+
+test('verification resend is throttled for three minutes', function () {
+    Notification::fake();
+
+    $user = $this->createUserWithRole('student', [
+        'personal_email' => 'student.cooldown.web@example.test',
+        'email_verified_at' => null,
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('verification.send', absolute: false), [
+            'email' => $user->personal_email,
+        ])
+        ->assertRedirect();
+
+    Notification::assertSentTo($user, VerifyEmail::class);
+
+    $cooldownResponse = $this->actingAs($user)
+        ->post(route('verification.send', absolute: false), [
+            'email' => $user->personal_email,
+        ]);
+
+    $cooldownResponse
+        ->assertRedirect()
+        ->assertSessionHasErrors(['email'])
+        ->assertSessionHas('status', 'verification-resend-cooldown')
+        ->assertSessionHas('retryAfterSeconds', fn($value) => is_int($value) && $value > 0 && $value <= 180)
+        ->assertSessionHas('cooldownSeconds', 180);
 });

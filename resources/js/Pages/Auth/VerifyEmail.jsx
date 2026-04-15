@@ -2,7 +2,7 @@ import PrimaryButton from "@/Components/PrimaryButton";
 import ApplicationLogo from "@/Components/ApplicationLogo";
 import GuestLayout from "@/Layouts/GuestLayout";
 import { Head, Link, useForm } from "@inertiajs/react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Mail, CheckCircle, Send } from "lucide-react";
 
 export default function VerifyEmail({
@@ -10,14 +10,51 @@ export default function VerifyEmail({
     currentEmail = "",
     requiresEmailInput = false,
     expiresInMinutes = 30,
+    retryAfterSeconds = 0,
+    cooldownSeconds = 180,
 }) {
     const { data, setData, post, processing, errors } = useForm({
         email: currentEmail || "",
     });
+    const [retryAfter, setRetryAfter] = useState(
+        Math.max(0, Number(retryAfterSeconds) || 0),
+    );
+
+    const cooldownMinutes = Math.max(
+        1,
+        Math.ceil((Number(cooldownSeconds) || 180) / 60),
+    );
+    const isCooldownActive = retryAfter > 0;
+
+    const formatRetryAfter = (seconds) => {
+        const totalSeconds = Math.max(0, Number(seconds) || 0);
+        const minutes = Math.floor(totalSeconds / 60);
+        const remainderSeconds = String(totalSeconds % 60).padStart(2, "0");
+
+        return `${minutes}:${remainderSeconds}`;
+    };
 
     useEffect(() => {
         setData("email", currentEmail || "");
     }, [currentEmail, setData]);
+
+    useEffect(() => {
+        setRetryAfter(Math.max(0, Number(retryAfterSeconds) || 0));
+    }, [retryAfterSeconds]);
+
+    useEffect(() => {
+        if (retryAfter <= 0) {
+            return undefined;
+        }
+
+        const countdownId = window.setInterval(() => {
+            setRetryAfter((previousValue) =>
+                previousValue <= 1 ? 0 : previousValue - 1,
+            );
+        }, 1000);
+
+        return () => window.clearInterval(countdownId);
+    }, [retryAfter]);
 
     const submit = (e) => {
         e.preventDefault();
@@ -53,9 +90,12 @@ export default function VerifyEmail({
                 <Mail className="w-8 h-8 text-blue-500 mx-auto mb-3" />
                 {requiresEmailInput
                     ? "Please enter your personal email first. We will send a verification link to activate your account access."
-                    : "Before getting started, verify your personal email by clicking the link we send. You can resend a new link anytime."}
+                    : "Before getting started, verify your personal email by clicking the link we send."}
                 <p className="mt-2 text-xs text-blue-700">
-                    Verification links expire in {expiresInMinutes} minutes.
+                    Verification links expire in {expiresInMinutes} minutes. You
+                    can request another verification email every{" "}
+                    {cooldownMinutes}
+                    {cooldownMinutes === 1 ? " minute" : " minutes"}.
                 </p>
             </div>
 
@@ -70,6 +110,13 @@ export default function VerifyEmail({
                 <div className="mb-4 text-sm font-medium text-green-600 text-center bg-green-50 p-3 rounded-xl border border-green-200 flex items-center justify-center gap-2">
                     <CheckCircle className="w-4 h-4" />A new verification link
                     has been sent to your personal email.
+                </div>
+            )}
+
+            {isCooldownActive && (
+                <div className="mb-4 text-sm font-medium text-amber-700 text-center bg-amber-50 p-3 rounded-xl border border-amber-200">
+                    You can resend another verification email in{" "}
+                    {formatRetryAfter(retryAfter)}.
                 </div>
             )}
 
@@ -99,13 +146,15 @@ export default function VerifyEmail({
 
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                     <PrimaryButton
-                        disabled={processing}
+                        disabled={processing || isCooldownActive}
                         className="w-full sm:w-auto justify-center bg-gradient-to-r from-primary to-pink-400 hover:from-primary/90 hover:to-pink-500 rounded-xl shadow-lg shadow-primary/25 transition-all duration-200"
                     >
                         <Send className="w-4 h-4 mr-2" />
-                        {requiresEmailInput
-                            ? "Send Verification Email"
-                            : "Resend Verification Email"}
+                        {isCooldownActive
+                            ? `Resend In ${formatRetryAfter(retryAfter)}`
+                            : requiresEmailInput
+                              ? "Send Verification Email"
+                              : "Resend Verification Email"}
                     </PrimaryButton>
 
                     <Link

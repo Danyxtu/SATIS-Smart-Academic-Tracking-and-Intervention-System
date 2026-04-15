@@ -111,6 +111,7 @@ return [
     'verification' => [
         'expire' => env('AUTH_VERIFICATION_EXPIRE', 30),
         'throttle' => env('AUTH_VERIFICATION_THROTTLE', 60),
+        'resend_cooldown_seconds' => env('AUTH_VERIFICATION_RESEND_COOLDOWN_SECONDS', 180),
     ],
 
     /*

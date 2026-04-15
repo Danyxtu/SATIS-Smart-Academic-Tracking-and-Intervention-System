@@ -28,8 +28,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Student verification setup endpoints (accessible before email verification)
     Route::middleware('student')->group(function () {
         Route::get('student/email-verification/status', [AuthController::class, 'studentEmailVerificationStatus']);
-        Route::post('student/email-verification/send', [AuthController::class, 'sendStudentEmailVerification'])
-            ->middleware('throttle:6,1');
+        Route::post('student/email-verification/send', [AuthController::class, 'sendStudentEmailVerification']);
 
         // Profile endpoints
         Route::get('student/profile', [\App\Http\Controllers\Api\StudentProfileController::class, 'index']);

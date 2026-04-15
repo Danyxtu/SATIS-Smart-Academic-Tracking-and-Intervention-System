@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Support\EmailVerificationResendLimiter;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -100,11 +101,16 @@ class AuthController extends Controller
 
         $freshUser = $user->fresh();
         $accountReadiness = $this->accountReadinessFlags($freshUser);
+        $retryAfterSeconds = $freshUser->hasVerifiedEmail()
+            ? 0
+            : EmailVerificationResendLimiter::retryAfter($freshUser);
 
         return response()->json([
             'user' => $freshUser,
             ...$accountReadiness,
             'verification_expire_minutes' => (int) config('auth.verification.expire', 30),
+            'resend_cooldown_seconds' => EmailVerificationResendLimiter::cooldownSeconds(),
+            'retry_after_seconds' => $retryAfterSeconds,
         ]);
     }
 
@@ -135,6 +141,7 @@ class AuthController extends Controller
         $submittedEmail = isset($validated['email'])
             ? Str::lower(trim((string) $validated['email']))
             : null;
+        $emailChanged = false;
 
         if (filled($submittedEmail) && $submittedEmail !== $user->personal_email) {
             $user->forceFill([
@@ -143,9 +150,16 @@ class AuthController extends Controller
             ])->save();
 
             $user->refresh();
+            $emailChanged = true;
         }
 
         $freshUser = $user->fresh();
+        $cooldownSeconds = EmailVerificationResendLimiter::cooldownSeconds();
+
+        if ($emailChanged) {
+            // New address is treated as a fresh verification request.
+            EmailVerificationResendLimiter::clear($freshUser);
+        }
 
         if (! filled((string) $freshUser->personal_email)) {
             return response()->json([
@@ -153,10 +167,28 @@ class AuthController extends Controller
                 'user' => $freshUser,
                 ...$this->accountReadinessFlags($freshUser),
                 'verification_expire_minutes' => (int) config('auth.verification.expire', 30),
+                'resend_cooldown_seconds' => $cooldownSeconds,
+                'retry_after_seconds' => 0,
             ], 422);
         }
 
         if (! $freshUser->hasVerifiedEmail()) {
+            $retryAfterSeconds = EmailVerificationResendLimiter::retryAfter($freshUser);
+
+            if ($retryAfterSeconds > 0) {
+                return response()->json([
+                    'message' => sprintf(
+                        'Please wait %s before resending another verification email.',
+                        EmailVerificationResendLimiter::formatRetryAfter($retryAfterSeconds)
+                    ),
+                    'user' => $freshUser,
+                    ...$this->accountReadinessFlags($freshUser),
+                    'verification_expire_minutes' => (int) config('auth.verification.expire', 30),
+                    'resend_cooldown_seconds' => $cooldownSeconds,
+                    'retry_after_seconds' => $retryAfterSeconds,
+                ], 429);
+            }
+
             try {
                 $freshUser->sendEmailVerificationNotification();
             } catch (Throwable $exception) {
@@ -172,17 +204,30 @@ class AuthController extends Controller
                     'user' => $freshUser,
                     ...$this->accountReadinessFlags($freshUser),
                     'verification_expire_minutes' => (int) config('auth.verification.expire', 30),
+                    'resend_cooldown_seconds' => $cooldownSeconds,
+                    'retry_after_seconds' => 0,
                 ], 503);
             }
+
+            $retryAfterSeconds = EmailVerificationResendLimiter::start($freshUser);
+
+            return response()->json([
+                'message' => 'A verification link has been sent to your personal email.',
+                'user' => $freshUser,
+                ...$this->accountReadinessFlags($freshUser),
+                'verification_expire_minutes' => (int) config('auth.verification.expire', 30),
+                'resend_cooldown_seconds' => $cooldownSeconds,
+                'retry_after_seconds' => $retryAfterSeconds,
+            ]);
         }
 
         return response()->json([
-            'message' => $freshUser->hasVerifiedEmail()
-                ? 'Email is already verified. You may proceed.'
-                : 'A verification link has been sent to your personal email.',
+            'message' => 'Email is already verified. You may proceed.',
             'user' => $freshUser,
             ...$this->accountReadinessFlags($freshUser),
             'verification_expire_minutes' => (int) config('auth.verification.expire', 30),
+            'resend_cooldown_seconds' => $cooldownSeconds,
+            'retry_after_seconds' => 0,
         ]);
     }
 
@@ -220,7 +265,7 @@ class AuthController extends Controller
             'has_personal_email' => $hasPersonalEmail,
             'email_verified' => $isEmailVerified,
             'requires_personal_email' => $requiresVerification && ! $hasPersonalEmail,
-            'requires_email_verification' => $requiresVerification && $hasPersonalEmail && ! $isEmailVerified,
+            'requires_email_verification' => $requiresVerification && ! $isEmailVerified,
         ];
     }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\EmailVerificationResendLimiter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -35,6 +36,7 @@ class EmailVerificationNotificationController extends Controller
         $submittedEmail = isset($validated['email'])
             ? Str::lower(trim((string) $validated['email']))
             : null;
+        $emailChanged = false;
 
         if (filled($submittedEmail) && $submittedEmail !== $user->personal_email) {
             $user->forceFill([
@@ -43,6 +45,14 @@ class EmailVerificationNotificationController extends Controller
             ])->save();
 
             $user->refresh();
+            $emailChanged = true;
+        }
+
+        $cooldownSeconds = EmailVerificationResendLimiter::cooldownSeconds();
+
+        if ($emailChanged) {
+            // New address should not inherit the previous resend cooldown.
+            EmailVerificationResendLimiter::clear($user);
         }
 
         if (! filled((string) $user->personal_email)) {
@@ -50,6 +60,8 @@ class EmailVerificationNotificationController extends Controller
                 ->withErrors([
                     'email' => 'Please enter a personal email before requesting verification.',
                 ])
+                ->with('retryAfterSeconds', 0)
+                ->with('cooldownSeconds', $cooldownSeconds)
                 ->withInput();
         }
 
@@ -59,6 +71,22 @@ class EmailVerificationNotificationController extends Controller
                 : '/';
 
             return redirect()->intended($redirectPath);
+        }
+
+        $retryAfterSeconds = EmailVerificationResendLimiter::retryAfter($user);
+
+        if ($retryAfterSeconds > 0) {
+            return back()
+                ->withErrors([
+                    'email' => sprintf(
+                        'Please wait %s before resending another verification email.',
+                        EmailVerificationResendLimiter::formatRetryAfter($retryAfterSeconds)
+                    ),
+                ])
+                ->with('status', 'verification-resend-cooldown')
+                ->with('retryAfterSeconds', $retryAfterSeconds)
+                ->with('cooldownSeconds', $cooldownSeconds)
+                ->withInput();
         }
 
         try {
@@ -75,9 +103,14 @@ class EmailVerificationNotificationController extends Controller
                 ->withErrors([
                     'email' => 'We could not send the verification email right now. Please try again in a moment.',
                 ])
+                ->with('retryAfterSeconds', 0)
+                ->with('cooldownSeconds', $cooldownSeconds)
                 ->withInput();
         }
 
-        return back()->with('status', 'verification-link-sent');
+        return back()
+            ->with('status', 'verification-link-sent')
+            ->with('retryAfterSeconds', EmailVerificationResendLimiter::start($user))
+            ->with('cooldownSeconds', $cooldownSeconds);
     }
 }
