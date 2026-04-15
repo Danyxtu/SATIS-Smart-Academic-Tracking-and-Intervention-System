@@ -120,6 +120,8 @@ Route::middleware(['auth', 'verified', 'can:access-super-admin-portal', 'superad
         // User Management
         Route::resource('users', UserManagementController::class)
             ->only(['index', 'store', 'update', 'destroy']);
+        Route::post('/users/{user}/reset-password', [UserManagementController::class, 'resetPassword'])
+            ->name('users.reset-password');
 
         // Password Reset Requests Management (Teacher + Student)
         Route::get('/password-reset-requests', [UserManagementController::class, 'passwordResetRequests'])

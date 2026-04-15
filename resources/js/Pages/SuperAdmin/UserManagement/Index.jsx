@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm } from "@inertiajs/react";
+import { Head, Link, router } from "@inertiajs/react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import {
     Users,
@@ -13,18 +13,8 @@ import {
     GraduationCap,
     BookOpen,
     Crown,
-    Lock,
-    Eye,
-    EyeOff,
-    Copy,
-    RefreshCw,
-    Info,
-    CheckCircle,
-    Save,
-    UserPlus,
 } from "lucide-react";
 import { useState } from "react";
-import EditUserModal from "@/Components/Superadmin/EditUserModal";
 import CreateUserModal from "@/Components/Superadmin/CreateUserModal";
 import UserDetailModal from "@/Components/Superadmin/UserDetailModal";
 
@@ -108,8 +98,11 @@ export default function Index({
     const [search, setSearch] = useState(filters?.search || "");
     const [roleFilter, setRoleFilter] = useState(filters?.role || "");
     const [createModal, setCreateModal] = useState(false);
-    const [viewModal, setViewModal] = useState({ open: false, user: null });
-    const [editModal, setEditModal] = useState({ open: false, user: null });
+    const [viewModal, setViewModal] = useState({
+        open: false,
+        user: null,
+        mode: "view",
+    });
     const [deleteModal, setDeleteModal] = useState({
         open: false,
         user: null,
@@ -387,6 +380,7 @@ export default function Index({
                                                 setViewModal({
                                                     open: true,
                                                     user,
+                                                    mode: "view",
                                                 })
                                             }
                                             className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-50/60 transition-colors group cursor-pointer"
@@ -468,9 +462,10 @@ export default function Index({
                                             >
                                                 <button
                                                     onClick={() =>
-                                                        setEditModal({
+                                                        setViewModal({
                                                             open: true,
                                                             user,
+                                                            mode: "edit",
                                                         })
                                                     }
                                                     className="rounded-lg p-1.5 text-slate-400 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
@@ -562,11 +557,15 @@ export default function Index({
 
             <UserDetailModal
                 show={viewModal.open}
-                onClose={() => setViewModal({ open: false, user: null })}
+                onClose={() =>
+                    setViewModal({ open: false, user: null, mode: "view" })
+                }
                 payload={viewModal.user ? { user: viewModal.user } : null}
                 loading={false}
                 error=""
                 row={viewModal.user}
+                mode={viewModal.mode || "view"}
+                departments={departments}
             />
 
             {/* ── Create Modal ─────────────────────────────────────────── */}
@@ -576,14 +575,6 @@ export default function Index({
                 departments={departments}
                 sections={sections}
                 studentCount={Number(studentCreationBaseCount || 0)}
-            />
-
-            {/* ── Edit Modal ───────────────────────────────────────────── */}
-            <EditUserModal
-                open={editModal.open}
-                onClose={() => setEditModal({ open: false, user: null })}
-                user={editModal.user}
-                departments={departments}
             />
 
             {/* ── Delete Modal ─────────────────────────────────────────── */}

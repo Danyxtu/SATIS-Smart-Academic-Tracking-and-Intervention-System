@@ -10,18 +10,27 @@ import {
     CheckCircle,
     ClipboardList,
     Copy,
+    Eye,
+    EyeOff,
     Layers,
+    Lock,
     Pencil,
+    QrCode,
+    RefreshCw,
     Save,
     Search,
+    Send,
     Shield,
     Trash2,
+    ToggleLeft,
+    ToggleRight,
     User,
     UserMinus,
     UserPlus,
     Users,
     X,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import Modal from "@/Components/Modal";
 import DepartmentDeleteConfirmModal from "@/Components/Superadmin/DepartmentDeleteConfirmModal";
 import SubjectDeleteConfirmModal from "@/Components/Superadmin/SubjectDeleteConfirmModal";
@@ -464,6 +473,7 @@ export default function ManagementDetailModal({
     onSubjectDeleted,
     sectionManageMode = "view",
     onSectionSaved,
+    userManageMode = "view",
     trackOptions = [],
     subjectTypeOptions = [],
     subjectSemesterOptions = [],
@@ -547,6 +557,15 @@ export default function ManagementDetailModal({
     const [userQuarterFilter, setUserQuarterFilter] = useState("midterm");
     const [selectedUserClassDetail, setSelectedUserClassDetail] =
         useState(null);
+    const [userEditMode, setUserEditMode] = useState(false);
+    const [showUserPassword, setShowUserPassword] = useState(false);
+    const [userPasswordCopied, setUserPasswordCopied] = useState(false);
+    const [userResetDelivery, setUserResetDelivery] = useState("email");
+    const [userResetProcessing, setUserResetProcessing] = useState(false);
+    const [userResetNotice, setUserResetNotice] = useState("");
+    const [userResetErrors, setUserResetErrors] = useState({});
+    const [userResetCredentials, setUserResetCredentials] = useState(null);
+    const [userResetCopied, setUserResetCopied] = useState(false);
 
     const isDepartmentTab = activeTab === "departments";
     const isSectionTab = activeTab === "sections";
@@ -670,6 +689,63 @@ export default function ManagementDetailModal({
         semester: "",
         grade_level: "",
     });
+
+    const {
+        data: userData,
+        setData: setUserData,
+        put: putUser,
+        processing: userSaving,
+        errors: userErrors,
+        clearErrors: clearUserErrors,
+    } = useForm({
+        first_name: "",
+        last_name: "",
+        middle_name: "",
+        email: "",
+        password: "",
+        role: "student",
+        department_id: "",
+        status: "active",
+    });
+
+    const currentUserForManage = useMemo(() => {
+        if (activeTab !== "users") {
+            return null;
+        }
+
+        return payload?.user || row || null;
+    }, [activeTab, payload, row]);
+
+    const currentUserIdForManage = currentUserForManage?.id;
+    const userRoleForForm = String(userData.role || "").trim();
+    const userIsTeacher = userRoleForForm === "teacher";
+    const userIsStudent = userRoleForForm === "student";
+    const userIsTeacherOrStudent = userIsTeacher || userIsStudent;
+    const userEmailValue = String(userData.email || "").trim();
+    const userCanSendEmail = userEmailValue.length > 0;
+    const disableUserResetAction =
+        !currentUserIdForManage ||
+        userResetProcessing ||
+        (!userIsStudent && !userCanSendEmail) ||
+        (userIsStudent && userResetDelivery === "email" && !userCanSendEmail);
+
+    const userResetQrPayload = useMemo(() => {
+        const username = String(
+            userResetCredentials?.username || currentUserForManage?.username || "",
+        ).trim();
+        const password = String(userResetCredentials?.password || "").trim();
+
+        if (!username || !password) {
+            return "";
+        }
+
+        return JSON.stringify({
+            type: "satis_student_credentials",
+            version: 1,
+            username,
+            password,
+        });
+    }, [userResetCredentials, currentUserForManage]);
 
     const sourceDepartment = useMemo(() => {
         if (!isDepartmentTab) {
@@ -1788,15 +1864,15 @@ export default function ManagementDetailModal({
             setUserSemesterFilter("all");
             setUserQuarterFilter("midterm");
 
-            if (userHasTeacherRole) {
-                setPanel("advisory");
-                return;
-            }
-
-            if (userHasStudentRole) {
+            if (userManageMode === "edit") {
+                setUserEditMode(true);
                 setPanel("info");
                 return;
             }
+
+            setUserEditMode(false);
+            setPanel("info");
+            return;
         }
 
         setPanel("info");
@@ -1805,9 +1881,184 @@ export default function ManagementDetailModal({
         show,
         payload,
         isDepartmentTab,
-        userHasTeacherRole,
-        userHasStudentRole,
+        userManageMode,
     ]);
+
+    useEffect(() => {
+        if (!show || activeTab !== "users") {
+            return;
+        }
+
+        const currentUser = payload?.user || row || {};
+        const currentRoles = normalizeRoles(
+            currentUser.roles_list ||
+                currentUser.roles ||
+                (currentUser.role ? [currentUser.role] : []),
+        );
+        const resolvedRole = currentRoles.includes("teacher")
+            ? "teacher"
+            : currentRoles.includes("student")
+              ? "student"
+              : currentRoles[0] || currentUser.role || "student";
+
+        setUserData({
+            first_name: currentUser.first_name || "",
+            last_name: currentUser.last_name || "",
+            middle_name: currentUser.middle_name || "",
+            email: currentUser.email || currentUser.personal_email || "",
+            password: "",
+            role: resolvedRole,
+            department_id: currentUser.department_id
+                ? String(currentUser.department_id)
+                : "",
+            status: currentUser.status || "active",
+        });
+
+        clearUserErrors();
+        setShowUserPassword(false);
+        setUserPasswordCopied(false);
+        setUserResetDelivery("email");
+        setUserResetProcessing(false);
+        setUserResetNotice("");
+        setUserResetErrors({});
+        setUserResetCredentials(null);
+        setUserResetCopied(false);
+    }, [show, activeTab, payload, row, setUserData, clearUserErrors]);
+
+    const generateUserPassword = () => {
+        const chars =
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
+        let generated = "";
+
+        for (let index = 0; index < 12; index += 1) {
+            generated += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+
+        setUserData("password", generated);
+    };
+
+    const copyUserPassword = async () => {
+        if (!userData.password) {
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(userData.password);
+            setUserPasswordCopied(true);
+            window.setTimeout(() => setUserPasswordCopied(false), 1800);
+        } catch {
+            setUserPasswordCopied(false);
+        }
+    };
+
+    const copyUserResetCredentials = async () => {
+        if (!userResetCredentials) {
+            return;
+        }
+
+        const resetCredentialsText = [
+            `Name: ${userResetCredentials.full_name || "-"}`,
+            `LRN: ${userResetCredentials.lrn || "-"}`,
+            `Username: ${userResetCredentials.username || "-"}`,
+            `Temporary Password: ${userResetCredentials.password || "-"}`,
+        ].join("\n");
+
+        try {
+            await navigator.clipboard.writeText(resetCredentialsText);
+            setUserResetCopied(true);
+            window.setTimeout(() => setUserResetCopied(false), 1800);
+        } catch {
+            setUserResetCopied(false);
+        }
+    };
+
+    const exitUserEditMode = () => {
+        const source = currentUserForManage || {};
+        const sourceRoles = normalizeRoles(
+            source.roles_list ||
+                source.roles ||
+                (source.role ? [source.role] : []),
+        );
+        const resolvedRole = sourceRoles.includes("teacher")
+            ? "teacher"
+            : sourceRoles.includes("student")
+              ? "student"
+              : sourceRoles[0] || source.role || "student";
+
+        setUserData({
+            first_name: source.first_name || "",
+            last_name: source.last_name || "",
+            middle_name: source.middle_name || "",
+            email: source.email || source.personal_email || "",
+            password: "",
+            role: resolvedRole,
+            department_id: source.department_id
+                ? String(source.department_id)
+                : "",
+            status: source.status || "active",
+        });
+
+        clearUserErrors();
+        setShowUserPassword(false);
+        setUserPasswordCopied(false);
+        setUserEditMode(false);
+        setPanel("info");
+    };
+
+    const handleUserSave = () => {
+        if (!currentUserIdForManage) {
+            return;
+        }
+
+        putUser(route("superadmin.users.update", currentUserIdForManage), {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                setUserEditMode(false);
+                setPanel("info");
+                setShowUserPassword(false);
+                setUserPasswordCopied(false);
+            },
+        });
+    };
+
+    const handleUserResetPassword = () => {
+        if (!currentUserIdForManage) {
+            return;
+        }
+
+        const delivery = userIsStudent ? userResetDelivery : "email";
+
+        setUserResetProcessing(true);
+        setUserResetErrors({});
+        setUserResetNotice("");
+        setUserResetCopied(false);
+
+        router.post(
+            route("superadmin.users.reset-password", currentUserIdForManage),
+            { delivery },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: (page) => {
+                    const flash = page?.props?.flash || {};
+                    const credentials = flash?.password_reset_credentials;
+
+                    setUserResetNotice(
+                        flash?.success ||
+                            "Temporary password was generated successfully.",
+                    );
+                    setUserResetCredentials(credentials || null);
+                },
+                onError: (formErrors) => {
+                    setUserResetErrors(formErrors || {});
+                },
+                onFinish: () => {
+                    setUserResetProcessing(false);
+                },
+            },
+        );
+    };
 
     const data = (() => {
         if (activeTab === "students") {
@@ -3215,6 +3466,165 @@ export default function ManagementDetailModal({
                     </div>
                 );
 
+            const resetPanel = (
+                <div className="space-y-3">
+                    <div className="rounded-lg border border-emerald-200 bg-white p-3">
+                        <p className="text-sm font-semibold text-slate-900">
+                            Reset Password
+                        </p>
+                        <p className="mt-1 text-xs text-slate-600">
+                            Generate a new temporary password. The user will be
+                            required to change this password on next login.
+                        </p>
+                    </div>
+
+                    {userIsStudent && (
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <button
+                                type="button"
+                                onClick={() => setUserResetDelivery("email")}
+                                className={`rounded-md border px-3 py-2 text-left text-xs font-semibold transition ${
+                                    userResetDelivery === "email"
+                                        ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                                        : "border-emerald-200 bg-white text-slate-600 hover:bg-emerald-50"
+                                }`}
+                            >
+                                <span className="inline-flex items-center gap-1.5">
+                                    <Send size={13} />
+                                    Send to Email
+                                </span>
+                                <p className="mt-1 text-[11px] font-normal text-slate-500">
+                                    Deliver temporary credentials via email.
+                                </p>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setUserResetDelivery("qr")}
+                                className={`rounded-md border px-3 py-2 text-left text-xs font-semibold transition ${
+                                    userResetDelivery === "qr"
+                                        ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                                        : "border-emerald-200 bg-white text-slate-600 hover:bg-emerald-50"
+                                }`}
+                            >
+                                <span className="inline-flex items-center gap-1.5">
+                                    <QrCode size={13} />
+                                    Show QR Code
+                                </span>
+                                <p className="mt-1 text-[11px] font-normal text-slate-500">
+                                    Generate credentials and present QR access.
+                                </p>
+                            </button>
+                        </div>
+                    )}
+
+                    {!userCanSendEmail &&
+                        (!userIsStudent ||
+                            (userIsStudent && userResetDelivery === "email")) && (
+                            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                Add an email first before using email delivery.
+                            </div>
+                        )}
+
+                    {userResetErrors.delivery && (
+                        <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                            {userResetErrors.delivery}
+                        </div>
+                    )}
+
+                    {userResetErrors.email && (
+                        <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                            {userResetErrors.email}
+                        </div>
+                    )}
+
+                    {userResetNotice && (
+                        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                            {userResetNotice}
+                        </div>
+                    )}
+
+                    {userIsStudent && userResetDelivery === "qr" && (
+                        userResetQrPayload ? (
+                            <div className="grid gap-3 rounded-lg border border-emerald-200 bg-white p-3 md:grid-cols-[180px_1fr]">
+                                <div className="flex items-center justify-center rounded-md border border-emerald-200 bg-white p-2">
+                                    <QRCodeSVG
+                                        value={userResetQrPayload}
+                                        size={150}
+                                        includeMargin
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+                                        <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                                            Full Name
+                                        </p>
+                                        <p className="text-sm font-semibold text-slate-800">
+                                            {userResetCredentials?.full_name ||
+                                                userName ||
+                                                "-"}
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+                                        <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                                            LRN
+                                        </p>
+                                        <p className="text-sm text-slate-700">
+                                            {userResetCredentials?.lrn ||
+                                                studentSection?.lrn ||
+                                                "-"}
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+                                        <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                                            Username
+                                        </p>
+                                        <p className="break-all font-mono text-sm text-slate-800">
+                                            {userResetCredentials?.username ||
+                                                current.username ||
+                                                "-"}
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                                        <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                                            Temporary Password
+                                        </p>
+                                        <p className="break-all font-mono text-sm text-amber-800">
+                                            {userResetCredentials?.password ||
+                                                "-"}
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={copyUserResetCredentials}
+                                        className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                            userResetCopied
+                                                ? "bg-emerald-100 text-emerald-700"
+                                                : "bg-emerald-600 text-white hover:bg-emerald-700"
+                                        }`}
+                                    >
+                                        <Copy size={13} />
+                                        {userResetCopied
+                                            ? "Credentials Copied"
+                                            : "Copy Credentials"}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                Generate temporary credentials first to display
+                                the QR code.
+                            </div>
+                        )
+                    )}
+                </div>
+            );
+
             return {
                 identity: {
                     title: userName,
@@ -3245,7 +3655,268 @@ export default function ManagementDetailModal({
                           ? 1
                           : 0
                       : userRoles.length,
-                infoPanel: (
+                infoPanel: userEditMode ? (
+                    <div className="space-y-3">
+                        <div>
+                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                                Edit profile
+                            </p>
+                            <div className="space-y-3 rounded-md border border-emerald-200 bg-white p-3">
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <div>
+                                        <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                            First Name
+                                        </p>
+                                        <input
+                                            type="text"
+                                            value={userData.first_name}
+                                            onChange={(event) =>
+                                                setUserData(
+                                                    "first_name",
+                                                    event.target.value,
+                                                )
+                                            }
+                                            className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            placeholder="e.g., Juan"
+                                        />
+                                        {userErrors.first_name && (
+                                            <p className="mt-1 text-[11px] text-rose-600">
+                                                {userErrors.first_name}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                            Last Name
+                                        </p>
+                                        <input
+                                            type="text"
+                                            value={userData.last_name}
+                                            onChange={(event) =>
+                                                setUserData(
+                                                    "last_name",
+                                                    event.target.value,
+                                                )
+                                            }
+                                            className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            placeholder="e.g., Dela Cruz"
+                                        />
+                                        {userErrors.last_name && (
+                                            <p className="mt-1 text-[11px] text-rose-600">
+                                                {userErrors.last_name}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                        Middle Name (Optional)
+                                    </p>
+                                    <input
+                                        type="text"
+                                        value={userData.middle_name}
+                                        onChange={(event) =>
+                                            setUserData(
+                                                "middle_name",
+                                                event.target.value,
+                                            )
+                                        }
+                                        className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                        placeholder="e.g., Rivera"
+                                    />
+                                    {userErrors.middle_name && (
+                                        <p className="mt-1 text-[11px] text-rose-600">
+                                            {userErrors.middle_name}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                        Email
+                                    </p>
+                                    <input
+                                        type="email"
+                                        value={userData.email}
+                                        onChange={(event) =>
+                                            setUserData(
+                                                "email",
+                                                event.target.value,
+                                            )
+                                        }
+                                        className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                        placeholder="email@school.edu"
+                                    />
+                                    {userErrors.email && (
+                                        <p className="mt-1 text-[11px] text-rose-600">
+                                            {userErrors.email}
+                                        </p>
+                                    )}
+                                </div>
+
+                                {userIsTeacherOrStudent && (
+                                    <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+                                        <p className="text-[11px] font-semibold text-emerald-700">
+                                            Role
+                                        </p>
+                                        <p className="text-xs text-slate-700">
+                                            {toLabelRole(userData.role)}
+                                        </p>
+                                        <p className="mt-1 text-[11px] text-slate-500">
+                                            Teacher and student roles are locked
+                                            and cannot be switched.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {userIsTeacher && (
+                                    <div>
+                                        <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                            Department
+                                        </p>
+                                        <select
+                                            value={userData.department_id}
+                                            onChange={(event) =>
+                                                setUserData(
+                                                    "department_id",
+                                                    event.target.value,
+                                                )
+                                            }
+                                            className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                        >
+                                            <option value="">
+                                                Select department
+                                            </option>
+                                            {resolvedDepartmentOptions.map(
+                                                (option) => (
+                                                    <option
+                                                        key={option.value}
+                                                        value={option.value}
+                                                    >
+                                                        {option.label}
+                                                        {option.code
+                                                            ? ` (${option.code})`
+                                                            : ""}
+                                                    </option>
+                                                ),
+                                            )}
+                                        </select>
+                                        {userErrors.department_id && (
+                                            <p className="mt-1 text-[11px] text-rose-600">
+                                                {userErrors.department_id}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="flex items-center justify-between rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+                                    <div>
+                                        <p className="text-[11px] font-semibold text-emerald-700">
+                                            Status
+                                        </p>
+                                        <p className="text-xs text-slate-700">
+                                            {userData.status === "active"
+                                                ? "Active"
+                                                : "Inactive"}
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setUserData(
+                                                "status",
+                                                userData.status === "active"
+                                                    ? "inactive"
+                                                    : "active",
+                                            )
+                                        }
+                                        className="text-slate-500 transition hover:text-emerald-700"
+                                        title="Toggle status"
+                                    >
+                                        {userData.status === "active" ? (
+                                            <ToggleRight size={24} />
+                                        ) : (
+                                            <ToggleLeft size={24} />
+                                        )}
+                                    </button>
+                                </div>
+
+                                <div className="rounded-md border border-emerald-200 bg-emerald-50 p-2.5">
+                                    <p className="mb-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
+                                        <Lock size={12} />
+                                        New Password (Optional)
+                                    </p>
+                                    <div className="relative">
+                                        <input
+                                            type={
+                                                showUserPassword
+                                                    ? "text"
+                                                    : "password"
+                                            }
+                                            value={userData.password}
+                                            onChange={(event) =>
+                                                setUserData(
+                                                    "password",
+                                                    event.target.value,
+                                                )
+                                            }
+                                            className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 pr-24 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            placeholder="Enter new password or generate one"
+                                        />
+
+                                        <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setShowUserPassword(
+                                                        (previous) =>
+                                                            !previous,
+                                                    )
+                                                }
+                                                className="rounded p-1 text-slate-500 transition hover:bg-emerald-100 hover:text-emerald-700"
+                                            >
+                                                {showUserPassword ? (
+                                                    <EyeOff size={13} />
+                                                ) : (
+                                                    <Eye size={13} />
+                                                )}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={copyUserPassword}
+                                                disabled={!userData.password}
+                                                className="rounded p-1 text-slate-500 transition hover:bg-emerald-100 hover:text-emerald-700 disabled:opacity-40"
+                                            >
+                                                <Copy size={13} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={generateUserPassword}
+                                                className="rounded p-1 text-slate-500 transition hover:bg-emerald-100 hover:text-emerald-700"
+                                            >
+                                                <RefreshCw size={13} />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {userErrors.password && (
+                                        <p className="mt-1 text-[11px] text-rose-600">
+                                            {userErrors.password}
+                                        </p>
+                                    )}
+
+                                    {userPasswordCopied && (
+                                        <p className="mt-1 text-[11px] text-emerald-700">
+                                            Password copied to clipboard.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
                     <div className="space-y-3">
                         <div>
                             <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
@@ -3334,6 +4005,7 @@ export default function ManagementDetailModal({
                     : hasStudentRole
                       ? studentSectionPanel
                       : rolesPanel,
+                resetPanel,
                 isTeacherPriority: hasTeacherRole,
                 isStudentPriority: hasStudentRole,
                 advisoryCount: advisoryClassesFiltered.length,
@@ -7821,6 +8493,17 @@ export default function ManagementDetailModal({
                                             label="Teaching Class"
                                             count={data.teachingCount}
                                         />
+                                        <SidebarButton
+                                            active={panel === "reset"}
+                                            onClick={() => {
+                                                setSelectedUserClassDetail(
+                                                    null,
+                                                );
+                                                setPanel("reset");
+                                            }}
+                                            icon={Lock}
+                                            label="Reset Password"
+                                        />
                                     </div>
                                 ) : activeTab === "users" &&
                                   data.isStudentPriority ? (
@@ -7865,6 +8548,18 @@ export default function ManagementDetailModal({
                                             label="Classes"
                                             count={data.studentClassesCount}
                                         />
+                                        <SidebarButton
+                                            active={panel === "reset"}
+                                            onClick={() => {
+                                                setSelectedUserClassDetail(
+                                                    null,
+                                                );
+                                                setUserQuarterFilter("midterm");
+                                                setPanel("reset");
+                                            }}
+                                            icon={Lock}
+                                            label="Reset Password"
+                                        />
                                     </div>
                                 ) : (
                                     <div className="space-y-1">
@@ -7883,6 +8578,16 @@ export default function ManagementDetailModal({
                                             label={data.secondaryLabel}
                                             count={data.secondaryCount}
                                         />
+                                        {activeTab === "users" && (
+                                            <SidebarButton
+                                                active={panel === "reset"}
+                                                onClick={() =>
+                                                    setPanel("reset")
+                                                }
+                                                icon={Lock}
+                                                label="Reset Password"
+                                            />
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -7946,6 +8651,10 @@ export default function ManagementDetailModal({
                                                 activeTab === "users" &&
                                                 data.isTeacherPriority
                                             ) {
+                                                if (panel === "reset") {
+                                                    return data.resetPanel;
+                                                }
+
                                                 if (panel === "info") {
                                                     return data.infoPanel;
                                                 }
@@ -7961,6 +8670,10 @@ export default function ManagementDetailModal({
                                                 activeTab === "users" &&
                                                 data.isStudentPriority
                                             ) {
+                                                if (panel === "reset") {
+                                                    return data.resetPanel;
+                                                }
+
                                                 if (panel === "info") {
                                                     return data.infoPanel;
                                                 }
@@ -7986,6 +8699,13 @@ export default function ManagementDetailModal({
                                                 return renderSectionClassesPanel();
                                             }
 
+                                            if (
+                                                activeTab === "users" &&
+                                                panel === "reset"
+                                            ) {
+                                                return data.resetPanel;
+                                            }
+
                                             return panel === "info"
                                                 ? data.infoPanel
                                                 : data.secondaryPanel;
@@ -7996,7 +8716,8 @@ export default function ManagementDetailModal({
 
                             {(isDepartmentTab ||
                                 isSectionTab ||
-                                isSubjectTab) &&
+                                isSubjectTab ||
+                                activeTab === "users") &&
                                 !loading &&
                                 !error && (
                                     <div className="pointer-events-none absolute right-5 bottom-5 z-20 flex items-center gap-2">
@@ -8299,6 +9020,73 @@ export default function ManagementDetailModal({
                                                 >
                                                     <UserPlus size={18} />
                                                 </button>
+                                            )
+                                        ) : activeTab === "users" ? (
+                                            panel === "reset" ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={
+                                                        handleUserResetPassword
+                                                    }
+                                                    disabled={
+                                                        disableUserResetAction
+                                                    }
+                                                    className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                >
+                                                    {userIsStudent &&
+                                                    userResetDelivery ===
+                                                        "qr" ? (
+                                                        <QrCode size={13} />
+                                                    ) : (
+                                                        <Send size={13} />
+                                                    )}
+                                                    {userResetProcessing
+                                                        ? "Processing..."
+                                                        : userIsStudent &&
+                                                            userResetDelivery ===
+                                                                "qr"
+                                                          ? "Generate QR Credentials"
+                                                          : "Send Temporary Password"}
+                                                </button>
+                                            ) : !userEditMode ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setPanel("info");
+                                                        setUserEditMode(true);
+                                                        clearUserErrors();
+                                                    }}
+                                                    className="pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg transition hover:bg-emerald-700"
+                                                    title="Edit user"
+                                                >
+                                                    <Pencil size={18} />
+                                                </button>
+                                            ) : (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={
+                                                            exitUserEditMode
+                                                        }
+                                                        disabled={userSaving}
+                                                        className="pointer-events-auto rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={
+                                                            handleUserSave
+                                                        }
+                                                        disabled={userSaving}
+                                                        className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg transition hover:bg-emerald-700 disabled:opacity-60"
+                                                    >
+                                                        <Save size={13} />
+                                                        {userSaving
+                                                            ? "Saving..."
+                                                            : "Save Changes"}
+                                                    </button>
+                                                </>
                                             )
                                         ) : !sectionEditMode ? (
                                             <button

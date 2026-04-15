@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\TemporaryCredentials;
 use App\Mail\TeacherCredentials;
 use App\Models\Enrollment;
 use App\Models\PasswordResetRequest;
@@ -595,7 +596,7 @@ class UserManagementController extends Controller
                 'student_queue.*.middle_name' => ['nullable', 'string', 'max:100'],
                 'student_queue.*.lrn' => ['required', 'string', 'size:12', 'distinct', 'unique:students,lrn'],
                 'student_queue.*.email' => ['nullable', 'email', 'max:255', 'distinct', 'unique:users,personal_email'],
-                'student_queue.*.username' => ['required', 'string', 'regex:/^[a-z]{2}\d{4}\d{5}$/', 'distinct', 'unique:users,username'],
+                'student_queue.*.username' => ['required', 'string', 'regex:/^[a-z]{2}\d{4}\d{5}$/', 'distinct'],
             ]);
 
             foreach ($validated['student_queue'] as $index => $studentPayload) {
@@ -618,12 +619,17 @@ class UserManagementController extends Controller
 
             DB::transaction(function () use ($validated, $selectedSection, $superAdmin, &$createdStudentCredentials) {
                 foreach ($validated['student_queue'] as $studentPayload) {
+                    $resolvedUsername = $this->resolveNextStudentUsername(
+                        (string) ($studentPayload['first_name'] ?? ''),
+                        (string) ($studentPayload['last_name'] ?? ''),
+                    );
+
                     $student = User::create([
                         'first_name' => $studentPayload['first_name'],
                         'last_name' => $studentPayload['last_name'],
                         'middle_name' => $studentPayload['middle_name'] ?? null,
                         'personal_email' => $studentPayload['email'] ?? null,
-                        'username' => $studentPayload['username'],
+                        'username' => $resolvedUsername,
                         'temporary_password' => $validated['password'],
                         'password' => Hash::make($validated['password']),
                         'department_id' => null,
@@ -656,7 +662,7 @@ class UserManagementController extends Controller
                         'last_name' => (string) ($studentPayload['last_name'] ?? ''),
                         'full_name' => $studentName,
                         'lrn' => (string) ($studentPayload['lrn'] ?? ''),
-                        'username' => (string) ($studentPayload['username'] ?? ''),
+                        'username' => (string) ($student->username ?? ''),
                         'password' => (string) ($validated['password'] ?? ''),
                     ];
                 }
@@ -676,7 +682,7 @@ class UserManagementController extends Controller
             'middle_name'   => ['nullable', 'string', 'max:100'],
             'lrn'           => ['nullable', 'string', 'size:12', 'unique:students,lrn'],
             'email'         => ['nullable', 'email', 'unique:users,personal_email'],
-            'username'      => ['nullable', 'string', 'regex:/^[a-z]{2}\d{4}\d{5}$/', 'unique:users,username'],
+            'username'      => ['nullable', 'string', 'regex:/^[a-z]{2}\d{4}\d{5}$/'],
             'password'      => ['nullable', Password::min(8)],
             'role'          => ['required', 'in:teacher,student'],
             'teacher_mode'  => ['nullable', 'in:single,multiple'],
@@ -739,24 +745,6 @@ class UserManagementController extends Controller
                     'lrn' => 'LRN is required for single student creation.',
                 ]);
             }
-
-            if (empty($validated['username'])) {
-                return back()->withErrors([
-                    'username' => 'Username is required for single student creation.',
-                ]);
-            }
-
-            $isValidUsername = $this->isValidStudentUsernameForName(
-                (string) $validated['username'],
-                (string) ($validated['first_name'] ?? ''),
-                (string) ($validated['last_name'] ?? ''),
-            );
-
-            if (! $isValidUsername) {
-                return back()->withErrors([
-                    'username' => 'Username format must follow initials + current year + 5-digit number (example: dd202300100).',
-                ]);
-            }
         }
 
         $selectedSection = null;
@@ -782,6 +770,13 @@ class UserManagementController extends Controller
             ? $teacherTempPassword
             : (string) ($validated['password'] ?? '');
 
+        $resolvedStudentUsername = $validated['role'] === 'student'
+            ? $this->resolveNextStudentUsername(
+                (string) ($validated['first_name'] ?? ''),
+                (string) ($validated['last_name'] ?? ''),
+            )
+            : null;
+
         $user = User::create([
             'first_name'           => $validated['first_name'],
             'last_name'            => $validated['last_name'],
@@ -799,7 +794,7 @@ class UserManagementController extends Controller
             'status'               => 'active',
             'created_by'           => $superAdmin->id,
             'username'             => $validated['role'] === 'student'
-                ? (string) ($validated['username'] ?? '')
+                ? (string) ($resolvedStudentUsername ?? '')
                 : null,
         ]);
 
@@ -830,7 +825,7 @@ class UserManagementController extends Controller
                     'last_name' => (string) ($validated['last_name'] ?? ''),
                     'full_name' => $studentName,
                     'lrn' => (string) ($validated['lrn'] ?? ''),
-                    'username' => (string) ($validated['username'] ?? ''),
+                    'username' => (string) ($user->username ?? ''),
                     'password' => (string) ($validated['password'] ?? ''),
                 ]]);
         }
@@ -881,6 +876,40 @@ class UserManagementController extends Controller
         $expectedYear = now()->format('Y');
 
         return str_starts_with($username, $expectedPrefix . $expectedYear);
+    }
+
+    private function resolveNextStudentUsername(string $firstName, string $lastName): string
+    {
+        $prefix = $this->buildStudentUsernamePrefix($firstName, $lastName);
+        $yearPart = now()->format('Y');
+        $usernamePrefix = $prefix . $yearPart;
+        $usernamePattern = '/^' . preg_quote($usernamePrefix, '/') . '\\d{5}$/';
+
+        $latestMatching = User::query()
+            ->whereHas('roles', function ($query) {
+                $query->where('name', 'student');
+            })
+            ->where('username', 'like', $usernamePrefix . '%')
+            ->orderByDesc('username')
+            ->pluck('username')
+            ->first(function ($value) use ($usernamePattern) {
+                return is_string($value) && preg_match($usernamePattern, $value) === 1;
+            });
+
+        $nextSequence = 1;
+
+        if (is_string($latestMatching) && preg_match('/(\d{5})$/', $latestMatching, $matches) === 1) {
+            $nextSequence = ((int) $matches[1]) + 1;
+        }
+
+        $candidate = sprintf('%s%05d', $usernamePrefix, $nextSequence);
+
+        while (User::query()->where('username', $candidate)->exists()) {
+            $nextSequence++;
+            $candidate = sprintf('%s%05d', $usernamePrefix, $nextSequence);
+        }
+
+        return $candidate;
     }
 
     private function buildStudentUsernamePrefix(string $firstName, string $lastName): string
@@ -992,6 +1021,68 @@ class UserManagementController extends Controller
 
         return redirect()->route('superadmin.users.index')
             ->with('success', 'User updated successfully.');
+    }
+
+    /**
+     * Generate a new temporary password and deliver it through email
+     * or return student credentials for QR display.
+     */
+    public function resetPassword(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'delivery' => ['required', Rule::in(['email', 'qr'])],
+        ]);
+
+        $delivery = (string) $validated['delivery'];
+        $isStudent = $user->hasRole('student');
+
+        if (! $isStudent && $delivery === 'qr') {
+            return back()->withErrors([
+                'delivery' => 'QR credential delivery is only available for student accounts.',
+            ]);
+        }
+
+        if ($delivery === 'email' && blank($user->email)) {
+            return back()->withErrors([
+                'email' => 'Cannot send temporary credentials because this account has no email address.',
+            ]);
+        }
+
+        $tempPassword = $this->generateTemporaryPassword();
+
+        $user->update([
+            'password' => Hash::make($tempPassword),
+            'must_change_password' => true,
+            'password_changed_at' => null,
+            'temporary_password' => $isStudent ? $tempPassword : null,
+        ]);
+
+        if ($delivery === 'email') {
+            Mail::to($user->email)->send(new TemporaryCredentials(
+                user: $user,
+                plainPassword: $tempPassword,
+                issuedBy: Auth::user(),
+                context: 'password reset',
+            ));
+        }
+
+        $successMessage = $delivery === 'email'
+            ? 'Temporary credentials were sent via email.'
+            : 'Temporary credentials generated. Share the QR code with the student.';
+
+        $response = back()->with('success', $successMessage);
+
+        if ($isStudent) {
+            $user->loadMissing('student');
+
+            $response = $response->with('password_reset_credentials', $this->buildResetCredentialPayload(
+                $user,
+                $tempPassword,
+                $user->student,
+            ));
+        }
+
+        return $response;
     }
 
     /**

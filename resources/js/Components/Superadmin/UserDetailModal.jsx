@@ -7,6 +7,8 @@ export default function UserDetailModal({
     loading = false,
     error = "",
     row,
+    mode = "view",
+    departments = [],
 }) {
     return (
         <ManagementDetailModal
@@ -17,6 +19,8 @@ export default function UserDetailModal({
             loading={loading}
             error={error}
             row={row}
+            userManageMode={mode}
+            departmentOptions={departments}
         />
     );
 }
