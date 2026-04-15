@@ -27,16 +27,19 @@ const STEPS = [
         id: 1,
         title: "Section Information",
         description: "Set section, cohort, and academic details",
+        icon: Plus,
     },
     {
         id: 2,
         title: "Student Assignment",
         description: "Assign existing or create new students",
+        icon: Users,
     },
     {
         id: 3,
         title: "Summary",
         description: "Review issues and save",
+        icon: Save,
     },
 ];
 
@@ -44,32 +47,29 @@ const GRADE_LEVEL_OPTIONS = ["11", "12"];
 const LRN_LENGTH = 12;
 
 function WizardStep({ step, currentStep }) {
+    const Icon = step.icon;
     const isActive = currentStep === step.id;
     const isComplete = currentStep > step.id;
 
     return (
-        <div className="flex items-center gap-2">
-            <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                    isComplete
-                        ? "bg-emerald-600 text-white"
-                        : isActive
-                          ? "bg-indigo-600 text-white"
-                          : "bg-slate-200 text-slate-600"
+        <div
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                isActive
+                    ? "bg-blue-100 text-blue-700"
+                    : isComplete
+                      ? "bg-blue-50 text-blue-700"
+                      : "bg-slate-50 text-slate-400"
+            }`}
+        >
+            <span
+                className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${
+                    isComplete ? "bg-blue-600 text-white" : "bg-white"
                 }`}
             >
-                {isComplete ? <CheckCircle2 size={14} /> : step.id}
-            </div>
-            <div className="hidden sm:block">
-                <p
-                    className={`text-xs font-semibold ${
-                        isActive ? "text-indigo-700" : "text-slate-600"
-                    }`}
-                >
-                    {step.title}
-                </p>
-                <p className="text-[11px] text-slate-500">{step.description}</p>
-            </div>
+                {isComplete ? <Check size={10} /> : step.id}
+            </span>
+            {Icon ? <Icon size={12} /> : null}
+            <span>{step.title}</span>
         </div>
     );
 }
@@ -79,6 +79,225 @@ function FieldError({ message }) {
 
     return <p className="mt-1 text-xs text-rose-600">{message}</p>;
 }
+
+const CSV_HEADER_ALIASES = {
+    student_name: ["studentname", "student", "name", "fullname", "full_name"],
+    first_name: ["firstname", "first", "first_name"],
+    last_name: ["lastname", "last", "surname", "last_name"],
+    middle_name: ["middlename", "middle", "middle_name"],
+    lrn: ["lrn", "learnerreferencenumber", "learnerreference"],
+    personal_email: ["personalemail", "email", "personal_email"],
+};
+
+const normalizeCsvHeader = (value = "") =>
+    String(value)
+        .replace(/^\uFEFF/, "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+
+const parseCsvLine = (line = "") => {
+    const values = [];
+    let currentValue = "";
+    let inQuotes = false;
+
+    for (let index = 0; index < line.length; index += 1) {
+        const character = line[index];
+
+        if (character === '"') {
+            if (inQuotes && line[index + 1] === '"') {
+                currentValue += '"';
+                index += 1;
+            } else {
+                inQuotes = !inQuotes;
+            }
+
+            continue;
+        }
+
+        if (character === "," && !inQuotes) {
+            values.push(currentValue.trim());
+            currentValue = "";
+            continue;
+        }
+
+        currentValue += character;
+    }
+
+    values.push(currentValue.trim());
+
+    return values;
+};
+
+const resolveCsvHeaderIndexes = (headerValues = []) => {
+    const normalizedHeaderValues = headerValues.map(normalizeCsvHeader);
+
+    const findIndex = (aliases = []) =>
+        normalizedHeaderValues.findIndex((headerValue) =>
+            aliases.includes(headerValue),
+        );
+
+    const indexes = {
+        student_name: findIndex(CSV_HEADER_ALIASES.student_name),
+        first_name: findIndex(CSV_HEADER_ALIASES.first_name),
+        last_name: findIndex(CSV_HEADER_ALIASES.last_name),
+        middle_name: findIndex(CSV_HEADER_ALIASES.middle_name),
+        lrn: findIndex(CSV_HEADER_ALIASES.lrn),
+        personal_email: findIndex(CSV_HEADER_ALIASES.personal_email),
+    };
+
+    const hasExplicitNameHeaders =
+        indexes.first_name !== -1 && indexes.last_name !== -1;
+    const hasSingleNameHeader = indexes.student_name !== -1;
+    const hasRequiredHeaders =
+        indexes.lrn !== -1 && (hasExplicitNameHeaders || hasSingleNameHeader);
+
+    return {
+        indexes,
+        hasRequiredHeaders,
+    };
+};
+
+const splitStudentFullName = (fullName = "") => {
+    const normalizedName = String(fullName).replace(/\s+/g, " ").trim();
+
+    if (!normalizedName) {
+        return {
+            first_name: "",
+            middle_name: "",
+            last_name: "",
+        };
+    }
+
+    const parts = normalizedName.split(" ");
+
+    if (parts.length === 1) {
+        return {
+            first_name: parts[0],
+            middle_name: "",
+            last_name: "",
+        };
+    }
+
+    return {
+        first_name: parts[0],
+        middle_name: "",
+        last_name: parts.slice(1).join(" "),
+    };
+};
+
+const parseStudentsFromCsvText = (csvText, existingLrns = new Set()) => {
+    const parsedRows = [];
+    const parseErrors = [];
+
+    const normalizedText = String(csvText || "")
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .trim();
+
+    if (!normalizedText) {
+        return {
+            parsedRows,
+            parseErrors: ["The uploaded CSV file is empty."],
+        };
+    }
+
+    const lines = normalizedText
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line !== "");
+
+    if (lines.length === 0) {
+        return {
+            parsedRows,
+            parseErrors: ["The uploaded CSV file is empty."],
+        };
+    }
+
+    const firstRowValues = parseCsvLine(lines[0]);
+    const { indexes, hasRequiredHeaders } =
+        resolveCsvHeaderIndexes(firstRowValues);
+    const useHeaderRow = hasRequiredHeaders;
+    const startIndex = useHeaderRow ? 1 : 0;
+    const seenLrns = new Set();
+
+    for (let rowIndex = startIndex; rowIndex < lines.length; rowIndex += 1) {
+        const lineNumber = rowIndex + 1;
+        const rowValues = parseCsvLine(lines[rowIndex]);
+
+        if (rowValues.every((value) => String(value || "").trim() === "")) {
+            continue;
+        }
+
+        const fullNameFromHeader = useHeaderRow
+            ? indexes.student_name !== -1
+                ? String(rowValues[indexes.student_name] ?? "").trim()
+                : ""
+            : "";
+        const splitName = splitStudentFullName(fullNameFromHeader);
+
+        const firstName = useHeaderRow
+            ? String(rowValues[indexes.first_name] ?? "").trim() ||
+              splitName.first_name
+            : String(rowValues[0] ?? "").trim();
+        const lastName = useHeaderRow
+            ? String(rowValues[indexes.last_name] ?? "").trim() ||
+              splitName.last_name
+            : String(rowValues[1] ?? "").trim();
+        const lrn = useHeaderRow
+            ? String(rowValues[indexes.lrn] ?? "").trim()
+            : String(rowValues[2] ?? "").trim();
+        const personalEmailRaw = useHeaderRow
+            ? indexes.personal_email !== -1
+                ? String(rowValues[indexes.personal_email] ?? "").trim()
+                : ""
+            : String(rowValues[3] ?? "").trim();
+        const middleName = useHeaderRow
+            ? indexes.middle_name !== -1
+                ? String(rowValues[indexes.middle_name] ?? "").trim()
+                : splitName.middle_name
+            : String(rowValues[4] ?? "").trim();
+
+        if (!firstName || !lastName || !lrn) {
+            parseErrors.push(
+                `Line ${lineNumber}: first_name, last_name, and lrn are required.`,
+            );
+            continue;
+        }
+
+        if (lrn.length !== LRN_LENGTH) {
+            parseErrors.push(
+                `Line ${lineNumber}: lrn must be exactly ${LRN_LENGTH} characters.`,
+            );
+            continue;
+        }
+
+        if (existingLrns.has(lrn) || seenLrns.has(lrn)) {
+            parseErrors.push(`Line ${lineNumber}: duplicate lrn ${lrn}.`);
+            continue;
+        }
+
+        seenLrns.add(lrn);
+
+        parsedRows.push({
+            id: crypto.randomUUID(),
+            first_name: firstName,
+            last_name: lastName,
+            middle_name: middleName,
+            lrn,
+            personal_email: personalEmailRaw.toLowerCase(),
+        });
+    }
+
+    if (useHeaderRow && lines.length === 1) {
+        parseErrors.push("CSV contains headers but no student rows.");
+    }
+
+    return {
+        parsedRows,
+        parseErrors,
+    };
+};
 
 export default function Index({
     sections,
@@ -193,6 +412,27 @@ export default function Index({
 
     const assignmentCount =
         queuedExistingStudents.length + newStudentsQueue.length;
+
+    const gradeToken = useMemo(() => {
+        const match = String(data.grade_level || "").match(/(\d{1,2})/);
+        if (match?.[1]) {
+            return match[1];
+        }
+
+        return String(data.grade_level || "").trim();
+    }, [data.grade_level]);
+
+    const sectionNamePreview = useMemo(() => {
+        const sectionName = String(data.section_name || "").trim();
+        if (!sectionName) {
+            return "";
+        }
+
+        const prefix = gradeToken || "?";
+        const specializationToken = String(data.strand || "").trim() || "STRAND";
+
+        return `${prefix} - ${specializationToken} - ${sectionName}`;
+    }, [data.section_name, data.strand, gradeToken]);
 
     const stepOneIssues = useMemo(() => {
         const issues = [];
@@ -512,6 +752,65 @@ export default function Index({
         }
     };
 
+    const handleCsvFileImport = async (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+
+        if (!file) {
+            return;
+        }
+
+        const fileName = String(file.name || "").toLowerCase();
+        const isCsvFile = fileName.endsWith(".csv") || file.type === "text/csv";
+
+        if (!isCsvFile) {
+            setBulkImportErrors(["Please upload a valid CSV file."]);
+            setWizardNotice("CSV import failed. Invalid file type.");
+            return;
+        }
+
+        try {
+            const csvText = await file.text();
+            const existingLrns = new Set(
+                newStudentsQueue.map((student) => student.lrn),
+            );
+            const { parsedRows, parseErrors } = parseStudentsFromCsvText(
+                csvText,
+                existingLrns,
+            );
+
+            if (parsedRows.length > 0) {
+                setNewStudentsQueue((previousStudents) => [
+                    ...previousStudents,
+                    ...parsedRows,
+                ]);
+            }
+
+            setBulkImportErrors(parseErrors);
+
+            if (parsedRows.length > 0) {
+                const importedLabel =
+                    parsedRows.length === 1 ? "student" : "students";
+                const skippedLabel = parseErrors.length === 1 ? "row" : "rows";
+                setWizardNotice(
+                    parseErrors.length > 0
+                        ? `Imported ${parsedRows.length} ${importedLabel} from ${file.name}. ${parseErrors.length} ${skippedLabel} skipped.`
+                        : `Imported ${parsedRows.length} ${importedLabel} from ${file.name}.`,
+                );
+                return;
+            }
+
+            setWizardNotice(
+                `No students were imported from ${file.name}. Check the errors below.`,
+            );
+        } catch (error) {
+            setBulkImportErrors([
+                "Unable to read the CSV file. Please try again.",
+            ]);
+            setWizardNotice("CSV import failed. Unable to read the file.");
+        }
+    };
+
     const removeQueuedNewStudent = (id) => {
         setNewStudentsQueue((prev) =>
             prev.filter((student) => student.id !== id),
@@ -643,8 +942,8 @@ export default function Index({
                             {search && (
                                 <button
                                     type="button"
-                                    onClick={clearSectionSearch}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                    onClick={clearSectionSearch}
                                 >
                                     <X size={14} />
                                 </button>
@@ -658,46 +957,43 @@ export default function Index({
                             Search
                         </button>
                     </form>
-                </div>
 
-                <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
-                    {sections.data.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
-                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
+                    <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100">
+                        {sections.data.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
                                 <School className="h-8 w-8 text-slate-400" />
+                                <h3 className="mt-4 text-base font-semibold text-slate-900">
+                                    No sections found
+                                </h3>
+                                <p className="mt-1 max-w-md text-sm text-slate-600">
+                                    Create your first section under your assigned
+                                    department using the wizard.
+                                </p>
                             </div>
-                            <h3 className="text-base font-semibold text-slate-900">
-                                No sections found
-                            </h3>
-                            <p className="mt-1 max-w-md text-sm text-slate-600">
-                                Create your first section under your assigned
-                                department using the wizard.
-                            </p>
-                        </div>
-                    ) : (
-                        <>
-                            <div className="grid grid-cols-12 gap-4 border-b border-slate-100 bg-slate-50/80 px-6 py-3">
-                                <div className="col-span-3 text-xs font-semibold uppercase tracking-wider text-slate-600">
-                                    Section
+                        ) : (
+                            <>
+                                <div className="grid grid-cols-12 gap-4 border-b border-slate-100 bg-slate-50/80 px-6 py-3">
+                                    <div className="col-span-3 text-xs font-semibold uppercase tracking-wider text-slate-600">
+                                        Section
+                                    </div>
+                                    <div className="col-span-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
+                                        Cohort
+                                    </div>
+                                    <div className="col-span-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
+                                        Grade/Strand
+                                    </div>
+                                    <div className="col-span-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-600">
+                                        Students
+                                    </div>
+                                    <div className="col-span-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
+                                        Created
+                                    </div>
+                                    <div className="col-span-1 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
+                                        Actions
+                                    </div>
                                 </div>
-                                <div className="col-span-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
-                                    Cohort
-                                </div>
-                                <div className="col-span-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
-                                    Grade/Strand
-                                </div>
-                                <div className="col-span-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-600">
-                                    Students
-                                </div>
-                                <div className="col-span-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
-                                    Created
-                                </div>
-                                <div className="col-span-1 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
-                                    Actions
-                                </div>
-                            </div>
 
-                            <div className="divide-y divide-slate-50">
+                                <div className="divide-y divide-slate-50">
                                 {sections.data.map((section) => (
                                     <div
                                         key={section.id}
@@ -778,36 +1074,37 @@ export default function Index({
                                         </div>
                                     </div>
                                 ))}
-                            </div>
-
-                            {sections.last_page > 1 && (
-                                <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-6 py-4">
-                                    <p className="text-xs text-slate-600">
-                                        Showing {sections.from}-{sections.to} of{" "}
-                                        {sections.total} sections
-                                    </p>
-                                    <div className="flex gap-1">
-                                        {sections.links.map((link, index) => (
-                                            <Link
-                                                key={index}
-                                                href={link.url || "#"}
-                                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                                                    link.active
-                                                        ? "bg-indigo-600 text-white shadow-sm"
-                                                        : link.url
-                                                          ? "text-slate-600 hover:bg-slate-100"
-                                                          : "cursor-not-allowed text-slate-300"
-                                                }`}
-                                                dangerouslySetInnerHTML={{
-                                                    __html: link.label,
-                                                }}
-                                            />
-                                        ))}
-                                    </div>
                                 </div>
-                            )}
-                        </>
-                    )}
+
+                                {sections.last_page > 1 && (
+                                    <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-6 py-4">
+                                        <p className="text-xs text-slate-600">
+                                            Showing {sections.from}-{sections.to} of{" "}
+                                            {sections.total} sections
+                                        </p>
+                                        <div className="flex gap-1">
+                                            {sections.links.map((link, index) => (
+                                                <Link
+                                                    key={index}
+                                                    href={link.url || "#"}
+                                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                                        link.active
+                                                            ? "bg-indigo-600 text-white shadow-sm"
+                                                            : link.url
+                                                              ? "text-slate-600 hover:bg-slate-100"
+                                                              : "cursor-not-allowed text-slate-300"
+                                                    }`}
+                                                    dangerouslySetInnerHTML={{
+                                                        __html: link.label,
+                                                    }}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -835,34 +1132,33 @@ export default function Index({
             {showWizard && (
                 <div className="fixed inset-0 z-50 overflow-y-auto">
                     <div
-                        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
+                        className="fixed inset-0 bg-slate-950/40 backdrop-blur-[2px]"
                         onClick={closeWizard}
                     />
 
-                    <div className="flex min-h-full items-center justify-center p-4">
-                        <div className="relative w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-                            <div className="relative overflow-hidden bg-gradient-to-r from-indigo-600 to-blue-700 px-6 py-5">
-                                <div className="absolute top-0 right-0 -mt-10 -mr-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
+                    <div className="flex min-h-full items-end justify-center p-3 pb-10 sm:items-center sm:p-4">
+                        <div className="relative flex h-[calc(100vh-6rem)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-2xl">
+                            <div className="relative shrink-0 overflow-hidden border-b border-blue-100 bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-4 sm:px-6 sm:py-5">
+                                <div className="absolute -right-8 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
                                 <button
                                     type="button"
                                     onClick={closeWizard}
-                                    className="absolute right-3 top-3 z-10 rounded-xl p-2 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
+                                    className="absolute right-3 top-3 rounded-lg p-1.5 text-blue-100 transition-colors hover:bg-white/15 hover:text-white disabled:opacity-60"
                                 >
-                                    <X size={18} />
+                                    <X size={16} />
                                 </button>
                                 <div className="relative">
-                                    <h2 className="text-lg font-bold text-white">
-                                        New Section Wizard
+                                    <h2 className="text-base font-semibold text-white">
+                                        Add Section Wizard
                                     </h2>
-                                    <p className="mt-0.5 text-xs text-indigo-100">
-                                        Department:{" "}
-                                        {department?.name || "Unassigned"}
+                                    <p className="text-xs text-blue-100">
+                                        Step {step} of {STEPS.length}: {STEPS[step - 1].title}
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="border-b border-slate-100 bg-slate-50/70 px-6 py-4">
-                                <div className="flex flex-wrap items-center gap-4">
+                            <div className="shrink-0 border-b border-blue-100 px-4 py-3 sm:px-6 sm:py-4">
+                                <div className="flex flex-wrap items-center gap-2">
                                     {STEPS.map((wizardStep) => (
                                         <WizardStep
                                             key={wizardStep.id}
@@ -874,12 +1170,12 @@ export default function Index({
                             </div>
 
                             {wizardNotice && (
-                                <div className="mx-6 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
+                                <div className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700 sm:mx-6">
                                     {wizardNotice}
                                 </div>
                             )}
 
-                            <div className="max-h-[72vh] overflow-y-auto px-6 py-5">
+                            <div className="min-h-0 flex-1 overflow-y-auto bg-blue-50/40 px-4 py-4 sm:px-6 sm:py-5">
                                 {step === 1 && (
                                     <div className="space-y-4">
                                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1108,6 +1404,16 @@ export default function Index({
                                             <FieldError
                                                 message={errors.description}
                                             />
+                                        </div>
+
+                                        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 md:col-span-2">
+                                            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                                                Section Output Preview
+                                            </p>
+                                            <p className="mt-1 text-sm font-semibold text-blue-900">
+                                                {sectionNamePreview ||
+                                                    "Fill in required fields to preview."}
+                                            </p>
                                         </div>
 
                                         {stepOneIssues.length > 0 && (
@@ -1447,9 +1753,26 @@ export default function Index({
                                                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                                                     Bulk Add
                                                 </p>
+                                                <div className="mb-2 flex flex-wrap items-center gap-2">
+                                                    <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700">
+                                                        <Upload size={13} />
+                                                        Upload CSV File
+                                                        <input
+                                                            type="file"
+                                                            accept=".csv,text/csv"
+                                                            className="hidden"
+                                                            onChange={
+                                                                handleCsvFileImport
+                                                            }
+                                                            disabled={processing}
+                                                        />
+                                                    </label>
+                                                    <p className="text-xs text-slate-500">
+                                                        Required: lrn plus either student_name or first_name/last_name.
+                                                    </p>
+                                                </div>
                                                 <p className="mb-2 text-[11px] text-slate-500">
-                                                    Format per line:
-                                                    first_name,last_name,lrn,email(optional),middle_name(optional)
+                                                    Format: student_name,lrn,email(optional) or first_name,last_name,lrn,email(optional),middle_name(optional)
                                                 </p>
                                                 <textarea
                                                     rows={5}
@@ -1459,7 +1782,9 @@ export default function Index({
                                                             event.target.value,
                                                         )
                                                     }
-                                                    placeholder="Juan,Dela Cruz,123456789012,juan@example.com"
+                                                    placeholder={
+                                                        "Juan,Dela Cruz,123456789012,,\nMaria,Santos,123456789013,maria@email.com,"
+                                                    }
                                                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 placeholder:text-slate-500 focus:border-indigo-500 focus:ring-indigo-500"
                                                 />
                                                 <div className="mt-3 flex justify-end">
@@ -1708,15 +2033,16 @@ export default function Index({
                                 )}
                             </div>
 
-                            <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-6 py-4">
+                            <div className="shrink-0 flex items-center justify-between border-t border-blue-100 bg-white px-4 py-3 sm:px-6 sm:py-4">
                                 <button
                                     type="button"
                                     onClick={
                                         step === 1 ? closeWizard : handleBack
                                     }
-                                    className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200"
+                                    disabled={processing}
+                                    className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
                                 >
-                                    <ChevronLeft size={16} />
+                                    <ChevronLeft size={13} />
                                     {step === 1 ? "Cancel" : "Back"}
                                 </button>
 
@@ -1724,10 +2050,11 @@ export default function Index({
                                     <button
                                         type="button"
                                         onClick={handleNext}
-                                        className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                                        disabled={processing}
+                                        className="inline-flex items-center gap-1 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
                                     >
                                         Next
-                                        <ChevronRight size={16} />
+                                        <ChevronRight size={13} />
                                     </button>
                                 ) : (
                                     <button
@@ -1737,7 +2064,7 @@ export default function Index({
                                             processing ||
                                             summaryIssues.length > 0
                                         }
-                                        className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                         <Save size={15} />
                                         {processing

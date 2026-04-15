@@ -11,6 +11,15 @@ const EditGradeCategoriesModal = ({
     quarter = 1,
     onSuccess,
 }) => {
+    const isAttendanceCategory = (category) => {
+        const categoryId = String(category?.id ?? "").toLowerCase();
+        const categoryLabel = String(category?.label ?? "").toLowerCase();
+
+        return (
+            categoryId === "attendance" || categoryLabel.includes("attendance")
+        );
+    };
+
     const isQuarterlyExamCategory = (category) => {
         const categoryId = String(category?.id ?? "").toLowerCase();
         const categoryLabel = String(category?.label ?? "").toLowerCase();
@@ -144,6 +153,27 @@ const EditGradeCategoriesModal = ({
                 id: newId,
                 label: "New Category",
                 weight: 0,
+                tasks: [],
+            },
+        ]);
+    };
+
+    const addAttendanceCategory = () => {
+        const attendanceExists = localCategories.some((category) =>
+            isAttendanceCategory(category),
+        );
+
+        if (attendanceExists) {
+            showToast.error("Attendance category already exists.");
+            return;
+        }
+
+        setLocalCategories((prev) => [
+            ...prev,
+            {
+                id: "attendance",
+                label: "Attendance",
+                weight: 5,
                 tasks: [],
             },
         ]);
@@ -346,9 +376,19 @@ const EditGradeCategoriesModal = ({
                                                     e.target.value,
                                                 )
                                             }
+                                            disabled={isAttendanceCategory(
+                                                category,
+                                            )}
                                             className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                             placeholder="Category name"
                                         />
+                                        {isAttendanceCategory(category) && (
+                                            <p className="mt-1 text-[11px] text-indigo-600">
+                                                Attendance is dynamic and
+                                                auto-calculated from attendance
+                                                logs.
+                                            </p>
+                                        )}
                                     </div>
 
                                     {/* Weight Input */}
@@ -454,6 +494,19 @@ const EditGradeCategoriesModal = ({
                         Add New Category
                     </button>
 
+                    {!localCategories.some((category) =>
+                        isAttendanceCategory(category),
+                    ) && (
+                        <button
+                            type="button"
+                            onClick={addAttendanceCategory}
+                            className="mt-2 w-full py-2.5 border-2 border-dashed border-emerald-300 rounded-lg text-sm text-emerald-700 hover:border-emerald-400 hover:text-emerald-800 transition flex items-center justify-center gap-2 bg-emerald-50"
+                        >
+                            <Plus size={16} />
+                            Add Attendance (Default 5%)
+                        </button>
+                    )}
+
                     {/* Info Note */}
                     <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                         <h4 className="text-sm font-semibold text-blue-800 mb-1.5">
@@ -468,6 +521,10 @@ const EditGradeCategoriesModal = ({
                             <li>
                                 • Categories with tasks cannot be removed -
                                 remove tasks first
+                            </li>
+                            <li>
+                                • Attendance uses Present / Total Meetings and
+                                is auto-computed from Attendance Module
                             </li>
                             <li>
                                 • Use "Distribute Evenly" to auto-balance

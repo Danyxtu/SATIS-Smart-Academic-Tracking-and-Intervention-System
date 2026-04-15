@@ -30,7 +30,7 @@ class EnrollmentGradeService
      */
     public function recalculateClassGrades(SchoolClass $subjectTeacher): void
     {
-        $subjectTeacher->load(['enrollments.grades']);
+        $subjectTeacher->load(['enrollments.grades', 'enrollments.attendanceRecords']);
         $storedCategories = $subjectTeacher->grade_categories ?? [];
 
         foreach ($subjectTeacher->enrollments as $enrollment) {
@@ -56,17 +56,18 @@ class EnrollmentGradeService
         // Resolve categories per quarter
         $q1Categories = $this->resolveCategories($storedCategories, 1);
         $q2Categories = $this->resolveCategories($storedCategories, 2);
+        $attendanceRate = $this->resolveAttendanceRate($enrollment);
 
         // --- Quarter 1 ---
-        $initialQ1 = $this->computeInitialGrade($q1Grades, $q1Categories);
-        $expectedQ1 = $this->computeExpectedGrade($q1Grades, $q1Categories);
+        $initialQ1 = $this->computeInitialGrade($q1Grades, $q1Categories, $attendanceRate);
+        $expectedQ1 = $this->computeExpectedGrade($q1Grades, $q1Categories, $attendanceRate);
         $q1Transmuted = $initialQ1 !== null
             ? $this->transmutationService->transmuteGrade($initialQ1)
             : null;
 
         // --- Quarter 2 ---
-        $initialQ2 = $this->computeInitialGrade($q2Grades, $q2Categories);
-        $expectedQ2 = $this->computeExpectedGrade($q2Grades, $q2Categories);
+        $initialQ2 = $this->computeInitialGrade($q2Grades, $q2Categories, $attendanceRate);
+        $expectedQ2 = $this->computeExpectedGrade($q2Grades, $q2Categories, $attendanceRate);
         $q2Transmuted = $initialQ2 !== null
             ? $this->transmutationService->transmuteGrade($initialQ2)
             : null;
@@ -115,7 +116,7 @@ class EnrollmentGradeService
      *
      * Returns null if no scores exist.
      */
-    private function computeInitialGrade(array $grades, array $categories): ?float
+    private function computeInitialGrade(array $grades, array $categories, ?float $attendanceRate = null): ?float
     {
         $totalWeight = 0;
         $weightedScore = 0;
@@ -124,6 +125,15 @@ class EnrollmentGradeService
         foreach ($categories as $category) {
             $tasks = $category['tasks'] ?? [];
             $weight = (float) ($category['weight'] ?? 0);
+
+            if ($this->isAttendanceCategory($category)) {
+                if ($weight > 0 && $attendanceRate !== null) {
+                    $weightedScore += $attendanceRate * $weight;
+                    $totalWeight += $weight;
+                    $hasAnyScore = true;
+                }
+                continue;
+            }
 
             if (empty($tasks) || $weight <= 0) {
                 continue;
@@ -169,12 +179,16 @@ class EnrollmentGradeService
      *
      * Returns null if fewer than 2 scored tasks exist (can't determine a trend).
      */
-    private function computeExpectedGrade(array $grades, array $categories): ?float
+    private function computeExpectedGrade(array $grades, array $categories, ?float $attendanceRate = null): ?float
     {
         // 1) Collect chronological task percentages across ALL categories
         $taskPercentages = [];
 
         foreach ($categories as $category) {
+            if ($this->isAttendanceCategory($category)) {
+                continue;
+            }
+
             foreach ($category['tasks'] ?? [] as $task) {
                 $value = $grades[$task['id']] ?? null;
                 $total = (float) ($task['total'] ?? 0);
@@ -208,6 +222,14 @@ class EnrollmentGradeService
         foreach ($categories as $category) {
             $tasks = $category['tasks'] ?? [];
             $weight = (float) ($category['weight'] ?? 0);
+
+            if ($this->isAttendanceCategory($category)) {
+                if ($weight > 0 && $attendanceRate !== null) {
+                    $weightedScore += $attendanceRate * $weight;
+                    $totalWeight += $weight;
+                }
+                continue;
+            }
 
             if (empty($tasks) || $weight <= 0) {
                 continue;
@@ -273,6 +295,31 @@ class EnrollmentGradeService
 
         // Legacy flat format — same categories for both quarters
         return $storedCategories;
+    }
+
+    private function isAttendanceCategory(array $category): bool
+    {
+        $id = strtolower((string) ($category['id'] ?? ''));
+        $label = strtolower((string) ($category['label'] ?? ''));
+
+        return $id === 'attendance' || str_contains($label, 'attendance');
+    }
+
+    private function resolveAttendanceRate(Enrollment $enrollment): ?float
+    {
+        $records = $enrollment->relationLoaded('attendanceRecords')
+            ? $enrollment->attendanceRecords
+            : $enrollment->attendanceRecords()->get();
+
+        $totalMeetings = $records->count();
+
+        if ($totalMeetings <= 0) {
+            return null;
+        }
+
+        $presentCount = $records->where('status', 'present')->count();
+
+        return max(0.0, min(1.0, $presentCount / $totalMeetings));
     }
 
     private function deriveRemarks(?int $finalGrade): ?string

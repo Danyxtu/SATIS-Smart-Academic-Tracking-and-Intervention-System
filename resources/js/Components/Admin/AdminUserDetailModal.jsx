@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { useForm } from "@inertiajs/react";
+import { router, useForm } from "@inertiajs/react";
 import {
     BookOpen,
+    Copy,
     Mail,
     Pencil,
+    QrCode,
     Save,
+    Send,
     Shield,
     User,
     UserCog,
     X,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import Modal from "@/Components/Modal";
 
 function RolePill({ role }) {
@@ -88,6 +92,12 @@ export default function AdminUserDetailModal({
     );
     const [editMode, setEditMode] = useState(mode === "edit");
     const [panel, setPanel] = useState("info");
+    const [resetDelivery, setResetDelivery] = useState("email");
+    const [resetProcessing, setResetProcessing] = useState(false);
+    const [resetErrors, setResetErrors] = useState({});
+    const [resetNotice, setResetNotice] = useState("");
+    const [resetCredentials, setResetCredentials] = useState(null);
+    const [resetCopied, setResetCopied] = useState(false);
 
     const { data, setData, put, processing, errors, clearErrors } = useForm({
         first_name: "",
@@ -122,6 +132,12 @@ export default function AdminUserDetailModal({
         const shouldEdit = mode === "edit";
         setEditMode(shouldEdit);
         setPanel(shouldEdit ? "edit" : "info");
+        setResetDelivery("email");
+        setResetProcessing(false);
+        setResetErrors({});
+        setResetNotice("");
+        setResetCredentials(null);
+        setResetCopied(false);
     }, [show, activeUser?.id, mode]);
 
     const fullName = [
@@ -135,6 +151,44 @@ export default function AdminUserDetailModal({
     const subjectRows = Array.isArray(activeUser?.subjects)
         ? activeUser.subjects
         : [];
+    const isStudentRole = (activeUser?.role || data.role) === "student";
+    const canSendEmail = Boolean(
+        (activeUser?.email || activeUser?.personal_email || "").trim(),
+    );
+
+    const sectionDisplay = [
+        activeUser?.grade_level,
+        activeUser?.strand || activeUser?.specialization,
+        activeUser?.section_name || activeUser?.section,
+    ]
+        .filter((value) => String(value || "").trim() !== "")
+        .join(" - ");
+
+    const resetQrPayload = useMemo(() => {
+        if (!resetCredentials?.password) {
+            return "";
+        }
+
+        return JSON.stringify({
+            type: "satis_student_credentials",
+            version: 1,
+            user_id: resetCredentials.user_id || activeUser?.id,
+            username:
+                resetCredentials.username ||
+                activeUser?.username ||
+                activeUser?.email ||
+                activeUser?.personal_email ||
+                "",
+            lrn: resetCredentials.lrn || null,
+            password: resetCredentials.password,
+        });
+    }, [
+        resetCredentials,
+        activeUser?.id,
+        activeUser?.username,
+        activeUser?.email,
+        activeUser?.personal_email,
+    ]);
 
     const handleClose = () => {
         if (processing) {
@@ -171,6 +225,69 @@ export default function AdminUserDetailModal({
         });
     };
 
+    const handleResetPassword = () => {
+        if (!activeUser?.id || resetProcessing) {
+            return;
+        }
+
+        setResetProcessing(true);
+        setResetErrors({});
+        setResetNotice("");
+        setResetCopied(false);
+
+        router.post(
+            route("admin.users.reset-password", activeUser.id),
+            { delivery: resetDelivery },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: (page) => {
+                    const flash = page?.props?.flash || {};
+
+                    setResetNotice(
+                        flash?.success ||
+                            "Temporary password was generated successfully.",
+                    );
+                    setResetCredentials(
+                        flash?.password_reset_credentials || null,
+                    );
+
+                    // Keep modal open for QR delivery so the student can scan.
+                    if (resetDelivery === "email") {
+                        onSaved?.(activeUser.id);
+                    }
+                },
+                onError: (formErrors) => {
+                    setResetErrors(formErrors || {});
+                },
+                onFinish: () => {
+                    setResetProcessing(false);
+                },
+            },
+        );
+    };
+
+    const handleCopyResetCredentials = async () => {
+        if (!resetCredentials?.password) {
+            return;
+        }
+
+        const content = [
+            `Name: ${resetCredentials.full_name || fullName || "-"}`,
+            `LRN: ${resetCredentials.lrn || "-"}`,
+            `Username: ${resetCredentials.username || activeUser?.username || "-"}`,
+            `Temporary Password: ${resetCredentials.password || "-"}`,
+        ].join("\n");
+
+        try {
+            await navigator.clipboard.writeText(content);
+            setResetCopied(true);
+            window.setTimeout(() => setResetCopied(false), 1800);
+        } catch {
+            setResetCopied(false);
+        }
+    };
+
     const userInitials =
         `${String(activeUser?.first_name || "").charAt(0)}${String(activeUser?.last_name || "").charAt(0)}`
             .toUpperCase()
@@ -181,14 +298,18 @@ export default function AdminUserDetailModal({
             ? "Subjects and Teachers"
             : panel === "edit"
               ? "Edit User"
-              : "User Information";
+              : panel === "reset"
+                ? "Reset Password"
+                : "User Information";
 
     const panelSubtitle =
         panel === "subjects"
             ? "Enrolled subjects and assigned teachers"
             : panel === "edit"
               ? "Update user fields with prefilled values"
-              : "Personal and role details";
+              : panel === "reset"
+                ? "Generate temporary credentials and deliver via email or QR"
+                : "Personal and role details";
 
     return (
         <Modal
@@ -249,6 +370,15 @@ export default function AdminUserDetailModal({
                                     }}
                                     icon={Pencil}
                                     label="Edit mode"
+                                />
+                                <NavItem
+                                    active={panel === "reset"}
+                                    onClick={() => {
+                                        setEditMode(false);
+                                        setPanel("reset");
+                                    }}
+                                    icon={Shield}
+                                    label="Reset password"
                                 />
                             </div>
                         </div>
@@ -324,7 +454,7 @@ export default function AdminUserDetailModal({
                                     />
                                     <DetailRow
                                         label="Section"
-                                        value={activeUser?.section}
+                                        value={sectionDisplay}
                                     />
                                 </div>
                             )}
@@ -454,6 +584,7 @@ export default function AdminUserDetailModal({
                                                         event.target.value,
                                                     )
                                                 }
+                                                disabled={isStudentRole}
                                                 className={`w-full rounded-xl border px-3 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 ${
                                                     errors.role
                                                         ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
@@ -468,6 +599,12 @@ export default function AdminUserDetailModal({
                                                 </option>
                                             </select>
                                             <FieldError message={errors.role} />
+                                            {isStudentRole && (
+                                                <p className="mt-1 text-xs text-slate-500">
+                                                    Student role is locked and
+                                                    cannot be edited here.
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
 
@@ -500,10 +637,183 @@ export default function AdminUserDetailModal({
                                     </div>
                                 </div>
                             )}
+
+                            {panel === "reset" && (
+                                <div className="space-y-4 rounded-lg border border-blue-200 bg-white p-4">
+                                    <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5">
+                                        <p className="text-sm font-semibold text-slate-900">
+                                            Reset Password
+                                        </p>
+                                        <p className="mt-1 text-xs text-slate-600">
+                                            Generate a temporary password and
+                                            deliver it through email or QR code.
+                                        </p>
+                                    </div>
+
+                                    <div className="w-full overflow-hidden rounded-xl border border-blue-200 bg-white">
+                                        <div className="grid w-full grid-cols-2">
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setResetDelivery("email")
+                                                }
+                                                className={`flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition ${
+                                                    resetDelivery === "email"
+                                                        ? "bg-blue-600 text-white"
+                                                        : "bg-white text-slate-700 hover:bg-blue-50"
+                                                }`}
+                                            >
+                                                <Send size={15} />
+                                                Send Through Email
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setResetDelivery("qr")
+                                                }
+                                                className={`flex items-center justify-center gap-2 border-l border-blue-200 px-4 py-3 text-sm font-semibold transition ${
+                                                    resetDelivery === "qr"
+                                                        ? "bg-blue-600 text-white"
+                                                        : "bg-white text-slate-700 hover:bg-blue-50"
+                                                }`}
+                                            >
+                                                <QrCode size={15} />
+                                                Show QR Code
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {resetDelivery === "email" &&
+                                        !canSendEmail && (
+                                            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                                Add an email first before using
+                                                email delivery.
+                                            </div>
+                                        )}
+
+                                    {resetErrors.delivery && (
+                                        <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                            {resetErrors.delivery}
+                                        </div>
+                                    )}
+
+                                    {resetErrors.email && (
+                                        <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                            {resetErrors.email}
+                                        </div>
+                                    )}
+
+                                    {resetNotice && (
+                                        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                                            {resetNotice}
+                                        </div>
+                                    )}
+
+                                    {resetDelivery === "qr" && (
+                                        <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3">
+                                            {resetQrPayload ? (
+                                                <div className="grid gap-3 md:grid-cols-[180px_1fr]">
+                                                    <div className="flex items-center justify-center rounded-md border border-blue-200 bg-white p-2">
+                                                        <QRCodeSVG
+                                                            value={
+                                                                resetQrPayload
+                                                            }
+                                                            size={150}
+                                                            includeMargin
+                                                        />
+                                                    </div>
+
+                                                    <div className="space-y-2">
+                                                        <div className="rounded-md border border-blue-200 bg-white px-3 py-2">
+                                                            <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+                                                                Full Name
+                                                            </p>
+                                                            <p className="text-sm font-semibold text-slate-800">
+                                                                {resetCredentials?.full_name ||
+                                                                    fullName ||
+                                                                    "-"}
+                                                            </p>
+                                                        </div>
+
+                                                        <div className="rounded-md border border-blue-200 bg-white px-3 py-2">
+                                                            <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+                                                                Username
+                                                            </p>
+                                                            <p className="break-all font-mono text-sm text-slate-800">
+                                                                {resetCredentials?.username ||
+                                                                    activeUser?.username ||
+                                                                    "-"}
+                                                            </p>
+                                                        </div>
+
+                                                        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                                                            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                                                                Temporary
+                                                                Password
+                                                            </p>
+                                                            <p className="break-all font-mono text-sm text-amber-800">
+                                                                {resetCredentials?.password ||
+                                                                    "-"}
+                                                            </p>
+                                                        </div>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={
+                                                                handleCopyResetCredentials
+                                                            }
+                                                            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                                                resetCopied
+                                                                    ? "bg-emerald-100 text-emerald-700"
+                                                                    : "bg-blue-600 text-white hover:bg-blue-700"
+                                                            }`}
+                                                        >
+                                                            <Copy size={13} />
+                                                            {resetCopied
+                                                                ? "Credentials Copied"
+                                                                : "Copy Credentials"}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <p className="text-xs text-slate-600">
+                                                    Generate temporary
+                                                    credentials to view QR code.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex items-center justify-end gap-2 border-t border-blue-200 bg-white px-5 py-3">
-                            {!editMode ? (
+                            {panel === "reset" ? (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={handleClose}
+                                        className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
+                                    >
+                                        Close
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleResetPassword}
+                                        disabled={
+                                            resetProcessing ||
+                                            (resetDelivery === "email" &&
+                                                !canSendEmail)
+                                        }
+                                        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                                    >
+                                        <Shield size={14} />
+                                        {resetProcessing
+                                            ? "Generating..."
+                                            : "Generate Temporary Password"}
+                                    </button>
+                                </>
+                            ) : !editMode ? (
                                 <>
                                     <button
                                         type="button"

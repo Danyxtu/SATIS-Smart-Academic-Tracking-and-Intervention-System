@@ -5,15 +5,52 @@
  * Each helper receives the full grades object and picks the right quarter slice.
  */
 
-const calculateFinalGrade = (grades = {}, categories = [], quarter = 1) => {
+const isAttendanceCategory = (category = {}) => {
+    const id = String(category?.id ?? "").toLowerCase();
+    const label = String(category?.label ?? "").toLowerCase();
+
+    return id === "attendance" || label.includes("attendance");
+};
+
+const resolveAttendanceRate = (attendanceSummary = {}) => {
+    const presentDays = Number(attendanceSummary?.present_days ?? 0);
+    const totalDays = Number(attendanceSummary?.total_days ?? 0);
+
+    if (!Number.isFinite(totalDays) || totalDays <= 0) {
+        return null;
+    }
+
+    const safePresentDays = Number.isFinite(presentDays) ? presentDays : 0;
+    const rate = safePresentDays / totalDays;
+
+    return Math.max(0, Math.min(1, rate));
+};
+
+const calculateFinalGrade = (
+    grades = {},
+    categories = [],
+    quarter = 1,
+    attendanceSummary = null,
+) => {
     if (!categories.length) return "N/A";
 
     const quarterGrades = grades?.[quarter] ?? {};
+    const attendanceRate = resolveAttendanceRate(attendanceSummary);
 
     let totalWeight = 0;
     let weightedScore = 0;
 
     categories.forEach((category) => {
+        if (isAttendanceCategory(category)) {
+            if (attendanceRate === null || !category.weight) {
+                return;
+            }
+
+            weightedScore += attendanceRate * category.weight;
+            totalWeight += category.weight;
+            return;
+        }
+
         const tasks = category?.tasks ?? [];
         if (!tasks.length || !category.weight) {
             return;
@@ -60,17 +97,41 @@ const calculateFinalGrade = (grades = {}, categories = [], quarter = 1) => {
     return `${percentage.toFixed(1)}%`;
 };
 
-const calculateOverallFinalGrade = (grades = {}, categories = []) => {
-    const q1Complete = isQuarterComplete(grades, categories, 1);
-    const q2Complete = isQuarterComplete(grades, categories, 2);
+const calculateOverallFinalGrade = (
+    grades = {},
+    categories = [],
+    attendanceSummary = null,
+) => {
+    const q1Complete = isQuarterComplete(
+        grades,
+        categories,
+        1,
+        attendanceSummary,
+    );
+    const q2Complete = isQuarterComplete(
+        grades,
+        categories,
+        2,
+        attendanceSummary,
+    );
 
     // Final grade is only available when both quarters are complete
     if (!q1Complete || !q2Complete) {
         return "—";
     }
 
-    const q1Grade = calculateFinalGrade(grades, categories, 1);
-    const q2Grade = calculateFinalGrade(grades, categories, 2);
+    const q1Grade = calculateFinalGrade(
+        grades,
+        categories,
+        1,
+        attendanceSummary,
+    );
+    const q2Grade = calculateFinalGrade(
+        grades,
+        categories,
+        2,
+        attendanceSummary,
+    );
 
     if (q1Grade === "—" || q2Grade === "—") {
         return "—";
@@ -92,10 +153,12 @@ const calculateExpectedQuarterlyGrade = (
     grades = {},
     categories = [],
     quarter = 1,
+    attendanceSummary = null,
 ) => {
     if (!categories.length) return "N/A";
 
     const quarterGrades = grades?.[quarter] ?? {};
+    const attendanceRate = resolveAttendanceRate(attendanceSummary);
 
     let totalEarned = 0;
     let totalPossible = 0;
@@ -104,6 +167,10 @@ const calculateExpectedQuarterlyGrade = (
 
     // First pass: calculate current performance rate
     categories.forEach((category) => {
+        if (isAttendanceCategory(category)) {
+            return;
+        }
+
         const tasks = category?.tasks ?? [];
         tasks.forEach((task) => {
             totalTasksCount++;
@@ -141,6 +208,14 @@ const calculateExpectedQuarterlyGrade = (
     let totalWeight = 0;
 
     categories.forEach((category) => {
+        if (isAttendanceCategory(category)) {
+            if (attendanceRate !== null && category.weight) {
+                weightedScore += attendanceRate * category.weight;
+                totalWeight += category.weight;
+            }
+            return;
+        }
+
         const tasks = category?.tasks ?? [];
         if (!tasks.length || !category.weight) {
             return;
@@ -208,12 +283,22 @@ const hasQuarterlyExamScores = (grades = {}, categories = [], quarter = 1) => {
 };
 
 // Check if quarter is complete (all categories have at least some scores)
-const isQuarterComplete = (grades = {}, categories = [], quarter = 1) => {
+const isQuarterComplete = (
+    grades = {},
+    categories = [],
+    quarter = 1,
+    attendanceSummary = null,
+) => {
     if (!categories.length) return false;
 
     const quarterGrades = grades?.[quarter] ?? {};
+    const attendanceRate = resolveAttendanceRate(attendanceSummary);
 
     return categories.every((category) => {
+        if (isAttendanceCategory(category)) {
+            return attendanceRate !== null;
+        }
+
         const tasks = category?.tasks ?? [];
         if (!tasks.length) return false;
 

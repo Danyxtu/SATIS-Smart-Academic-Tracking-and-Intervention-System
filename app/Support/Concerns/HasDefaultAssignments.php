@@ -135,6 +135,7 @@ trait HasDefaultAssignments
         'written_works'    => ['label' => 'Written Works',    'weight' => 0.30],
         'performance_task' => ['label' => 'Performance Task', 'weight' => 0.40],
         'quarterly_exam'   => ['label' => 'Quarterly Exam',   'weight' => 0.30],
+        'attendance'       => ['label' => 'Attendance',       'weight' => 0.05],
     ];
 
     /**
@@ -145,6 +146,14 @@ trait HasDefaultAssignments
         1 => ['id' => 'performance_task', 'label' => 'Performance Task', 'weight' => 0.40],
         2 => ['id' => 'quarterly_exam',   'label' => 'Quarterly Exam',   'weight' => 0.30],
     ];
+
+    private function isAttendanceCategory(array $category): bool
+    {
+        $id = strtolower((string) ($category['id'] ?? ''));
+        $label = strtolower((string) ($category['label'] ?? ''));
+
+        return $id === 'attendance' || str_contains($label, 'attendance');
+    }
 
     protected function normalizeGradeCategories(?array $categories = null): array
     {
@@ -185,6 +194,20 @@ trait HasDefaultAssignments
                 $weight = $this->normalizeCategoryWeight(
                     $storedWeight ?? ($known['weight'] ?? null)
                 );
+
+                if ($this->isAttendanceCategory($category)) {
+                    $id = 'attendance';
+                    $label = 'Attendance';
+                    // Attendance score is dynamic and must not have manual tasks.
+                    $tasks = [];
+
+                    return [
+                        'id' => $id,
+                        'label' => $label,
+                        'weight' => $weight > 0 ? $weight : 0.05,
+                        'tasks' => $tasks,
+                    ];
+                }
 
                 $tasks = collect($category['tasks'] ?? [])
                     ->map(function ($task, $taskIndex) use ($id) {

@@ -507,15 +507,107 @@ class UserController extends Controller
      */
     public function resetPassword(Request $request, User $user)
     {
+        // Backward compatibility: allow direct password reset if provided.
+        if ($request->filled('password')) {
+            $validated = $request->validate([
+                'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            ]);
+
+            $user->update([
+                'password' => Hash::make($validated['password']),
+                'must_change_password' => true,
+                'password_changed_at' => null,
+                'temporary_password' => $user->hasRole('student')
+                    ? $validated['password']
+                    : null,
+            ]);
+
+            return back()->with('success', 'Password reset successfully.');
+        }
+
         $validated = $request->validate([
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'delivery' => ['required', Rule::in(['email', 'qr'])],
         ]);
+
+        $delivery = (string) $validated['delivery'];
+
+        if ($delivery === 'email' && blank($user->email)) {
+            return back()->withErrors([
+                'email' => 'Cannot send temporary credentials because this account has no email address.',
+            ]);
+        }
+
+        $tempPassword = $this->generateTemporaryPassword();
+
+        $isStudent = $user->hasRole('student');
 
         $user->update([
-            'password' => Hash::make($validated['password']),
+            'password' => Hash::make($tempPassword),
+            'must_change_password' => true,
+            'password_changed_at' => null,
+            'temporary_password' => $isStudent ? $tempPassword : null,
         ]);
 
-        return back()->with('success', 'Password reset successfully.');
+        if ($delivery === 'email') {
+            if ($isStudent) {
+                Mail::to($user->email)->send(new TemporaryCredentials(
+                    user: $user,
+                    plainPassword: $tempPassword,
+                    issuedBy: Auth::user(),
+                    context: 'password reset',
+                ));
+            } else {
+                Mail::to($user->email)->send(new TeacherCredentials(
+                    teacher: $user,
+                    plainPassword: $tempPassword,
+                    issuedBy: Auth::user(),
+                ));
+            }
+        }
+
+        $message = $delivery === 'email'
+            ? 'Temporary credentials were sent via email.'
+            : 'Temporary credentials generated. Share the QR code with the user.';
+
+        $response = back()->with('success', $message);
+
+        if ($isStudent || $delivery === 'qr') {
+            $user->loadMissing('student');
+
+            $response = $response->with('password_reset_credentials', $this->buildResetCredentialPayload(
+                $user,
+                $tempPassword,
+                $user->student,
+            ));
+        }
+
+        return $response;
+    }
+
+    private function generateTemporaryPassword(int $length = 8): string
+    {
+        $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+        $tempPassword = '';
+
+        for ($i = 0; $i < $length; $i++) {
+            $tempPassword .= $chars[random_int(0, strlen($chars) - 1)];
+        }
+
+        return $tempPassword;
+    }
+
+    private function buildResetCredentialPayload(User $user, string $tempPassword, ?Student $student = null): array
+    {
+        $resolvedStudent = $student ?? $user->student;
+        $loginIdentifier = (string) ($user->username ?: $user->email ?: '');
+
+        return [
+            'user_id' => $user->id,
+            'full_name' => $user->name,
+            'lrn' => $resolvedStudent?->lrn,
+            'username' => $loginIdentifier,
+            'password' => $tempPassword,
+        ];
     }
 
     /**

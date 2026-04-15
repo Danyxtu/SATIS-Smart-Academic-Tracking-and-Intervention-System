@@ -44,6 +44,7 @@ class GradeCalculationController extends Controller
             'subject',
             'enrollments.user.student',
             'enrollments.grades',
+            'enrollments.attendanceRecords',
         ]);
 
         // Build per-quarter grade structure
@@ -77,7 +78,7 @@ class GradeCalculationController extends Controller
 
         // Find the specific enrollment
         $enrollment = $subjectTeacher->enrollments()
-            ->with(['user.student', 'grades'])
+            ->with(['user.student', 'grades', 'attendanceRecords'])
             ->findOrFail($enrollmentId);
 
         // Build per-quarter grade structure
@@ -110,7 +111,7 @@ class GradeCalculationController extends Controller
         ]);
 
         // Load relationships
-        $query = $subjectTeacher->enrollments()->with(['user.student', 'grades']);
+        $query = $subjectTeacher->enrollments()->with(['user.student', 'grades', 'attendanceRecords']);
 
         // If specific enrollment IDs provided, filter by them
         if (isset($data['enrollment_ids'])) {

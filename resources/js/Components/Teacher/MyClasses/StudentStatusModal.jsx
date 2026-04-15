@@ -49,6 +49,8 @@ const StudentStatusModal = ({
         ? hasQuarterlyExamScores(student.grades, q1Categories, 1)
         : false;
 
+    const attendanceSummary = student?.attendance?.summary ?? {};
+
     // Calculate grades for the selected quarter
     const quarterlyGrade =
         hasQuarterlyExamScores &&
@@ -61,6 +63,7 @@ const StudentStatusModal = ({
                   student.grades,
                   currentCategories,
                   selectedQuarter,
+                  attendanceSummary,
               )
             : "—";
     const expectedGrade = calculateExpectedQuarterlyGrade
@@ -68,12 +71,16 @@ const StudentStatusModal = ({
               student.grades,
               currentCategories,
               selectedQuarter,
+              attendanceSummary,
           )
         : "—";
     const finalGrade = calculateOverallFinalGrade
-        ? calculateOverallFinalGrade(student.grades, gradeCategories)
+        ? calculateOverallFinalGrade(
+              student.grades,
+              gradeCategories,
+              attendanceSummary,
+          )
         : "—";
-    const attendanceSummary = student?.attendance?.summary ?? {};
     const attendanceRecords = Array.isArray(student?.attendance?.records)
         ? student.attendance.records
         : [];

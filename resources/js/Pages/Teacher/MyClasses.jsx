@@ -13,6 +13,9 @@ import {
     XCircle,
     Copy,
     Users,
+    X,
+    HelpCircle,
+    Info,
 } from "lucide-react";
 
 // Utils
@@ -118,6 +121,8 @@ const MyClasses = ({
         return classIdFromUrl ? parseInt(classIdFromUrl) : null;
     });
     const [isAddClassModalOpen, setIsAddClassModalOpen] = useState(false);
+    const [showGradesHelp, setShowGradesHelp] = useState(false);
+    const [isFadingOut, setIsFadingOut] = useState(false);
     const [editClassModal, setEditClassModal] = useState({
         open: false,
         classData: null,
@@ -389,6 +394,32 @@ const MyClasses = ({
         setDeleteClassModal({ open: false, classData: null });
     }, [isSemesterViewOnly]);
 
+    useEffect(() => {
+        let fadeOutTimer;
+        let removeTimer;
+
+        if (showGradesHelp) {
+            setIsFadingOut(false);
+
+            fadeOutTimer = setTimeout(() => {
+                setIsFadingOut(true);
+            }, 9500);
+
+            removeTimer = setTimeout(() => {
+                setShowGradesHelp(false);
+            }, 10000);
+        }
+
+        return () => {
+            clearTimeout(fadeOutTimer);
+            clearTimeout(removeTimer);
+        };
+    }, [showGradesHelp]);
+
+    const handleCloseGradesHelp = () => {
+        setShowGradesHelp(false);
+    };
+
     const refreshClassData = async (
         classId,
         { showGlobalLoading = false } = {},
@@ -625,7 +656,71 @@ const MyClasses = ({
                     )}
 
                     {!hasSelectedClass && (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-4 relative">
+                            {/* Help Button & Bubble */}
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowGradesHelp(true)}
+                                    className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors dark:text-slate-400 dark:hover:text-indigo-400 mt-1"
+                                >
+                                    <HelpCircle size={14} />
+                                    <span className="underline decoration-dashed underline-offset-4">
+                                        How grades are calculated?
+                                    </span>
+                                </button>
+
+                                {/* Bubble Message */}
+                                {showGradesHelp && (
+                                    <div
+                                        className={`absolute top-full right-0 mt-3 z-[100] w-72 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-4 transition-opacity duration-500 ease-in-out ${isFadingOut ? "opacity-0" : "opacity-100"}`}
+                                    >
+                                        <button
+                                            onClick={handleCloseGradesHelp}
+                                            className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors bg-slate-100 dark:bg-slate-700 rounded-full p-1"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <Info
+                                                size={16}
+                                                className="text-indigo-500"
+                                            />
+                                            <h4 className="font-semibold text-sm text-slate-900 dark:text-white">
+                                                Grade Calculation
+                                            </h4>
+                                        </div>
+                                        <div className="text-xs text-slate-600 dark:text-slate-300 space-y-3">
+                                            <div className="bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-600">
+                                                <p className="font-medium text-slate-800 dark:text-slate-200 mb-1">
+                                                    Quarterly Grade
+                                                </p>
+                                                <p className="text-slate-500 dark:text-slate-400">
+                                                    Quarterly Grade = (Written
+                                                    Works × weight(n%)) +
+                                                    (Performance Tasks ×
+                                                    weight(n%)) + (Quarterly
+                                                    Exam × weight(n%))
+                                                </p>
+                                            </div>
+                                            <div className="bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-600">
+                                                <p className="font-medium text-slate-800 dark:text-slate-200 mb-1">
+                                                    Final Grade
+                                                </p>
+                                                <p className="text-slate-500 dark:text-slate-400">
+                                                    (Q1 Grade + Q2 Grade) / 2
+                                                </p>
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 italic leading-tight">
+                                                Note: Percentages may vary
+                                                depending on the subject type
+                                                (Core, Applied, Specialized).
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             <button
                                 type="button"
                                 onClick={() => {

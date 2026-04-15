@@ -13,6 +13,8 @@ import {
     ChevronRight,
     Users,
     X,
+    HelpCircle,
+    Info,
 } from "lucide-react";
 // Utils
 import {
@@ -293,6 +295,13 @@ const isQuarterlyExamCategory = (category = {}) => {
     );
 };
 
+const isAttendanceCategory = (category = {}) => {
+    const categoryId = String(category.id ?? "").toLowerCase();
+    const categoryLabel = String(category.label ?? "").toLowerCase();
+
+    return categoryId === "attendance" || categoryLabel.includes("attendance");
+};
+
 const orderQuarterCategories = (categories = []) => {
     const list = Array.isArray(categories) ? categories : [];
     const nonQuarterly = [];
@@ -319,6 +328,19 @@ const toNumericGradeValue = (rawValue) => {
     return Number.isFinite(numericValue) ? numericValue : null;
 };
 
+const getAttendanceMetrics = (student = {}) => {
+    const summary = student?.attendance?.summary ?? {};
+    const presentDays = Number(summary?.present_days ?? 0);
+    const totalDays = Number(summary?.total_days ?? 0);
+    const rate = totalDays > 0 ? presentDays / totalDays : null;
+
+    return {
+        presentDays,
+        totalDays,
+        rate,
+    };
+};
+
 const calculateQuarterCategoryBreakdown = ({
     student,
     categories,
@@ -332,8 +354,24 @@ const calculateQuarterCategoryBreakdown = ({
     let hasAnyContribution = false;
 
     (categories ?? []).forEach((category) => {
-        const tasks = category?.tasks ?? [];
         const weight = Number(category?.weight ?? 0);
+
+        if (isAttendanceCategory(category)) {
+            const attendance = getAttendanceMetrics(student);
+
+            if (attendance.rate === null || !weight) {
+                contributionByCategory[category.id] = null;
+                return;
+            }
+
+            const contribution = attendance.rate * weight * 100;
+            contributionByCategory[category.id] = contribution;
+            totalAdded += contribution;
+            hasAnyContribution = true;
+            return;
+        }
+
+        const tasks = category?.tasks ?? [];
 
         if (!tasks.length || !weight) {
             contributionByCategory[category.id] = null;
@@ -624,6 +662,8 @@ const MyClass = (props) => {
     const [isUploadingClasslist, setIsUploadingClasslist] = useState(false);
     const [uploadError, setUploadError] = useState(null);
     const [uploadSuccess, setUploadSuccess] = useState(null);
+    const [showGradesHelp, setShowGradesHelp] = useState(false);
+    const [isFadingOut, setIsFadingOut] = useState(false);
     const classlistUploadRef = useRef(null);
     const gradeUploadRef = useRef(null);
     const hasHydratedViewFromUrl = useRef(false);
@@ -640,10 +680,7 @@ const MyClass = (props) => {
         }));
     };
     const isQuarterlyExam = (category) => {
-        return (
-            category.id === "quarterly_exam" ||
-            category.label?.toLowerCase().includes("quarterly exam")
-        );
+        return isQuarterlyExamCategory(category);
     };
     const getLatestTask = (category) => {
         const tasks = category?.tasks ?? [];
@@ -960,6 +997,32 @@ const MyClass = (props) => {
         }
     }, [taskColumnModal.isOpen, selectedTaskColumnData]);
 
+    useEffect(() => {
+        let fadeOutTimer;
+        let removeTimer;
+
+        if (showGradesHelp) {
+            setIsFadingOut(false);
+
+            fadeOutTimer = setTimeout(() => {
+                setIsFadingOut(true);
+            }, 9500);
+
+            removeTimer = setTimeout(() => {
+                setShowGradesHelp(false);
+            }, 10000);
+        }
+
+        return () => {
+            clearTimeout(fadeOutTimer);
+            clearTimeout(removeTimer);
+        };
+    }, [showGradesHelp]);
+
+    const handleCloseGradesHelp = () => {
+        setShowGradesHelp(false);
+    };
+
     const refreshCurrentClassData = async () => {
         if (!selectedClass?.id || typeof onRefreshClassData !== "function") {
             return;
@@ -1251,6 +1314,10 @@ const MyClass = (props) => {
     const handleAutoAddCategoryTask = (category) => {
         if (isReadOnlyView) return;
         if (!category || isSavingCategoryTask) return;
+
+        if (isAttendanceCategory(category)) {
+            return;
+        }
 
         if (
             isQuarterlyExamCategory(category) &&
@@ -1755,6 +1822,70 @@ const MyClass = (props) => {
                                     Grades
                                 </button>
                             </div>
+
+                            {/* Help Button & Bubble */}
+                            <div className="relative ml-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowGradesHelp(true)}
+                                    className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors dark:text-slate-400 dark:hover:text-indigo-400"
+                                >
+                                    <HelpCircle size={14} />
+                                    <span className="underline decoration-dashed underline-offset-4 hidden sm:inline">
+                                        How grades are calculated?
+                                    </span>
+                                </button>
+
+                                {/* Bubble Message */}
+                                {showGradesHelp && (
+                                    <div
+                                        className={`absolute top-full left-0 lg:left-auto lg:right-0 mt-3 z-[100] w-72 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-4 transition-opacity duration-500 ease-in-out ${isFadingOut ? "opacity-0" : "opacity-100"}`}
+                                    >
+                                        <button
+                                            onClick={handleCloseGradesHelp}
+                                            className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors bg-slate-100 dark:bg-slate-700 rounded-full p-1"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <Info
+                                                size={16}
+                                                className="text-indigo-500"
+                                            />
+                                            <h4 className="font-semibold text-sm text-slate-900 dark:text-white">
+                                                Grade Calculation
+                                            </h4>
+                                        </div>
+                                        <div className="text-xs text-slate-600 dark:text-slate-300 space-y-3">
+                                            <div className="bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-600">
+                                                <p className="font-medium text-slate-800 dark:text-slate-200 mb-1">
+                                                    Quarterly Grade
+                                                </p>
+                                                <p className="text-slate-500 dark:text-slate-400">
+                                                    Quarterly Grade = (Written
+                                                    Works × weight(n%)) +
+                                                    (Performance Tasks ×
+                                                    weight(n%)) + (Quarterly
+                                                    Exam × weight(n%))
+                                                </p>
+                                            </div>
+                                            <div className="bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-600">
+                                                <p className="font-medium text-slate-800 dark:text-slate-200 mb-1">
+                                                    Final Grade
+                                                </p>
+                                                <p className="text-slate-500 dark:text-slate-400">
+                                                    (Q1 Grade + Q2 Grade) / 2
+                                                </p>
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 italic leading-tight">
+                                                Note: Percentages may vary
+                                                depending on the subject type
+                                                (Core, Applied, Specialized).
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -2106,10 +2237,10 @@ const MyClass = (props) => {
                                         <thead className="bg-gray-50 dark:bg-gray-800">
                                             {/* Compact header with smaller text */}
                                             <tr>
-                                                <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[160px]">
+                                                <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[160px]">
                                                     Student Name
                                                 </th>
-                                                <th className="sticky left-[160px] z-20 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[100px]">
+                                                <th className="sticky left-[160px] z-20 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[100px]">
                                                     LRN
                                                 </th>
 
@@ -2146,6 +2277,9 @@ const MyClass = (props) => {
                                                                   );
                                                         const canAddTask =
                                                             !isReadOnlyView &&
+                                                            !isAttendanceCategory(
+                                                                category,
+                                                            ) &&
                                                             (!isQE ||
                                                                 tasks.length ===
                                                                     0);
@@ -2163,7 +2297,7 @@ const MyClass = (props) => {
                                                                 colSpan={
                                                                     colSpan
                                                                 }
-                                                                className="bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700"
+                                                                className="bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700"
                                                             >
                                                                 <div className="flex items-center gap-1.5">
                                                                     {!isQE &&
@@ -2210,7 +2344,7 @@ const MyClass = (props) => {
                                                                         {isCollapsed &&
                                                                             tasks.length >
                                                                                 1 && (
-                                                                                <span className="ml-1 text-[9px] text-gray-400 dark:text-gray-500">
+                                                                                <span className="ml-1 text-[9px] text-gray-500 dark:text-gray-400">
                                                                                     (
                                                                                     {
                                                                                         tasks.length
@@ -2295,13 +2429,17 @@ const MyClass = (props) => {
                                                             taskHeaderCells.push(
                                                                 <th
                                                                     key={`${category.id}-empty`}
-                                                                    className={`px-3 py-1.5 text-left text-[10px] font-medium text-gray-400 dark:text-gray-500 ${
+                                                                    className={`px-3 py-1.5 text-left text-[10px] font-medium text-gray-600 dark:text-gray-400 ${
                                                                         isReadOnlyView
                                                                             ? "border-r border-gray-200 dark:border-gray-700"
                                                                             : ""
                                                                     }`}
                                                                 >
-                                                                    No tasks
+                                                                    {isAttendanceCategory(
+                                                                        category,
+                                                                    )
+                                                                        ? "Auto from attendance"
+                                                                        : "No tasks"}
                                                                 </th>,
                                                             );
                                                         } else if (
@@ -2311,7 +2449,7 @@ const MyClass = (props) => {
                                                             taskHeaderCells.push(
                                                                 <th
                                                                     key={`${category.id}-collapsed`}
-                                                                    className={`px-3 py-1.5 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 bg-indigo-50/30 dark:bg-indigo-900/10 transition-colors hover:bg-indigo-100/50 dark:hover:bg-indigo-900/20 ${
+                                                                    className={`px-3 py-1.5 text-left text-[10px] font-medium text-gray-700 dark:text-gray-300 bg-indigo-50/30 dark:bg-indigo-900/10 transition-colors hover:bg-indigo-100/50 dark:hover:bg-indigo-900/20 ${
                                                                         isReadOnlyView
                                                                             ? "border-r border-gray-200 dark:border-gray-700"
                                                                             : ""
@@ -2332,7 +2470,7 @@ const MyClass = (props) => {
                                                                                 latestTask.label
                                                                             }
                                                                         </span>
-                                                                        <span className="text-[9px] font-normal text-gray-400 dark:text-gray-500">
+                                                                        <span className="text-[9px] font-normal text-gray-600 dark:text-gray-400">
                                                                             /{" "}
                                                                             {
                                                                                 latestTask.total
@@ -2357,7 +2495,7 @@ const MyClass = (props) => {
                                                                     taskHeaderCells.push(
                                                                         <th
                                                                             key={`${category.id}-${task.id}`}
-                                                                            className={`px-3 py-1.5 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 bg-indigo-50/30 dark:bg-indigo-900/10 transition-colors hover:bg-indigo-100/50 dark:hover:bg-indigo-900/20 ${
+                                                                            className={`px-3 py-1.5 text-left text-[10px] font-medium text-gray-700 dark:text-gray-300 bg-indigo-50/30 dark:bg-indigo-900/10 transition-colors hover:bg-indigo-100/50 dark:hover:bg-indigo-900/20 ${
                                                                                 hasRightBorder
                                                                                     ? "border-r border-gray-200 dark:border-gray-700"
                                                                                     : ""
@@ -2378,7 +2516,7 @@ const MyClass = (props) => {
                                                                                         task.label
                                                                                     }
                                                                                 </span>
-                                                                                <span className="text-[9px] font-normal text-gray-400 dark:text-gray-500">
+                                                                                <span className="text-[9px] font-normal text-gray-600 dark:text-gray-400">
                                                                                     /{" "}
                                                                                     {
                                                                                         task.total
@@ -2398,9 +2536,12 @@ const MyClass = (props) => {
                                                                     category,
                                                                 );
                                                             const canAddTask =
-                                                                !isQECategory ||
-                                                                tasks.length ===
-                                                                    0;
+                                                                !isAttendanceCategory(
+                                                                    category,
+                                                                ) &&
+                                                                (!isQECategory ||
+                                                                    tasks.length ===
+                                                                        0);
 
                                                             if (canAddTask) {
                                                                 taskHeaderCells.push(
@@ -2529,7 +2670,7 @@ const MyClass = (props) => {
                                                                 {formatAcademicMeta(
                                                                     student,
                                                                 ) && (
-                                                                    <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+                                                                    <div className="text-[10px] text-gray-600 dark:text-gray-300 truncate">
                                                                         {formatAcademicMeta(
                                                                             student,
                                                                         )}
@@ -2538,7 +2679,7 @@ const MyClass = (props) => {
                                                             </td>
                                                             {/* LRN - Compact */}
                                                             <td
-                                                                className={`sticky left-[160px] z-10 ${gradeColors.leftCell} px-3 py-2 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 min-w-[100px]`}
+                                                                className={`sticky left-[160px] z-10 ${gradeColors.leftCell} px-3 py-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700 min-w-[100px]`}
                                                             >
                                                                 {student.lrn}
                                                             </td>
@@ -2564,16 +2705,30 @@ const MyClass = (props) => {
                                                                     if (
                                                                         !tasks.length
                                                                     ) {
+                                                                        const attendanceMetrics =
+                                                                            getAttendanceMetrics(
+                                                                                student,
+                                                                            );
+                                                                        const attendanceLabel =
+                                                                            attendanceMetrics.totalDays >
+                                                                            0
+                                                                                ? `${attendanceMetrics.presentDays}/${attendanceMetrics.totalDays} (${(attendanceMetrics.rate * 100).toFixed(1)}%)`
+                                                                                : "—";
+
                                                                         gradeInputCells.push(
                                                                             <td
                                                                                 key={`${studentKey}-${category.id}-placeholder`}
-                                                                                className={`px-3 py-2 text-center text-xs text-gray-400 dark:text-gray-500 ${
+                                                                                className={`px-3 py-2 text-center text-xs text-gray-600 dark:text-gray-400 ${
                                                                                     isReadOnlyView
                                                                                         ? "border-r border-gray-200 dark:border-gray-700"
                                                                                         : ""
                                                                                 }`}
                                                                             >
-                                                                                —
+                                                                                {isAttendanceCategory(
+                                                                                    category,
+                                                                                )
+                                                                                    ? attendanceLabel
+                                                                                    : "—"}
                                                                             </td>,
                                                                         );
                                                                     } else if (
@@ -2745,11 +2900,14 @@ const MyClass = (props) => {
                                                                         !isReadOnlyView
                                                                     ) {
                                                                         const canAddTask =
-                                                                            !isQuarterlyExamCategory(
+                                                                            !isAttendanceCategory(
+                                                                                category,
+                                                                            ) &&
+                                                                            (!isQuarterlyExamCategory(
                                                                                 category,
                                                                             ) ||
-                                                                            tasks.length ===
-                                                                                0;
+                                                                                tasks.length ===
+                                                                                    0);
 
                                                                         if (
                                                                             canAddTask
@@ -2832,13 +2990,13 @@ const MyClass = (props) => {
                                             <tr>
                                                 <th
                                                     rowSpan={2}
-                                                    className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[160px]"
+                                                    className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[160px]"
                                                 >
                                                     Student Name
                                                 </th>
                                                 <th
                                                     rowSpan={2}
-                                                    className="bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[100px]"
+                                                    className="bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-[10px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 min-w-[100px]"
                                                 >
                                                     LRN
                                                 </th>
@@ -2993,14 +3151,14 @@ const MyClass = (props) => {
                                                                 {formatAcademicMeta(
                                                                     student,
                                                                 ) && (
-                                                                    <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+                                                                    <div className="text-[10px] text-gray-600 dark:text-gray-300 truncate">
                                                                         {formatAcademicMeta(
                                                                             student,
                                                                         )}
                                                                     </div>
                                                                 )}
                                                             </td>
-                                                            <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 min-w-[100px]">
+                                                            <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700 min-w-[100px]">
                                                                 {student.lrn}
                                                             </td>
 
@@ -3079,7 +3237,7 @@ const MyClass = (props) => {
                                                                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                                                         final_grade ==
                                                                         null
-                                                                            ? "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                                                                            ? "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                                                                             : final_grade >=
                                                                                 75
                                                                               ? "bg-green-100 text-green-800"
@@ -3101,7 +3259,7 @@ const MyClass = (props) => {
                                                                             : remarks ===
                                                                                 "Failed"
                                                                               ? "bg-red-100 text-red-800"
-                                                                              : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                                                                              : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                                                                     }`}
                                                                 >
                                                                     {remarks}

@@ -18,7 +18,7 @@ class GradeCalculationService
      *
      * $grades is a quarter-grouped array: [ 1 => [ taskId => score ], 2 => [ taskId => score ] ]
      */
-    public function calculateFinalGrade(array $grades, array $categories, int $quarter = 1): string
+    public function calculateFinalGrade(array $grades, array $categories, int $quarter = 1, ?float $attendanceRate = null): string
     {
         if (empty($categories)) {
             return 'N/A';
@@ -32,6 +32,14 @@ class GradeCalculationService
         foreach ($categories as $category) {
             $tasks = $category['tasks'] ?? [];
             $weight = $category['weight'] ?? 0;
+
+            if ($this->isAttendanceCategory($category)) {
+                if ($weight && $attendanceRate !== null) {
+                    $weightedScore += $attendanceRate * $weight;
+                    $totalWeight += $weight;
+                }
+                continue;
+            }
 
             if (empty($tasks) || !$weight) {
                 continue;
@@ -103,7 +111,7 @@ class GradeCalculationService
     /**
      * Check if quarter is complete (all categories have at least some scores)
      */
-    public function isQuarterComplete(array $grades, array $categories, int $quarter = 1): bool
+    public function isQuarterComplete(array $grades, array $categories, int $quarter = 1, ?float $attendanceRate = null): bool
     {
         if (empty($categories)) {
             return false;
@@ -112,6 +120,14 @@ class GradeCalculationService
         $quarterGrades = $grades[$quarter] ?? [];
 
         foreach ($categories as $category) {
+            if ($this->isAttendanceCategory($category)) {
+                if ($attendanceRate === null) {
+                    return false;
+                }
+
+                continue;
+            }
+
             $tasks = $category['tasks'] ?? [];
             if (empty($tasks)) {
                 return false;
@@ -138,22 +154,22 @@ class GradeCalculationService
     /**
      * Calculate the overall final grade (average of Q1 and Q2)
      */
-    public function calculateOverallFinalGrade(array $grades, array $q1Categories, array $q2Categories = []): string
+    public function calculateOverallFinalGrade(array $grades, array $q1Categories, array $q2Categories = [], ?float $attendanceRate = null): string
     {
         // If q2Categories not provided, use q1Categories for both (legacy compat)
         if (empty($q2Categories)) {
             $q2Categories = $q1Categories;
         }
 
-        $q1Complete = $this->isQuarterComplete($grades, $q1Categories, 1);
-        $q2Complete = $this->isQuarterComplete($grades, $q2Categories, 2);
+        $q1Complete = $this->isQuarterComplete($grades, $q1Categories, 1, $attendanceRate);
+        $q2Complete = $this->isQuarterComplete($grades, $q2Categories, 2, $attendanceRate);
 
         if (!$q1Complete || !$q2Complete) {
             return '—';
         }
 
-        $q1Grade = $this->calculateFinalGrade($grades, $q1Categories, 1);
-        $q2Grade = $this->calculateFinalGrade($grades, $q2Categories, 2);
+        $q1Grade = $this->calculateFinalGrade($grades, $q1Categories, 1, $attendanceRate);
+        $q2Grade = $this->calculateFinalGrade($grades, $q2Categories, 2, $attendanceRate);
 
         if ($q1Grade === '—' || $q2Grade === '—') {
             return '—';
@@ -253,18 +269,44 @@ class GradeCalculationService
 
         $q1Categories = $gradeStructure['1']['categories'] ?? $gradeStructure['categories'] ?? [];
         $q2Categories = $gradeStructure['2']['categories'] ?? $gradeStructure['categories'] ?? [];
+        $attendanceRate = $this->resolveAttendanceRate($enrollment);
 
         return [
-            'q1_grade' => $this->calculateFinalGrade($grades, $q1Categories, 1),
-            'q2_grade' => $this->calculateFinalGrade($grades, $q2Categories, 2),
-            'overall_grade' => $this->calculateOverallFinalGrade($grades, $q1Categories, $q2Categories),
-            'q1_complete' => $this->isQuarterComplete($grades, $q1Categories, 1),
-            'q2_complete' => $this->isQuarterComplete($grades, $q2Categories, 2),
+            'q1_grade' => $this->calculateFinalGrade($grades, $q1Categories, 1, $attendanceRate),
+            'q2_grade' => $this->calculateFinalGrade($grades, $q2Categories, 2, $attendanceRate),
+            'overall_grade' => $this->calculateOverallFinalGrade($grades, $q1Categories, $q2Categories, $attendanceRate),
+            'q1_complete' => $this->isQuarterComplete($grades, $q1Categories, 1, $attendanceRate),
+            'q2_complete' => $this->isQuarterComplete($grades, $q2Categories, 2, $attendanceRate),
             'q1_has_exam' => $this->hasQuarterlyExamScores($grades, $q1Categories, 1),
             'q2_has_exam' => $this->hasQuarterlyExamScores($grades, $q2Categories, 2),
             'q1_expected' => $this->calculateExpectedQuarterlyGrade($grades, $q1Categories, 1),
             'q2_expected' => $this->calculateExpectedQuarterlyGrade($grades, $q2Categories, 2),
         ];
+    }
+
+    private function isAttendanceCategory(array $category): bool
+    {
+        $id = strtolower((string) ($category['id'] ?? ''));
+        $label = strtolower((string) ($category['label'] ?? ''));
+
+        return $id === 'attendance' || str_contains($label, 'attendance');
+    }
+
+    private function resolveAttendanceRate(Enrollment $enrollment): ?float
+    {
+        $records = $enrollment->relationLoaded('attendanceRecords')
+            ? $enrollment->attendanceRecords
+            : $enrollment->attendanceRecords()->get();
+
+        $totalMeetings = $records->count();
+
+        if ($totalMeetings <= 0) {
+            return null;
+        }
+
+        $presentCount = $records->where('status', 'present')->count();
+
+        return max(0.0, min(1.0, $presentCount / $totalMeetings));
     }
 
     /**
