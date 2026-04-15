@@ -268,20 +268,19 @@ implements MustVerifyEmailContract
     }
 
     /**
-     * Enforce email verification for students and super admins.
-     * Other non-student roles keep legacy behavior.
+     * Enforce email verification for super admins, teachers, and students.
      */
     public function hasVerifiedEmail(): bool
     {
-        if ($this->isSuperAdmin()) {
+        if ($this->isSuperAdmin() || $this->isTeacher()) {
             return filled((string) $this->personal_email) && ! is_null($this->email_verified_at);
         }
 
-        if (! $this->isStudent()) {
-            return true;
+        if ($this->isStudent()) {
+            return ! is_null($this->email_verified_at);
         }
 
-        return ! is_null($this->email_verified_at);
+        return true;
     }
 
     /**

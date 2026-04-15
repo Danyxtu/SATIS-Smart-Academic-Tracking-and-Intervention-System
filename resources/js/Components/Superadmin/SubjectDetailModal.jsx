@@ -7,6 +7,12 @@ export default function SubjectDetailModal({
     loading = false,
     error = "",
     row,
+    subjectManageMode = "view",
+    onSubjectSaved,
+    onSubjectDeleted,
+    typeOptions = [],
+    semesterOptions = [],
+    gradeLevelOptions = [],
 }) {
     return (
         <ManagementDetailModal
@@ -17,6 +23,12 @@ export default function SubjectDetailModal({
             loading={loading}
             error={error}
             row={row}
+            subjectManageMode={subjectManageMode}
+            onSubjectSaved={onSubjectSaved}
+            onSubjectDeleted={onSubjectDeleted}
+            subjectTypeOptions={typeOptions}
+            subjectSemesterOptions={semesterOptions}
+            subjectGradeLevelOptions={gradeLevelOptions}
         />
     );
 }

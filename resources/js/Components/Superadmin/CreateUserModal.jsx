@@ -34,7 +34,6 @@ const STUDENT_MODE_CSV = "csv";
 
 const STUDENT_GRADE_LEVEL_OPTIONS = ["11", "12"];
 
-const PASSWORD_MASK = "********";
 const STUDENT_USERNAME_FORMAT = /^[a-z]{2}\d{4}\d{5}$/;
 const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const LRN_LENGTH = 12;
@@ -69,6 +68,7 @@ const STEPS = [
 
 function WizardStep({
     step,
+    displayIndex,
     currentStep,
     maxVisitedStep,
     onNavigate,
@@ -106,7 +106,7 @@ function WizardStep({
                     isDone ? "bg-emerald-600 text-white" : "bg-white"
                 }`}
             >
-                {isDone ? <Check size={10} /> : step.id}
+                {isDone ? <Check size={10} /> : displayIndex + 1}
             </span>
             <Icon size={12} />
             <span>{step.label}</span>
@@ -690,6 +690,24 @@ export default function CreateUserModal({
         return studentMode === STUDENT_MODE_SINGLE;
     }, [isTeacher, teacherMode, studentMode]);
 
+    const visibleSteps = useMemo(
+        () =>
+            isTeacher
+                ? STEPS.filter((wizardStep) => wizardStep.id !== STEP_SECURITY)
+                : STEPS,
+        [isTeacher],
+    );
+
+    const activeVisibleStepIndex = useMemo(() => {
+        const currentIndex = visibleSteps.findIndex(
+            (wizardStep) => wizardStep.id === step,
+        );
+
+        return currentIndex >= 0 ? currentIndex : 0;
+    }, [visibleSteps, step]);
+
+    const activeVisibleStep = visibleSteps[activeVisibleStepIndex] ?? null;
+
     useEffect(() => {
         if (open && !wasOpenRef.current) {
             reset();
@@ -940,7 +958,7 @@ export default function CreateUserModal({
             return;
         }
 
-        if (errorKeys.some((field) => field === "password")) {
+        if (!isTeacher && errorKeys.some((field) => field === "password")) {
             setStep(STEP_SECURITY);
             return;
         }
@@ -969,7 +987,7 @@ export default function CreateUserModal({
         ) {
             setStep(STEP_PROFILE);
         }
-    }, [open, errors, step]);
+    }, [open, errors, step, isTeacher]);
 
     const closeModal = () => {
         if (processing) {
@@ -1512,6 +1530,11 @@ export default function CreateUserModal({
     const validateSecurityStep = () => {
         const nextErrors = {};
 
+        if (isTeacher) {
+            setClientErrors(nextErrors);
+            return true;
+        }
+
         if (!String(data.password || "").trim()) {
             nextErrors.password = "Password is required.";
         }
@@ -1534,11 +1557,23 @@ export default function CreateUserModal({
             return;
         }
 
-        if (step === STEP_PROFILE && !validateProfileStep()) {
+        if (step === STEP_PROFILE) {
+            if (!validateProfileStep()) {
+                return;
+            }
+
+            setClientErrors({});
+            setStep(isTeacher ? STEP_REVIEW : STEP_SECURITY);
             return;
         }
 
-        if (step === STEP_SECURITY && !validateSecurityStep()) {
+        if (step === STEP_SECURITY) {
+            if (!validateSecurityStep()) {
+                return;
+            }
+
+            setClientErrors({});
+            setStep(STEP_REVIEW);
             return;
         }
 
@@ -1554,6 +1589,11 @@ export default function CreateUserModal({
 
         if (step === STEP_USER_SELECTION) {
             closeModal();
+            return;
+        }
+
+        if (isTeacher && step === STEP_REVIEW) {
+            setStep(STEP_PROFILE);
             return;
         }
 
@@ -1603,7 +1643,6 @@ export default function CreateUserModal({
             payload = {
                 role: "teacher",
                 teacher_mode: TEACHER_MODE_MULTIPLE,
-                password: data.password,
                 teacher_queue: teacherQueue.map((queueItem) => ({
                     first_name: queueItem.first_name,
                     last_name: queueItem.last_name,
@@ -1634,7 +1673,6 @@ export default function CreateUserModal({
                 last_name: data.last_name,
                 middle_name: data.middle_name,
                 email: data.email,
-                password: data.password,
                 role: "teacher",
                 teacher_mode: TEACHER_MODE_SINGLE,
                 assign_as_admin: Boolean(data.assign_as_admin),
@@ -1771,8 +1809,9 @@ export default function CreateUserModal({
                                 Create User Wizard
                             </h2>
                             <p className="text-xs text-emerald-100">
-                                Step {step} of {STEPS.length}:{" "}
-                                {STEPS[step - 1].label}
+                                Step {activeVisibleStepIndex + 1} of{" "}
+                                {visibleSteps.length}:{" "}
+                                {activeVisibleStep?.label}
                             </p>
                         </div>
                     </div>
@@ -1780,10 +1819,11 @@ export default function CreateUserModal({
 
                 <div className="shrink-0 border-b border-emerald-100 px-6 py-3">
                     <div className="flex flex-wrap items-center gap-2">
-                        {STEPS.map((wizardStep) => (
+                        {visibleSteps.map((wizardStep, stepIndex) => (
                             <WizardStep
                                 key={wizardStep.id}
                                 step={wizardStep}
+                                displayIndex={stepIndex}
                                 currentStep={step}
                                 maxVisitedStep={maxVisitedStep}
                                 onNavigate={handleVisitedStepNavigation}
@@ -1844,7 +1884,7 @@ export default function CreateUserModal({
                                                     </p>
                                                     <p className="text-xs text-slate-500">
                                                         {role === "teacher"
-                                                            ? "Manage department-linked teacher accounts"
+                                                            ? "Manage department-linked teacher accounts with server-generated credentials"
                                                             : "Create student credentials and QR access"}
                                                     </p>
                                                 </div>
@@ -2953,45 +2993,87 @@ export default function CreateUserModal({
 
                     {step === STEP_SECURITY && (
                         <div className="space-y-4 rounded-xl border border-emerald-100 bg-white p-4">
-                            <Field
-                                label="Password"
-                                icon={Lock}
-                                required
-                                error={errors.password || clientErrors.password}
-                            >
-                                <input
-                                    type="password"
-                                    value={data.password}
-                                    readOnly
-                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-emerald-500 focus:bg-white focus:ring-emerald-500"
-                                />
-                            </Field>
+                            {isTeacher ? (
+                                <>
+                                    <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                                        <Info
+                                            size={15}
+                                            className="mt-0.5 shrink-0 text-emerald-700"
+                                        />
+                                        <p className="text-xs leading-relaxed text-emerald-800">
+                                            <span className="font-semibold">
+                                                Teacher credentials are fully
+                                                server-generated.
+                                            </span>{" "}
+                                            Temporary username and password are
+                                            generated after account creation and
+                                            sent to the teacher&apos;s email.
+                                        </p>
+                                    </div>
 
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    setData(
-                                        "password",
-                                        generateRandomPassword(),
-                                    )
-                                }
-                                className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
-                            >
-                                <RefreshCw size={13} />
-                                Regenerate Password
-                            </button>
+                                    <div className="flex items-start gap-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+                                        <Info
+                                            size={15}
+                                            className="mt-0.5 shrink-0 text-amber-600"
+                                        />
+                                        <p className="text-xs leading-relaxed text-amber-800">
+                                            <span className="font-semibold">
+                                                Next login flow:
+                                            </span>{" "}
+                                            Teacher must create a new password
+                                            on first login, then verify email
+                                            before accessing the teacher portal.
+                                        </p>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <Field
+                                        label="Password"
+                                        icon={Lock}
+                                        required
+                                        error={
+                                            errors.password ||
+                                            clientErrors.password
+                                        }
+                                    >
+                                        <input
+                                            type="password"
+                                            value={data.password}
+                                            readOnly
+                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-emerald-500 focus:bg-white focus:ring-emerald-500"
+                                        />
+                                    </Field>
 
-                            <div className="flex items-start gap-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
-                                <Info
-                                    size={15}
-                                    className="mt-0.5 shrink-0 text-amber-600"
-                                />
-                                <p className="text-xs leading-relaxed text-amber-800">
-                                    <span className="font-semibold">Note:</span>{" "}
-                                    The user will be required to change their
-                                    password on first login.
-                                </p>
-                            </div>
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setData(
+                                                "password",
+                                                generateRandomPassword(),
+                                            )
+                                        }
+                                        className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                                    >
+                                        <RefreshCw size={13} />
+                                        Regenerate Password
+                                    </button>
+
+                                    <div className="flex items-start gap-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+                                        <Info
+                                            size={15}
+                                            className="mt-0.5 shrink-0 text-amber-600"
+                                        />
+                                        <p className="text-xs leading-relaxed text-amber-800">
+                                            <span className="font-semibold">
+                                                Note:
+                                            </span>{" "}
+                                            The user will be required to change
+                                            their password on first login.
+                                        </p>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     )}
 
@@ -3199,13 +3281,15 @@ export default function CreateUserModal({
                                 </>
                             )}
 
-                            {!isStudent && (
+                            {isTeacher && (
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                        Generated Password
+                                        Credentials Delivery
                                     </p>
-                                    <p className="font-mono text-sm text-slate-800">
-                                        {data.password ? PASSWORD_MASK : "-"}
+                                    <p className="text-sm text-slate-700">
+                                        Temporary username and password will be
+                                        generated by the server and emailed to
+                                        the teacher after account creation.
                                     </p>
                                 </div>
                             )}

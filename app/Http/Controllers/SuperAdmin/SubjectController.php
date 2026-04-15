@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\SystemSetting;
 use App\Models\Subject;
 use App\Models\SubjectType;
 use Illuminate\Http\RedirectResponse;
@@ -37,10 +38,19 @@ class SubjectController extends Controller
         $typeFilter = $this->resolveTypeFilter($request->input('type'));
         $semesterFilter = $this->resolveSemesterFilter($request->input('semester'));
         $gradeLevelFilter = $this->resolveGradeLevelFilter($request->input('grade_level'));
+        $currentSchoolYear = $this->currentSchoolYear();
+        $currentSemester = $this->currentSemester();
 
         $query = Subject::query()
             ->with(['subjectTypes:id,type_key,name'])
-            ->withCount('subjectTeachers');
+            ->withCount([
+                'subjectTeachers',
+                'subjectTeachers as current_subject_teachers_count' => function ($builder) use ($currentSchoolYear, $currentSemester) {
+                    $builder
+                        ->where('school_year', $currentSchoolYear)
+                        ->where('semester', $currentSemester);
+                },
+            ]);
 
         if ($search !== '') {
             $query->where(function ($builder) use ($search) {
@@ -69,8 +79,11 @@ class SubjectController extends Controller
             ->withQueryString();
 
         $subjects->setCollection(
-            $subjects->getCollection()->map(function (Subject $subject) {
+            $subjects->getCollection()->map(function (Subject $subject) use ($currentSchoolYear, $currentSemester) {
                 $primaryType = $subject->primarySubjectType();
+                $currentClassesCount = (int) ($subject->current_subject_teachers_count ?? 0);
+                $canDelete = $currentClassesCount === 0;
+                $semesterLabel = $this->semesterLabel($currentSemester);
 
                 return [
                     'id' => $subject->id,
@@ -86,6 +99,13 @@ class SubjectController extends Controller
                         ->values()
                         ->all(),
                     'classes_count' => (int) ($subject->subject_teachers_count ?? 0),
+                    'current_classes_count' => $currentClassesCount,
+                    'can_delete' => $canDelete,
+                    'delete_blocked_reason' => $canDelete
+                        ? ''
+                        : "Cannot delete subject assigned to classes for {$currentSchoolYear}, {$semesterLabel}.",
+                    'current_school_year' => $currentSchoolYear,
+                    'current_semester' => $currentSemester,
                     'created_at' => $subject->created_at?->toIso8601String(),
                     'updated_at' => $subject->updated_at?->toIso8601String(),
                 ];
@@ -218,8 +238,20 @@ class SubjectController extends Controller
     {
         $this->authorize('delete-subject');
 
-        if ($subject->subjectTeachers()->exists()) {
-            return back()->with('error', 'Cannot delete subject assigned to active classes.');
+        $currentSchoolYear = $this->currentSchoolYear();
+        $currentSemester = $this->currentSemester();
+        $semesterLabel = $this->semesterLabel($currentSemester);
+
+        $isAssignedToCurrentClasses = $subject->subjectTeachers()
+            ->where('school_year', $currentSchoolYear)
+            ->where('semester', $currentSemester)
+            ->exists();
+
+        if ($isAssignedToCurrentClasses) {
+            return back()->with(
+                'error',
+                "Cannot delete subject assigned to classes for {$currentSchoolYear}, {$semesterLabel}."
+            );
         }
 
         $subject->delete();
@@ -447,5 +479,20 @@ class SubjectController extends Controller
     private function normalizeText(string $value): string
     {
         return preg_replace('/\s+/', ' ', trim($value)) ?? trim($value);
+    }
+
+    private function currentSchoolYear(): string
+    {
+        return trim((string) SystemSetting::getCurrentSchoolYear());
+    }
+
+    private function currentSemester(): string
+    {
+        return trim((string) SystemSetting::getCurrentSemester());
+    }
+
+    private function semesterLabel(string $semester): string
+    {
+        return $semester === '2' ? '2nd Semester' : '1st Semester';
     }
 }

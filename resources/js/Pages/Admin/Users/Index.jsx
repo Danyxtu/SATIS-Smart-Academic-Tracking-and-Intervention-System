@@ -202,9 +202,6 @@ const SortHeader = ({
 
 // Create User Modal
 const CreateUserModal = ({ isOpen, onClose, department, initialRole }) => {
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
     const { data, setData, post, processing, errors, reset, clearErrors } =
         useForm({
             first_name: "",
@@ -212,8 +209,6 @@ const CreateUserModal = ({ isOpen, onClose, department, initialRole }) => {
             middle_name: "",
             lrn: "",
             email: "",
-            password: "",
-            password_confirmation: "",
             role: initialRole,
         });
 
@@ -229,8 +224,6 @@ const CreateUserModal = ({ isOpen, onClose, department, initialRole }) => {
         onClose();
         reset();
         clearErrors();
-        setShowPassword(false);
-        setShowConfirmPassword(false);
     };
 
     const handleSubmit = (e) => {
@@ -351,7 +344,9 @@ const CreateUserModal = ({ isOpen, onClose, department, initialRole }) => {
                                                     </span>
                                                 </div>
                                                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                                    Requires a manual password.
+                                                    Login credentials are
+                                                    auto-generated and sent via
+                                                    email.
                                                 </p>
                                             </button>
                                         </div>
@@ -568,107 +563,19 @@ const CreateUserModal = ({ isOpen, onClose, department, initialRole }) => {
                                     )}
 
                                     {data.role === "teacher" && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
-                                                <label
-                                                    htmlFor="modal_password"
-                                                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                                                >
-                                                    Password *
-                                                </label>
-                                                <div className="relative">
-                                                    <Lock
-                                                        size={18}
-                                                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                                                    />
-                                                    <input
-                                                        id="modal_password"
-                                                        type={
-                                                            showPassword
-                                                                ? "text"
-                                                                : "password"
-                                                        }
-                                                        value={data.password}
-                                                        onChange={(e) =>
-                                                            setData(
-                                                                "password",
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        className="w-full pl-10 pr-10 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                                        placeholder="Enter password"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            setShowPassword(
-                                                                !showPassword,
-                                                            )
-                                                        }
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                    >
-                                                        {showPassword ? (
-                                                            <EyeOff size={18} />
-                                                        ) : (
-                                                            <Eye size={18} />
-                                                        )}
-                                                    </button>
-                                                </div>
-                                                {errors.password && (
-                                                    <p className="mt-1 text-sm text-red-600">
-                                                        {errors.password}
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            <div>
-                                                <label
-                                                    htmlFor="modal_password_confirmation"
-                                                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                                                >
-                                                    Confirm Password *
-                                                </label>
-                                                <div className="relative">
-                                                    <Lock
-                                                        size={18}
-                                                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                                                    />
-                                                    <input
-                                                        id="modal_password_confirmation"
-                                                        type={
-                                                            showConfirmPassword
-                                                                ? "text"
-                                                                : "password"
-                                                        }
-                                                        value={
-                                                            data.password_confirmation
-                                                        }
-                                                        onChange={(e) =>
-                                                            setData(
-                                                                "password_confirmation",
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        className="w-full pl-10 pr-10 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                                        placeholder="Confirm password"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            setShowConfirmPassword(
-                                                                !showConfirmPassword,
-                                                            )
-                                                        }
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                    >
-                                                        {showConfirmPassword ? (
-                                                            <EyeOff size={18} />
-                                                        ) : (
-                                                            <Eye size={18} />
-                                                        )}
-                                                    </button>
-                                                </div>
-                                            </div>
+                                        <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                            <Key
+                                                size={18}
+                                                className="text-blue-500 mt-0.5"
+                                            />
+                                            <p className="text-sm text-blue-700 dark:text-blue-300">
+                                                A secure temporary username and
+                                                password will be auto-generated
+                                                and sent to this teacher&apos;s
+                                                email. They must create a new
+                                                password and verify email on
+                                                first login.
+                                            </p>
                                         </div>
                                     )}
 

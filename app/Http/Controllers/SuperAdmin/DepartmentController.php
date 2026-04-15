@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\SuperAdmin;
 
-use App\Mail\TemporaryCredentials;
 use App\Http\Controllers\Controller;
+use App\Mail\TeacherCredentials;
 use App\Models\Department;
 use App\Models\SchoolClass;
 use App\Models\SchoolTrack;
@@ -355,6 +355,7 @@ class DepartmentController extends Controller
             'password' => Hash::make($tempPassword),
             'department_id' => $department->id,
             'must_change_password' => true,
+            'email_verified_at' => null,
             'status' => 'active',
             'created_by' => $request->user()?->id,
             'username' => null,
@@ -363,11 +364,10 @@ class DepartmentController extends Controller
         $teacher->syncRolesByName(['teacher']);
 
         try {
-            Mail::to($teacher->email)->send(new TemporaryCredentials(
-                user: $teacher,
+            Mail::to($teacher->email)->send(new TeacherCredentials(
+                teacher: $teacher,
                 plainPassword: $tempPassword,
                 issuedBy: $request->user(),
-                context: 'new teacher account',
             ));
         } catch (\Throwable $exception) {
             report($exception);

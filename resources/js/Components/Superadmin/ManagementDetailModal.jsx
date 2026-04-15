@@ -2,11 +2,14 @@ import axios from "axios";
 import { router, useForm } from "@inertiajs/react";
 import { useEffect, useMemo, useState } from "react";
 import {
+    ArrowLeft,
     ArrowRightLeft,
     BookOpen,
     Building2,
+    Check,
     CheckCircle,
     ClipboardList,
+    Copy,
     Layers,
     Pencil,
     Save,
@@ -21,6 +24,7 @@ import {
 } from "lucide-react";
 import Modal from "@/Components/Modal";
 import DepartmentDeleteConfirmModal from "@/Components/Superadmin/DepartmentDeleteConfirmModal";
+import SubjectDeleteConfirmModal from "@/Components/Superadmin/SubjectDeleteConfirmModal";
 
 const ROLE_LABELS = {
     super_admin: "Super Admin",
@@ -54,6 +58,28 @@ function formatDateTime(value) {
         hour: "2-digit",
         minute: "2-digit",
     });
+}
+
+function toSemesterLabel(semester) {
+    return String(semester) === "2" ? "2nd Semester" : "1st Semester";
+}
+
+function normalizeSemesterValue(semester) {
+    const normalized = String(semester ?? "").trim();
+
+    if (normalized === "1" || normalized === "2") {
+        return normalized;
+    }
+
+    return "";
+}
+
+function normalizeScalarOptions(options = [], fallback = []) {
+    if (!Array.isArray(options) || options.length === 0) {
+        return fallback;
+    }
+
+    return options.map((option) => String(option ?? "").trim()).filter(Boolean);
 }
 
 function toLabelRole(value) {
@@ -433,9 +459,15 @@ export default function ManagementDetailModal({
     departmentManageMode = "view",
     onDepartmentSaved,
     onDepartmentDeleted,
+    subjectManageMode = "view",
+    onSubjectSaved,
+    onSubjectDeleted,
     sectionManageMode = "view",
     onSectionSaved,
     trackOptions = [],
+    subjectTypeOptions = [],
+    subjectSemesterOptions = [],
+    subjectGradeLevelOptions = [],
     departmentOptions = [],
     teacherOptions = [],
     subjectOptions = [],
@@ -505,14 +537,66 @@ export default function ManagementDetailModal({
     const [sectionStudentsSyncing, setSectionStudentsSyncing] = useState(false);
     const [sectionStudentsSaveError, setSectionStudentsSaveError] =
         useState("");
+    const [subjectPersistedData, setSubjectPersistedData] = useState(null);
+    const [subjectEditMode, setSubjectEditMode] = useState(false);
+    const [subjectDeleting, setSubjectDeleting] = useState(false);
+    const [showSubjectDeleteModal, setShowSubjectDeleteModal] = useState(false);
+    const [subjectDeleteError, setSubjectDeleteError] = useState("");
+    const [subjectCopyStatus, setSubjectCopyStatus] = useState("idle");
+    const [userSemesterFilter, setUserSemesterFilter] = useState("all");
+    const [userQuarterFilter, setUserQuarterFilter] = useState("midterm");
+    const [selectedUserClassDetail, setSelectedUserClassDetail] =
+        useState(null);
 
     const isDepartmentTab = activeTab === "departments";
     const isSectionTab = activeTab === "sections";
+    const isSubjectTab = activeTab === "subjects";
     const isDepartmentCreateMode = departmentManageMode === "create";
+
+    const userRolesForModal = useMemo(() => {
+        if (activeTab !== "users") {
+            return [];
+        }
+
+        const currentUser = payload?.user || row || {};
+
+        return normalizeRoles(
+            currentUser.roles_list ||
+                currentUser.roles ||
+                (currentUser.role ? [currentUser.role] : []),
+        );
+    }, [activeTab, payload, row]);
+
+    const userHasTeacherRole =
+        activeTab === "users" && userRolesForModal.includes("teacher");
+    const userHasStudentRole =
+        activeTab === "users" &&
+        !userHasTeacherRole &&
+        userRolesForModal.includes("student");
 
     const resolvedTrackOptions = useMemo(
         () => normalizeTrackOptions(trackOptions),
         [trackOptions],
+    );
+
+    const resolvedSubjectTypeOptions = useMemo(
+        () =>
+            Array.isArray(subjectTypeOptions)
+                ? subjectTypeOptions.filter(
+                      (option) => option?.key && option?.label,
+                  )
+                : [],
+        [subjectTypeOptions],
+    );
+
+    const resolvedSubjectSemesterOptions = useMemo(
+        () => normalizeScalarOptions(subjectSemesterOptions, ["1", "2"]),
+        [subjectSemesterOptions],
+    );
+
+    const resolvedSubjectGradeLevelOptions = useMemo(
+        () => normalizeScalarOptions(subjectGradeLevelOptions, ["11", "12"]),
+        [subjectGradeLevelOptions],
     );
 
     const resolvedDepartmentOptions = useMemo(
@@ -569,6 +653,22 @@ export default function ManagementDetailModal({
         description: "",
         advisor_teacher_id: "",
         is_active: true,
+    });
+
+    const {
+        data: subjectData,
+        setData: setSubjectData,
+        put: putSubject,
+        processing: subjectSaving,
+        errors: subjectErrors,
+        clearErrors: clearSubjectErrors,
+    } = useForm({
+        subject_name: "",
+        subject_code: "",
+        total_hours: "",
+        type_key: "",
+        semester: "",
+        grade_level: "",
     });
 
     const sourceDepartment = useMemo(() => {
@@ -731,8 +831,76 @@ export default function ManagementDetailModal({
         };
     }, [isSectionTab, payload, row]);
 
+    const sourceSubject = useMemo(() => {
+        if (!isSubjectTab) {
+            return null;
+        }
+
+        const fallback = {
+            id: row?.id,
+            subject_name: row?.subject_name || row?.name,
+            subject_code: row?.subject_code || row?.code,
+            total_hours: row?.total_hours,
+            subject_type_key: row?.subject_type_key || row?.type_key,
+            subject_type_name: row?.subject_type_name || row?.type_name,
+            semester: row?.semester,
+            grade_level: row?.grade_level,
+            classes_count: row?.classes_count,
+            current_classes_count: row?.current_classes_count,
+            can_delete: row?.can_delete,
+            delete_blocked_reason: row?.delete_blocked_reason,
+            current_school_year: row?.current_school_year,
+            current_semester: row?.current_semester,
+            created_at: row?.created_at,
+            updated_at: row?.updated_at,
+        };
+
+        const incoming = payload?.subject || {};
+        const merged = {
+            ...fallback,
+            ...incoming,
+        };
+
+        return {
+            id: merged.id ?? null,
+            subject_name: merged.subject_name || merged.name || "",
+            subject_code: merged.subject_code || merged.code || "",
+            total_hours:
+                merged.total_hours === null || merged.total_hours === undefined
+                    ? ""
+                    : String(merged.total_hours),
+            subject_type_key: merged.subject_type_key || merged.type_key || "",
+            subject_type_name:
+                merged.subject_type_name || merged.type_name || "",
+            semester:
+                merged.semester === null || merged.semester === undefined
+                    ? ""
+                    : String(merged.semester),
+            grade_level:
+                merged.grade_level === null || merged.grade_level === undefined
+                    ? ""
+                    : String(merged.grade_level),
+            classes_count: asNumber(merged.classes_count, 0),
+            current_classes_count: asNumber(merged.current_classes_count, 0),
+            can_delete:
+                typeof merged.can_delete === "boolean"
+                    ? merged.can_delete
+                    : asNumber(merged.current_classes_count, 0) === 0,
+            delete_blocked_reason: merged.delete_blocked_reason || "",
+            current_school_year: merged.current_school_year || "",
+            current_semester:
+                merged.current_semester === null ||
+                merged.current_semester === undefined
+                    ? ""
+                    : String(merged.current_semester),
+            created_at: merged.created_at || "",
+            updated_at: merged.updated_at || "",
+        };
+    }, [isSubjectTab, payload, row]);
+
     const activeDepartment = deptPersistedDepartment || sourceDepartment;
     const activeSection = sectionPersistedData || sourceSection;
+    const activeSubject = subjectPersistedData || sourceSubject;
     const sourceDepartmentSyncKey = useMemo(() => {
         if (!sourceDepartment) {
             return "";
@@ -795,6 +963,28 @@ export default function ManagementDetailModal({
             sourceSection.students_count ?? "",
         ].join("::");
     }, [sourceSection]);
+
+    const sourceSubjectSyncKey = useMemo(() => {
+        if (!sourceSubject) {
+            return "";
+        }
+
+        return [
+            sourceSubject.id ?? "",
+            sourceSubject.subject_name ?? "",
+            sourceSubject.subject_code ?? "",
+            sourceSubject.total_hours ?? "",
+            sourceSubject.subject_type_key ?? "",
+            sourceSubject.semester ?? "",
+            sourceSubject.grade_level ?? "",
+            sourceSubject.classes_count ?? "",
+            sourceSubject.current_classes_count ?? "",
+            sourceSubject.can_delete ? "1" : "0",
+            sourceSubject.delete_blocked_reason ?? "",
+            sourceSubject.current_school_year ?? "",
+            sourceSubject.current_semester ?? "",
+        ].join("::");
+    }, [sourceSubject]);
 
     const sectionTeacherPool = useMemo(
         () => (Array.isArray(teacherOptions) ? teacherOptions : []),
@@ -1189,6 +1379,21 @@ export default function ManagementDetailModal({
         });
     };
 
+    const hydrateSubjectForm = (subject) => {
+        if (!subject) {
+            return;
+        }
+
+        setSubjectData({
+            subject_name: subject.subject_name || "",
+            subject_code: subject.subject_code || "",
+            total_hours: subject.total_hours || "",
+            type_key: subject.subject_type_key || "",
+            semester: subject.semester || "",
+            grade_level: subject.grade_level || "",
+        });
+    };
+
     useEffect(() => {
         if (!show || !isDepartmentTab) {
             return;
@@ -1333,6 +1538,28 @@ export default function ManagementDetailModal({
         clearSectionErrors,
         currentSchoolYear,
         sourceSection?.school_year,
+    ]);
+
+    useEffect(() => {
+        if (!show || !isSubjectTab) {
+            return;
+        }
+
+        setSubjectPersistedData(null);
+        hydrateSubjectForm(sourceSubject);
+        setSubjectEditMode(subjectManageMode === "edit");
+        setSubjectDeleting(false);
+        setShowSubjectDeleteModal(false);
+        setSubjectDeleteError("");
+        setSubjectCopyStatus("idle");
+        clearSubjectErrors();
+        setPanel("info");
+    }, [
+        show,
+        isSubjectTab,
+        sourceSubjectSyncKey,
+        subjectManageMode,
+        clearSubjectErrors,
     ]);
 
     useEffect(() => {
@@ -1556,8 +1783,31 @@ export default function ManagementDetailModal({
             return;
         }
 
+        if (activeTab === "users") {
+            setSelectedUserClassDetail(null);
+            setUserSemesterFilter("all");
+            setUserQuarterFilter("midterm");
+
+            if (userHasTeacherRole) {
+                setPanel("advisory");
+                return;
+            }
+
+            if (userHasStudentRole) {
+                setPanel("info");
+                return;
+            }
+        }
+
         setPanel("info");
-    }, [activeTab, show, payload, isDepartmentTab]);
+    }, [
+        activeTab,
+        show,
+        payload,
+        isDepartmentTab,
+        userHasTeacherRole,
+        userHasStudentRole,
+    ]);
 
     const data = (() => {
         if (activeTab === "students") {
@@ -2094,6 +2344,14 @@ export default function ManagementDetailModal({
                     current.roles ||
                     (current.role ? [current.role] : []),
             );
+            const hasTeacherRole = userRoles.includes("teacher");
+            const hasStudentRole =
+                !hasTeacherRole && userRoles.includes("student");
+            const prioritizedRole = hasTeacherRole
+                ? "teacher"
+                : hasStudentRole
+                  ? "student"
+                  : userRoles[0] || current.role;
             const userName =
                 current.name ||
                 [current.first_name, current.middle_name, current.last_name]
@@ -2105,22 +2363,888 @@ export default function ManagementDetailModal({
             const departmentCode =
                 current.department_code || current.department?.department_code;
 
+            const advisoryClasses = Array.isArray(
+                current.teacher_advisory_classes,
+            )
+                ? current.teacher_advisory_classes
+                : Array.isArray(current.advisory_classes)
+                  ? current.advisory_classes
+                  : [];
+
+            const teachingClasses = Array.isArray(
+                current.teacher_teaching_classes,
+            )
+                ? current.teacher_teaching_classes
+                : Array.isArray(current.teaching_classes)
+                  ? current.teaching_classes
+                  : [];
+
+            const studentSection =
+                current.student_section &&
+                typeof current.student_section === "object"
+                    ? current.student_section
+                    : null;
+
+            const studentClasses = Array.isArray(current.student_classes)
+                ? current.student_classes
+                : [];
+
+            const currentSemesterValue = normalizeSemesterValue(
+                current.current_semester,
+            );
+
+            const matchesSemester = (semesterValue) =>
+                userSemesterFilter === "all" ||
+                normalizeSemesterValue(semesterValue) === userSemesterFilter;
+
+            const advisoryClassesFiltered = advisoryClasses.filter((entry) => {
+                if (userSemesterFilter === "all") {
+                    return true;
+                }
+
+                const sectionClasses = Array.isArray(entry?.classes)
+                    ? entry.classes
+                    : [];
+
+                return sectionClasses.some((classEntry) =>
+                    matchesSemester(classEntry?.semester),
+                );
+            });
+
+            const teachingClassesFiltered = teachingClasses.filter((entry) =>
+                matchesSemester(entry?.semester),
+            );
+
+            const studentClassesFiltered = studentClasses.filter((entry) =>
+                matchesSemester(entry?.semester),
+            );
+
+            const secondSemesterStarted =
+                currentSemesterValue === "2" ||
+                studentClasses.some(
+                    (entry) => normalizeSemesterValue(entry?.semester) === "2",
+                );
+
+            const semesterFilterToggle =
+                hasTeacherRole || hasStudentRole ? (
+                    <div className="rounded-lg border border-emerald-200 bg-white p-1">
+                        <div className="grid w-full grid-cols-3 gap-1">
+                            {[
+                                { value: "all", label: "All Semester" },
+                                { value: "1", label: "1st Semester" },
+                                { value: "2", label: "2nd Semester" },
+                            ].map((option) => {
+                                const active =
+                                    userSemesterFilter === option.value;
+
+                                return (
+                                    <button
+                                        key={option.value}
+                                        type="button"
+                                        onClick={() =>
+                                            setUserSemesterFilter(option.value)
+                                        }
+                                        className={`w-full rounded-md px-3 py-2 text-[11px] font-semibold transition ${
+                                            active
+                                                ? "bg-emerald-600 text-white"
+                                                : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                        }`}
+                                    >
+                                        {option.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ) : null;
+
+            const selectedAdvisoryClass =
+                selectedUserClassDetail?.source === "advisory"
+                    ? selectedUserClassDetail.item
+                    : null;
+
+            const selectedTeachingClass =
+                selectedUserClassDetail?.source === "teaching"
+                    ? selectedUserClassDetail.item
+                    : null;
+
+            const selectedStudentClass =
+                selectedUserClassDetail?.source === "student"
+                    ? selectedUserClassDetail.item
+                    : null;
+
+            const advisoryPanel = (
+                <div className="space-y-3">
+                    {semesterFilterToggle}
+
+                    {selectedAdvisoryClass ? (
+                        <div className="space-y-3">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedUserClassDetail(null)}
+                                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                            >
+                                <ArrowLeft size={13} />
+                                Back to Advisory Classes
+                            </button>
+
+                            <div className="rounded-lg border border-emerald-200 bg-white p-3">
+                                <p className="text-sm font-semibold text-slate-900">
+                                    {selectedAdvisoryClass.section_label ||
+                                        selectedAdvisoryClass.section_name ||
+                                        "Advisory Section"}
+                                </p>
+                                <p className="mt-1 text-[11px] text-slate-500">
+                                    {selectedAdvisoryClass.section_code ||
+                                        "No section code"}
+                                    {selectedAdvisoryClass.school_year
+                                        ? ` • ${selectedAdvisoryClass.school_year}`
+                                        : ""}
+                                </p>
+
+                                <div className="mt-3 rounded-md bg-emerald-50 px-4">
+                                    <FieldRow
+                                        label="Grade level"
+                                        value={
+                                            selectedAdvisoryClass.grade_level
+                                                ? `Grade ${selectedAdvisoryClass.grade_level}`
+                                                : "-"
+                                        }
+                                    />
+                                    <FieldRow
+                                        label="Strand"
+                                        value={
+                                            selectedAdvisoryClass.strand || "-"
+                                        }
+                                    />
+                                    <FieldRow
+                                        label="Track"
+                                        value={
+                                            selectedAdvisoryClass.track || "-"
+                                        }
+                                    />
+                                    <FieldRow
+                                        label="Class records"
+                                        value={asNumber(
+                                            selectedAdvisoryClass.classes_count,
+                                            Array.isArray(
+                                                selectedAdvisoryClass.classes,
+                                            )
+                                                ? selectedAdvisoryClass.classes
+                                                      .length
+                                                : 0,
+                                        )}
+                                    />
+                                </div>
+                            </div>
+
+                            {(() => {
+                                const advisoryClassItems = Array.isArray(
+                                    selectedAdvisoryClass.classes,
+                                )
+                                    ? selectedAdvisoryClass.classes
+                                    : [];
+
+                                const filteredClassItems =
+                                    userSemesterFilter === "all"
+                                        ? advisoryClassItems
+                                        : advisoryClassItems.filter((item) =>
+                                              matchesSemester(item?.semester),
+                                          );
+
+                                if (filteredClassItems.length === 0) {
+                                    return (
+                                        <EmptyCard message="No advisory class records found for the selected semester." />
+                                    );
+                                }
+
+                                return (
+                                    <div className="space-y-2">
+                                        {filteredClassItems.map((item) => (
+                                            <div
+                                                key={`advisory-detail-${item.id || item.subject_id || item.subject_code || item.subject_name}`}
+                                                className="rounded-lg border border-emerald-200 bg-white p-3"
+                                            >
+                                                <p className="text-[13px] font-semibold text-slate-900">
+                                                    {item.subject_name ||
+                                                        "Unknown Subject"}
+                                                </p>
+                                                <p className="mt-1 text-[11px] text-slate-500">
+                                                    {item.subject_code ||
+                                                        "No subject code"}
+                                                    {item.semester
+                                                        ? ` • ${toSemesterLabel(item.semester)}`
+                                                        : ""}
+                                                </p>
+                                                <p className="mt-1 text-[11px] text-slate-500">
+                                                    Teacher:{" "}
+                                                    {item.teacher_name ||
+                                                        "Unassigned"}
+                                                    {` • ${asNumber(item.students_count, 0)} students`}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    ) : advisoryClassesFiltered.length === 0 ? (
+                        <EmptyCard message="No advisory classes found for the selected semester." />
+                    ) : (
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                <SummaryCard
+                                    label="Advisory classes"
+                                    value={advisoryClassesFiltered.length}
+                                />
+                                <SummaryCard
+                                    label="School year"
+                                    value={
+                                        advisoryClassesFiltered[0]
+                                            ?.school_year || "-"
+                                    }
+                                />
+                                <SummaryCard
+                                    label="Semester filter"
+                                    value={
+                                        userSemesterFilter === "all"
+                                            ? "All"
+                                            : toSemesterLabel(
+                                                  userSemesterFilter,
+                                              )
+                                    }
+                                    muted
+                                />
+                            </div>
+
+                            {advisoryClassesFiltered.map((entry) => {
+                                const sectionClasses = Array.isArray(
+                                    entry?.classes,
+                                )
+                                    ? entry.classes
+                                    : [];
+
+                                const filteredSectionClasses =
+                                    userSemesterFilter === "all"
+                                        ? sectionClasses
+                                        : sectionClasses.filter((item) =>
+                                              matchesSemester(item?.semester),
+                                          );
+
+                                const subjectMap = new Map();
+
+                                filteredSectionClasses.forEach((item) => {
+                                    const uniqueKey = [
+                                        item.subject_id ||
+                                            item.subject_code ||
+                                            item.subject_name ||
+                                            item.id ||
+                                            "subject",
+                                        normalizeSemesterValue(item.semester) ||
+                                            "all",
+                                    ].join("::");
+
+                                    if (!subjectMap.has(uniqueKey)) {
+                                        subjectMap.set(uniqueKey, {
+                                            subject_name: item.subject_name,
+                                            subject_code: item.subject_code,
+                                            semester: normalizeSemesterValue(
+                                                item.semester,
+                                            ),
+                                        });
+                                    }
+                                });
+
+                                const subjects = Array.from(
+                                    subjectMap.values(),
+                                );
+
+                                return (
+                                    <button
+                                        key={`advisory-${entry.id || entry.section_id || entry.section_name}`}
+                                        type="button"
+                                        onClick={() =>
+                                            setSelectedUserClassDetail({
+                                                source: "advisory",
+                                                item: entry,
+                                            })
+                                        }
+                                        className="w-full rounded-lg border border-emerald-200 bg-white p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50"
+                                    >
+                                        <p className="text-sm font-semibold text-slate-900">
+                                            {entry.section_label ||
+                                                entry.section_name ||
+                                                "Advisory Section"}
+                                        </p>
+                                        <p className="mt-1 text-[11px] text-slate-500">
+                                            {entry.section_code ||
+                                                "No section code"}
+                                            {entry.school_year
+                                                ? ` • ${entry.school_year}`
+                                                : ""}
+                                        </p>
+
+                                        <div className="mt-2 flex flex-wrap gap-1.5">
+                                            {subjects.length === 0 ? (
+                                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                                    No subject records
+                                                </span>
+                                            ) : (
+                                                subjects
+                                                    .slice(0, 4)
+                                                    .map((subject, index) => (
+                                                        <span
+                                                            key={`subject-chip-${entry.id}-${subject.subject_code || subject.subject_name || index}`}
+                                                            className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700"
+                                                        >
+                                                            {subject.subject_code ||
+                                                                subject.subject_name ||
+                                                                "Subject"}
+                                                            {subject.semester
+                                                                ? ` • Sem ${subject.semester}`
+                                                                : ""}
+                                                        </span>
+                                                    ))
+                                            )}
+                                            {subjects.length > 4 && (
+                                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                                    +{subjects.length - 4} more
+                                                </span>
+                                            )}
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+
+            const teachingPanel = (
+                <div className="space-y-3">
+                    {semesterFilterToggle}
+
+                    {selectedTeachingClass ? (
+                        <div className="space-y-3">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedUserClassDetail(null)}
+                                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                            >
+                                <ArrowLeft size={13} />
+                                Back to Teaching Classes
+                            </button>
+
+                            <div className="rounded-lg border border-emerald-200 bg-white p-3">
+                                <p className="text-sm font-semibold text-slate-900">
+                                    {selectedTeachingClass.section_label ||
+                                        selectedTeachingClass.section_name ||
+                                        "Teaching Class"}
+                                </p>
+                                <p className="mt-1 text-[13px] font-semibold text-emerald-700">
+                                    {selectedTeachingClass.subject_name ||
+                                        "Unknown Subject"}
+                                </p>
+
+                                <div className="mt-3 rounded-md bg-emerald-50 px-4">
+                                    <FieldRow
+                                        label="Subject code"
+                                        value={
+                                            selectedTeachingClass.subject_code ||
+                                            "-"
+                                        }
+                                        mono
+                                    />
+                                    <FieldRow
+                                        label="Semester"
+                                        value={
+                                            selectedTeachingClass.semester
+                                                ? toSemesterLabel(
+                                                      selectedTeachingClass.semester,
+                                                  )
+                                                : "-"
+                                        }
+                                    />
+                                    <FieldRow
+                                        label="School year"
+                                        value={
+                                            selectedTeachingClass.school_year ||
+                                            "-"
+                                        }
+                                    />
+                                    <FieldRow
+                                        label="Grade level"
+                                        value={
+                                            selectedTeachingClass.grade_level
+                                                ? `Grade ${selectedTeachingClass.grade_level}`
+                                                : "-"
+                                        }
+                                    />
+                                    <FieldRow
+                                        label="Strand / Track"
+                                        value={
+                                            [
+                                                selectedTeachingClass.strand,
+                                                selectedTeachingClass.track,
+                                            ]
+                                                .filter(Boolean)
+                                                .join(" / ") || "-"
+                                        }
+                                    />
+                                    <FieldRow
+                                        label="Students"
+                                        value={asNumber(
+                                            selectedTeachingClass.students_count,
+                                            0,
+                                        )}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    ) : teachingClassesFiltered.length === 0 ? (
+                        <EmptyCard message="No teaching classes found for the selected semester." />
+                    ) : (
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                <SummaryCard
+                                    label="Teaching classes"
+                                    value={teachingClassesFiltered.length}
+                                />
+                                <SummaryCard
+                                    label="Students"
+                                    value={teachingClassesFiltered.reduce(
+                                        (sum, entry) =>
+                                            sum +
+                                            asNumber(entry.students_count, 0),
+                                        0,
+                                    )}
+                                />
+                                <SummaryCard
+                                    label="Semester filter"
+                                    value={
+                                        userSemesterFilter === "all"
+                                            ? "All"
+                                            : toSemesterLabel(
+                                                  userSemesterFilter,
+                                              )
+                                    }
+                                    muted
+                                />
+                            </div>
+
+                            {teachingClassesFiltered.map((entry) => (
+                                <button
+                                    key={`teaching-${entry.id || entry.subject_id || entry.section_id}`}
+                                    type="button"
+                                    onClick={() =>
+                                        setSelectedUserClassDetail({
+                                            source: "teaching",
+                                            item: entry,
+                                        })
+                                    }
+                                    className="w-full rounded-lg border border-emerald-200 bg-white p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50"
+                                >
+                                    <p className="text-sm font-semibold text-slate-900">
+                                        {entry.section_label ||
+                                            entry.section_name ||
+                                            "Section"}
+                                    </p>
+                                    <p className="mt-1 text-[13px] font-semibold text-emerald-700">
+                                        {entry.subject_name ||
+                                            "Unknown Subject"}
+                                    </p>
+                                    <p className="mt-1 text-[11px] text-slate-500">
+                                        {entry.subject_code ||
+                                            "No subject code"}
+                                        {entry.semester
+                                            ? ` • ${toSemesterLabel(entry.semester)}`
+                                            : ""}
+                                        {` • ${asNumber(entry.students_count, 0)} students`}
+                                    </p>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+
+            const studentSectionPanel = studentSection ? (
+                <div className="space-y-3">
+                    <div className="rounded-lg border border-emerald-200 bg-white p-3">
+                        <p className="text-sm font-semibold text-slate-900">
+                            {studentSection.section_label ||
+                                studentSection.section_name ||
+                                "Student Section"}
+                        </p>
+                        <p className="mt-1 text-[11px] text-slate-500">
+                            {studentSection.section_code || "No section code"}
+                            {studentSection.school_year
+                                ? ` • ${studentSection.school_year}`
+                                : ""}
+                        </p>
+
+                        <div className="mt-3 rounded-md bg-emerald-50 px-4">
+                            <FieldRow
+                                label="Grade level"
+                                value={
+                                    studentSection.grade_level
+                                        ? `Grade ${studentSection.grade_level}`
+                                        : "-"
+                                }
+                            />
+                            <FieldRow
+                                label="Strand"
+                                value={studentSection.strand || "-"}
+                            />
+                            <FieldRow
+                                label="Track"
+                                value={studentSection.track || "-"}
+                            />
+                            <FieldRow
+                                label="LRN"
+                                value={studentSection.lrn || "-"}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <SummaryCard
+                            label="Classes"
+                            value={studentClasses.length}
+                        />
+                        <SummaryCard
+                            label="Semester"
+                            value={
+                                currentSemesterValue
+                                    ? toSemesterLabel(currentSemesterValue)
+                                    : "N/A"
+                            }
+                        />
+                        <SummaryCard label="Status" value="Enrolled" muted />
+                    </div>
+                </div>
+            ) : (
+                <EmptyCard message="This student is not assigned to a section yet." />
+            );
+
+            const studentClassesPanel = (
+                <div className="space-y-3">
+                    {semesterFilterToggle}
+
+                    {selectedStudentClass ? (
+                        <div className="space-y-3">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSelectedUserClassDetail(null);
+                                    setUserQuarterFilter("midterm");
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                            >
+                                <ArrowLeft size={13} />
+                                Back to Class Banners
+                            </button>
+
+                            <div className="rounded-lg border border-emerald-200 bg-white p-3">
+                                <p className="text-sm font-semibold text-slate-900">
+                                    {selectedStudentClass.section_label ||
+                                        selectedStudentClass.section_name ||
+                                        "Section"}
+                                </p>
+                                <p className="mt-1 text-[13px] font-semibold text-emerald-700">
+                                    {selectedStudentClass.subject_name ||
+                                        "Unknown Subject"}
+                                </p>
+                                <p className="mt-1 text-[11px] text-slate-500">
+                                    {selectedStudentClass.subject_code ||
+                                        "No subject code"}
+                                    {selectedStudentClass.semester
+                                        ? ` • ${toSemesterLabel(selectedStudentClass.semester)}`
+                                        : ""}
+                                    {selectedStudentClass.teacher_name
+                                        ? ` • ${selectedStudentClass.teacher_name}`
+                                        : ""}
+                                </p>
+                            </div>
+
+                            <div className="rounded-lg border border-emerald-200 bg-white p-1">
+                                <div className="grid w-full grid-cols-2 gap-1">
+                                    {[
+                                        {
+                                            value: "midterm",
+                                            label: "Midterm Quarter",
+                                        },
+                                        {
+                                            value: "final",
+                                            label: "Final Quarter",
+                                        },
+                                    ].map((quarterOption) => {
+                                        const active =
+                                            userQuarterFilter ===
+                                            quarterOption.value;
+
+                                        return (
+                                            <button
+                                                key={quarterOption.value}
+                                                type="button"
+                                                onClick={() =>
+                                                    setUserQuarterFilter(
+                                                        quarterOption.value,
+                                                    )
+                                                }
+                                                className={`w-full rounded-md px-3 py-2 text-[11px] font-semibold transition ${
+                                                    active
+                                                        ? "bg-emerald-600 text-white"
+                                                        : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                                }`}
+                                            >
+                                                {quarterOption.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {(() => {
+                                const selectedQuarterGrade =
+                                    userQuarterFilter === "final"
+                                        ? selectedStudentClass.final_quarter_grade
+                                        : selectedStudentClass.midterm_grade;
+
+                                const hasQuarterGrade =
+                                    selectedQuarterGrade !== null &&
+                                    selectedQuarterGrade !== undefined;
+
+                                const standingLabel = hasQuarterGrade
+                                    ? asNumber(selectedQuarterGrade, 0) >= 75
+                                        ? "Passing"
+                                        : "At Risk"
+                                    : "No standing yet";
+
+                                const tone = gradeTone(
+                                    hasQuarterGrade
+                                        ? asNumber(selectedQuarterGrade, 0)
+                                        : 0,
+                                );
+
+                                return (
+                                    <div className="space-y-3">
+                                        <div className="rounded-lg border border-emerald-200 bg-white p-3">
+                                            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                                                {userQuarterFilter === "final"
+                                                    ? "Final Quarter Performance"
+                                                    : "Midterm Quarter Performance"}
+                                            </p>
+
+                                            {hasQuarterGrade ? (
+                                                <div className="mt-2 flex items-center justify-between gap-3">
+                                                    <p className="text-2xl font-semibold text-emerald-900">
+                                                        {selectedQuarterGrade}
+                                                    </p>
+                                                    <span
+                                                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone.pill}`}
+                                                    >
+                                                        {standingLabel}
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <p className="mt-2 text-xs text-slate-600">
+                                                    No recorded grade yet for
+                                                    this quarter.
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="rounded-md bg-emerald-50 px-4">
+                                            <FieldRow
+                                                label="Midterm grade"
+                                                value={
+                                                    selectedStudentClass.midterm_grade ??
+                                                    "-"
+                                                }
+                                            />
+                                            <FieldRow
+                                                label="Final quarter grade"
+                                                value={
+                                                    selectedStudentClass.final_quarter_grade ??
+                                                    "-"
+                                                }
+                                            />
+                                            <FieldRow
+                                                label="Final grade"
+                                                value={
+                                                    selectedStudentClass.final_grade ??
+                                                    "-"
+                                                }
+                                            />
+                                            <FieldRow
+                                                label="Standing"
+                                                value={
+                                                    selectedStudentClass.remarks ||
+                                                    "No standing yet"
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    ) : userSemesterFilter === "2" && !secondSemesterStarted ? (
+                        <EmptyCard message="2nd semester has not started yet for this school year." />
+                    ) : studentClasses.length === 0 ? (
+                        <EmptyCard message="This student has no classes yet." />
+                    ) : studentClassesFiltered.length === 0 ? (
+                        <EmptyCard message="No classes found for the selected semester." />
+                    ) : (
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                <SummaryCard
+                                    label="Classes"
+                                    value={studentClassesFiltered.length}
+                                />
+                                <SummaryCard
+                                    label="Semester filter"
+                                    value={
+                                        userSemesterFilter === "all"
+                                            ? "All"
+                                            : toSemesterLabel(
+                                                  userSemesterFilter,
+                                              )
+                                    }
+                                />
+                                <SummaryCard
+                                    label="Current semester"
+                                    value={
+                                        currentSemesterValue
+                                            ? toSemesterLabel(
+                                                  currentSemesterValue,
+                                              )
+                                            : "N/A"
+                                    }
+                                    muted
+                                />
+                            </div>
+
+                            {studentClassesFiltered.map((entry) => (
+                                <button
+                                    key={`student-class-${entry.class_id || entry.enrollment_id}`}
+                                    type="button"
+                                    onClick={() => {
+                                        setSelectedUserClassDetail({
+                                            source: "student",
+                                            item: entry,
+                                        });
+                                        setUserQuarterFilter("midterm");
+                                    }}
+                                    className="w-full rounded-lg border border-emerald-200 bg-white p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50"
+                                >
+                                    <p className="text-sm font-semibold text-slate-900">
+                                        {entry.section_label ||
+                                            entry.section_name ||
+                                            "Section"}
+                                    </p>
+                                    <p className="mt-1 text-[13px] font-semibold text-emerald-700">
+                                        {entry.subject_name ||
+                                            "Unknown Subject"}
+                                    </p>
+                                    <p className="mt-1 text-[11px] text-slate-500">
+                                        {entry.subject_code ||
+                                            "No subject code"}
+                                        {entry.semester
+                                            ? ` • ${toSemesterLabel(entry.semester)}`
+                                            : ""}
+                                        {entry.teacher_name
+                                            ? ` • ${entry.teacher_name}`
+                                            : ""}
+                                    </p>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+
+            const rolesPanel =
+                userRoles.length === 0 ? (
+                    <EmptyCard message="No role assignments were attached to this user." />
+                ) : (
+                    <div className="space-y-3">
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                            <SummaryCard
+                                label="Role count"
+                                value={userRoles.length}
+                            />
+                            <SummaryCard
+                                label="Status"
+                                value={current.status || "-"}
+                            />
+                            <SummaryCard
+                                label="User ID"
+                                value={current.user_id || current.id || "-"}
+                                muted
+                            />
+                        </div>
+
+                        <div className="rounded-lg border border-emerald-200 bg-white p-3">
+                            <p className="mb-2 text-xs font-semibold text-emerald-900">
+                                Assigned roles
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                {userRoles.map((role) => (
+                                    <span
+                                        key={role}
+                                        className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
+                                    >
+                                        {toLabelRole(role)}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="rounded-lg border border-emerald-200 bg-white p-3">
+                            <p className="text-xs font-semibold text-emerald-900">
+                                Timeline
+                            </p>
+                            <p className="mt-1 text-[11px] text-slate-700">
+                                Created: {formatDateTime(current.created_at)}
+                            </p>
+                            <p className="mt-1 text-[11px] text-slate-700">
+                                Updated: {formatDateTime(current.updated_at)}
+                            </p>
+                        </div>
+                    </div>
+                );
+
             return {
                 identity: {
                     title: userName,
                     subtitle: current.username || current.email || "user",
                     tags: [
-                        toLabelRole(userRoles[0] || current.role),
+                        toLabelRole(prioritizedRole),
                         current.status || null,
                     ].filter(Boolean),
                     keyLabel: "User ID",
                     keyValue: current.user_id || current.id || "-",
                 },
                 headerTitle: "User information",
-                headerSubtitle: "Profile details and assigned access",
+                headerSubtitle: hasTeacherRole
+                    ? "Teacher assignments and class workload"
+                    : hasStudentRole
+                      ? "Section placement and class performance standing"
+                      : "Profile details and assigned access",
                 infoLabel: "Profile",
-                secondaryLabel: "Roles",
-                secondaryCount: userRoles.length,
+                secondaryLabel: hasTeacherRole
+                    ? "Advisory Class"
+                    : hasStudentRole
+                      ? "Section"
+                      : "Roles",
+                secondaryCount: hasTeacherRole
+                    ? advisoryClassesFiltered.length
+                    : hasStudentRole
+                      ? studentSection
+                          ? 1
+                          : 0
+                      : userRoles.length,
                 infoPanel: (
                     <div className="space-y-3">
                         <div>
@@ -2141,9 +3265,7 @@ export default function ManagementDetailModal({
                                 />
                                 <FieldRow
                                     label="Primary role"
-                                    value={toLabelRole(
-                                        userRoles[0] || current.role,
-                                    )}
+                                    value={toLabelRole(prioritizedRole)}
                                 />
                                 <FieldRow
                                     label="Department"
@@ -2159,60 +3281,68 @@ export default function ManagementDetailModal({
                                 />
                             </div>
                         </div>
-                    </div>
-                ),
-                secondaryPanel:
-                    userRoles.length === 0 ? (
-                        <EmptyCard message="No role assignments were attached to this user." />
-                    ) : (
-                        <div className="space-y-3">
+
+                        {hasTeacherRole && (
                             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                <SummaryCard
+                                    label="Advisory"
+                                    value={advisoryClassesFiltered.length}
+                                />
+                                <SummaryCard
+                                    label="Teaching"
+                                    value={teachingClassesFiltered.length}
+                                />
                                 <SummaryCard
                                     label="Role count"
                                     value={userRoles.length}
-                                />
-                                <SummaryCard
-                                    label="Status"
-                                    value={current.status || "-"}
-                                />
-                                <SummaryCard
-                                    label="User ID"
-                                    value={current.user_id || current.id || "-"}
                                     muted
                                 />
                             </div>
+                        )}
 
-                            <div className="rounded-lg border border-emerald-200 bg-white p-3">
-                                <p className="mb-2 text-xs font-semibold text-emerald-900">
-                                    Assigned roles
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                    {userRoles.map((role) => (
-                                        <span
-                                            key={role}
-                                            className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
-                                        >
-                                            {toLabelRole(role)}
-                                        </span>
-                                    ))}
-                                </div>
+                        {hasStudentRole && (
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                <SummaryCard
+                                    label="Section"
+                                    value={
+                                        studentSection?.section_code ||
+                                        studentSection?.section_name ||
+                                        "-"
+                                    }
+                                />
+                                <SummaryCard
+                                    label="Classes"
+                                    value={studentClasses.length}
+                                />
+                                <SummaryCard
+                                    label="Current semester"
+                                    value={
+                                        currentSemesterValue
+                                            ? toSemesterLabel(
+                                                  currentSemesterValue,
+                                              )
+                                            : "N/A"
+                                    }
+                                    muted
+                                />
                             </div>
-
-                            <div className="rounded-lg border border-emerald-200 bg-white p-3">
-                                <p className="text-xs font-semibold text-emerald-900">
-                                    Timeline
-                                </p>
-                                <p className="mt-1 text-[11px] text-slate-700">
-                                    Created:{" "}
-                                    {formatDateTime(current.created_at)}
-                                </p>
-                                <p className="mt-1 text-[11px] text-slate-700">
-                                    Updated:{" "}
-                                    {formatDateTime(current.updated_at)}
-                                </p>
-                            </div>
-                        </div>
-                    ),
+                        )}
+                    </div>
+                ),
+                secondaryPanel: hasTeacherRole
+                    ? advisoryPanel
+                    : hasStudentRole
+                      ? studentSectionPanel
+                      : rolesPanel,
+                isTeacherPriority: hasTeacherRole,
+                isStudentPriority: hasStudentRole,
+                advisoryCount: advisoryClassesFiltered.length,
+                teachingCount: teachingClassesFiltered.length,
+                advisoryPanel,
+                teachingPanel,
+                studentSectionPanel,
+                studentClassesPanel,
+                studentClassesCount: studentClassesFiltered.length,
             };
         }
 
@@ -2395,12 +3525,15 @@ export default function ManagementDetailModal({
         }
 
         if (activeTab === "subjects") {
-            const subject = payload?.subject || row || {};
-            const relatedClasses = Array.isArray(payload?.classes)
-                ? payload.classes
-                : [];
-            const classCount =
-                relatedClasses.length || asNumber(subject.classes_count, 0);
+            const subject = activeSubject || payload?.subject || row || {};
+            const classCount = asNumber(subject.classes_count, 0);
+            const currentClassCount = asNumber(
+                subject.current_classes_count,
+                0,
+            );
+            const detailsTitle = subjectEditMode
+                ? "Edit subject details"
+                : "Subject profile";
 
             return {
                 identity: {
@@ -2418,60 +3551,264 @@ export default function ManagementDetailModal({
                     keyValue: subject.id || "-",
                 },
                 headerTitle: "Subject information",
-                headerSubtitle: "Catalog details and class usage",
+                headerSubtitle: subjectEditMode
+                    ? "Update subject details and classification"
+                    : "Catalog details and classification",
                 infoLabel: "Subject info",
-                secondaryLabel: "Classes",
-                secondaryCount: classCount,
+                secondaryLabel: "Subject info",
+                secondaryCount: undefined,
                 infoPanel: (
                     <div className="space-y-3">
                         <div>
                             <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                                Subject profile
+                                {detailsTitle}
                             </p>
-                            <div className="rounded-md bg-emerald-50 px-4">
-                                <FieldRow
-                                    label="Subject"
-                                    value={subject.subject_name || subject.name}
-                                />
-                                <FieldRow
-                                    label="Code"
-                                    value={subject.subject_code || subject.code}
-                                    mono
-                                />
-                                <FieldRow
-                                    label="Type"
-                                    value={
-                                        subject.subject_type_name ||
-                                        subject.type_name ||
-                                        subject.subject_type_key ||
-                                        "-"
-                                    }
-                                />
-                                <FieldRow
-                                    label="Semester"
-                                    value={
-                                        subject.semester
-                                            ? `Semester ${subject.semester}`
-                                            : "-"
-                                    }
-                                />
-                                <FieldRow
-                                    label="Grade level"
-                                    value={subject.grade_level || "-"}
-                                />
-                                <FieldRow
-                                    label="Total hours"
-                                    value={
-                                        subject.total_hours
-                                            ? `${subject.total_hours}h`
-                                            : "-"
-                                    }
-                                />
-                                <FieldRow label="Classes" value={classCount} />
-                            </div>
+                            {subjectEditMode ? (
+                                <div className="rounded-md bg-emerald-50 p-3">
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        <div className="sm:col-span-2">
+                                            <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                                Subject Name
+                                            </p>
+                                            <input
+                                                type="text"
+                                                value={subjectData.subject_name}
+                                                onChange={(event) =>
+                                                    setSubjectData(
+                                                        "subject_name",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="e.g., General Mathematics"
+                                                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            />
+                                            {subjectErrors.subject_name && (
+                                                <p className="mt-1 text-[11px] text-rose-600">
+                                                    {subjectErrors.subject_name}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                                Subject Code
+                                            </p>
+                                            <input
+                                                type="text"
+                                                value={subjectData.subject_code}
+                                                onChange={(event) =>
+                                                    setSubjectData(
+                                                        "subject_code",
+                                                        event.target.value.toUpperCase(),
+                                                    )
+                                                }
+                                                placeholder="e.g., GENMATH"
+                                                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 font-mono text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            />
+                                            {subjectErrors.subject_code && (
+                                                <p className="mt-1 text-[11px] text-rose-600">
+                                                    {subjectErrors.subject_code}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                                Total Hours
+                                            </p>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                value={subjectData.total_hours}
+                                                onChange={(event) =>
+                                                    setSubjectData(
+                                                        "total_hours",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="e.g., 160"
+                                                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            />
+                                            {subjectErrors.total_hours && (
+                                                <p className="mt-1 text-[11px] text-rose-600">
+                                                    {subjectErrors.total_hours}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                                Semester
+                                            </p>
+                                            <select
+                                                value={subjectData.semester}
+                                                onChange={(event) =>
+                                                    setSubjectData(
+                                                        "semester",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            >
+                                                <option value="">
+                                                    Select semester
+                                                </option>
+                                                {resolvedSubjectSemesterOptions.map(
+                                                    (semesterOption) => (
+                                                        <option
+                                                            key={semesterOption}
+                                                            value={
+                                                                semesterOption
+                                                            }
+                                                        >
+                                                            {toSemesterLabel(
+                                                                semesterOption,
+                                                            )}
+                                                        </option>
+                                                    ),
+                                                )}
+                                            </select>
+                                            {subjectErrors.semester && (
+                                                <p className="mt-1 text-[11px] text-rose-600">
+                                                    {subjectErrors.semester}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                                Grade Level
+                                            </p>
+                                            <select
+                                                value={subjectData.grade_level}
+                                                onChange={(event) =>
+                                                    setSubjectData(
+                                                        "grade_level",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            >
+                                                <option value="">
+                                                    Select grade level
+                                                </option>
+                                                {resolvedSubjectGradeLevelOptions.map(
+                                                    (gradeOption) => (
+                                                        <option
+                                                            key={gradeOption}
+                                                            value={gradeOption}
+                                                        >
+                                                            {gradeOption}
+                                                        </option>
+                                                    ),
+                                                )}
+                                            </select>
+                                            {subjectErrors.grade_level && (
+                                                <p className="mt-1 text-[11px] text-rose-600">
+                                                    {subjectErrors.grade_level}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                                Subject Type
+                                            </p>
+                                            <select
+                                                value={subjectData.type_key}
+                                                onChange={(event) =>
+                                                    setSubjectData(
+                                                        "type_key",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            >
+                                                <option value="">
+                                                    Select subject type
+                                                </option>
+                                                {resolvedSubjectTypeOptions.map(
+                                                    (option) => (
+                                                        <option
+                                                            key={option.key}
+                                                            value={option.key}
+                                                        >
+                                                            {option.label}
+                                                        </option>
+                                                    ),
+                                                )}
+                                            </select>
+                                            {subjectErrors.type_key && (
+                                                <p className="mt-1 text-[11px] text-rose-600">
+                                                    {subjectErrors.type_key}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="rounded-md bg-emerald-50 px-4">
+                                    <FieldRow
+                                        label="Subject"
+                                        value={
+                                            subject.subject_name ||
+                                            subject.name ||
+                                            "-"
+                                        }
+                                    />
+                                    <FieldRow
+                                        label="Code"
+                                        value={
+                                            subject.subject_code ||
+                                            subject.code ||
+                                            "-"
+                                        }
+                                        mono
+                                    />
+                                    <FieldRow
+                                        label="Type"
+                                        value={
+                                            subject.subject_type_name ||
+                                            subject.type_name ||
+                                            subject.subject_type_key ||
+                                            "-"
+                                        }
+                                    />
+                                    <FieldRow
+                                        label="Semester"
+                                        value={
+                                            subject.semester
+                                                ? toSemesterLabel(
+                                                      subject.semester,
+                                                  )
+                                                : "-"
+                                        }
+                                    />
+                                    <FieldRow
+                                        label="Grade level"
+                                        value={subject.grade_level || "-"}
+                                    />
+                                    <FieldRow
+                                        label="Total hours"
+                                        value={
+                                            subject.total_hours
+                                                ? `${subject.total_hours}h`
+                                                : "-"
+                                        }
+                                    />
+                                    <FieldRow
+                                        label="Classes"
+                                        value={classCount}
+                                    />
+                                    <FieldRow
+                                        label="Current semester classes"
+                                        value={currentClassCount}
+                                    />
+                                </div>
+                            )}
                         </div>
 
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                             <SummaryCard
                                 label="Created"
                                 value={formatDateTime(subject.created_at)}
@@ -2481,34 +3818,14 @@ export default function ManagementDetailModal({
                                 value={formatDateTime(subject.updated_at)}
                                 muted
                             />
+                            <SummaryCard
+                                label="Current Usage"
+                                value={currentClassCount}
+                            />
                         </div>
                     </div>
                 ),
-                secondaryPanel:
-                    relatedClasses.length === 0 ? (
-                        <EmptyCard message="No related class records were provided for this subject." />
-                    ) : (
-                        <div className="space-y-3">
-                            {relatedClasses.map((entry) => (
-                                <div
-                                    key={`${entry.id || entry.class_id || entry.section_name || entry.teacher_name}`}
-                                    className="rounded-lg border border-emerald-200 bg-white p-3"
-                                >
-                                    <p className="text-[13px] font-semibold text-slate-900">
-                                        {entry.section_name ||
-                                            "Unnamed section"}
-                                    </p>
-                                    <p className="mt-1 text-[11px] text-slate-600">
-                                        Teacher: {entry.teacher_name || "-"}
-                                    </p>
-                                    <p className="mt-1 text-[11px] text-slate-500">
-                                        {entry.school_year || "-"} · Grade{" "}
-                                        {entry.grade_level || "-"}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    ),
+                secondaryPanel: null,
             };
         }
 
@@ -3911,6 +5228,162 @@ export default function ManagementDetailModal({
                 },
             },
         );
+    };
+
+    const exitSubjectEditMode = () => {
+        if (!activeSubject) {
+            setSubjectEditMode(false);
+            return;
+        }
+
+        hydrateSubjectForm(activeSubject);
+        clearSubjectErrors();
+        setSubjectEditMode(false);
+    };
+
+    const handleSubjectSave = () => {
+        if (!activeSubject?.id) {
+            return;
+        }
+
+        putSubject(route("superadmin.subjects.update", activeSubject.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                const selectedType = resolvedSubjectTypeOptions.find(
+                    (option) =>
+                        String(option.key) === String(subjectData.type_key),
+                );
+                const nextSubject = {
+                    ...(activeSubject || {}),
+                    subject_name: subjectData.subject_name || "",
+                    subject_code: subjectData.subject_code || "",
+                    total_hours:
+                        subjectData.total_hours === null ||
+                        subjectData.total_hours === undefined
+                            ? ""
+                            : String(subjectData.total_hours),
+                    subject_type_key: subjectData.type_key || "",
+                    subject_type_name:
+                        selectedType?.label || activeSubject.subject_type_name,
+                    semester: subjectData.semester || "",
+                    grade_level: subjectData.grade_level || "",
+                    updated_at: new Date().toISOString(),
+                };
+
+                setSubjectPersistedData(nextSubject);
+                setSubjectEditMode(false);
+                onSubjectSaved?.(nextSubject);
+            },
+        });
+    };
+
+    const handleCopySubject = async () => {
+        if (!activeSubject) {
+            return;
+        }
+
+        const copyPayload = [
+            `Subject: ${activeSubject.subject_name || "-"}`,
+            `Code: ${activeSubject.subject_code || "-"}`,
+            `Type: ${activeSubject.subject_type_name || activeSubject.subject_type_key || "-"}`,
+            `Semester: ${activeSubject.semester ? toSemesterLabel(activeSubject.semester) : "-"}`,
+            `Grade Level: ${activeSubject.grade_level || "-"}`,
+        ].join("\n");
+
+        try {
+            if (typeof navigator === "undefined" || !navigator.clipboard) {
+                throw new Error("Clipboard unavailable");
+            }
+
+            await navigator.clipboard.writeText(copyPayload);
+            setSubjectCopyStatus("copied");
+            window.setTimeout(() => setSubjectCopyStatus("idle"), 1600);
+        } catch {
+            setSubjectCopyStatus("error");
+            window.setTimeout(() => setSubjectCopyStatus("idle"), 2000);
+        }
+    };
+
+    const subjectDeleteBlockedReason = useMemo(() => {
+        if (!isSubjectTab || !activeSubject?.id) {
+            return "";
+        }
+
+        if (activeSubject.delete_blocked_reason) {
+            return activeSubject.delete_blocked_reason;
+        }
+
+        if (
+            activeSubject.can_delete === false ||
+            asNumber(activeSubject.current_classes_count, 0) > 0
+        ) {
+            const schoolYear =
+                activeSubject.current_school_year || "the current school year";
+            const semesterLabel = activeSubject.current_semester
+                ? toSemesterLabel(activeSubject.current_semester)
+                : "current semester";
+
+            return `Cannot delete subject assigned to classes for ${schoolYear}, ${semesterLabel}.`;
+        }
+
+        return "";
+    }, [isSubjectTab, activeSubject]);
+
+    const openSubjectDeleteModal = () => {
+        if (!isSubjectTab || !activeSubject?.id || subjectDeleting) {
+            return;
+        }
+
+        if (subjectDeleteBlockedReason) {
+            return;
+        }
+
+        setSubjectDeleteError("");
+        setShowSubjectDeleteModal(true);
+    };
+
+    const closeSubjectDeleteModal = () => {
+        if (subjectDeleting) {
+            return;
+        }
+
+        setShowSubjectDeleteModal(false);
+        setSubjectDeleteError("");
+    };
+
+    const confirmSubjectDelete = () => {
+        if (!isSubjectTab || !activeSubject?.id || subjectDeleting) {
+            return;
+        }
+
+        setSubjectDeleteError("");
+        setSubjectDeleting(true);
+
+        router.delete(route("superadmin.subjects.destroy", activeSubject.id), {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: (page) => {
+                const flashError = page?.props?.flash?.error;
+
+                if (flashError) {
+                    setSubjectDeleteError(flashError);
+                    return;
+                }
+
+                setShowSubjectDeleteModal(false);
+                setSubjectDeleteError("");
+                onSubjectDeleted?.(activeSubject.id);
+                onClose?.();
+            },
+            onError: () => {
+                setSubjectDeleteError(
+                    "Unable to delete subject right now. Please try again.",
+                );
+            },
+            onFinish: () => {
+                setSubjectDeleting(false);
+            },
+        });
     };
 
     const exitSectionEditMode = () => {
@@ -6192,7 +7665,7 @@ export default function ManagementDetailModal({
                 show={show}
                 onClose={onClose}
                 maxWidth="3xl"
-                closeable={!isDepartmentTab}
+                closeable={!(isDepartmentTab || isSubjectTab)}
             >
                 <div className="h-[calc(100vh-7rem)] max-h-[calc(100vh-7rem)] min-h-0 overflow-hidden">
                     <div className="flex h-full min-h-0 flex-col md:flex-row">
@@ -6301,6 +7774,98 @@ export default function ManagementDetailModal({
                                             count={sectionStudentsCount}
                                         />
                                     </div>
+                                ) : isSubjectTab ? (
+                                    <div className="space-y-1">
+                                        <SidebarButton
+                                            active={panel === "info"}
+                                            onClick={() => setPanel("info")}
+                                            icon={BookOpen}
+                                            label={data.infoLabel}
+                                        />
+                                    </div>
+                                ) : activeTab === "users" &&
+                                  data.isTeacherPriority ? (
+                                    <div className="space-y-1">
+                                        <SidebarButton
+                                            active={panel === "info"}
+                                            onClick={() => {
+                                                setSelectedUserClassDetail(
+                                                    null,
+                                                );
+                                                setPanel("info");
+                                            }}
+                                            icon={User}
+                                            label="Profile"
+                                        />
+                                        <SidebarButton
+                                            active={panel === "advisory"}
+                                            onClick={() => {
+                                                setSelectedUserClassDetail(
+                                                    null,
+                                                );
+                                                setPanel("advisory");
+                                            }}
+                                            icon={Users}
+                                            label="Advisory Class"
+                                            count={data.advisoryCount}
+                                        />
+                                        <SidebarButton
+                                            active={panel === "teaching"}
+                                            onClick={() => {
+                                                setSelectedUserClassDetail(
+                                                    null,
+                                                );
+                                                setPanel("teaching");
+                                            }}
+                                            icon={BookOpen}
+                                            label="Teaching Class"
+                                            count={data.teachingCount}
+                                        />
+                                    </div>
+                                ) : activeTab === "users" &&
+                                  data.isStudentPriority ? (
+                                    <div className="space-y-1">
+                                        <SidebarButton
+                                            active={panel === "info"}
+                                            onClick={() => {
+                                                setSelectedUserClassDetail(
+                                                    null,
+                                                );
+                                                setUserQuarterFilter("midterm");
+                                                setPanel("info");
+                                            }}
+                                            icon={User}
+                                            label="Student Information"
+                                        />
+                                        <SidebarButton
+                                            active={panel === "section"}
+                                            onClick={() => {
+                                                setSelectedUserClassDetail(
+                                                    null,
+                                                );
+                                                setUserQuarterFilter("midterm");
+                                                setPanel("section");
+                                            }}
+                                            icon={Layers}
+                                            label="Section"
+                                            count={
+                                                data.secondaryCount ?? undefined
+                                            }
+                                        />
+                                        <SidebarButton
+                                            active={panel === "classes"}
+                                            onClick={() => {
+                                                setSelectedUserClassDetail(
+                                                    null,
+                                                );
+                                                setUserQuarterFilter("midterm");
+                                                setPanel("classes");
+                                            }}
+                                            icon={BookOpen}
+                                            label="Classes"
+                                            count={data.studentClassesCount}
+                                        />
+                                    </div>
                                 ) : (
                                     <div className="space-y-1">
                                         <SidebarButton
@@ -6368,22 +7933,70 @@ export default function ManagementDetailModal({
 
                                 {!loading && !error && (
                                     <>
-                                        {isDepartmentTab
-                                            ? renderDepartmentPanel()
-                                            : isSectionTab &&
+                                        {(() => {
+                                            if (isDepartmentTab) {
+                                                return renderDepartmentPanel();
+                                            }
+
+                                            if (isSubjectTab) {
+                                                return data.infoPanel;
+                                            }
+
+                                            if (
+                                                activeTab === "users" &&
+                                                data.isTeacherPriority
+                                            ) {
+                                                if (panel === "info") {
+                                                    return data.infoPanel;
+                                                }
+
+                                                if (panel === "teaching") {
+                                                    return data.teachingPanel;
+                                                }
+
+                                                return data.advisoryPanel;
+                                            }
+
+                                            if (
+                                                activeTab === "users" &&
+                                                data.isStudentPriority
+                                            ) {
+                                                if (panel === "info") {
+                                                    return data.infoPanel;
+                                                }
+
+                                                if (panel === "classes") {
+                                                    return data.studentClassesPanel;
+                                                }
+
+                                                return data.studentSectionPanel;
+                                            }
+
+                                            if (
+                                                isSectionTab &&
                                                 panel === "students"
-                                              ? renderSectionStudentsPanel()
-                                              : isSectionTab &&
-                                                  panel === "secondary"
-                                                ? renderSectionClassesPanel()
-                                                : panel === "info"
-                                                  ? data.infoPanel
-                                                  : data.secondaryPanel}
+                                            ) {
+                                                return renderSectionStudentsPanel();
+                                            }
+
+                                            if (
+                                                isSectionTab &&
+                                                panel === "secondary"
+                                            ) {
+                                                return renderSectionClassesPanel();
+                                            }
+
+                                            return panel === "info"
+                                                ? data.infoPanel
+                                                : data.secondaryPanel;
+                                        })()}
                                     </>
                                 )}
                             </div>
 
-                            {(isDepartmentTab || isSectionTab) &&
+                            {(isDepartmentTab ||
+                                isSectionTab ||
+                                isSubjectTab) &&
                                 !loading &&
                                 !error && (
                                     <div className="pointer-events-none absolute right-5 bottom-5 z-20 flex items-center gap-2">
@@ -6465,6 +8078,107 @@ export default function ManagementDetailModal({
                                                         : "Save Changes"}
                                                 </button>
                                             </>
+                                        ) : isSubjectTab ? (
+                                            !subjectEditMode ? (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={
+                                                            openSubjectDeleteModal
+                                                        }
+                                                        disabled={
+                                                            subjectDeleting ||
+                                                            Boolean(
+                                                                subjectDeleteBlockedReason,
+                                                            )
+                                                        }
+                                                        title={
+                                                            subjectDeleteBlockedReason ||
+                                                            "Delete subject"
+                                                        }
+                                                        className={`pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full text-white shadow-lg transition ${
+                                                            subjectDeleteBlockedReason ||
+                                                            subjectDeleting
+                                                                ? "cursor-not-allowed bg-rose-300"
+                                                                : "bg-rose-600 hover:bg-rose-700"
+                                                        }`}
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={
+                                                            handleCopySubject
+                                                        }
+                                                        className="pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-700 text-white shadow-lg transition hover:bg-slate-800"
+                                                        title={
+                                                            subjectCopyStatus ===
+                                                            "copied"
+                                                                ? "Copied"
+                                                                : subjectCopyStatus ===
+                                                                    "error"
+                                                                  ? "Copy failed"
+                                                                  : "Copy subject details"
+                                                        }
+                                                    >
+                                                        {subjectCopyStatus ===
+                                                        "copied" ? (
+                                                            <Check size={18} />
+                                                        ) : (
+                                                            <Copy size={18} />
+                                                        )}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setPanel("info");
+                                                            setSubjectEditMode(
+                                                                true,
+                                                            );
+                                                            clearSubjectErrors();
+                                                        }}
+                                                        disabled={
+                                                            subjectDeleting
+                                                        }
+                                                        className="pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                        title="Edit subject"
+                                                    >
+                                                        <Pencil size={18} />
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={
+                                                            exitSubjectEditMode
+                                                        }
+                                                        disabled={
+                                                            subjectSaving ||
+                                                            subjectDeleting
+                                                        }
+                                                        className="pointer-events-auto rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={
+                                                            handleSubjectSave
+                                                        }
+                                                        disabled={
+                                                            subjectSaving ||
+                                                            subjectDeleting
+                                                        }
+                                                        className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg transition hover:bg-emerald-700 disabled:opacity-60"
+                                                    >
+                                                        <Save size={13} />
+                                                        {subjectSaving
+                                                            ? "Saving..."
+                                                            : "Save Changes"}
+                                                    </button>
+                                                </>
+                                            )
                                         ) : isSectionTab &&
                                           panel === "students" ? (
                                             !sectionStudentsEditMode ? (
@@ -6642,6 +8356,20 @@ export default function ManagementDetailModal({
                 blockedReason={departmentDeleteBlockedReason}
                 error={departmentDeleteError}
                 deleting={departmentDeleting}
+            />
+
+            <SubjectDeleteConfirmModal
+                show={Boolean(show && isSubjectTab && showSubjectDeleteModal)}
+                onClose={closeSubjectDeleteModal}
+                onConfirm={confirmSubjectDelete}
+                subjectName={
+                    activeSubject?.subject_name ||
+                    activeSubject?.subject_code ||
+                    ""
+                }
+                blockedReason={subjectDeleteBlockedReason}
+                error={subjectDeleteError}
+                deleting={subjectDeleting}
             />
         </>
     );

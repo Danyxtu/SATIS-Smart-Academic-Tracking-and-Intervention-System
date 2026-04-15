@@ -26,6 +26,11 @@ Route::get('/', function () {
             return redirect()->route('verification.notice');
         }
 
+        if ($user->hasRole('teacher') && (! filled((string) $user->personal_email) || ! $user->hasVerifiedEmail())) {
+            return redirect()->route('verification.notice')
+                ->with('status', 'verification-email-required');
+        }
+
         // Always prioritize teacher dashboard if user has teacher role
         if ($user->hasRole('teacher')) {
             return redirect()->route('teacher.dashboard');
@@ -104,6 +109,11 @@ Route::get('/redirect-after-login', function () {
 
     if ($user->hasRole('super_admin') && (! filled((string) $user->personal_email) || ! $user->hasVerifiedEmail())) {
         return redirect()->route('verification.notice');
+    }
+
+    if ($user->hasRole('teacher') && (! filled((string) $user->personal_email) || ! $user->hasVerifiedEmail())) {
+        return redirect()->route('verification.notice')
+            ->with('status', 'verification-email-required');
     }
 
     // Always prioritize teacher dashboard if user has teacher role

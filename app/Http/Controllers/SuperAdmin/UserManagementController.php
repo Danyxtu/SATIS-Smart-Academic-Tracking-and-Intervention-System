@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\TeacherCredentials;
+use App\Models\Enrollment;
 use App\Models\PasswordResetRequest;
 use App\Models\Role;
+use App\Models\SchoolClass;
 use App\Models\Section;
 use App\Models\Student;
 use App\Models\SystemSetting;
@@ -13,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
@@ -23,6 +27,8 @@ class UserManagementController extends Controller
     {
         $query = User::query()->with('roles:id,name', 'department:id,department_name,department_code');
         $countQuery = User::query();
+        $currentSchoolYear = (string) SystemSetting::getCurrentSchoolYear();
+        $currentSemester = (string) SystemSetting::getCurrentSemester();
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
@@ -50,11 +56,327 @@ class UserManagementController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        $users->getCollection()->transform(function (User $user) {
-            $roleNames = $user->roles->pluck('name')->values()->all();
+        $pageUsers = $users->getCollection();
+        $teacherUserIds = $pageUsers
+            ->filter(function (User $user) {
+                return $user->roles->contains('name', 'teacher');
+            })
+            ->pluck('id')
+            ->values()
+            ->all();
+        $studentUserIds = $pageUsers
+            ->filter(function (User $user) {
+                return $user->roles->contains('name', 'student');
+            })
+            ->pluck('id')
+            ->values()
+            ->all();
+
+        $advisorySectionsByTeacher = collect();
+        $teachingClassesByTeacher = collect();
+        $studentProfilesByUserId = collect();
+        $studentClassesByUserId = collect();
+
+        if (!empty($teacherUserIds)) {
+            $advisorySectionsByTeacher = Section::query()
+                ->whereIn('advisor_teacher_id', $teacherUserIds)
+                ->where('school_year', $currentSchoolYear)
+                ->with([
+                    'classes' => function ($query) {
+                        $query->select([
+                            'id',
+                            'section_id',
+                            'subject_id',
+                            'teacher_id',
+                            'school_year',
+                            'semester',
+                            'grade_level',
+                            'section',
+                            'strand',
+                            'track',
+                        ])
+                            ->withCount('enrollments')
+                            ->with([
+                                'subject:id,subject_name,subject_code,semester,grade_level',
+                                'teacher:id,first_name,middle_name,last_name',
+                            ])
+                            ->orderBy('semester')
+                            ->orderBy('id');
+                    },
+                ])
+                ->orderBy('grade_level')
+                ->orderBy('section_name')
+                ->get()
+                ->groupBy('advisor_teacher_id');
+
+            $teachingClassesByTeacher = SchoolClass::query()
+                ->whereIn('teacher_id', $teacherUserIds)
+                ->where('school_year', $currentSchoolYear)
+                ->withCount('enrollments')
+                ->with([
+                    'subject:id,subject_name,subject_code,semester,grade_level',
+                    'sectionRecord:id,section_name,section_code,grade_level,strand,track,school_year',
+                ])
+                ->orderBy('grade_level')
+                ->orderBy('section')
+                ->orderBy('semester')
+                ->get()
+                ->groupBy('teacher_id');
+        }
+
+        if (!empty($studentUserIds)) {
+            $studentProfilesByUserId = Student::query()
+                ->whereIn('user_id', $studentUserIds)
+                ->with([
+                    'sectionRecord:id,section_name,section_code,grade_level,strand,track,school_year',
+                ])
+                ->get()
+                ->keyBy('user_id');
+
+            $studentClassesByUserId = Enrollment::query()
+                ->select([
+                    'id',
+                    'user_id',
+                    'class_id',
+                    'q1_grade',
+                    'q2_grade',
+                    'final_grade',
+                    'remarks',
+                ])
+                ->whereIn('user_id', $studentUserIds)
+                ->whereHas('schoolClass', function ($query) use ($currentSchoolYear) {
+                    $query->where('school_year', $currentSchoolYear);
+                })
+                ->with([
+                    'schoolClass' => function ($query) {
+                        $query->select([
+                            'id',
+                            'subject_id',
+                            'teacher_id',
+                            'section_id',
+                            'school_year',
+                            'semester',
+                            'grade_level',
+                            'section',
+                            'strand',
+                            'track',
+                        ])
+                            ->with([
+                                'subject:id,subject_name,subject_code,semester,grade_level',
+                                'teacher:id,first_name,middle_name,last_name',
+                                'sectionRecord:id,section_name,section_code,grade_level,strand,track,school_year',
+                            ]);
+                    },
+                ])
+                ->get()
+                ->groupBy('user_id');
+        }
+
+        $users->getCollection()->transform(function (User $user) use (
+            $advisorySectionsByTeacher,
+            $teachingClassesByTeacher,
+            $studentProfilesByUserId,
+            $studentClassesByUserId,
+            $currentSchoolYear,
+            $currentSemester,
+        ) {
+            $roleNames = $user->roles->pluck('name')->values();
+            $roleNamesOrdered = $roleNames->contains('teacher')
+                ? collect(['teacher'])
+                ->merge($roleNames->reject(function ($roleName) {
+                    return $roleName === 'teacher';
+                }))
+                ->values()
+                : $roleNames;
+
             $payload = $user->toArray();
-            $payload['role'] = $roleNames[0] ?? null;
-            $payload['roles_list'] = $roleNames;
+            $payload['role'] = $roleNamesOrdered->first();
+            $payload['roles_list'] = $roleNamesOrdered->all();
+            $payload['current_school_year'] = $currentSchoolYear;
+            $payload['current_semester'] = $currentSemester;
+
+            if ($roleNames->contains('teacher')) {
+                $advisoryClasses = collect($advisorySectionsByTeacher->get($user->id, collect()))
+                    ->map(function (Section $section) {
+                        $specialization = $section->track ?: ($section->strand ?: null);
+                        $sectionLabel = satis_section_full_label(
+                            $section->grade_level,
+                            $specialization,
+                            $section->section_name,
+                        );
+
+                        $classes = $section->classes
+                            ->map(function (SchoolClass $classEntry) {
+                                return [
+                                    'id' => (int) $classEntry->id,
+                                    'subject_id' => $classEntry->subject_id ? (int) $classEntry->subject_id : null,
+                                    'subject_name' => $classEntry->subject?->subject_name,
+                                    'subject_code' => $classEntry->subject?->subject_code,
+                                    'semester' => $classEntry->semester === null ? null : (string) $classEntry->semester,
+                                    'teacher_id' => $classEntry->teacher_id ? (int) $classEntry->teacher_id : null,
+                                    'teacher_name' => $classEntry->teacher?->name,
+                                    'students_count' => (int) ($classEntry->enrollments_count ?? 0),
+                                ];
+                            })
+                            ->values()
+                            ->all();
+
+                        return [
+                            'id' => (int) $section->id,
+                            'section_id' => (int) $section->id,
+                            'section_name' => $section->section_name,
+                            'section_code' => $section->section_code,
+                            'section_label' => $sectionLabel,
+                            'grade_level' => $section->grade_level,
+                            'strand' => $section->strand,
+                            'track' => $section->track,
+                            'school_year' => $section->school_year,
+                            'classes_count' => count($classes),
+                            'classes' => $classes,
+                        ];
+                    })
+                    ->values()
+                    ->all();
+
+                $teachingClasses = collect($teachingClassesByTeacher->get($user->id, collect()))
+                    ->map(function (SchoolClass $classEntry) {
+                        $section = $classEntry->sectionRecord;
+                        $subject = $classEntry->subject;
+
+                        $sectionName = $section?->section_name ?: $classEntry->section;
+                        $gradeLevel = $section?->grade_level ?: $classEntry->grade_level;
+                        $strand = $section?->strand ?: $classEntry->strand;
+                        $track = $section?->track ?: $classEntry->track;
+                        $specialization = $track ?: ($strand ?: null);
+
+                        return [
+                            'id' => (int) $classEntry->id,
+                            'section_id' => $classEntry->section_id ? (int) $classEntry->section_id : null,
+                            'section_name' => $sectionName,
+                            'section_code' => $section?->section_code,
+                            'section_label' => satis_section_full_label(
+                                $gradeLevel,
+                                $specialization,
+                                $sectionName,
+                            ),
+                            'subject_id' => $classEntry->subject_id ? (int) $classEntry->subject_id : null,
+                            'subject_name' => $subject?->subject_name,
+                            'subject_code' => $subject?->subject_code,
+                            'semester' => $classEntry->semester === null ? null : (string) $classEntry->semester,
+                            'school_year' => $classEntry->school_year,
+                            'grade_level' => $gradeLevel,
+                            'strand' => $strand,
+                            'track' => $track,
+                            'students_count' => (int) ($classEntry->enrollments_count ?? 0),
+                        ];
+                    })
+                    ->values()
+                    ->all();
+
+                $payload['teacher_advisory_classes'] = $advisoryClasses;
+                $payload['teacher_teaching_classes'] = $teachingClasses;
+            } else {
+                $payload['teacher_advisory_classes'] = [];
+                $payload['teacher_teaching_classes'] = [];
+            }
+
+            if ($roleNames->contains('student')) {
+                /** @var Student|null $studentProfile */
+                $studentProfile = $studentProfilesByUserId->get($user->id);
+                $sectionRecord = $studentProfile?->sectionRecord;
+
+                $sectionName = $sectionRecord?->section_name ?: $studentProfile?->section;
+                $gradeLevel = $sectionRecord?->grade_level ?: $studentProfile?->grade_level;
+                $strand = $sectionRecord?->strand ?: $studentProfile?->strand;
+                $track = $sectionRecord?->track ?: $studentProfile?->track;
+                $specialization = $track ?: ($strand ?: null);
+
+                $payload['student_section'] = [
+                    'student_id' => $studentProfile?->id ? (int) $studentProfile->id : null,
+                    'section_id' => $sectionRecord?->id ? (int) $sectionRecord->id : null,
+                    'section_name' => $sectionName,
+                    'section_code' => $sectionRecord?->section_code,
+                    'section_label' => $sectionName
+                        ? satis_section_full_label(
+                            $gradeLevel,
+                            $specialization,
+                            $sectionName,
+                        )
+                        : null,
+                    'grade_level' => $gradeLevel,
+                    'strand' => $strand,
+                    'track' => $track,
+                    'school_year' => $sectionRecord?->school_year,
+                    'lrn' => $studentProfile?->lrn,
+                ];
+
+                $studentClasses = collect($studentClassesByUserId->get($user->id, collect()))
+                    ->map(function (Enrollment $enrollment) {
+                        $schoolClass = $enrollment->schoolClass;
+                        if (! $schoolClass) {
+                            return null;
+                        }
+
+                        $subject = $schoolClass->subject;
+                        $teacher = $schoolClass->teacher;
+                        $sectionRecord = $schoolClass->sectionRecord;
+
+                        $sectionName = $sectionRecord?->section_name ?: $schoolClass->section;
+                        $gradeLevel = $sectionRecord?->grade_level ?: $schoolClass->grade_level;
+                        $strand = $sectionRecord?->strand ?: $schoolClass->strand;
+                        $track = $sectionRecord?->track ?: $schoolClass->track;
+                        $specialization = $track ?: ($strand ?: null);
+
+                        return [
+                            'enrollment_id' => (int) $enrollment->id,
+                            'class_id' => (int) $schoolClass->id,
+                            'school_year' => $schoolClass->school_year,
+                            'semester' => $schoolClass->semester === null ? null : (string) $schoolClass->semester,
+                            'grade_level' => $gradeLevel,
+                            'strand' => $strand,
+                            'track' => $track,
+                            'section_id' => $schoolClass->section_id ? (int) $schoolClass->section_id : null,
+                            'section_name' => $sectionName,
+                            'section_code' => $sectionRecord?->section_code,
+                            'section_label' => $sectionName
+                                ? satis_section_full_label(
+                                    $gradeLevel,
+                                    $specialization,
+                                    $sectionName,
+                                )
+                                : null,
+                            'subject_id' => $schoolClass->subject_id ? (int) $schoolClass->subject_id : null,
+                            'subject_name' => $subject?->subject_name,
+                            'subject_code' => $subject?->subject_code,
+                            'teacher_id' => $schoolClass->teacher_id ? (int) $schoolClass->teacher_id : null,
+                            'teacher_name' => $teacher?->name,
+                            'midterm_grade' => $enrollment->q1_grade === null ? null : (int) $enrollment->q1_grade,
+                            'final_quarter_grade' => $enrollment->q2_grade === null ? null : (int) $enrollment->q2_grade,
+                            'final_grade' => $enrollment->final_grade === null ? null : (int) $enrollment->final_grade,
+                            'remarks' => $enrollment->remarks,
+                        ];
+                    })
+                    ->filter()
+                    ->sortBy(function (array $entry) {
+                        $semesterOrder = $entry['semester'] === '2'
+                            ? 2
+                            : ($entry['semester'] === '1' ? 1 : 9);
+
+                        return sprintf(
+                            '%02d|%s|%s',
+                            $semesterOrder,
+                            strtolower((string) ($entry['subject_name'] ?? '')),
+                            strtolower((string) ($entry['section_label'] ?? '')),
+                        );
+                    })
+                    ->values()
+                    ->all();
+
+                $payload['student_classes'] = $studentClasses;
+            } else {
+                $payload['student_section'] = null;
+                $payload['student_classes'] = [];
+            }
 
             return $payload;
         });
@@ -166,7 +488,6 @@ class UserManagementController extends Controller
             $validated = $request->validate([
                 'role' => ['required', 'in:teacher'],
                 'teacher_mode' => ['required', 'in:multiple'],
-                'password' => ['required', Password::min(8)],
                 'teacher_queue' => ['required', 'array', 'min:1'],
                 'teacher_queue.*.first_name' => ['required', 'string', 'max:100'],
                 'teacher_queue.*.last_name' => ['required', 'string', 'max:100'],
@@ -209,39 +530,57 @@ class UserManagementController extends Controller
                 $pendingAdminDepartmentIds[] = $departmentId;
             }
 
-            DB::transaction(function () use ($validated, $superAdmin) {
-                foreach ($validated['teacher_queue'] as $teacherPayload) {
-                    $assignedRoles = ['teacher'];
+            try {
+                DB::transaction(function () use ($validated, $superAdmin) {
+                    foreach ($validated['teacher_queue'] as $teacherPayload) {
+                        $assignedRoles = ['teacher'];
 
-                    if (!empty($teacherPayload['assign_as_admin'])) {
-                        $assignedRoles[] = 'admin';
+                        if (!empty($teacherPayload['assign_as_admin'])) {
+                            $assignedRoles[] = 'admin';
+                        }
+
+                        $tempPassword = $this->generateTemporaryPassword(12);
+
+                        $teacher = User::create([
+                            'first_name' => $teacherPayload['first_name'],
+                            'last_name' => $teacherPayload['last_name'],
+                            'middle_name' => $teacherPayload['middle_name'] ?? null,
+                            'personal_email' => $teacherPayload['email'] ?? null,
+                            'temporary_password' => $tempPassword,
+                            'password' => Hash::make($tempPassword),
+                            'department_id' => $teacherPayload['department_id'],
+                            'must_change_password' => true,
+                            'email_verified_at' => null,
+                            'status' => 'active',
+                            'created_by' => $superAdmin->id,
+                            'username' => null,
+                        ]);
+
+                        $roleIds = Role::whereIn('name', $assignedRoles)->pluck('id')->all();
+                        if (!empty($roleIds)) {
+                            $teacher->roles()->sync($roleIds);
+                        }
+
+                        Mail::to($teacher->email)->send(new TeacherCredentials(
+                            teacher: $teacher,
+                            plainPassword: $tempPassword,
+                            issuedBy: $superAdmin,
+                        ));
                     }
+                });
+            } catch (\Throwable $exception) {
+                report($exception);
 
-                    $teacher = User::create([
-                        'first_name' => $teacherPayload['first_name'],
-                        'last_name' => $teacherPayload['last_name'],
-                        'middle_name' => $teacherPayload['middle_name'] ?? null,
-                        'personal_email' => $teacherPayload['email'] ?? null,
-                        'password' => Hash::make($validated['password']),
-                        'department_id' => $teacherPayload['department_id'],
-                        'must_change_password' => true,
-                        'status' => 'active',
-                        'created_by' => $superAdmin->id,
-                        'username' => null,
-                    ]);
-
-                    $roleIds = Role::whereIn('name', $assignedRoles)->pluck('id')->all();
-                    if (!empty($roleIds)) {
-                        $teacher->roles()->sync($roleIds);
-                    }
-                }
-            });
+                return back()->withErrors([
+                    'teacher_queue' => 'Unable to create teacher accounts and send credentials right now. Please try again.',
+                ]);
+            }
 
             $createdCount = count($validated['teacher_queue']);
             $label = $createdCount === 1 ? 'teacher' : 'teachers';
 
             return redirect()->route('superadmin.users.index')
-                ->with('success', "{$createdCount} {$label} created successfully.");
+                ->with('success', "{$createdCount} {$label} created successfully. Login credentials were sent via email.");
         }
 
         if ($role === 'student' && in_array($studentMode, ['multiple', 'csv'], true)) {
@@ -338,7 +677,7 @@ class UserManagementController extends Controller
             'lrn'           => ['nullable', 'string', 'size:12', 'unique:students,lrn'],
             'email'         => ['nullable', 'email', 'unique:users,personal_email'],
             'username'      => ['nullable', 'string', 'regex:/^[a-z]{2}\d{4}\d{5}$/', 'unique:users,username'],
-            'password'      => ['required', Password::min(8)],
+            'password'      => ['nullable', Password::min(8)],
             'role'          => ['required', 'in:teacher,student'],
             'teacher_mode'  => ['nullable', 'in:single,multiple'],
             'student_mode'  => ['nullable', 'in:single,multiple,csv'],
@@ -350,6 +689,12 @@ class UserManagementController extends Controller
         if ($validated['role'] === 'teacher' && empty($validated['department_id'])) {
             return back()->withErrors([
                 'department_id' => 'Department is required for teachers.',
+            ]);
+        }
+
+        if ($validated['role'] === 'teacher' && empty($validated['email'])) {
+            return back()->withErrors([
+                'email' => 'Email is required for teachers.',
             ]);
         }
 
@@ -374,6 +719,12 @@ class UserManagementController extends Controller
             if (($validated['student_mode'] ?? 'single') !== 'single') {
                 return back()->withErrors([
                     'student_mode' => 'Invalid student mode for single student creation.',
+                ]);
+            }
+
+            if (empty($validated['password'])) {
+                return back()->withErrors([
+                    'password' => 'Password is required for single student creation.',
                 ]);
             }
 
@@ -423,6 +774,14 @@ class UserManagementController extends Controller
             $assignedRoles = ['student'];
         }
 
+        $teacherTempPassword = $validated['role'] === 'teacher'
+            ? $this->generateTemporaryPassword(12)
+            : null;
+
+        $resolvedPassword = $validated['role'] === 'teacher'
+            ? $teacherTempPassword
+            : (string) ($validated['password'] ?? '');
+
         $user = User::create([
             'first_name'           => $validated['first_name'],
             'last_name'            => $validated['last_name'],
@@ -430,12 +789,13 @@ class UserManagementController extends Controller
             'personal_email'       => $validated['email'] ?? null,
             'temporary_password'   => $validated['role'] === 'student'
                 ? $validated['password']
-                : null,
-            'password'             => Hash::make($validated['password']),
+                : $teacherTempPassword,
+            'password'             => Hash::make($resolvedPassword),
             'department_id'        => $validated['role'] === 'teacher'
                 ? $validated['department_id']
                 : null,
             'must_change_password' => true,
+            'email_verified_at'    => null,
             'status'               => 'active',
             'created_by'           => $superAdmin->id,
             'username'             => $validated['role'] === 'student'
@@ -475,8 +835,25 @@ class UserManagementController extends Controller
                 ]]);
         }
 
+        try {
+            Mail::to($user->email)->send(new TeacherCredentials(
+                teacher: $user,
+                plainPassword: (string) $teacherTempPassword,
+                issuedBy: $superAdmin,
+            ));
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            $user->roles()->detach();
+            $user->delete();
+
+            return back()->withErrors([
+                'email' => 'Unable to send login credentials email. Please try again.',
+            ]);
+        }
+
         return redirect()->route('superadmin.users.index')
-            ->with('success', 'User created successfully.');
+            ->with('success', 'Teacher created successfully. Login credentials were sent via email.');
     }
 
     private function buildStudentSectionAttributes(?Section $section): array

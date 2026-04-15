@@ -70,6 +70,15 @@ class AuthenticatedSessionController extends Controller
                 ->with('status', 'verification-email-required');
         }
 
+        // Teachers must verify email before teacher portal access.
+        if (
+            $user->isTeacher() &&
+            (! filled((string) $user->personal_email) || ! $user->hasVerifiedEmail())
+        ) {
+            return redirect()->route('verification.notice')
+                ->with('status', 'verification-email-required');
+        }
+
         // Students must complete email setup and verification before dashboard access.
         if (
             $user->isStudent() &&

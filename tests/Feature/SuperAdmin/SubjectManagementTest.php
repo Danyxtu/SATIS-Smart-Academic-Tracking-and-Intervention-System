@@ -5,6 +5,7 @@ namespace Tests\Feature\SuperAdmin;
 use App\Models\Subject;
 use App\Models\SubjectTeacher;
 use App\Models\SubjectType;
+use App\Models\SystemSetting;
 use App\Models\User;
 use Tests\TestCase;
 
@@ -166,6 +167,11 @@ class SubjectManagementTest extends TestCase
         /** @var User $teacher */
         $teacher = $this->createUserWithRole('teacher');
 
+        $currentSchoolYear = '2030-2031';
+        $currentSemester = '2';
+        SystemSetting::set('current_school_year', $currentSchoolYear);
+        SystemSetting::set('current_semester', $currentSemester);
+
         $subject = Subject::create([
             'subject_name' => 'Statistics and Probability',
             'subject_code' => 'STAT-PROB',
@@ -179,10 +185,10 @@ class SubjectManagementTest extends TestCase
             'color' => 'indigo',
             'strand' => 'STEM',
             'track' => 'Academic',
-            'school_year' => '2025-2026',
+            'school_year' => $currentSchoolYear,
             'current_quarter' => 1,
             'grade_categories' => [],
-            'semester' => '1',
+            'semester' => $currentSemester,
         ]);
 
         $response = $this->actingAs($superAdmin)
@@ -191,6 +197,45 @@ class SubjectManagementTest extends TestCase
         $response->assertSessionHas('error');
 
         $this->assertDatabaseHas('subjects', [
+            'id' => $subject->id,
+        ]);
+    }
+
+    public function test_super_admin_can_delete_subject_when_classes_are_outside_current_term(): void
+    {
+        /** @var User $superAdmin */
+        $superAdmin = $this->createUserWithRole('super_admin');
+        /** @var User $teacher */
+        $teacher = $this->createUserWithRole('teacher');
+
+        SystemSetting::set('current_school_year', '2030-2031');
+        SystemSetting::set('current_semester', '2');
+
+        $subject = Subject::create([
+            'subject_name' => 'Earth and Life Science',
+            'subject_code' => 'ELS-HIST',
+        ]);
+
+        SubjectTeacher::create([
+            'subject_id' => $subject->id,
+            'teacher_id' => $teacher->id,
+            'grade_level' => '11',
+            'section' => 'STEM-B',
+            'color' => 'blue',
+            'strand' => 'STEM',
+            'track' => 'Academic',
+            'school_year' => '2029-2030',
+            'current_quarter' => 1,
+            'grade_categories' => [],
+            'semester' => '1',
+        ]);
+
+        $response = $this->actingAs($superAdmin)
+            ->delete(route('superadmin.subjects.destroy', $subject));
+
+        $response->assertRedirect(route('superadmin.subjects.index'));
+
+        $this->assertDatabaseMissing('subjects', [
             'id' => $subject->id,
         ]);
     }

@@ -1,6 +1,5 @@
 import { Head, Link, router, useForm } from "@inertiajs/react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
-import DeleteConfirmModal from "@/Components/Superadmin/DeleteConfirmModal";
 import SubjectWizardModal from "@/Components/Superadmin/SubjectWizardModal";
 import SubjectDetailModal from "@/Components/Superadmin/SubjectDetailModal";
 import {
@@ -8,7 +7,6 @@ import {
     Plus,
     Search,
     X,
-    Trash2,
     GraduationCap,
     Calendar,
     Pencil,
@@ -23,267 +21,6 @@ import { useEffect, useMemo, useState } from "react";
 
 function toSemesterLabel(semester) {
     return String(semester) === "2" ? "2nd Semester" : "1st Semester";
-}
-
-function SubjectEditModal({
-    isOpen,
-    data,
-    setData,
-    errors,
-    processing,
-    onClose,
-    onSubmit,
-    typeOptions,
-    semesterOptions,
-    gradeLevelOptions,
-}) {
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto p-4 pb-10 sm:items-center">
-            <div
-                className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
-                onClick={onClose}
-            />
-
-            <div className="relative w-full max-w-md max-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
-                <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 ring-1 ring-emerald-200">
-                            <BookOpen size={16} className="text-emerald-600" />
-                        </div>
-                        <div>
-                            <h2 className="text-base font-semibold text-slate-900">
-                                Edit Subject
-                            </h2>
-                            <p className="text-xs text-slate-500">
-                                Update subject details and classification
-                            </p>
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        disabled={processing}
-                        className="z-10 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
-                    >
-                        <X size={16} />
-                    </button>
-                </div>
-
-                <form onSubmit={onSubmit}>
-                    <div className="max-h-[calc(100vh-14rem)] space-y-5 overflow-y-auto px-6 py-5">
-                        <div>
-                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                Subject Name{" "}
-                                <span className="text-rose-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={data.subject_name}
-                                onChange={(e) =>
-                                    setData("subject_name", e.target.value)
-                                }
-                                placeholder="e.g., General Mathematics"
-                                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:ring-2 focus:ring-offset-0 ${
-                                    errors.subject_name
-                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                        : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
-                                }`}
-                            />
-                            {errors.subject_name && (
-                                <p className="mt-1.5 text-xs text-rose-600">
-                                    {errors.subject_name}
-                                </p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                Subject Code{" "}
-                                <span className="text-rose-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={data.subject_code}
-                                onChange={(e) =>
-                                    setData(
-                                        "subject_code",
-                                        e.target.value.toUpperCase(),
-                                    )
-                                }
-                                placeholder="e.g., GENMATH"
-                                className={`w-full rounded-xl border px-3.5 py-2.5 font-mono text-sm text-slate-900 placeholder:font-sans placeholder:text-slate-400 outline-none transition-all focus:ring-2 focus:ring-offset-0 ${
-                                    errors.subject_code
-                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                        : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
-                                }`}
-                            />
-                            {errors.subject_code && (
-                                <p className="mt-1.5 text-xs text-rose-600">
-                                    {errors.subject_code}
-                                </p>
-                            )}
-                            <p className="mt-1.5 text-xs text-slate-400">
-                                Letters, numbers, spaces, or hyphens only.
-                            </p>
-                        </div>
-
-                        <div>
-                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                Total Hours
-                            </label>
-                            <input
-                                type="number"
-                                min="1"
-                                value={data.total_hours ?? ""}
-                                onChange={(e) =>
-                                    setData("total_hours", e.target.value)
-                                }
-                                placeholder="e.g., 160"
-                                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:ring-2 focus:ring-offset-0 ${
-                                    errors.total_hours
-                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                        : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
-                                }`}
-                            />
-                            {errors.total_hours && (
-                                <p className="mt-1.5 text-xs text-rose-600">
-                                    {errors.total_hours}
-                                </p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                Semester
-                            </label>
-                            <select
-                                value={data.semester ?? ""}
-                                onChange={(e) =>
-                                    setData("semester", e.target.value)
-                                }
-                                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 focus:ring-offset-0 ${
-                                    errors.semester
-                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                        : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
-                                }`}
-                            >
-                                <option value="">Select semester</option>
-                                {semesterOptions.map((option) => (
-                                    <option key={option} value={option}>
-                                        {toSemesterLabel(option)}
-                                    </option>
-                                ))}
-                            </select>
-                            {errors.semester && (
-                                <p className="mt-1.5 text-xs text-rose-600">
-                                    {errors.semester}
-                                </p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                Grade Level
-                            </label>
-                            <select
-                                value={data.grade_level ?? ""}
-                                onChange={(e) =>
-                                    setData("grade_level", e.target.value)
-                                }
-                                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 focus:ring-offset-0 ${
-                                    errors.grade_level
-                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                        : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
-                                }`}
-                            >
-                                <option value="">Select grade level</option>
-                                {gradeLevelOptions.map((option) => (
-                                    <option key={option} value={option}>
-                                        {option}
-                                    </option>
-                                ))}
-                            </select>
-                            {errors.grade_level && (
-                                <p className="mt-1.5 text-xs text-rose-600">
-                                    {errors.grade_level}
-                                </p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                Subject Type
-                            </label>
-                            <select
-                                value={data.type_key ?? ""}
-                                onChange={(e) =>
-                                    setData("type_key", e.target.value)
-                                }
-                                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all focus:ring-2 focus:ring-offset-0 ${
-                                    errors.type_key
-                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                        : "border-slate-300 bg-white focus:border-emerald-500 focus:ring-emerald-100"
-                                }`}
-                            >
-                                <option value="">Select subject type</option>
-                                {typeOptions.map((option) => (
-                                    <option key={option.key} value={option.key}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </select>
-                            {errors.type_key && (
-                                <p className="mt-1.5 text-xs text-rose-600">
-                                    {errors.type_key}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-2.5 border-t border-slate-100 px-6 py-4">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            disabled={processing}
-                            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={processing}
-                            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-60"
-                        >
-                            {processing && (
-                                <svg
-                                    className="h-3.5 w-3.5 animate-spin"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                >
-                                    <circle
-                                        className="opacity-25"
-                                        cx="12"
-                                        cy="12"
-                                        r="10"
-                                        stroke="currentColor"
-                                        strokeWidth="4"
-                                    />
-                                    <path
-                                        className="opacity-75"
-                                        fill="currentColor"
-                                        d="M4 12a8 8 0 018-8v8z"
-                                    />
-                                </svg>
-                            )}
-                            Save Changes
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
 }
 
 function StatCard({ icon: Icon, label, value, accent, active, onClick }) {
@@ -337,30 +74,10 @@ export default function Index({
         filters.grade_level || "all",
     );
     const [showCreateModal, setShowCreateModal] = useState(false);
-    const [showEditModal, setShowEditModal] = useState(false);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [subjectToEdit, setSubjectToEdit] = useState(null);
-    const [subjectToDelete, setSubjectToDelete] = useState(null);
     const [subjectToView, setSubjectToView] = useState(null);
+    const [subjectDetailMode, setSubjectDetailMode] = useState("view");
 
     const createForm = useForm({ type_key: "", subjects: [] });
-
-    const {
-        data: editData,
-        setData: setEditData,
-        put,
-        processing: editProcessing,
-        errors: editErrors,
-        reset: resetEdit,
-        clearErrors: clearEditErrors,
-    } = useForm({
-        subject_name: "",
-        subject_code: "",
-        total_hours: "",
-        type_key: "",
-        semester: "",
-        grade_level: "",
-    });
 
     useEffect(() => {
         setSearch(filters.search || "");
@@ -460,13 +177,6 @@ export default function Index({
         setShowCreateModal(false);
     };
 
-    const closeEditModal = () => {
-        clearEditErrors();
-        resetEdit();
-        setSubjectToEdit(null);
-        setShowEditModal(false);
-    };
-
     const handleSearch = (e) => {
         e.preventDefault();
         visitIndex(search, typeFilter, semesterFilter, gradeLevelFilter);
@@ -492,25 +202,14 @@ export default function Index({
         visitIndex(search, typeFilter, semesterFilter, nextGradeLevel);
     };
 
-    const openEditModal = (subject) => {
-        setSubjectToEdit(subject);
-        setEditData({
-            subject_name: subject.subject_name,
-            subject_code: subject.subject_code,
-            total_hours: subject.total_hours ?? "",
-            type_key: subject.subject_type_key ?? "",
-            semester: String(subject.semester ?? "1"),
-            grade_level: subject.grade_level ?? "",
-        });
-        setShowEditModal(true);
-    };
-
-    const openDetailModal = (subject) => {
+    const openDetailModal = (subject, mode = "view") => {
         setSubjectToView(subject);
+        setSubjectDetailMode(mode);
     };
 
     const closeDetailModal = () => {
         setSubjectToView(null);
+        setSubjectDetailMode("view");
     };
 
     const handleCreateFromWizard = (payload) => {
@@ -522,29 +221,6 @@ export default function Index({
                 createForm.transform((data) => data);
             },
         });
-    };
-
-    const handleUpdate = (e) => {
-        e.preventDefault();
-        if (!subjectToEdit) return;
-        put(route("superadmin.subjects.update", subjectToEdit.id), {
-            preserveScroll: true,
-            onSuccess: closeEditModal,
-        });
-    };
-
-    const handleDelete = () => {
-        if (!subjectToDelete) return;
-        router.delete(
-            route("superadmin.subjects.destroy", subjectToDelete.id),
-            {
-                preserveScroll: true,
-                onFinish: () => {
-                    setShowDeleteModal(false);
-                    setSubjectToDelete(null);
-                },
-            },
-        );
     };
 
     const subjectTypeBadgeStyles = {
@@ -905,23 +581,15 @@ export default function Index({
                                             <button
                                                 type="button"
                                                 onClick={() =>
-                                                    openEditModal(subject)
+                                                    openDetailModal(
+                                                        subject,
+                                                        "edit",
+                                                    )
                                                 }
                                                 title="Edit"
                                                 className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-emerald-50 hover:text-emerald-600"
                                             >
                                                 <Pencil size={14} />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setSubjectToDelete(subject);
-                                                    setShowDeleteModal(true);
-                                                }}
-                                                title="Delete"
-                                                className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600"
-                                            >
-                                                <Trash2 size={14} />
                                             </button>
                                         </div>
                                     </div>
@@ -1000,18 +668,6 @@ export default function Index({
                 onClose={closeCreateModal}
                 onSubmit={handleCreateFromWizard}
             />
-            <SubjectEditModal
-                isOpen={showEditModal}
-                data={editData}
-                setData={setEditData}
-                errors={editErrors}
-                processing={editProcessing}
-                typeOptions={availableTypeOptions}
-                semesterOptions={availableSemesterOptions}
-                gradeLevelOptions={availableGradeLevelOptions}
-                onClose={closeEditModal}
-                onSubmit={handleUpdate}
-            />
             <SubjectDetailModal
                 show={Boolean(subjectToView)}
                 onClose={closeDetailModal}
@@ -1019,17 +675,15 @@ export default function Index({
                 loading={false}
                 error=""
                 row={subjectToView}
-            />
-            <DeleteConfirmModal
-                isOpen={showDeleteModal}
-                onClose={() => {
-                    setShowDeleteModal(false);
-                    setSubjectToDelete(null);
+                subjectManageMode={subjectDetailMode}
+                typeOptions={availableTypeOptions}
+                semesterOptions={availableSemesterOptions}
+                gradeLevelOptions={availableGradeLevelOptions}
+                onSubjectSaved={(updatedSubject) => {
+                    setSubjectToView(updatedSubject);
+                    setSubjectDetailMode("view");
                 }}
-                onConfirm={handleDelete}
-                title="Delete Subject"
-                itemName={subjectToDelete?.subject_name}
-                description="This will permanently remove the subject if it is not linked to active classes. This action cannot be undone."
+                onSubjectDeleted={closeDetailModal}
             />
         </>
     );

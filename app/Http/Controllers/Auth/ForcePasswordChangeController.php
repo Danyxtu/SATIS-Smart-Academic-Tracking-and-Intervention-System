@@ -56,6 +56,16 @@ class ForcePasswordChangeController extends Controller
             );
         }
 
+        if (
+            $user->isTeacher() &&
+            (! filled((string) $user->personal_email) || ! $user->hasVerifiedEmail())
+        ) {
+            return redirect()->route('verification.notice')->with(
+                'status',
+                'verification-email-required'
+            );
+        }
+
         // Redirect based on role priority for multi-role users.
         // Teacher should always land on teacher dashboard when present.
         if ($user->isTeacher()) {

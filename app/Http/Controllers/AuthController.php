@@ -208,7 +208,9 @@ class AuthController extends Controller
      */
     private function accountReadinessFlags(User $user): array
     {
-        $requiresVerification = $user->hasRole('student') || $user->hasRole('super_admin');
+        $requiresVerification = $user->hasRole('student')
+            || $user->hasRole('super_admin')
+            || $user->hasRole('teacher');
         $hasPersonalEmail = filled((string) $user->personal_email);
         $isEmailVerified = $requiresVerification
             ? ($hasPersonalEmail && $user->hasVerifiedEmail())

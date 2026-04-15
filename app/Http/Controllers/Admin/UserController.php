@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\TeacherCredentials;
 use App\Mail\TemporaryCredentials;
 use App\Models\User;
 use App\Models\Student;
@@ -266,21 +267,11 @@ class UserController extends Controller
             $rules['lrn'] = 'required|string|size:12|unique:students,lrn';
         }
 
-        // Only require password for non-student roles
-        if ($request->role !== 'student') {
-            $rules['password'] = ['required', 'confirmed', Rules\Password::defaults()];
-        }
-
         $validated = $request->validate($rules);
 
-        // Generate random password for students, use provided password for others
-        $tempPassword = null;
-        if ($validated['role'] === 'student') {
-            $tempPassword = Str::random(10);
-            $password = $tempPassword;
-        } else {
-            $password = $validated['password'];
-        }
+        $tempPassword = $validated['role'] === 'teacher'
+            ? Str::random(12)
+            : Str::random(10);
 
         // Create user with department assignment for teachers
         $userData = [
@@ -288,18 +279,18 @@ class UserController extends Controller
             'last_name' => $validated['last_name'],
             'middle_name' => $validated['middle_name'] ?? null,
             'personal_email' => $validated['email'] ?? null,
-            'password' => Hash::make($password),
+            'password' => Hash::make($tempPassword),
             'created_by' => $admin->id,
-            'email_verified_at' => now(),
+            'email_verified_at' => null,
         ];
 
         if ($validated['role'] === 'student') {
             $seed = trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? ''));
             $userData['username'] = User::generateUniqueUsername($seed);
-            $userData['temporary_password'] = $tempPassword;
-            $userData['must_change_password'] = true;
-            $userData['email_verified_at'] = null;
         }
+
+        $userData['temporary_password'] = $tempPassword;
+        $userData['must_change_password'] = true;
 
         // Assign department for teachers
         if ($validated['role'] === 'teacher' && $departmentId) {
@@ -331,8 +322,25 @@ class UserController extends Controller
                 ->with('success', 'Student created successfully. Temporary credentials were sent via email.');
         }
 
+        try {
+            Mail::to($user->email)->send(new TeacherCredentials(
+                teacher: $user,
+                plainPassword: (string) $tempPassword,
+                issuedBy: $admin,
+            ));
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            $user->roles()->detach();
+            $user->delete();
+
+            return back()->withErrors([
+                'email' => 'Unable to send login credentials email. Please try again.',
+            ])->withInput();
+        }
+
         return redirect()->route('admin.users.index')
-            ->with('success', 'Teacher created successfully and assigned to your department.');
+            ->with('success', 'Teacher created successfully. Login credentials were sent via email.');
     }
 
     /**
