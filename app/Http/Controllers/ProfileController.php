@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\PasswordResetRequest;
 use App\Models\Student;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -32,7 +31,6 @@ class ProfileController extends Controller
             ->first();
 
         return Inertia::render('Student/ProfileSettings', [
-            'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => session('status'),
             'student' => $student ? [
                 'id' => $student->id,

@@ -19,7 +19,7 @@ class EmailOtpVerificationTest extends TestCase
         Mail::fake();
         $user = User::factory()->create(['email_verified_at' => null]);
         $this->actingAs($user);
-        $email = $user->email;
+        $email = $user->personal_email;
 
         $response = $this->postJson('/email-otp/send', ['email' => $email]);
         $response->assertStatus(200);
@@ -29,6 +29,7 @@ class EmailOtpVerificationTest extends TestCase
         $verify = $this->postJson('/email-otp/verify', ['email' => $email, 'otp' => $otp]);
         $verify->assertStatus(200);
         $this->assertNotNull($user->fresh()->email_verified_at);
+        $this->assertSame($email, $user->fresh()->personal_email);
     }
 
     public function test_cannot_resend_otp_within_cooldown()
@@ -36,7 +37,7 @@ class EmailOtpVerificationTest extends TestCase
         Mail::fake();
         $user = User::factory()->create(['email_verified_at' => null]);
         $this->actingAs($user);
-        $email = $user->email;
+        $email = $user->personal_email;
         $this->postJson('/email-otp/send', ['email' => $email]);
         $response = $this->postJson('/email-otp/send', ['email' => $email]);
         $response->assertStatus(429);
@@ -47,7 +48,7 @@ class EmailOtpVerificationTest extends TestCase
         Mail::fake();
         $user = User::factory()->create(['email_verified_at' => null]);
         $this->actingAs($user);
-        $email = $user->email;
+        $email = $user->personal_email;
         $this->postJson('/email-otp/send', ['email' => $email]);
         $otp = \App\Models\EmailVerificationOtp::where('user_id', $user->id)->first();
         $otp->expires_at = now()->subMinute();

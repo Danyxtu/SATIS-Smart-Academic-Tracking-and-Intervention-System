@@ -23,11 +23,18 @@ export function useKeyboardShortcuts(shortcuts, options = {}) {
                 target.isContentEditable;
 
             // Build the key combination string
+            const normalizedKey =
+                typeof event.key === "string" ? event.key.toLowerCase() : "";
+
+            if (!normalizedKey) {
+                return;
+            }
+
             const keys = [];
             if (event.ctrlKey || event.metaKey) keys.push("ctrl");
             if (event.altKey) keys.push("alt");
             if (event.shiftKey) keys.push("shift");
-            keys.push(event.key.toLowerCase());
+            keys.push(normalizedKey);
 
             const keyCombo = keys.join("+");
 
@@ -51,7 +58,7 @@ export function useKeyboardShortcuts(shortcuts, options = {}) {
                 }
             }
         },
-        [shortcuts, enabled, preventDefault]
+        [shortcuts, enabled, preventDefault],
     );
 
     useEffect(() => {
@@ -129,7 +136,7 @@ export function useShortcutHelp() {
                     </div>
                 ))}
             </div>,
-            { duration: 5000 }
+            { duration: 5000 },
         );
     };
 

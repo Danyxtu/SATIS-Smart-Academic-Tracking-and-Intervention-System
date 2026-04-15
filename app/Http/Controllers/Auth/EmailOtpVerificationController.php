@@ -3,67 +3,137 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Mail\OtpMail;
 use App\Models\EmailVerificationOtp;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class EmailOtpVerificationController extends Controller
 {
-    public function send(Request $request)
+    private const OTP_LENGTH = 6;
+    private const OTP_EXPIRY_MINUTES = 6;
+    private const RESEND_COOLDOWN_SECONDS = 180;
+
+    public function send(Request $request): JsonResponse
     {
-        $request->validate([
-            'email' => 'required|email',
-        ]);
         $user = $request->user();
-        $now = now();
-        $otp = random_int(100000, 999999);
-        $expiresAt = $now->copy()->addMinutes(6);
-        $resendAvailableAt = $now->copy()->addMinutes(3);
 
-        $record = EmailVerificationOtp::updateOrCreate(
-            [
-                'user_id' => $user->id,
-                'email' => $request->email,
+        $validated = $request->validate([
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                'lowercase',
+                Rule::unique(User::class, 'personal_email')->ignore($user->id),
             ],
-            [
-                'otp' => $otp,
-                'expires_at' => $expiresAt,
-                'resend_available_at' => $resendAvailableAt,
-            ]
-        );
+        ]);
 
-        if ($record->wasRecentlyCreated || $now->greaterThanOrEqualTo($record->resend_available_at)) {
-            Mail::to($request->email)->send(new \App\Mail\OtpMail($otp));
-        } else {
-            $seconds = $record->resend_available_at->diffInSeconds($now);
-            return response()->json(['message' => 'Please wait before resending.', 'resend_in' => $seconds], 429);
+        $email = Str::lower(trim((string) $validated['email']));
+        $now = now();
+
+        $latestOtp = EmailVerificationOtp::query()
+            ->where('user_id', $user->id)
+            ->latest('updated_at')
+            ->first();
+
+        if ($latestOtp && $now->lt($latestOtp->resend_available_at)) {
+            $retryAfterSeconds = $now->diffInSeconds($latestOtp->resend_available_at);
+
+            return response()->json([
+                'message' => 'Please wait before resending another OTP.',
+                'resend_in' => $retryAfterSeconds,
+                'cooldown_seconds' => self::RESEND_COOLDOWN_SECONDS,
+            ], 429);
         }
 
-        return response()->json(['message' => 'OTP sent.', 'resend_in' => 180]);
+        $otp = str_pad((string) random_int(0, 999999), self::OTP_LENGTH, '0', STR_PAD_LEFT);
+
+        EmailVerificationOtp::query()->where('user_id', $user->id)->delete();
+
+        EmailVerificationOtp::query()->create([
+            'user_id' => $user->id,
+            'email' => $email,
+            'otp' => $otp,
+            'expires_at' => $now->copy()->addMinutes(self::OTP_EXPIRY_MINUTES),
+            'resend_available_at' => $now->copy()->addSeconds(self::RESEND_COOLDOWN_SECONDS),
+        ]);
+
+        Mail::to($email)->send(new OtpMail($otp, self::OTP_EXPIRY_MINUTES));
+
+        return response()->json([
+            'message' => 'OTP sent successfully.',
+            'resend_in' => self::RESEND_COOLDOWN_SECONDS,
+            'cooldown_seconds' => self::RESEND_COOLDOWN_SECONDS,
+            'expires_in_minutes' => self::OTP_EXPIRY_MINUTES,
+        ]);
     }
 
-    public function verify(Request $request)
+    public function verify(Request $request): JsonResponse
     {
-        $request->validate([
-            'email' => 'required|email',
-            'otp' => 'required|digits:6',
-        ]);
         $user = $request->user();
+
+        $validated = $request->validate([
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                'lowercase',
+                Rule::unique(User::class, 'personal_email')->ignore($user->id),
+            ],
+            'otp' => ['required', 'digits:6'],
+        ]);
+
+        $email = Str::lower(trim((string) $validated['email']));
+        $submittedOtp = trim((string) $validated['otp']);
         $now = now();
-        $record = EmailVerificationOtp::where('user_id', $user->id)
-            ->where('email', $request->email)
-            ->where('otp', $request->otp)
+
+        $record = EmailVerificationOtp::query()
+            ->where('user_id', $user->id)
+            ->where('email', $email)
+            ->where('otp', $submittedOtp)
+            ->latest('updated_at')
             ->first();
-        if (!$record || $now->greaterThan($record->expires_at)) {
-            return response()->json(['message' => 'Invalid or expired OTP.'], 422);
+
+        if (! $record) {
+            return response()->json([
+                'message' => 'Invalid OTP for this email address.',
+            ], 422);
         }
-        // Mark user as verified (implement logic for all user types)
-        $user->email_verified_at = $now;
-        $user->save();
-        $record->delete();
-        return response()->json(['message' => 'Email verified.']);
+
+        if ($now->greaterThan($record->expires_at)) {
+            $record->delete();
+
+            return response()->json([
+                'message' => 'OTP expired. Please request a new code.',
+            ], 422);
+        }
+
+        $user->forceFill([
+            'personal_email' => $email,
+            'email_verified_at' => $now,
+        ])->save();
+
+        EmailVerificationOtp::query()->where('user_id', $user->id)->delete();
+
+        $redirectPath = Route::has('redirect-after-login')
+            ? route('redirect-after-login', absolute: false)
+            : '/';
+
+        return response()->json([
+            'message' => 'Email verified successfully.',
+            'redirect_to' => $redirectPath,
+            'user' => $user->fresh(),
+            'has_personal_email' => true,
+            'email_verified' => true,
+            'requires_personal_email' => false,
+            'requires_email_verification' => false,
+        ]);
     }
 }

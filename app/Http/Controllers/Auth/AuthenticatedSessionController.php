@@ -43,11 +43,6 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        $intendedVerificationUrl = $this->resolveIntendedEmailVerificationUrl($request);
-        if ($intendedVerificationUrl !== null) {
-            return redirect()->intended($intendedVerificationUrl);
-        }
-
         $user = Auth::user();
 
         if (! $user instanceof User) {
@@ -184,32 +179,5 @@ class AuthenticatedSessionController extends Controller
         }
 
         return $tracked;
-    }
-
-    private function resolveIntendedEmailVerificationUrl(Request $request): ?string
-    {
-        $intendedUrl = $request->session()->get('url.intended');
-
-        if (! is_string($intendedUrl) || $intendedUrl === '') {
-            return null;
-        }
-
-        $path = parse_url($intendedUrl, PHP_URL_PATH);
-        if (! is_string($path) || ! Str::startsWith('/' . ltrim($path, '/'), '/verify-email/')) {
-            return null;
-        }
-
-        $query = parse_url($intendedUrl, PHP_URL_QUERY);
-        if (! is_string($query) || $query === '') {
-            return null;
-        }
-
-        parse_str($query, $queryParams);
-
-        if (! array_key_exists('signature', $queryParams) || ! array_key_exists('expires', $queryParams)) {
-            return null;
-        }
-
-        return $intendedUrl;
     }
 }

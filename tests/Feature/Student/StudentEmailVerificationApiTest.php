@@ -22,7 +22,7 @@ it('requires student personal email and verification after api login', function 
         ->assertJsonPath('email_verified', false);
 });
 
-it('throttles student api verification resend for three minutes', function () {
+it('throttles student api OTP resend for three minutes', function () {
     $student = $this->createUserWithRole('student', [
         'personal_email' => 'student.cooldown.api@example.test',
         'email_verified_at' => null,
@@ -30,25 +30,23 @@ it('throttles student api verification resend for three minutes', function () {
 
     Sanctum::actingAs($student);
 
-    $firstResponse = postJson('/api/student/email-verification/send', [
+    $firstResponse = postJson('/api/email-otp/send', [
         'email' => $student->personal_email,
     ]);
 
     $firstResponse
         ->assertOk()
-        ->assertJsonPath('resend_cooldown_seconds', 180)
-        ->assertJsonPath('requires_email_verification', true)
-        ->assertJson(fn($json) => $json->where('retry_after_seconds', fn($value) => is_int($value) && $value > 0 && $value <= 180)->etc());
+        ->assertJsonPath('cooldown_seconds', 180)
+        ->assertJson(fn($json) => $json->where('resend_in', fn($value) => is_numeric($value) && (int) $value > 0 && (int) $value <= 180)->etc());
 
-    $secondResponse = postJson('/api/student/email-verification/send', [
+    $secondResponse = postJson('/api/email-otp/send', [
         'email' => $student->personal_email,
     ]);
 
     $secondResponse
         ->assertStatus(429)
-        ->assertJsonPath('resend_cooldown_seconds', 180)
+        ->assertJsonPath('cooldown_seconds', 180)
         ->assertJson(fn($json) => $json
-            ->where('retry_after_seconds', fn($value) => is_int($value) && $value > 0 && $value <= 180)
-            ->where('requires_email_verification', true)
+            ->where('resend_in', fn($value) => is_numeric($value) && (int) $value > 0 && (int) $value <= 180)
             ->etc());
 });
