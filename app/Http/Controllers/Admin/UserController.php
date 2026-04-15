@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class UserController extends Controller
@@ -361,6 +362,9 @@ class UserController extends Controller
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'middle_name' => $user->middle_name,
                 'email' => $user->email,
                 'role' => $user->roles->pluck('name')->first(),
                 'department_id' => $user->department_id,
@@ -388,33 +392,81 @@ class UserController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'first_name' => ['nullable', 'string', 'max:255'],
+            'last_name' => ['nullable', 'string', 'max:255'],
+            'middle_name' => ['nullable', 'string', 'max:255'],
+            'name' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'string', 'email', 'max:255', Rule::unique('users', 'personal_email')->ignore($user->id)],
             'role' => 'required|in:student,teacher', // Admin cannot change role to admin
         ]);
+
+        $firstName = trim((string) ($validated['first_name'] ?? ''));
+        $lastName = trim((string) ($validated['last_name'] ?? ''));
+        $middleName = trim((string) ($validated['middle_name'] ?? ''));
+
+        // Backward compatibility for legacy forms that still send a single name field.
+        if (($firstName === '' || $lastName === '') && !empty($validated['name'])) {
+            $tokens = preg_split('/\s+/', trim((string) $validated['name'])) ?: [];
+
+            if ($firstName === '' && !empty($tokens[0])) {
+                $firstName = (string) $tokens[0];
+            }
+
+            if ($lastName === '' && count($tokens) > 1) {
+                $lastName = (string) $tokens[count($tokens) - 1];
+            }
+
+            if ($middleName === '' && count($tokens) > 2) {
+                $middleName = implode(' ', array_slice($tokens, 1, -1));
+            }
+        }
+
+        if ($firstName === '' || $lastName === '') {
+            throw ValidationException::withMessages([
+                'first_name' => 'First name is required.',
+                'last_name' => 'Last name is required.',
+            ]);
+        }
 
         $oldRole = $user->roles->pluck('name')->first();
 
         // Prepare update data
         $updateData = [
-            'name' => $validated['name'],
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'middle_name' => $middleName !== '' ? $middleName : null,
             'personal_email' => $validated['email'] ?? null,
         ];
 
         // If changing to teacher, assign department
         if ($validated['role'] === 'teacher' && $admin->department_id) {
             $updateData['department_id'] = $admin->department_id;
+        } elseif ($validated['role'] === 'student') {
+            $updateData['department_id'] = null;
         }
 
         $user->update($updateData);
         $user->syncRolesByName([$validated['role']]);
 
+        $studentDisplayName = trim(
+            $firstName
+                . ' '
+                . ($middleName !== '' ? $middleName . ' ' : '')
+                . $lastName
+        );
+
         // Handle role change from non-student to student
         if ($oldRole !== 'student' && $validated['role'] === 'student') {
             Student::firstOrCreate(
                 ['user_id' => $user->id],
-                ['student_id' => 'STU-' . str_pad($user->id, 6, '0', STR_PAD_LEFT)]
+                ['student_name' => $studentDisplayName]
             );
+        }
+
+        if ($validated['role'] === 'student' && $user->student) {
+            $user->student->update([
+                'student_name' => $studentDisplayName,
+            ]);
         }
 
         return redirect()->route('admin.users.index')

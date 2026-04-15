@@ -60,13 +60,13 @@ const FilterTab = ({ label, count, isActive, onClick }) => (
         onClick={onClick}
         className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
             isActive
-                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                 : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
         }`}
     >
         {label}
         <span
-            className={`ml-2 px-1.5 py-0.5 text-xs rounded-full ${isActive ? "bg-emerald-200 dark:bg-emerald-800" : "bg-gray-200 dark:bg-gray-600"}`}
+            className={`ml-2 px-1.5 py-0.5 text-xs rounded-full ${isActive ? "bg-blue-200 dark:bg-blue-800" : "bg-gray-200 dark:bg-gray-600"}`}
         >
             {count}
         </span>
@@ -214,7 +214,7 @@ const ApproveModal = ({
                                         <button
                                             type="submit"
                                             disabled={processing}
-                                            className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50"
+                                            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
                                         >
                                             {processing
                                                 ? "Approving..."
@@ -470,7 +470,7 @@ const ResetCredentialsModal = ({ isOpen, onClose, credentials }) => {
                                         <button
                                             type="button"
                                             onClick={onClose}
-                                            className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                                            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
                                         >
                                             Close
                                         </button>
@@ -609,7 +609,7 @@ const ResetStudentPasswordConfirmModal = ({
                                         <button
                                             type="submit"
                                             disabled={processing || !data.lrn}
-                                            className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50"
+                                            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
                                         >
                                             {processing
                                                 ? "Resetting..."
@@ -813,7 +813,7 @@ export function PasswordResetRequestsPage({
                         <div className="flex gap-2">
                             <button
                                 type="submit"
-                                className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
                             >
                                 Search
                             </button>
@@ -859,7 +859,7 @@ export function PasswordResetRequestsPage({
                                                     student,
                                                 })
                                             }
-                                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
                                         >
                                             <KeyRound size={13} /> Reset
                                             Password
@@ -890,7 +890,7 @@ export function PasswordResetRequestsPage({
                                             href={link.url || "#"}
                                             className={`px-2 py-1 rounded text-xs ${
                                                 link.active
-                                                    ? "bg-emerald-600 text-white"
+                                                    ? "bg-blue-600 text-white"
                                                     : link.url
                                                       ? "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                                       : "text-gray-300 cursor-not-allowed"
@@ -995,7 +995,7 @@ export function PasswordResetRequestsPage({
                                                         request,
                                                     })
                                                 }
-                                                className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+                                                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
                                             >
                                                 Approve
                                             </button>
@@ -1068,7 +1068,7 @@ export function PasswordResetRequestsPage({
                                     <Link
                                         key={index}
                                         href={link.url || "#"}
-                                        className={`px-3 py-1 rounded-lg text-sm font-medium ${link.active ? "bg-emerald-600 text-white" : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"}`}
+                                        className={`px-3 py-1 rounded-lg text-sm font-medium ${link.active ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"}`}
                                         preserveState
                                     >
                                         {link.label}

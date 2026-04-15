@@ -29,7 +29,7 @@ const RoleCard = ({
         onClick={onClick}
         className={`p-4 rounded-xl border-2 text-left transition-all ${
             isSelected
-                ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
                 : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
         }`}
     >
@@ -37,7 +37,7 @@ const RoleCard = ({
             <div
                 className={`p-2 rounded-lg ${
                     isSelected
-                        ? "bg-purple-100 dark:bg-purple-900/30"
+                        ? "bg-blue-100 dark:bg-blue-900/30"
                         : "bg-gray-100 dark:bg-gray-700"
                 }`}
             >
@@ -45,7 +45,7 @@ const RoleCard = ({
                     size={24}
                     className={
                         isSelected
-                            ? "text-purple-600 dark:text-purple-400"
+                            ? "text-blue-600 dark:text-blue-400"
                             : "text-gray-500 dark:text-gray-400"
                     }
                 />
@@ -53,14 +53,14 @@ const RoleCard = ({
             {isSelected && (
                 <CheckCircle
                     size={20}
-                    className="text-purple-600 dark:text-purple-400"
+                    className="text-blue-600 dark:text-blue-400"
                 />
             )}
         </div>
         <h4
             className={`mt-3 font-semibold ${
                 isSelected
-                    ? "text-purple-900 dark:text-purple-100"
+                    ? "text-blue-900 dark:text-blue-100"
                     : "text-gray-900 dark:text-white"
             }`}
         >
@@ -135,7 +135,7 @@ export default function Edit({ user, department }) {
             <div className="mb-6">
                 <Link
                     href={route("admin.users.index")}
-                    className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 mb-4"
+                    className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 mb-4"
                 >
                     <ArrowLeft size={16} />
                     Back to Users
@@ -342,7 +342,7 @@ export default function Edit({ user, department }) {
                         <button
                             type="submit"
                             disabled={processing}
-                            className="inline-flex items-center gap-2 px-6 py-2.5 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                            className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                         >
                             {processing ? (
                                 <>

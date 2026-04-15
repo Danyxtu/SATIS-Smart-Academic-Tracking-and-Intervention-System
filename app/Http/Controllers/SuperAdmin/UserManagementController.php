@@ -403,6 +403,37 @@ class UserManagementController extends Controller
             })
             ->count();
 
+        $usernameYear = now()->format('Y');
+        $usernamePattern = '/^([a-z]{2}' . preg_quote($usernameYear, '/') . ')(\d{5})$/';
+
+        $studentUsernameLatestByPrefix = User::query()
+            ->whereHas('roles', function ($query) {
+                $query->where('name', 'student');
+            })
+            ->whereNotNull('username')
+            ->where('username', 'like', '__' . $usernameYear . '%')
+            ->pluck('username')
+            ->reduce(function (array $carry, $username) use ($usernamePattern) {
+                if (! is_string($username)) {
+                    return $carry;
+                }
+
+                if (preg_match($usernamePattern, $username, $matches) !== 1) {
+                    return $carry;
+                }
+
+                $prefix = (string) ($matches[1] ?? '');
+                $sequence = (int) ($matches[2] ?? 0);
+
+                if ($prefix === '') {
+                    return $carry;
+                }
+
+                $carry[$prefix] = max((int) ($carry[$prefix] ?? 0), $sequence);
+
+                return $carry;
+            }, []);
+
         foreach ($roleCountRows as $roleName => $total) {
             if (array_key_exists($roleName, $roleCounts)) {
                 $roleCounts[$roleName] = (int) $total;
@@ -474,6 +505,7 @@ class UserManagementController extends Controller
             'filters'     => $request->only('search', 'role'),
             'roleCounts'  => $roleCounts,
             'studentCreationBaseCount' => $studentCreationBaseCount,
+            'studentUsernameLatestByPrefix' => $studentUsernameLatestByPrefix,
         ]);
     }
 

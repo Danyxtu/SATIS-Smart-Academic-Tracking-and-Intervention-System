@@ -249,6 +249,25 @@ const buildStudentUsername = ({ firstName, lastName, year, sequence }) => {
     return `${prefix}${yearPart}${sequencePart}`;
 };
 
+const buildStudentUsernamePrefixForYear = ({ firstName, lastName, year }) => {
+    const prefix = getInitialsPrefix(firstName, lastName);
+    const yearPart = String(year || new Date().getFullYear())
+        .padStart(4, "0")
+        .slice(-4);
+
+    return `${prefix}${yearPart}`;
+};
+
+const normalizeUsernameSequence = (value) => {
+    const numericValue = Number(value);
+
+    if (!Number.isFinite(numericValue) || numericValue < 0) {
+        return 0;
+    }
+
+    return Math.floor(numericValue);
+};
+
 const isValidStudentUsername = (value = "") =>
     STUDENT_USERNAME_FORMAT.test(String(value || ""));
 
@@ -415,23 +434,49 @@ function emptyStudentDraft() {
     };
 }
 
-const applyStudentQueueUsernames = (queue, firstSequenceNumber, yearNumber) =>
-    queue.map((queueItem, index) => ({
-        ...queueItem,
-        username: buildStudentUsername({
+const applyStudentQueueUsernames = (
+    queue,
+    yearNumber,
+    latestByPrefix = {},
+) => {
+    const runningSequenceByPrefix = {};
+
+    return queue.map((queueItem) => {
+        const usernamePrefix = buildStudentUsernamePrefixForYear({
             firstName: queueItem.first_name,
             lastName: queueItem.last_name,
             year: yearNumber,
-            sequence: firstSequenceNumber + index,
-        }),
-    }));
+        });
+
+        const baseSequence = normalizeUsernameSequence(
+            latestByPrefix[usernamePrefix],
+        );
+
+        const nextSequence =
+            normalizeUsernameSequence(runningSequenceByPrefix[usernamePrefix]) ||
+            baseSequence;
+
+        const resolvedSequence = nextSequence + 1;
+        runningSequenceByPrefix[usernamePrefix] = resolvedSequence;
+
+        return {
+            ...queueItem,
+            username: buildStudentUsername({
+                firstName: queueItem.first_name,
+                lastName: queueItem.last_name,
+                year: yearNumber,
+                sequence: resolvedSequence,
+            }),
+        };
+    });
+};
 
 export default function CreateUserModal({
     open,
     onClose,
     departments,
     sections = [],
-    studentCount = 0,
+    studentUsernameLatestByPrefix = {},
 }) {
     const wasOpenRef = useRef(false);
     const studentSectionPickerRef = useRef(null);
@@ -499,10 +544,28 @@ export default function CreateUserModal({
     const isStudent = data.role === "student";
 
     const currentYearNumber = useMemo(() => new Date().getFullYear(), []);
-    const firstStudentSequenceNumber = useMemo(
-        () => Math.max(1, Number(studentCount || 0) + 1),
-        [studentCount],
-    );
+    const normalizedStudentUsernameLatestByPrefix = useMemo(() => {
+        if (
+            !studentUsernameLatestByPrefix ||
+            typeof studentUsernameLatestByPrefix !== "object"
+        ) {
+            return {};
+        }
+
+        return Object.entries(studentUsernameLatestByPrefix).reduce(
+            (carry, [prefix, sequence]) => {
+                const normalizedPrefix = String(prefix || "").toLowerCase();
+
+                if (!/^[a-z]{2}\d{4}$/.test(normalizedPrefix)) {
+                    return carry;
+                }
+
+                carry[normalizedPrefix] = normalizeUsernameSequence(sequence);
+                return carry;
+            },
+            {},
+        );
+    }, [studentUsernameLatestByPrefix]);
 
     const selectedDepartment = useMemo(
         () =>
@@ -642,11 +705,21 @@ export default function CreateUserModal({
             return "";
         }
 
+        const usernamePrefix = buildStudentUsernamePrefixForYear({
+            firstName: data.first_name,
+            lastName: data.last_name,
+            year: currentYearNumber,
+        });
+
+        const latestSequence = normalizeUsernameSequence(
+            normalizedStudentUsernameLatestByPrefix[usernamePrefix],
+        );
+
         return buildStudentUsername({
             firstName: data.first_name,
             lastName: data.last_name,
             year: currentYearNumber,
-            sequence: firstStudentSequenceNumber,
+            sequence: latestSequence + 1,
         });
     }, [
         isStudent,
@@ -654,7 +727,7 @@ export default function CreateUserModal({
         data.first_name,
         data.last_name,
         currentYearNumber,
-        firstStudentSequenceNumber,
+        normalizedStudentUsernameLatestByPrefix,
     ]);
 
     const singleStudentUsernameValid = useMemo(
@@ -1328,8 +1401,8 @@ export default function CreateUserModal({
 
         const nextQueue = applyStudentQueueUsernames(
             [...studentQueue, studentPayload],
-            firstStudentSequenceNumber,
             currentYearNumber,
+            normalizedStudentUsernameLatestByPrefix,
         );
 
         setStudentQueue(nextQueue);
@@ -1344,8 +1417,8 @@ export default function CreateUserModal({
 
         const reAssignedQueue = applyStudentQueueUsernames(
             filteredQueue,
-            firstStudentSequenceNumber,
             currentYearNumber,
+            normalizedStudentUsernameLatestByPrefix,
         );
 
         setStudentQueue(reAssignedQueue);
@@ -1373,8 +1446,8 @@ export default function CreateUserModal({
 
         const normalizedQueue = applyStudentQueueUsernames(
             rows,
-            firstStudentSequenceNumber,
             currentYearNumber,
+            normalizedStudentUsernameLatestByPrefix,
         );
 
         const duplicateLrnSet = new Set();

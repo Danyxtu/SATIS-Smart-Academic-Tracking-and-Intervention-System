@@ -1,11 +1,13 @@
 import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
+import AdminSectionDetailModal from "@/Components/Admin/AdminSectionDetailModal";
 import {
     AlertTriangle,
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
     Layers3,
+    Pencil,
     Plus,
     Save,
     School,
@@ -91,6 +93,11 @@ export default function Index({
     const [search, setSearch] = useState(filters.search || "");
 
     const [showWizard, setShowWizard] = useState(false);
+    const [sectionDetailModal, setSectionDetailModal] = useState({
+        open: false,
+        row: null,
+        mode: "view",
+    });
     const [step, setStep] = useState(1);
     const [wizardNotice, setWizardNotice] = useState("");
 
@@ -289,6 +296,22 @@ export default function Index({
         setShowWizard(false);
         setWizardNotice("");
         clearErrors();
+    };
+
+    const openSectionDetailModal = (section, mode = "view") => {
+        setSectionDetailModal({
+            open: true,
+            row: section,
+            mode: mode === "edit" ? "edit" : "view",
+        });
+    };
+
+    const closeSectionDetailModal = () => {
+        setSectionDetailModal({
+            open: false,
+            row: null,
+            mode: "view",
+        });
     };
 
     const handleNext = () => {
@@ -564,7 +587,7 @@ export default function Index({
                                 type="button"
                                 onClick={openWizard}
                                 disabled={!department?.id}
-                                className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-indigo-700 shadow-sm transition-colors hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 shadow-sm transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 <Plus size={16} />
                                 New Section
@@ -666,8 +689,11 @@ export default function Index({
                                 <div className="col-span-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-600">
                                     Students
                                 </div>
-                                <div className="col-span-3 text-xs font-semibold uppercase tracking-wider text-slate-600">
+                                <div className="col-span-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
                                     Created
+                                </div>
+                                <div className="col-span-1 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
+                                    Actions
                                 </div>
                             </div>
 
@@ -675,7 +701,13 @@ export default function Index({
                                 {sections.data.map((section) => (
                                     <div
                                         key={section.id}
-                                        className="grid grid-cols-12 items-center gap-4 px-6 py-4 transition-colors hover:bg-slate-50/60"
+                                        onClick={() =>
+                                            openSectionDetailModal(
+                                                section,
+                                                "view",
+                                            )
+                                        }
+                                        className="grid cursor-pointer grid-cols-12 items-center gap-4 px-6 py-4 transition-colors hover:bg-slate-50/60"
                                     >
                                         <div className="col-span-3 min-w-0">
                                             <p className="truncate text-sm font-semibold text-slate-900">
@@ -714,7 +746,7 @@ export default function Index({
                                             </span>
                                         </div>
 
-                                        <div className="col-span-3 text-xs text-slate-600">
+                                        <div className="col-span-2 text-xs text-slate-600">
                                             {new Date(
                                                 section.created_at,
                                             ).toLocaleDateString("en-US", {
@@ -722,6 +754,27 @@ export default function Index({
                                                 month: "short",
                                                 day: "numeric",
                                             })}
+                                        </div>
+
+                                        <div
+                                            className="col-span-1 flex justify-end"
+                                            onClick={(event) =>
+                                                event.stopPropagation()
+                                            }
+                                        >
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    openSectionDetailModal(
+                                                        section,
+                                                        "edit",
+                                                    )
+                                                }
+                                                className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+                                                title="Edit section"
+                                            >
+                                                <Pencil size={14} />
+                                            </button>
                                         </div>
                                     </div>
                                 ))}
@@ -757,6 +810,27 @@ export default function Index({
                     )}
                 </div>
             </div>
+
+            <AdminSectionDetailModal
+                show={sectionDetailModal.open}
+                onClose={closeSectionDetailModal}
+                payload={
+                    sectionDetailModal.row
+                        ? {
+                              section: sectionDetailModal.row,
+                          }
+                        : null
+                }
+                loading={false}
+                error=""
+                row={sectionDetailModal.row}
+                mode={sectionDetailModal.mode}
+                teachers={teachers}
+                currentSchoolYear={currentSchoolYear}
+                onSaved={() => {
+                    closeSectionDetailModal();
+                }}
+            />
 
             {showWizard && (
                 <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -1101,7 +1175,7 @@ export default function Index({
                                                     onClick={
                                                         queueSelectedExisting
                                                     }
-                                                    className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                                                    className="inline-flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
                                                 >
                                                     <UserCheck size={13} />
                                                     Bulk Assign (
@@ -1167,7 +1241,7 @@ export default function Index({
                                                                                 student,
                                                                             )
                                                                         }
-                                                                        className="rounded-lg bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                                                                        className="rounded-lg bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                                                                     >
                                                                         Assign
                                                                     </button>
@@ -1361,7 +1435,7 @@ export default function Index({
                                                         onClick={
                                                             queueSingleNewStudent
                                                         }
-                                                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                                                        className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
                                                     >
                                                         <UserPlus size={13} />
                                                         Add Single Student
@@ -1394,7 +1468,7 @@ export default function Index({
                                                         onClick={
                                                             queueBulkNewStudents
                                                         }
-                                                        className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                                                        className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
                                                     >
                                                         <Upload size={13} />
                                                         Bulk Queue
@@ -1650,7 +1724,7 @@ export default function Index({
                                     <button
                                         type="button"
                                         onClick={handleNext}
-                                        className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+                                        className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                                     >
                                         Next
                                         <ChevronRight size={16} />
@@ -1663,7 +1737,7 @@ export default function Index({
                                             processing ||
                                             summaryIssues.length > 0
                                         }
-                                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                         <Save size={15} />
                                         {processing

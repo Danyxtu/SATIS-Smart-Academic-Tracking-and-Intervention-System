@@ -1,6 +1,7 @@
 import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import DeleteConfirmModal from "@/Components/Superadmin/DeleteConfirmModal";
+import AdminClassDetailModal from "@/Components/Admin/AdminClassDetailModal";
 import {
     AlertTriangle,
     BookOpen,
@@ -116,6 +117,11 @@ export default function Index({
     const [classToEdit, setClassToEdit] = useState(null);
     const [classToDelete, setClassToDelete] = useState(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [classDetailModal, setClassDetailModal] = useState({
+        open: false,
+        row: null,
+        mode: "view",
+    });
     const [step, setStep] = useState(1);
     const [wizardNotice, setWizardNotice] = useState("");
 
@@ -261,19 +267,20 @@ export default function Index({
         setShowWizard(true);
     };
 
-    const openEditWizard = (item) => {
-        clearErrors();
-        setWizardNotice("");
-        setWizardMode("edit");
-        setClassToEdit(item);
-        setStep(1);
-        setData({
-            subject_id: String(item.subject_id || ""),
-            section_id: String(item.section_id || ""),
-            teacher_id: String(item.teacher_id || ""),
-            school_year: item.school_year || currentSchoolYear || "",
+    const openClassDetailModal = (item, mode = "view") => {
+        setClassDetailModal({
+            open: true,
+            row: item,
+            mode: mode === "edit" ? "edit" : "view",
         });
-        setShowWizard(true);
+    };
+
+    const closeClassDetailModal = () => {
+        setClassDetailModal({
+            open: false,
+            row: null,
+            mode: "view",
+        });
     };
 
     const closeWizard = () => {
@@ -372,7 +379,7 @@ export default function Index({
                     <button
                         type="button"
                         onClick={openCreateWizard}
-                        className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+                        className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
                     >
                         <Plus size={16} />
                         New Class Wizard
@@ -461,7 +468,7 @@ export default function Index({
                                 <button
                                     type="button"
                                     onClick={openCreateWizard}
-                                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
                                 >
                                     <Plus size={16} />
                                     Create First Class
@@ -492,7 +499,10 @@ export default function Index({
                                 {classes.data.map((item) => (
                                     <div
                                         key={item.id}
-                                        className="grid grid-cols-12 items-center gap-4 px-5 py-4 transition-colors hover:bg-slate-50/70"
+                                        onClick={() =>
+                                            openClassDetailModal(item, "view")
+                                        }
+                                        className="grid cursor-pointer grid-cols-12 items-center gap-4 px-5 py-4 transition-colors hover:bg-slate-50/70"
                                     >
                                         <div className="col-span-3 min-w-0">
                                             <p className="truncate text-sm font-semibold text-slate-900">
@@ -542,11 +552,19 @@ export default function Index({
                                             </span>
                                         </div>
 
-                                        <div className="col-span-1 flex items-center justify-end gap-1">
+                                        <div
+                                            className="col-span-1 flex items-center justify-end gap-1"
+                                            onClick={(event) =>
+                                                event.stopPropagation()
+                                            }
+                                        >
                                             <button
                                                 type="button"
                                                 onClick={() =>
-                                                    openEditWizard(item)
+                                                    openClassDetailModal(
+                                                        item,
+                                                        "edit",
+                                                    )
                                                 }
                                                 title="Edit class"
                                                 className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
@@ -623,6 +641,29 @@ export default function Index({
                     )}
                 </div>
             </div>
+
+            <AdminClassDetailModal
+                show={classDetailModal.open}
+                onClose={closeClassDetailModal}
+                payload={
+                    classDetailModal.row
+                        ? {
+                              class: classDetailModal.row,
+                          }
+                        : null
+                }
+                loading={false}
+                error=""
+                row={classDetailModal.row}
+                mode={classDetailModal.mode}
+                subjects={subjects}
+                sections={sections}
+                teachers={teachers}
+                currentSchoolYear={currentSchoolYear}
+                onSaved={() => {
+                    closeClassDetailModal();
+                }}
+            />
 
             {showWizard && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -930,7 +971,7 @@ export default function Index({
                                 <button
                                     type="button"
                                     onClick={goNext}
-                                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+                                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                                 >
                                     Next
                                     <ChevronRight size={16} />
@@ -942,7 +983,7 @@ export default function Index({
                                     disabled={
                                         processing || summaryIssues.length > 0
                                     }
-                                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     <Save size={15} />
                                     {processing

@@ -1231,10 +1231,10 @@ export default function ArchiveDetailModal({
                 : User;
 
     return (
-        <Modal show={show} onClose={onClose} maxWidth="3xl">
-            <div className="max-h-[84vh] overflow-hidden">
-                <div className="flex min-h-[560px] flex-col md:flex-row">
-                    <aside className="flex w-full shrink-0 flex-col border-b border-emerald-200 md:w-[220px] md:border-b-0 md:border-r">
+        <Modal show={show} onClose={onClose} maxWidth="3xl" closeable={false}>
+            <div className="h-[calc(100vh-7rem)] max-h-[calc(100vh-7rem)] min-h-0 overflow-hidden">
+                <div className="flex h-full min-h-0 flex-col md:flex-row">
+                    <aside className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden border-b border-emerald-200 md:h-full md:w-[220px] md:border-b-0 md:border-r">
                         <div className="bg-emerald-600 px-4 py-4">
                             <div className="mb-2 inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-200 text-sm font-semibold text-emerald-900">
                                 {initials(data.identity.title)}
@@ -1257,7 +1257,7 @@ export default function ArchiveDetailModal({
                             </div>
                         </div>
 
-                        <div className="flex-1 px-3 py-3">
+                        <div className="flex-1 overflow-y-auto px-3 py-3">
                             <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                                 Menu
                             </p>
@@ -1290,7 +1290,7 @@ export default function ArchiveDetailModal({
                         </div>
                     </aside>
 
-                    <section className="flex min-w-0 flex-1 flex-col bg-white">
+                    <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white">
                         <div className="flex items-start justify-between gap-3 border-b border-emerald-200 px-5 py-4">
                             <div>
                                 <p className="text-[15px] font-semibold text-slate-900">
@@ -1309,7 +1309,7 @@ export default function ArchiveDetailModal({
                             </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto bg-emerald-50 p-4">
+                        <div className="min-h-0 flex-1 overflow-y-auto bg-emerald-50 p-4">
                             {loading && (
                                 <div className="rounded-lg border border-emerald-200 bg-white px-4 py-6 text-sm text-emerald-700">
                                     Loading details...

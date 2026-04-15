@@ -94,6 +94,7 @@ export default function Index({
     filters,
     roleCounts = {},
     studentCreationBaseCount = 0,
+    studentUsernameLatestByPrefix = {},
 }) {
     const [search, setSearch] = useState(filters?.search || "");
     const [roleFilter, setRoleFilter] = useState(filters?.role || "");
@@ -575,6 +576,7 @@ export default function Index({
                 departments={departments}
                 sections={sections}
                 studentCount={Number(studentCreationBaseCount || 0)}
+                studentUsernameLatestByPrefix={studentUsernameLatestByPrefix}
             />
 
             {/* ── Delete Modal ─────────────────────────────────────────── */}

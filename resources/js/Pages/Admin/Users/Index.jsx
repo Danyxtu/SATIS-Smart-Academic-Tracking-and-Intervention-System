@@ -27,9 +27,9 @@ import {
     User,
     Mail,
     Building2,
-    Lock,
 } from "lucide-react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
+import AdminUserDetailModal from "@/Components/Admin/AdminUserDetailModal";
 
 // Role Badge Component
 const RoleBadge = ({ role }) => {
@@ -94,7 +94,7 @@ const SubjectsPopover = ({ subjects }) => {
         <div className="relative">
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
             >
                 <BookOpen size={12} />
                 {subjects.length} subject{subjects.length > 1 ? "s" : ""}
@@ -145,7 +145,7 @@ const FilterTab = ({ label, count, isActive, onClick }) => (
         onClick={onClick}
         className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
             isActive
-                ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                 : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
         }`}
     >
@@ -153,7 +153,7 @@ const FilterTab = ({ label, count, isActive, onClick }) => (
         <span
             className={`ml-2 px-1.5 py-0.5 text-xs rounded-full ${
                 isActive
-                    ? "bg-purple-200 dark:bg-purple-800"
+                    ? "bg-blue-200 dark:bg-blue-800"
                     : "bg-gray-200 dark:bg-gray-600"
             }`}
         >
@@ -175,7 +175,7 @@ const SortHeader = ({
     return (
         <button
             onClick={() => onSort(field)}
-            className="flex items-center gap-1 font-medium text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+            className="flex items-center gap-1 font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
         >
             {label}
             <span className="flex flex-col">
@@ -183,7 +183,7 @@ const SortHeader = ({
                     size={12}
                     className={`-mb-1 ${
                         isActive && currentDirection === "asc"
-                            ? "text-purple-600"
+                            ? "text-blue-600"
                             : "text-gray-400"
                     }`}
                 />
@@ -191,7 +191,7 @@ const SortHeader = ({
                     size={12}
                     className={`-mt-1 ${
                         isActive && currentDirection === "desc"
-                            ? "text-purple-600"
+                            ? "text-blue-600"
                             : "text-gray-400"
                     }`}
                 />
@@ -304,14 +304,14 @@ const CreateUserModal = ({ isOpen, onClose, department, initialRole }) => {
                                                 }
                                                 className={`p-3 rounded-xl border-2 text-left transition-all ${
                                                     data.role === "student"
-                                                        ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+                                                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
                                                         : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
                                                 }`}
                                             >
                                                 <div className="flex items-center gap-2">
                                                     <GraduationCap
                                                         size={18}
-                                                        className="text-purple-600 dark:text-purple-400"
+                                                        className="text-blue-600 dark:text-blue-400"
                                                     />
                                                     <span className="font-medium text-gray-900 dark:text-white">
                                                         Student
@@ -330,14 +330,14 @@ const CreateUserModal = ({ isOpen, onClose, department, initialRole }) => {
                                                 }
                                                 className={`p-3 rounded-xl border-2 text-left transition-all ${
                                                     data.role === "teacher"
-                                                        ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+                                                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
                                                         : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
                                                 }`}
                                             >
                                                 <div className="flex items-center gap-2">
                                                     <UserCog
                                                         size={18}
-                                                        className="text-purple-600 dark:text-purple-400"
+                                                        className="text-blue-600 dark:text-blue-400"
                                                     />
                                                     <span className="font-medium text-gray-900 dark:text-white">
                                                         Teacher
@@ -590,7 +590,7 @@ const CreateUserModal = ({ isOpen, onClose, department, initialRole }) => {
                                         <button
                                             type="submit"
                                             disabled={processing}
-                                            className="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors disabled:opacity-50"
+                                            className="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
                                         >
                                             {processing
                                                 ? "Creating..."
@@ -755,7 +755,7 @@ const ResetPasswordModal = ({ isOpen, onClose, user }) => {
                                         <button
                                             type="submit"
                                             disabled={processing}
-                                            className="px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors disabled:opacity-50"
+                                            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
                                         >
                                             {processing
                                                 ? "Resetting..."
@@ -836,167 +836,8 @@ const DeleteModal = ({ isOpen, onClose, user, onConfirm, processing }) => (
     </Transition.Root>
 );
 
-// Bulk Delete Confirmation Modal with Password Input
-const BulkDeleteModal = ({
-    isOpen,
-    onClose,
-    selectedCount,
-    onConfirm,
-    processing,
-}) => {
-    const [password, setPassword] = useState("");
-    const [showPassword, setShowPassword] = useState(false);
-    const [error, setError] = useState("");
-
-    useEffect(() => {
-        if (isOpen) {
-            setPassword("");
-            setError("");
-            setShowPassword(false);
-        }
-    }, [isOpen]);
-
-    const handleConfirm = () => {
-        if (!password.trim()) {
-            setError("Password is required");
-            return;
-        }
-        onConfirm(password);
-        setPassword("");
-        setError("");
-    };
-
-    return (
-        <Transition.Root show={isOpen} as={Fragment}>
-            <Dialog as="div" className="relative z-50" onClose={onClose}>
-                <Transition.Child
-                    as={Fragment}
-                    enter="ease-out duration-300"
-                    enterFrom="opacity-0"
-                    enterTo="opacity-100"
-                    leave="ease-in duration-200"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                >
-                    <div className="fixed inset-0 bg-black/50 transition-opacity" />
-                </Transition.Child>
-
-                <div className="fixed inset-0 z-50 overflow-y-auto">
-                    <div className="flex min-h-full items-center justify-center p-4">
-                        <Transition.Child
-                            as={Fragment}
-                            enter="ease-out duration-300"
-                            enterFrom="opacity-0 scale-95"
-                            enterTo="opacity-100 scale-100"
-                            leave="ease-in duration-200"
-                            leaveFrom="opacity-100 scale-100"
-                            leaveTo="opacity-0 scale-95"
-                        >
-                            <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-xl transition-all p-6">
-                                <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 dark:bg-red-900/30 rounded-full mb-4">
-                                    <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
-                                </div>
-                                <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white text-center">
-                                    Delete {selectedCount} User
-                                    {selectedCount > 1 ? "s" : ""}?
-                                </Dialog.Title>
-                                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 text-center">
-                                    This action cannot be undone. Please enter
-                                    your password to confirm.
-                                </p>
-
-                                <div className="mt-6 space-y-4">
-                                    <div className="relative">
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Admin Password
-                                        </label>
-                                        <div className="relative">
-                                            <input
-                                                type={
-                                                    showPassword
-                                                        ? "text"
-                                                        : "password"
-                                                }
-                                                value={password}
-                                                onChange={(e) => {
-                                                    setPassword(e.target.value);
-                                                    setError("");
-                                                }}
-                                                onKeyDown={(e) => {
-                                                    if (
-                                                        e.key === "Enter" &&
-                                                        !processing
-                                                    ) {
-                                                        handleConfirm();
-                                                    }
-                                                }}
-                                                placeholder="Enter your password"
-                                                className={`w-full px-4 py-2 pr-10 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 transition-colors ${
-                                                    error
-                                                        ? "border-red-500 dark:border-red-400"
-                                                        : "border-gray-300 dark:border-gray-600 focus:border-purple-500 dark:focus:border-purple-400"
-                                                }`}
-                                                disabled={processing}
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setShowPassword(
-                                                        !showPassword,
-                                                    )
-                                                }
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                                            >
-                                                {showPassword ? (
-                                                    <EyeOff size={18} />
-                                                ) : (
-                                                    <Eye size={18} />
-                                                )}
-                                            </button>
-                                        </div>
-                                        {error && (
-                                            <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
-                                                <Lock size={14} />
-                                                {error}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="flex justify-center gap-3 mt-8">
-                                    <button
-                                        type="button"
-                                        onClick={onClose}
-                                        disabled={processing}
-                                        className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleConfirm}
-                                        disabled={
-                                            processing || !password.trim()
-                                        }
-                                        className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 inline-flex items-center gap-2"
-                                    >
-                                        <Trash2 size={16} />
-                                        {processing
-                                            ? "Deleting..."
-                                            : "Delete Users"}
-                                    </button>
-                                </div>
-                            </Dialog.Panel>
-                        </Transition.Child>
-                    </div>
-                </div>
-            </Dialog>
-        </Transition.Root>
-    );
-};
-
 // User Actions Dropdown
-const UserActions = ({ user, onResetPassword, onDelete }) => {
+const UserActions = ({ user, onEdit, onResetPassword, onDelete }) => {
     const [isOpen, setIsOpen] = useState(false);
 
     return (
@@ -1015,13 +856,16 @@ const UserActions = ({ user, onResetPassword, onDelete }) => {
                         onClick={() => setIsOpen(false)}
                     />
                     <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-20 py-1">
-                        <Link
-                            href={route("admin.users.edit", user.id)}
-                            className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        <button
+                            onClick={() => {
+                                setIsOpen(false);
+                                onEdit(user);
+                            }}
+                            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                         >
                             <Edit size={16} />
                             Edit User
-                        </Link>
+                        </button>
                         <button
                             onClick={() => {
                                 setIsOpen(false);
@@ -1063,8 +907,12 @@ export default function Index({
         isOpen: false,
         initialRole: "student",
     });
+    const [userDetailModal, setUserDetailModal] = useState({
+        isOpen: false,
+        user: null,
+        mode: "view",
+    });
     const [hasHandledCreateQuery, setHasHandledCreateQuery] = useState(false);
-    const [selectedUsers, setSelectedUsers] = useState([]);
     const [resetPasswordModal, setResetPasswordModal] = useState({
         isOpen: false,
         user: null,
@@ -1072,10 +920,6 @@ export default function Index({
     const [deleteModal, setDeleteModal] = useState({
         isOpen: false,
         user: null,
-    });
-    const [bulkDeleteModal, setBulkDeleteModal] = useState({
-        isOpen: false,
-        loading: false,
     });
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -1141,22 +985,6 @@ export default function Index({
         );
     };
 
-    const handleSelectAll = (e) => {
-        if (e.target.checked) {
-            setSelectedUsers(users.data.map((u) => u.id));
-        } else {
-            setSelectedUsers([]);
-        }
-    };
-
-    const handleSelect = (userId) => {
-        setSelectedUsers((prev) =>
-            prev.includes(userId)
-                ? prev.filter((id) => id !== userId)
-                : [...prev, userId],
-        );
-    };
-
     const handleDelete = () => {
         setIsDeleting(true);
         router.delete(route("admin.users.destroy", deleteModal.user.id), {
@@ -1168,29 +996,6 @@ export default function Index({
                 setIsDeleting(false);
             },
         });
-    };
-
-    const handleBulkDelete = () => {
-        if (selectedUsers.length === 0) return;
-        setBulkDeleteModal({ isOpen: true, loading: false });
-    };
-
-    const handleConfirmBulkDelete = (password) => {
-        if (selectedUsers.length === 0) return;
-        setBulkDeleteModal({ isOpen: true, loading: true });
-        router.post(
-            route("admin.users.bulk-destroy"),
-            { ids: selectedUsers, password },
-            {
-                onSuccess: () => {
-                    setSelectedUsers([]);
-                    setBulkDeleteModal({ isOpen: false, loading: false });
-                },
-                onError: (errors) => {
-                    setBulkDeleteModal({ isOpen: true, loading: false });
-                },
-            },
-        );
     };
 
     return (
@@ -1241,7 +1046,7 @@ export default function Index({
                             initialRole: "student",
                         })
                     }
-                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors shadow-sm"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
                 >
                     <Plus size={18} />
                     Add User
@@ -1311,7 +1116,7 @@ export default function Index({
                                     className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
                                         filters.section === "all" ||
                                         !filters.section
-                                            ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
+                                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                                             : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400"
                                     }`}
                                 >
@@ -1325,7 +1130,7 @@ export default function Index({
                                         }
                                         className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
                                             filters.section === section
-                                                ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
+                                                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                                                 : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400"
                                         }`}
                                     >
@@ -1336,21 +1141,6 @@ export default function Index({
                         </div>
                     )}
                 </div>
-
-                {selectedUsers.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center gap-4">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
-                            {selectedUsers.length} selected
-                        </span>
-                        <button
-                            onClick={handleBulkDelete}
-                            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                        >
-                            <Trash2 size={16} />
-                            Delete Selected
-                        </button>
-                    </div>
-                )}
             </div>
 
             {/* Users Table */}
@@ -1359,18 +1149,6 @@ export default function Index({
                     <table className="w-full">
                         <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
                             <tr>
-                                <th className="px-4 py-3 text-left">
-                                    <input
-                                        type="checkbox"
-                                        checked={
-                                            selectedUsers.length ===
-                                                users.data.length &&
-                                            users.data.length > 0
-                                        }
-                                        onChange={handleSelectAll}
-                                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                                    />
-                                </th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                     <SortHeader
                                         label="Name"
@@ -1423,20 +1201,15 @@ export default function Index({
                                 users.data.map((user) => (
                                     <tr
                                         key={user.id}
+                                        onClick={() =>
+                                            setUserDetailModal({
+                                                isOpen: true,
+                                                user,
+                                                mode: "view",
+                                            })
+                                        }
                                         className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                                     >
-                                        <td className="px-4 py-4">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedUsers.includes(
-                                                    user.id,
-                                                )}
-                                                onChange={() =>
-                                                    handleSelect(user.id)
-                                                }
-                                                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                                            />
-                                        </td>
                                         <td className="px-4 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
@@ -1477,9 +1250,21 @@ export default function Index({
                                                 user.created_at,
                                             ).toLocaleDateString()}
                                         </td>
-                                        <td className="px-4 py-4 text-right">
+                                        <td
+                                            className="px-4 py-4 text-right"
+                                            onClick={(event) =>
+                                                event.stopPropagation()
+                                            }
+                                        >
                                             <UserActions
                                                 user={user}
+                                                onEdit={(u) =>
+                                                    setUserDetailModal({
+                                                        isOpen: true,
+                                                        user: u,
+                                                        mode: "edit",
+                                                    })
+                                                }
                                                 onResetPassword={(u) =>
                                                     setResetPasswordModal({
                                                         isOpen: true,
@@ -1499,7 +1284,7 @@ export default function Index({
                             ) : (
                                 <tr>
                                     <td
-                                        colSpan={8}
+                                        colSpan={7}
                                         className="px-4 py-12 text-center text-gray-500 dark:text-gray-400"
                                     >
                                         <Users
@@ -1567,7 +1352,7 @@ export default function Index({
                                         href={link.url || "#"}
                                         className={`px-3 py-1 rounded-lg text-sm font-medium ${
                                             link.active
-                                                ? "bg-purple-600 text-white"
+                                                ? "bg-blue-600 text-white"
                                                 : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                                         }`}
                                         preserveState
@@ -1593,6 +1378,30 @@ export default function Index({
                 department={department}
                 initialRole={createUserModal.initialRole}
             />
+            <AdminUserDetailModal
+                show={userDetailModal.isOpen}
+                onClose={() =>
+                    setUserDetailModal({
+                        isOpen: false,
+                        user: null,
+                        mode: "view",
+                    })
+                }
+                payload={
+                    userDetailModal.user ? { user: userDetailModal.user } : null
+                }
+                loading={false}
+                error=""
+                row={userDetailModal.user}
+                mode={userDetailModal.mode}
+                onSaved={() =>
+                    setUserDetailModal({
+                        isOpen: false,
+                        user: null,
+                        mode: "view",
+                    })
+                }
+            />
             <ResetPasswordModal
                 isOpen={resetPasswordModal.isOpen}
                 onClose={() =>
@@ -1606,15 +1415,6 @@ export default function Index({
                 user={deleteModal.user}
                 onConfirm={handleDelete}
                 processing={isDeleting}
-            />
-            <BulkDeleteModal
-                isOpen={bulkDeleteModal.isOpen}
-                onClose={() =>
-                    setBulkDeleteModal({ isOpen: false, loading: false })
-                }
-                selectedCount={selectedUsers.length}
-                onConfirm={handleConfirmBulkDelete}
-                processing={bulkDeleteModal.loading}
             />
         </>
     );

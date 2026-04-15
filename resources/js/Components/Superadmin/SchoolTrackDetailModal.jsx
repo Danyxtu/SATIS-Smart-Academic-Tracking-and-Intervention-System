@@ -418,7 +418,12 @@ export default function SchoolTrackDetailModal({
     );
 
     return (
-        <Modal show={show} onClose={closeModal} maxWidth="3xl">
+        <Modal
+            show={show}
+            onClose={closeModal}
+            maxWidth="3xl"
+            closeable={false}
+        >
             <div className="relative h-[calc(100vh-7rem)] max-h-[calc(100vh-7rem)] min-h-0 overflow-hidden">
                 <div className="flex h-full min-h-0 flex-col md:flex-row">
                     <aside className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden border-b border-emerald-200 md:h-full md:w-[220px] md:border-b-0 md:border-r">

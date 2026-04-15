@@ -366,6 +366,118 @@ class SectionController extends Controller
             ->with('section_create_summary', $summary);
     }
 
+    /**
+     * Update an existing section in the admin's department.
+     */
+    public function update(Request $request, Section $section): RedirectResponse
+    {
+        $admin = $request->user();
+        $departmentId = $admin?->department_id;
+
+        if (! $departmentId) {
+            return back()->with('error', 'Your account has no assigned department.');
+        }
+
+        $managedSection = $this->resolveManagedSection($section, $departmentId);
+
+        $validated = $request->validate([
+            'section_name' => ['required', 'string', 'max:255'],
+            'section_code' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9\s\-]+$/'],
+            'cohort' => ['required', 'string', 'max:120'],
+            'grade_level' => ['nullable', 'string', Rule::in(satis_grade_level_options())],
+            'strand' => ['nullable', 'string', 'max:100'],
+            'track' => ['nullable', 'string', 'max:100'],
+            'school_year' => ['required', 'string', 'max:9', 'regex:/^\d{4}-\d{4}$/'],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'advisor_teacher_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
+            'is_active' => ['sometimes', 'boolean'],
+        ]);
+
+        $advisorTeacherId = isset($validated['advisor_teacher_id'])
+            ? (int) $validated['advisor_teacher_id']
+            : null;
+
+        if ($advisorTeacherId !== null && $advisorTeacherId > 0) {
+            $this->ensureTeacherAssignable($advisorTeacherId, $departmentId, 'advisor_teacher_id');
+        } else {
+            $advisorTeacherId = null;
+        }
+
+        $sectionName = satis_extract_section_base_name($validated['section_name'])
+            ?? $this->normalizeText($validated['section_name']);
+        $cohort = $this->normalizeText($validated['cohort']);
+        $gradeLevel = satis_normalize_grade_level($validated['grade_level'] ?? null);
+        $schoolYear = $this->normalizeText($validated['school_year']);
+        $normalizedSectionCode = $this->normalizeNullableText($validated['section_code'] ?? null);
+
+        if ($normalizedSectionCode !== null) {
+            $normalizedSectionCode = $this->normalizeSectionCode($normalizedSectionCode);
+        }
+
+        $sectionCode = $normalizedSectionCode !== null && $normalizedSectionCode !== ''
+            ? $normalizedSectionCode
+            : $managedSection->section_code;
+
+        $conflictingSectionName = Section::query()
+            ->where('department_id', $departmentId)
+            ->where('cohort', $cohort)
+            ->where('section_name', $sectionName)
+            ->where('id', '!=', $managedSection->id)
+            ->exists();
+
+        if ($conflictingSectionName) {
+            throw ValidationException::withMessages([
+                'section_name' => 'A section with this name already exists for the selected cohort in your department.',
+            ]);
+        }
+
+        $conflictingSectionCode = Section::query()
+            ->where('department_id', $departmentId)
+            ->where('cohort', $cohort)
+            ->where('section_code', $sectionCode)
+            ->where('id', '!=', $managedSection->id)
+            ->exists();
+
+        if ($conflictingSectionCode) {
+            throw ValidationException::withMessages([
+                'section_code' => 'Section code is already used in your department for this cohort.',
+            ]);
+        }
+
+        $managedSection->update([
+            'advisor_teacher_id' => $advisorTeacherId,
+            'section_name' => $sectionName,
+            'section_code' => $sectionCode,
+            'cohort' => $cohort,
+            'grade_level' => $gradeLevel,
+            'strand' => $this->normalizeNullableText($validated['strand'] ?? null),
+            'track' => $this->normalizeNullableText($validated['track'] ?? null),
+            'school_year' => $schoolYear,
+            'description' => $this->normalizeNullableText($validated['description'] ?? null),
+            'is_active' => array_key_exists('is_active', $validated)
+                ? (bool) $validated['is_active']
+                : $managedSection->is_active,
+        ]);
+
+        return redirect()
+            ->route('admin.sections.index')
+            ->with('success', 'Section updated successfully.');
+    }
+
+    /**
+     * Scope section operations to the admin's department.
+     */
+    private function resolveManagedSection(Section $section, int $departmentId): Section
+    {
+        $resolved = Section::query()->findOrFail($section->id);
+
+        if ((int) $resolved->department_id !== (int) $departmentId) {
+            abort(404);
+        }
+
+        return $resolved;
+    }
+
     private function ensureTeacherAssignable(int $teacherId, int $departmentId, string $field = 'advisor_teacher_id'): void
     {
         $teacherIsAssignable = User::query()

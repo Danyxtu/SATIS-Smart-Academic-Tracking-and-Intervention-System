@@ -207,7 +207,7 @@ export default function Dashboard({ auth, stats, userTrends, department }) {
                         href={route("admin.users.index", {
                             openCreate: 1,
                         })}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors shadow-sm"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
                     >
                         <UserPlus size={18} />
                         Add New User
@@ -233,7 +233,7 @@ export default function Dashboard({ auth, stats, userTrends, department }) {
                         </h2>
                         <Link
                             href={route("admin.users.index")}
-                            className="text-sm text-purple-600 hover:text-purple-700 font-medium flex items-center gap-1"
+                            className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
                         >
                             View All
                             <ArrowRight size={16} />

@@ -569,8 +569,18 @@ export default function ManagementDetailModal({
 
     const isDepartmentTab = activeTab === "departments";
     const isSectionTab = activeTab === "sections";
+    const isClassTab = activeTab === "classes";
     const isSubjectTab = activeTab === "subjects";
+    const isUserTab = activeTab === "users";
+    const isAuditLogTab = activeTab === "audit-logs";
     const isDepartmentCreateMode = departmentManageMode === "create";
+    const isCloseButtonOnlyTab =
+        isDepartmentTab ||
+        isSectionTab ||
+        isClassTab ||
+        isSubjectTab ||
+        isUserTab ||
+        isAuditLogTab;
 
     const userRolesForModal = useMemo(() => {
         if (activeTab !== "users") {
@@ -731,7 +741,9 @@ export default function ManagementDetailModal({
 
     const userResetQrPayload = useMemo(() => {
         const username = String(
-            userResetCredentials?.username || currentUserForManage?.username || "",
+            userResetCredentials?.username ||
+                currentUserForManage?.username ||
+                "",
         ).trim();
         const password = String(userResetCredentials?.password || "").trim();
 
@@ -1876,13 +1888,7 @@ export default function ManagementDetailModal({
         }
 
         setPanel("info");
-    }, [
-        activeTab,
-        show,
-        payload,
-        isDepartmentTab,
-        userManageMode,
-    ]);
+    }, [activeTab, show, payload, isDepartmentTab, userManageMode]);
 
     useEffect(() => {
         if (!show || activeTab !== "users") {
@@ -3520,7 +3526,8 @@ export default function ManagementDetailModal({
 
                     {!userCanSendEmail &&
                         (!userIsStudent ||
-                            (userIsStudent && userResetDelivery === "email")) && (
+                            (userIsStudent &&
+                                userResetDelivery === "email")) && (
                             <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                                 Add an email first before using email delivery.
                             </div>
@@ -3544,8 +3551,9 @@ export default function ManagementDetailModal({
                         </div>
                     )}
 
-                    {userIsStudent && userResetDelivery === "qr" && (
-                        userResetQrPayload ? (
+                    {userIsStudent &&
+                        userResetDelivery === "qr" &&
+                        (userResetQrPayload ? (
                             <div className="grid gap-3 rounded-lg border border-emerald-200 bg-white p-3 md:grid-cols-[180px_1fr]">
                                 <div className="flex items-center justify-center rounded-md border border-emerald-200 bg-white p-2">
                                     <QRCodeSVG
@@ -3620,8 +3628,7 @@ export default function ManagementDetailModal({
                                 Generate temporary credentials first to display
                                 the QR code.
                             </div>
-                        )
-                    )}
+                        ))}
                 </div>
             );
 
@@ -3871,8 +3878,7 @@ export default function ManagementDetailModal({
                                                 type="button"
                                                 onClick={() =>
                                                     setShowUserPassword(
-                                                        (previous) =>
-                                                            !previous,
+                                                        (previous) => !previous,
                                                     )
                                                 }
                                                 className="rounded p-1 text-slate-500 transition hover:bg-emerald-100 hover:text-emerald-700"
@@ -8337,7 +8343,7 @@ export default function ManagementDetailModal({
                 show={show}
                 onClose={onClose}
                 maxWidth="3xl"
-                closeable={!(isDepartmentTab || isSubjectTab)}
+                closeable={!isCloseButtonOnlyTab}
             >
                 <div className="h-[calc(100vh-7rem)] max-h-[calc(100vh-7rem)] min-h-0 overflow-hidden">
                     <div className="flex h-full min-h-0 flex-col md:flex-row">
@@ -9075,9 +9081,7 @@ export default function ManagementDetailModal({
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        onClick={
-                                                            handleUserSave
-                                                        }
+                                                        onClick={handleUserSave}
                                                         disabled={userSaving}
                                                         className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg transition hover:bg-emerald-700 disabled:opacity-60"
                                                     >

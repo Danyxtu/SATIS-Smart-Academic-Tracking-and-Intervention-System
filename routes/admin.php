@@ -49,6 +49,8 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('sections.index');
         Route::post('/sections', [AdminSectionController::class, 'store'])
             ->name('sections.store');
+        Route::put('/sections/{section}', [AdminSectionController::class, 'update'])
+            ->name('sections.update');
 
         // Class Management
         Route::get('/classes', [AdminClassController::class, 'index'])
