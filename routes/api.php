@@ -21,6 +21,9 @@ Route::get('/health', function () {
 Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
 Route::middleware('auth:sanctum')->group(function () {
+    // Universal OTP endpoints for all users
+    Route::post('email-otp/send', [\App\Http\Controllers\Auth\EmailOtpVerificationController::class, 'send']);
+    Route::post('email-otp/verify', [\App\Http\Controllers\Auth\EmailOtpVerificationController::class, 'verify']);
     // Force password change for new accounts
     Route::post('force-change-password', [AuthController::class, 'forceChangePassword']);
     Route::post('logout', [AuthController::class, 'logout']);

@@ -47,15 +47,12 @@ Route::middleware('auth')->group(function () {
     Route::post('force-change-password', [ForcePasswordChangeController::class, 'store'])
         ->name('password.force-change.update');
 
+
+    // OTP-based verification endpoints (universal for all users)
     Route::get('verify-email', EmailVerificationPromptController::class)
         ->name('verification.notice');
-
-    Route::get('verify-email/{id}/{hash}', VerifyEmailController::class)
-        ->middleware(['signed', 'throttle:6,1'])
-        ->name('verification.verify');
-
-    Route::post('email/verification-notification', [EmailVerificationNotificationController::class, 'store'])
-        ->name('verification.send');
+    Route::post('email-otp/send', [\App\Http\Controllers\Auth\EmailOtpVerificationController::class, 'send'])->name('otp.send');
+    Route::post('email-otp/verify', [\App\Http\Controllers\Auth\EmailOtpVerificationController::class, 'verify'])->name('otp.verify');
 
     Route::get('confirm-password', [ConfirmablePasswordController::class, 'show'])
         ->name('password.confirm');

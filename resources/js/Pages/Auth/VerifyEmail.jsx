@@ -20,40 +20,105 @@ export default function VerifyEmail({
         Math.max(0, Number(retryAfterSeconds) || 0),
     );
 
-    const cooldownMinutes = Math.max(
-        1,
-        Math.ceil((Number(cooldownSeconds) || 180) / 60),
-    );
-    const isCooldownActive = retryAfter > 0;
+        const [email, setEmail] = useState(currentEmail || "");
+        const [otp, setOtp] = useState("");
+        const [retryAfter, setRetryAfter] = useState(Math.max(0, Number(retryAfterSeconds) || 0));
+        const [cooldown, setCooldown] = useState(Number(cooldownSeconds) || 180);
+        const [sending, setSending] = useState(false);
+        const [verifying, setVerifying] = useState(false);
+        const [message, setMessage] = useState("");
+        const [error, setError] = useState("");
 
-    const formatRetryAfter = (seconds) => {
-        const totalSeconds = Math.max(0, Number(seconds) || 0);
-        const minutes = Math.floor(totalSeconds / 60);
-        const remainderSeconds = String(totalSeconds % 60).padStart(2, "0");
+        const cooldownMinutes = Math.max(1, Math.ceil((Number(cooldown) || 180) / 60));
+        const isCooldownActive = retryAfter > 0;
 
-        return `${minutes}:${remainderSeconds}`;
-    };
+        const formatRetryAfter = (seconds) => {
+            const totalSeconds = Math.max(0, Number(seconds) || 0);
+            const minutes = Math.floor(totalSeconds / 60);
+            const remainderSeconds = String(totalSeconds % 60).padStart(2, "0");
+            return `${minutes}:${remainderSeconds}`;
+        };
 
-    useEffect(() => {
-        setData("email", currentEmail || "");
-    }, [currentEmail, setData]);
+        useEffect(() => {
+            setEmail(currentEmail || "");
+        }, [currentEmail]);
 
-    useEffect(() => {
-        setRetryAfter(Math.max(0, Number(retryAfterSeconds) || 0));
-    }, [retryAfterSeconds]);
+        useEffect(() => {
+            setRetryAfter(Math.max(0, Number(retryAfterSeconds) || 0));
+            setCooldown(Number(cooldownSeconds) || 180);
+        }, [retryAfterSeconds, cooldownSeconds]);
 
-    useEffect(() => {
-        if (retryAfter <= 0) {
-            return undefined;
-        }
+        useEffect(() => {
+            if (retryAfter <= 0) return;
+            const countdownId = window.setInterval(() => {
+                setRetryAfter((previousValue) => (previousValue <= 1 ? 0 : previousValue - 1));
+            }, 1000);
+            return () => window.clearInterval(countdownId);
+        }, [retryAfter]);
 
-        const countdownId = window.setInterval(() => {
-            setRetryAfter((previousValue) =>
-                previousValue <= 1 ? 0 : previousValue - 1,
-            );
-        }, 1000);
+        const handleSendOtp = async (e) => {
+            e.preventDefault();
+            setError("");
+            setMessage("");
+            if (isCooldownActive) {
+                setError(`Please wait ${formatRetryAfter(retryAfter)} before resending another OTP.`);
+                return;
+            }
+            if (!email.includes("@")) {
+                setError("Please enter a valid personal email.");
+                return;
+            }
+            setSending(true);
+            try {
+                const res = await fetch("/email-otp/send", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+                    body: JSON.stringify({ email }),
+                });
+                const data = await res.json();
+                setSending(false);
+                if (!res.ok) {
+                    setError(data.message || "Failed to send OTP.");
+                    setRetryAfter(Number(data.resend_in || 0));
+                    return;
+                }
+                setMessage(data.message || "OTP sent.");
+                setRetryAfter(180);
+            } catch (err) {
+                setSending(false);
+                setError("Failed to send OTP.");
+            }
+        };
 
-        return () => window.clearInterval(countdownId);
+        const handleVerifyOtp = async (e) => {
+            e.preventDefault();
+            setError("");
+            setMessage("");
+            if (!otp || otp.length !== 6) {
+                setError("Please enter the 6-digit OTP sent to your email.");
+                return;
+            }
+            setVerifying(true);
+            try {
+                const res = await fetch("/email-otp/verify", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+                    body: JSON.stringify({ email, otp }),
+                });
+                const data = await res.json();
+                setVerifying(false);
+                if (!res.ok) {
+                    setError(data.message || "Failed to verify OTP.");
+                    return;
+                }
+                setMessage(data.message || "Email verified successfully.");
+                setOtp("");
+                // Optionally, reload or redirect here
+            } catch (err) {
+                setVerifying(false);
+                setError("Failed to verify OTP.");
+            }
+        };
     }, [retryAfter]);
 
     const submit = (e) => {
