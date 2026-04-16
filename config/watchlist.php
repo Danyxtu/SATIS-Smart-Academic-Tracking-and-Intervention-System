@@ -9,7 +9,7 @@ return [
         'absence_threshold' => 5,
     ],
 
-    // Medium risk (Needs Attention): absences > 3 OR failing activities > 3.
+    // Medium risk (Needs Attention): absences >= 3 OR failing activities >= 3.
     'needs_attention' => [
         'absence_threshold' => 3,
         'failing_activities_threshold' => 3,

@@ -260,8 +260,6 @@ class SettingsController extends Controller
 
             $archive = $snapshotService->capture($oldSY, $newSY, $userId);
 
-            $newCohort = $this->resolveCohortFromSchoolYear($newSY);
-
             $grade11Sections = Section::query()
                 ->where('school_year', $oldSY)
                 ->where('grade_level', '11')
@@ -281,28 +279,71 @@ class SettingsController extends Controller
 
             $promotedSectionMap = [];
             $promotedSectionsCount = 0;
+            $departmentCodesById = Department::query()
+                ->pluck('department_code', 'id');
 
             foreach ($grade11Sections as $grade11Section) {
-                $promotedSection = Section::query()->firstOrCreate(
-                    [
-                        'department_id' => (int) $grade11Section->department_id,
-                        'section_code' => $grade11Section->section_code,
-                        'cohort' => $newCohort,
-                    ],
-                    [
+                $sectionName = satis_extract_section_base_name($grade11Section->section_name)
+                    ?? $grade11Section->section_name;
+                $sectionSpecialization = satis_normalize_whitespace($grade11Section->strand)
+                    ?? satis_normalize_whitespace((string) $departmentCodesById->get((int) $grade11Section->department_id));
+                $baseSectionCode = satis_generate_section_code(
+                    '12',
+                    $sectionSpecialization,
+                    $sectionName,
+                );
+
+                $promotedSection = Section::query()
+                    ->where('department_id', (int) $grade11Section->department_id)
+                    ->where('school_year', $newSY)
+                    ->where('grade_level', '12')
+                    ->where(function ($query) use ($grade11Section, $sectionName): void {
+                        $query
+                            ->whereRaw('UPPER(section_name) = ?', [strtoupper((string) $sectionName)])
+                            ->orWhere('section_code', $grade11Section->section_code);
+                    })
+                    ->first();
+
+                if ($promotedSection) {
+                    $sectionCode = $this->ensureUniqueSectionCode(
+                        (int) $grade11Section->department_id,
+                        $newSY,
+                        $baseSectionCode,
+                        (int) $promotedSection->id,
+                    );
+
+                    $promotedSection->update([
                         'advisor_teacher_id' => $grade11Section->advisor_teacher_id,
-                        'created_by' => $userId,
-                        'section_name' => satis_extract_section_base_name($grade11Section->section_name) ?? $grade11Section->section_name,
+                        'section_name' => $sectionName,
+                        'section_code' => $sectionCode,
                         'grade_level' => '12',
-                        'strand' => $grade11Section->strand,
+                        'strand' => $sectionSpecialization,
                         'track' => $grade11Section->track,
                         'school_year' => $newSY,
                         'description' => $grade11Section->description,
                         'is_active' => true,
-                    ]
-                );
+                    ]);
+                } else {
+                    $sectionCode = $this->ensureUniqueSectionCode(
+                        (int) $grade11Section->department_id,
+                        $newSY,
+                        $baseSectionCode,
+                    );
 
-                if ($promotedSection->wasRecentlyCreated) {
+                    $promotedSection = Section::query()->create([
+                        'department_id' => (int) $grade11Section->department_id,
+                        'advisor_teacher_id' => $grade11Section->advisor_teacher_id,
+                        'created_by' => $userId,
+                        'section_name' => $sectionName,
+                        'section_code' => $sectionCode,
+                        'grade_level' => '12',
+                        'strand' => $sectionSpecialization,
+                        'track' => $grade11Section->track,
+                        'school_year' => $newSY,
+                        'description' => $grade11Section->description,
+                        'is_active' => true,
+                    ]);
+
                     $promotedSectionsCount++;
                 }
 
@@ -457,17 +498,34 @@ class SettingsController extends Controller
             ->with('rollover_summary', $rolloverSummary);
     }
 
-    private function resolveCohortFromSchoolYear(string $schoolYear): string
-    {
-        if (preg_match('/^(\d{4})-\d{4}$/', $schoolYear, $matches) === 1) {
-            return $matches[1];
+    private function ensureUniqueSectionCode(
+        int $departmentId,
+        string $schoolYear,
+        string $baseCode,
+        ?int $ignoreSectionId = null,
+    ): string {
+        $counter = 1;
+        $candidate = $baseCode;
+
+        while (true) {
+            $query = Section::query()
+                ->where('department_id', $departmentId)
+                ->where('school_year', $schoolYear)
+                ->where('section_code', $candidate);
+
+            if ($ignoreSectionId !== null) {
+                $query->where('id', '!=', $ignoreSectionId);
+            }
+
+            if (! $query->exists()) {
+                break;
+            }
+
+            $counter++;
+            $candidate = $baseCode . '-' . $counter;
         }
 
-        if (preg_match('/(\d{4})/', $schoolYear, $matches) === 1) {
-            return $matches[1];
-        }
-
-        return (string) now()->year;
+        return $candidate;
     }
 
     private function buildSyStats(string $schoolYear, ?int $semester = null): array

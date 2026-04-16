@@ -3,6 +3,7 @@ import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import AdminSectionDetailModal from "@/Components/Admin/AdminSectionDetailModal";
 import {
     AlertTriangle,
+    Check,
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
@@ -26,7 +27,8 @@ const STEPS = [
     {
         id: 1,
         title: "Section Information",
-        description: "Set section, cohort, and academic details",
+        description:
+            "Choose grade level, strand/specialization, section name, and adviser",
         icon: Plus,
     },
     {
@@ -45,6 +47,7 @@ const STEPS = [
 
 const GRADE_LEVEL_OPTIONS = ["11", "12"];
 const LRN_LENGTH = 12;
+const normalizeSpecializationOption = (value = "") => String(value).trim();
 
 function WizardStep({ step, currentStep }) {
     const Icon = step.icon;
@@ -338,11 +341,8 @@ export default function Index({
     const { data, setData, post, processing, errors, reset, clearErrors } =
         useForm({
             section_name: "",
-            section_code: "",
-            cohort: String(new Date().getFullYear()),
             grade_level: "",
-            strand: department?.code || "",
-            track: "Academic",
+            strand: "",
             school_year: currentSchoolYear || "",
             description: "",
             advisor_teacher_id: "",
@@ -369,6 +369,65 @@ export default function Index({
             })),
         );
     }, [newStudentsQueue, setData]);
+
+    const departmentSpecializationOptions = useMemo(() => {
+        const options = Array.isArray(department?.specializations)
+            ? department.specializations
+                  .map((item) =>
+                      normalizeSpecializationOption(
+                          item?.specialization_name ?? item,
+                      ),
+                  )
+                  .filter((item) => item !== "")
+            : [];
+
+        if (options.length > 0) {
+            return [...new Set(options)];
+        }
+
+        const fallback = normalizeSpecializationOption(department?.code);
+
+        return fallback ? [fallback] : [];
+    }, [department?.code, department?.specializations]);
+
+    useEffect(() => {
+        const selectedStrand = normalizeSpecializationOption(data.strand);
+
+        if (departmentSpecializationOptions.length === 0) {
+            if (selectedStrand !== "") {
+                setData("strand", "");
+            }
+
+            return;
+        }
+
+        if (departmentSpecializationOptions.includes(selectedStrand)) {
+            return;
+        }
+
+        if (departmentSpecializationOptions.length === 1) {
+            setData("strand", departmentSpecializationOptions[0]);
+            return;
+        }
+
+        if (selectedStrand !== "") {
+            setData("strand", "");
+        }
+    }, [departmentSpecializationOptions, data.strand, setData]);
+
+    useEffect(() => {
+        if (!data.advisor_teacher_id) {
+            return;
+        }
+
+        const adviserStillAvailable = teachers.some(
+            (teacher) => String(teacher.id) === String(data.advisor_teacher_id),
+        );
+
+        if (!adviserStillAvailable) {
+            setData("advisor_teacher_id", "");
+        }
+    }, [teachers, data.advisor_teacher_id, setData]);
 
     const queuedExistingIdSet = useMemo(
         () => new Set(queuedExistingStudents.map((student) => student.id)),
@@ -429,7 +488,8 @@ export default function Index({
         }
 
         const prefix = gradeToken || "?";
-        const specializationToken = String(data.strand || "").trim() || "STRAND";
+        const specializationToken =
+            String(data.strand || "").trim() || "STRAND";
 
         return `${prefix} - ${specializationToken} - ${sectionName}`;
     }, [data.section_name, data.strand, gradeToken]);
@@ -437,12 +497,24 @@ export default function Index({
     const stepOneIssues = useMemo(() => {
         const issues = [];
 
+        if (!String(data.grade_level || "").trim()) {
+            issues.push("Grade level is required.");
+        }
+
+        if (!String(data.strand || "").trim()) {
+            issues.push("Strand/Specialization is required.");
+        }
+
         if (!data.section_name.trim()) {
             issues.push("Section name is required.");
         }
 
-        if (!data.cohort.trim()) {
-            issues.push("Cohort is required.");
+        if (teachers.length === 0) {
+            issues.push(
+                "No adviser is available in your department. Add a teacher first.",
+            );
+        } else if (!data.advisor_teacher_id) {
+            issues.push("Adviser is required.");
         }
 
         if (!department?.id) {
@@ -452,7 +524,14 @@ export default function Index({
         }
 
         return issues;
-    }, [data.section_name, data.cohort, department?.id]);
+    }, [
+        data.grade_level,
+        data.strand,
+        data.section_name,
+        data.advisor_teacher_id,
+        teachers.length,
+        department?.id,
+    ]);
 
     const summaryIssues = useMemo(() => {
         const issues = [...stepOneIssues];
@@ -518,11 +597,8 @@ export default function Index({
         reset();
         setData({
             section_name: "",
-            section_code: "",
-            cohort: String(new Date().getFullYear()),
             grade_level: "",
-            strand: department?.code || "",
-            track: "Academic",
+            strand: "",
             school_year: currentSchoolYear || "",
             description: "",
             advisor_teacher_id: "",
@@ -866,8 +942,8 @@ export default function Index({
                                     Section Management
                                 </h1>
                                 <p className="mt-0.5 text-sm text-indigo-100">
-                                    Create sections by cohort and assign
-                                    students in guided steps
+                                    Create sections and assign students in
+                                    guided steps
                                 </p>
                             </div>
                         </div>
@@ -903,7 +979,6 @@ export default function Index({
                             {flash.section_create_summary.section_code})
                         </p>
                         <p className="mt-1 text-xs text-emerald-700">
-                            Cohort {flash.section_create_summary.cohort} |
                             Existing assigned:{" "}
                             {
                                 flash.section_create_summary
@@ -932,7 +1007,7 @@ export default function Index({
                             />
                             <input
                                 type="text"
-                                placeholder="Search section name, code, or cohort..."
+                                placeholder="Search section name or code..."
                                 value={search}
                                 onChange={(event) =>
                                     setSearch(event.target.value)
@@ -966,20 +1041,17 @@ export default function Index({
                                     No sections found
                                 </h3>
                                 <p className="mt-1 max-w-md text-sm text-slate-600">
-                                    Create your first section under your assigned
-                                    department using the wizard.
+                                    Create your first section under your
+                                    assigned department using the wizard.
                                 </p>
                             </div>
                         ) : (
                             <>
                                 <div className="grid grid-cols-12 gap-4 border-b border-slate-100 bg-slate-50/80 px-6 py-3">
-                                    <div className="col-span-3 text-xs font-semibold uppercase tracking-wider text-slate-600">
+                                    <div className="col-span-4 text-xs font-semibold uppercase tracking-wider text-slate-600">
                                         Section
                                     </div>
-                                    <div className="col-span-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
-                                        Cohort
-                                    </div>
-                                    <div className="col-span-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
+                                    <div className="col-span-3 text-xs font-semibold uppercase tracking-wider text-slate-600">
                                         Grade/Strand
                                     </div>
                                     <div className="col-span-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-600">
@@ -994,111 +1066,108 @@ export default function Index({
                                 </div>
 
                                 <div className="divide-y divide-slate-50">
-                                {sections.data.map((section) => (
-                                    <div
-                                        key={section.id}
-                                        onClick={() =>
-                                            openSectionDetailModal(
-                                                section,
-                                                "view",
-                                            )
-                                        }
-                                        className="grid cursor-pointer grid-cols-12 items-center gap-4 px-6 py-4 transition-colors hover:bg-slate-50/60"
-                                    >
-                                        <div className="col-span-3 min-w-0">
-                                            <p className="truncate text-sm font-semibold text-slate-900">
-                                                {section.section_full_label ||
-                                                    section.section_name}
-                                            </p>
-                                            <p className="mt-0.5 text-xs text-slate-500">
-                                                Code: {section.section_code}
-                                            </p>
-                                        </div>
-
-                                        <div className="col-span-2">
-                                            <span className="inline-flex items-center rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700">
-                                                {section.cohort}
-                                            </span>
-                                        </div>
-
-                                        <div className="col-span-2 text-xs text-slate-700">
-                                            <p className="font-medium">
-                                                {section.grade_level || "-"}
-                                            </p>
-                                            <p className="text-slate-500">
-                                                {section.strand || "-"}
-                                            </p>
-                                            <p className="mt-0.5 text-[11px] text-slate-500">
-                                                Adviser:{" "}
-                                                {section.advisor_teacher_name ||
-                                                    "N/A"}
-                                            </p>
-                                        </div>
-
-                                        <div className="col-span-2 flex justify-center">
-                                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1.5 text-[11px] font-bold text-emerald-700">
-                                                <Users size={11} />
-                                                {section.students_count}
-                                            </span>
-                                        </div>
-
-                                        <div className="col-span-2 text-xs text-slate-600">
-                                            {new Date(
-                                                section.created_at,
-                                            ).toLocaleDateString("en-US", {
-                                                year: "numeric",
-                                                month: "short",
-                                                day: "numeric",
-                                            })}
-                                        </div>
-
+                                    {sections.data.map((section) => (
                                         <div
-                                            className="col-span-1 flex justify-end"
-                                            onClick={(event) =>
-                                                event.stopPropagation()
+                                            key={section.id}
+                                            onClick={() =>
+                                                openSectionDetailModal(
+                                                    section,
+                                                    "view",
+                                                )
                                             }
+                                            className="grid cursor-pointer grid-cols-12 items-center gap-4 px-6 py-4 transition-colors hover:bg-slate-50/60"
                                         >
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    openSectionDetailModal(
-                                                        section,
-                                                        "edit",
-                                                    )
+                                            <div className="col-span-4 min-w-0">
+                                                <p className="truncate text-sm font-semibold text-slate-900">
+                                                    {section.section_full_label ||
+                                                        section.section_name}
+                                                </p>
+                                                <p className="mt-0.5 text-xs text-slate-500">
+                                                    Code: {section.section_code}
+                                                </p>
+                                            </div>
+
+                                            <div className="col-span-3 text-xs text-slate-700">
+                                                <p className="font-medium">
+                                                    {section.grade_level || "-"}
+                                                </p>
+                                                <p className="text-slate-500">
+                                                    {section.strand || "-"}
+                                                </p>
+                                                <p className="mt-0.5 text-[11px] text-slate-500">
+                                                    Adviser:{" "}
+                                                    {section.advisor_teacher_name ||
+                                                        "N/A"}
+                                                </p>
+                                            </div>
+
+                                            <div className="col-span-2 flex justify-center">
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1.5 text-[11px] font-bold text-emerald-700">
+                                                    <Users size={11} />
+                                                    {section.students_count}
+                                                </span>
+                                            </div>
+
+                                            <div className="col-span-2 text-xs text-slate-600">
+                                                {new Date(
+                                                    section.created_at,
+                                                ).toLocaleDateString("en-US", {
+                                                    year: "numeric",
+                                                    month: "short",
+                                                    day: "numeric",
+                                                })}
+                                            </div>
+
+                                            <div
+                                                className="col-span-1 flex justify-end"
+                                                onClick={(event) =>
+                                                    event.stopPropagation()
                                                 }
-                                                className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
-                                                title="Edit section"
                                             >
-                                                <Pencil size={14} />
-                                            </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        openSectionDetailModal(
+                                                            section,
+                                                            "edit",
+                                                        )
+                                                    }
+                                                    className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+                                                    title="Edit section"
+                                                >
+                                                    <Pencil size={14} />
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
                                 </div>
 
                                 {sections.last_page > 1 && (
                                     <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-6 py-4">
                                         <p className="text-xs text-slate-600">
-                                            Showing {sections.from}-{sections.to} of{" "}
-                                            {sections.total} sections
+                                            Showing {sections.from}-
+                                            {sections.to} of {sections.total}{" "}
+                                            sections
                                         </p>
                                         <div className="flex gap-1">
-                                            {sections.links.map((link, index) => (
-                                                <Link
-                                                    key={index}
-                                                    href={link.url || "#"}
-                                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                                                        link.active
-                                                            ? "bg-indigo-600 text-white shadow-sm"
-                                                            : link.url
-                                                              ? "text-slate-600 hover:bg-slate-100"
-                                                              : "cursor-not-allowed text-slate-300"
-                                                    }`}
-                                                    dangerouslySetInnerHTML={{
-                                                        __html: link.label,
-                                                    }}
-                                                />
-                                            ))}
+                                            {sections.links.map(
+                                                (link, index) => (
+                                                    <Link
+                                                        key={index}
+                                                        href={link.url || "#"}
+                                                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                                            link.active
+                                                                ? "bg-indigo-600 text-white shadow-sm"
+                                                                : link.url
+                                                                  ? "text-slate-600 hover:bg-slate-100"
+                                                                  : "cursor-not-allowed text-slate-300"
+                                                        }`}
+                                                        dangerouslySetInnerHTML={{
+                                                            __html: link.label,
+                                                        }}
+                                                    />
+                                                ),
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -1152,7 +1221,8 @@ export default function Index({
                                         Add Section Wizard
                                     </h2>
                                     <p className="text-xs text-blue-100">
-                                        Step {step} of {STEPS.length}: {STEPS[step - 1].title}
+                                        Step {step} of {STEPS.length}:{" "}
+                                        {STEPS[step - 1].title}
                                     </p>
                                 </div>
                             </div>
@@ -1181,80 +1251,10 @@ export default function Index({
                                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                             <div>
                                                 <label className="mb-1.5 block text-sm font-medium text-slate-800">
-                                                    Section Name{" "}
+                                                    Grade Level{" "}
                                                     <span className="text-rose-500">
                                                         *
                                                     </span>
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={data.section_name}
-                                                    onChange={(event) =>
-                                                        setData(
-                                                            "section_name",
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                    placeholder="e.g., STEM-A"
-                                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:border-indigo-500 focus:bg-white focus:ring-indigo-500"
-                                                />
-                                                <FieldError
-                                                    message={
-                                                        errors.section_name
-                                                    }
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="mb-1.5 block text-sm font-medium text-slate-800">
-                                                    Section Code
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={data.section_code}
-                                                    onChange={(event) =>
-                                                        setData(
-                                                            "section_code",
-                                                            event.target.value.toUpperCase(),
-                                                        )
-                                                    }
-                                                    placeholder="Auto-generated when empty"
-                                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:border-indigo-500 focus:bg-white focus:ring-indigo-500"
-                                                />
-                                                <FieldError
-                                                    message={
-                                                        errors.section_code
-                                                    }
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="mb-1.5 block text-sm font-medium text-slate-800">
-                                                    Cohort{" "}
-                                                    <span className="text-rose-500">
-                                                        *
-                                                    </span>
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={data.cohort}
-                                                    onChange={(event) =>
-                                                        setData(
-                                                            "cohort",
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                    placeholder="e.g., 2026"
-                                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:border-indigo-500 focus:bg-white focus:ring-indigo-500"
-                                                />
-                                                <FieldError
-                                                    message={errors.cohort}
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="mb-1.5 block text-sm font-medium text-slate-800">
-                                                    Grade Level
                                                 </label>
                                                 <select
                                                     value={data.grade_level}
@@ -1289,10 +1289,12 @@ export default function Index({
 
                                             <div>
                                                 <label className="mb-1.5 block text-sm font-medium text-slate-800">
-                                                    Strand
+                                                    Strand/Specialization{" "}
+                                                    <span className="text-rose-500">
+                                                        *
+                                                    </span>
                                                 </label>
-                                                <input
-                                                    type="text"
+                                                <select
                                                     value={data.strand}
                                                     onChange={(event) =>
                                                         setData(
@@ -1300,9 +1302,40 @@ export default function Index({
                                                             event.target.value,
                                                         )
                                                     }
-                                                    placeholder="e.g., STEM"
+                                                    disabled={
+                                                        !data.grade_level ||
+                                                        departmentSpecializationOptions.length ===
+                                                            0
+                                                    }
                                                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:border-indigo-500 focus:bg-white focus:ring-indigo-500"
-                                                />
+                                                >
+                                                    <option value="">
+                                                        {!data.grade_level
+                                                            ? "Select grade level first"
+                                                            : departmentSpecializationOptions.length ===
+                                                                0
+                                                              ? "No strand/specialization available"
+                                                              : "Select strand/specialization"}
+                                                    </option>
+                                                    {departmentSpecializationOptions.map(
+                                                        (specialization) => (
+                                                            <option
+                                                                key={
+                                                                    specialization
+                                                                }
+                                                                value={
+                                                                    specialization
+                                                                }
+                                                            >
+                                                                {specialization}
+                                                            </option>
+                                                        ),
+                                                    )}
+                                                </select>
+                                                <p className="mt-1 text-xs text-slate-500">
+                                                    Loaded from your department
+                                                    strands.
+                                                </p>
                                                 <FieldError
                                                     message={errors.strand}
                                                 />
@@ -1310,28 +1343,36 @@ export default function Index({
 
                                             <div>
                                                 <label className="mb-1.5 block text-sm font-medium text-slate-800">
-                                                    Track
+                                                    Section Name{" "}
+                                                    <span className="text-rose-500">
+                                                        *
+                                                    </span>
                                                 </label>
                                                 <input
                                                     type="text"
-                                                    value={data.track}
+                                                    value={data.section_name}
                                                     onChange={(event) =>
                                                         setData(
-                                                            "track",
+                                                            "section_name",
                                                             event.target.value,
                                                         )
                                                     }
-                                                    placeholder="e.g., Academic"
+                                                    placeholder="e.g., Einstein"
                                                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:border-indigo-500 focus:bg-white focus:ring-indigo-500"
                                                 />
                                                 <FieldError
-                                                    message={errors.track}
+                                                    message={
+                                                        errors.section_name
+                                                    }
                                                 />
                                             </div>
 
                                             <div>
                                                 <label className="mb-1.5 block text-sm font-medium text-slate-800">
-                                                    Adviser Teacher
+                                                    Assign Adviser{" "}
+                                                    <span className="text-rose-500">
+                                                        *
+                                                    </span>
                                                 </label>
                                                 <select
                                                     value={
@@ -1343,10 +1384,15 @@ export default function Index({
                                                             event.target.value,
                                                         )
                                                     }
-                                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:ring-indigo-500"
+                                                    disabled={
+                                                        teachers.length === 0
+                                                    }
+                                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:border-indigo-500 focus:bg-white focus:ring-indigo-500"
                                                 >
                                                     <option value="">
-                                                        Unassigned (N/A)
+                                                        {teachers.length === 0
+                                                            ? "No adviser available"
+                                                            : "Select adviser"}
                                                     </option>
                                                     {teachers.map((teacher) => (
                                                         <option
@@ -1764,15 +1810,22 @@ export default function Index({
                                                             onChange={
                                                                 handleCsvFileImport
                                                             }
-                                                            disabled={processing}
+                                                            disabled={
+                                                                processing
+                                                            }
                                                         />
                                                     </label>
                                                     <p className="text-xs text-slate-500">
-                                                        Required: lrn plus either student_name or first_name/last_name.
+                                                        Required: lrn plus
+                                                        either student_name or
+                                                        first_name/last_name.
                                                     </p>
                                                 </div>
                                                 <p className="mb-2 text-[11px] text-slate-500">
-                                                    Format: student_name,lrn,email(optional) or first_name,last_name,lrn,email(optional),middle_name(optional)
+                                                    Format:
+                                                    student_name,lrn,email(optional)
+                                                    or
+                                                    first_name,last_name,lrn,email(optional),middle_name(optional)
                                                 </p>
                                                 <textarea
                                                     rows={5}
@@ -1942,14 +1995,9 @@ export default function Index({
                                                     <span className="font-semibold">
                                                         Code:
                                                     </span>{" "}
-                                                    {data.section_code ||
-                                                        "Auto"}
-                                                </p>
-                                                <p>
-                                                    <span className="font-semibold">
-                                                        Cohort:
-                                                    </span>{" "}
-                                                    {data.cohort || "-"}
+                                                    Auto-generated from Grade,
+                                                    Strand/Specialization, and
+                                                    Section Name
                                                 </p>
                                                 <p>
                                                     <span className="font-semibold">
@@ -1962,7 +2010,7 @@ export default function Index({
                                                     <span className="font-semibold">
                                                         Track:
                                                     </span>{" "}
-                                                    {data.track || "-"}
+                                                    Auto from department
                                                 </p>
                                                 <p>
                                                     <span className="font-semibold">

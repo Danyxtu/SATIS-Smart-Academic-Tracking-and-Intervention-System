@@ -19,6 +19,8 @@ class InterventionController extends Controller
         ]);
 
         $enrollment = Enrollment::with(['subjectTeacher', 'user'])->findOrFail($validated['enrollment_id']);
+        $schoolYear = Intervention::resolveCurrentSchoolYear()
+            ?? ((int) date('Y')) . '-' . (((int) date('Y')) + 1);
 
         if (optional($enrollment->subjectTeacher)->teacher_id !== $request->user()->id) {
             abort(403, 'You are not authorized to start an intervention for this student.');
@@ -28,10 +30,12 @@ class InterventionController extends Controller
             [
                 'enrollment_id' => $enrollment->id,
                 'status' => 'active',
+                'school_year' => $schoolYear,
             ],
             [
                 'type' => $validated['type'],
                 'notes' => $validated['notes'] ?? '',
+                'school_year' => $schoolYear,
             ]
         );
 

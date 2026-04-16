@@ -80,6 +80,9 @@ class WatchlistRuleService
 
         $failingActivitiesTotal = $this->countFailingActivities($scoredGrades, $passingGrade);
 
+        $normalizedRemarks = strtolower(trim((string) ($enrollment->remarks ?? '')));
+        $isRemarkedPassed = $normalizedRemarks === 'passed';
+
         $quarterAverages = $this->calculateQuarterAverages($scoredGrades);
         $midtermGrade = $this->resolveMidtermAverage($quarterAverages);
         $finalQuarterGrade = $this->resolveFinalQuarterAverage($quarterAverages);
@@ -108,15 +111,19 @@ class WatchlistRuleService
             ? round(($dropPoints / $midtermGrade) * 100, 2)
             : null;
 
-        // High risk: below passing OR absences reached the high-risk threshold.
-        $atRisk = ($hasGrades && $overallGrade < $passingGrade)
-            || $absences >= $highRiskAbsenceThreshold;
+        // High risk: below passing OR absences reached the high-risk threshold,
+        // except when the enrollment is explicitly marked as Passed.
+        $atRisk = ! $isRemarkedPassed
+            && (
+                ($hasGrades && $overallGrade < $passingGrade)
+                || $absences >= $highRiskAbsenceThreshold
+            );
 
         // Medium risk: either attendance concern OR sustained failing activity pattern.
         $needsAttention = ! $atRisk
             && (
-                $absences > $needsAttentionAbsenceThreshold
-                || $failingActivitiesTotal > $needsAttentionFailingActivitiesThreshold
+                $absences >= $needsAttentionAbsenceThreshold
+                || $failingActivitiesTotal >= $needsAttentionFailingActivitiesThreshold
             );
 
         $hasDownTrend = ($dropPoints !== null && $dropPoints > 0)
@@ -167,6 +174,9 @@ class WatchlistRuleService
                 $dropPoints,
                 $dropPercent,
                 $passingGrade,
+                $highRiskAbsenceThreshold,
+                $needsAttentionAbsenceThreshold,
+                $needsAttentionFailingActivitiesThreshold,
             ),
             'metrics' => [
                 'has_grades' => $hasGrades,
@@ -288,20 +298,39 @@ class WatchlistRuleService
         ?float $dropPoints,
         ?float $dropPercent,
         float $passingGrade,
+        int $highRiskAbsenceThreshold,
+        int $needsAttentionAbsenceThreshold,
+        int $needsAttentionFailingActivitiesThreshold,
     ): array {
         return match ($riskKey) {
             'at_risk' => array_values(array_filter([
                 $overallGrade !== null
                     ? sprintf('Current grade %.2f%% is below %.2f%%.', $overallGrade, $passingGrade)
                     : null,
-                $absences > 0
-                    ? sprintf('%d absence(s) reached the high-risk threshold.', $absences)
+                $absences >= $highRiskAbsenceThreshold
+                    ? sprintf(
+                        '%d absence(s) reached the high-risk threshold (%d).',
+                        $absences,
+                        $highRiskAbsenceThreshold,
+                    )
                     : null,
             ])),
-            'needs_attention' => [
-                sprintf('%d absence(s) exceeded the medium threshold.', $absences),
-                sprintf('%d failing activity score(s) detected.', $failingActivitiesTotal),
-            ],
+            'needs_attention' => array_values(array_filter([
+                $absences >= $needsAttentionAbsenceThreshold
+                    ? sprintf(
+                        '%d absence(s) reached the needs attention threshold (%d).',
+                        $absences,
+                        $needsAttentionAbsenceThreshold,
+                    )
+                    : null,
+                $failingActivitiesTotal >= $needsAttentionFailingActivitiesThreshold
+                    ? sprintf(
+                        '%d failing activity score(s) reached the threshold (%d).',
+                        $failingActivitiesTotal,
+                        $needsAttentionFailingActivitiesThreshold,
+                    )
+                    : null,
+            ])),
             'recent_decline' => array_values(array_filter([
                 $midtermGrade !== null && $finalQuarterGrade !== null
                     ? sprintf('Midterm %.2f%% to final quarter %.2f%%.', $midtermGrade, $finalQuarterGrade)

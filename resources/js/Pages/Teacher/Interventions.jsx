@@ -287,6 +287,7 @@ const TASK_DELIVERY_MODES = [
 ];
 
 const TASK_SUPPORTED_TYPES = ["task_list", "academic_agreement"];
+const PARENT_CONTACT_TYPE = "parent_contact";
 
 const getTaskDeliveryModeLabel = (mode) =>
     TASK_DELIVERY_MODES.find((item) => item.value === mode)?.label ?? "";
@@ -701,18 +702,25 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
     const [selectedType, setSelectedType] = useState("automated_nudge");
     const [notes, setNotes] = useState("");
     const [deadlineAt, setDeadlineAt] = useState("");
+    const [parentMessage, setParentMessage] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitSuccess, setSubmitSuccess] = useState(false);
-
-    if (!open) return null;
 
     const currentType =
         BULK_INTERVENTION_TYPES.find((t) => t.id === selectedType) ??
         BULK_INTERVENTION_TYPES[0];
-    const deadlineRequired = currentType.tier >= 2;
+    const isParentContactType = selectedType === PARENT_CONTACT_TYPE;
+    const deadlineRequired = currentType.tier >= 2 && !isParentContactType;
+    const studentsMissingParentContact = selectedStudents.filter(
+        (student) => !String(student.parentContact ?? "").trim(),
+    );
+
+    if (!open) return null;
 
     const handleSubmit = () => {
         if (deadlineRequired && !deadlineAt) return;
+        if (isParentContactType && !parentMessage.trim()) return;
+
         setIsSubmitting(true);
         router.post(
             route("teacher.interventions.bulk"),
@@ -721,6 +729,12 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
                 type: selectedType,
                 notes,
                 deadline_at: deadlineRequired ? deadlineAt : null,
+                ...(isParentContactType
+                    ? {
+                          send_sms: true,
+                          sms_custom_message: parentMessage.trim(),
+                      }
+                    : {}),
             },
             {
                 onSuccess: () => {
@@ -731,6 +745,7 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
                         setSelectedType("automated_nudge");
                         setNotes("");
                         setDeadlineAt("");
+                        setParentMessage("");
                     }, 1500);
                 },
                 onFinish: () => setIsSubmitting(false),
@@ -928,6 +943,50 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
                             </div>
                         )}
 
+                        {isParentContactType && (
+                            <div className="space-y-3 rounded-xl border border-sky-200 bg-sky-50 p-4">
+                                <div>
+                                    <h5 className="text-sm font-semibold text-sky-900">
+                                        Parent Contact SMS
+                                    </h5>
+                                    <p className="mt-1 text-xs text-sky-700">
+                                        The custom message below will be sent to
+                                        each selected student's saved parent
+                                        number.
+                                    </p>
+                                    {studentsMissingParentContact.length >
+                                        0 && (
+                                        <p className="mt-2 text-xs font-medium text-amber-700">
+                                            {
+                                                studentsMissingParentContact.length
+                                            }{" "}
+                                            selected student
+                                            {studentsMissingParentContact.length !==
+                                            1
+                                                ? "s"
+                                                : ""}{" "}
+                                            do not have a saved parent number.
+                                        </p>
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-sm font-semibold text-sky-900">
+                                        Custom Message to Parent
+                                    </label>
+                                    <textarea
+                                        value={parentMessage}
+                                        onChange={(e) =>
+                                            setParentMessage(e.target.value)
+                                        }
+                                        rows={4}
+                                        className="w-full rounded-xl border border-sky-300 px-4 py-3 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500 resize-none"
+                                        placeholder="Type the message you want to send to parents..."
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        )}
+
                         {/* Notes */}
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -957,7 +1016,9 @@ function BulkInterventionModal({ open, onClose, selectedStudents }) {
                     <button
                         onClick={handleSubmit}
                         disabled={
-                            isSubmitting || (deadlineRequired && !deadlineAt)
+                            isSubmitting ||
+                            (deadlineRequired && !deadlineAt) ||
+                            (isParentContactType && !parentMessage.trim())
                         }
                         className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
@@ -1171,16 +1232,25 @@ function StartInterventionModal({
     enrollmentId,
     studentName,
     priority,
+    parentContact,
 }) {
     const isHighRisk = priority === "High";
+    const normalizedParentContact =
+        typeof parentContact === "string" ? parentContact.trim() : "";
 
-    const { data, setData, post, processing, reset } = useForm({
-        enrollment_id: enrollmentId,
-        type: isHighRisk ? "academic_agreement" : "parent_contact",
-        notes: "",
-        deadline_at: "",
-        tasks: [],
-    });
+    const { data, setData, post, processing, reset, errors, transform } =
+        useForm({
+            enrollment_id: enrollmentId,
+            type: isHighRisk ? "academic_agreement" : "parent_contact",
+            notes: "",
+            deadline_at: "",
+            tasks: [],
+            parent_phone:
+                normalizedParentContact && normalizedParentContact !== "N/A"
+                    ? normalizedParentContact
+                    : "",
+            sms_custom_message: "",
+        });
 
     const [taskDraft, setTaskDraft] = useState({
         task_name: "",
@@ -1192,10 +1262,22 @@ function StartInterventionModal({
         setData("enrollment_id", enrollmentId);
     }, [enrollmentId]);
 
+    useEffect(() => {
+        if (normalizedParentContact && normalizedParentContact !== "N/A") {
+            setData("parent_phone", normalizedParentContact);
+        }
+    }, [normalizedParentContact]);
+
     const selectedStrategy = INTERVENTION_STRATEGIES[data.type];
-    const deadlineRequired = (selectedStrategy?.tier ?? 1) >= 2;
+    const isParentContactType = data.type === PARENT_CONTACT_TYPE;
+    const deadlineRequired =
+        (selectedStrategy?.tier ?? 1) >= 2 && !isParentContactType;
     const requiresTaskChecklist = TASK_SUPPORTED_TYPES.includes(data.type);
     const isAcademicAgreement = data.type === "academic_agreement";
+    const parentPhoneMissing =
+        isParentContactType && !String(data.parent_phone ?? "").trim();
+    const parentMessageMissing =
+        isParentContactType && !String(data.sms_custom_message ?? "").trim();
 
     useEffect(() => {
         if (!deadlineRequired) setData("deadline_at", "");
@@ -1247,6 +1329,24 @@ function StartInterventionModal({
     const handleSubmit = (e) => {
         e.preventDefault();
         if (deadlineRequired && !data.deadline_at) return;
+
+        transform((current) => {
+            const { parent_phone, sms_custom_message, ...basePayload } =
+                current;
+
+            return {
+                ...basePayload,
+                deadline_at: deadlineRequired ? current.deadline_at : null,
+                ...(current.type === PARENT_CONTACT_TYPE
+                    ? {
+                          send_sms: true,
+                          parent_phone,
+                          sms_custom_message,
+                      }
+                    : {}),
+            };
+        });
+
         post(route("teacher.interventions.store"), {
             onSuccess: () => {
                 reset();
@@ -1267,10 +1367,15 @@ function StartInterventionModal({
     const canSubmit =
         !processing &&
         !(deadlineRequired && !data.deadline_at) &&
-        !(requiresTaskChecklist && data.tasks.length === 0);
+        !(requiresTaskChecklist && data.tasks.length === 0) &&
+        !parentPhoneMissing &&
+        !parentMessageMissing;
 
-    const footerHint =
-        deadlineRequired && !data.deadline_at
+    const footerHint = parentPhoneMissing
+        ? "⚠️ Enter the parent's contact number"
+        : parentMessageMissing
+          ? "⚠️ Add the custom SMS message for the parent"
+          : deadlineRequired && !data.deadline_at
             ? "⚠️ Deadline date and time is required for this tier"
             : requiresTaskChecklist && data.tasks.length === 0
               ? "⚠️ Please add at least one task before starting"
@@ -1395,6 +1500,64 @@ function StartInterventionModal({
                             <p className="mt-1 text-xs text-amber-700">
                                 Required for Tier 2 and Tier 3 interventions.
                             </p>
+                        </div>
+                    )}
+
+                    {isParentContactType && (
+                        <div className="space-y-4 rounded-xl border border-sky-200 bg-sky-50 p-4">
+                            <div>
+                                <label className="mb-2 block text-sm font-semibold text-sky-900">
+                                    Parent Number
+                                </label>
+                                <input
+                                    type="text"
+                                    value={data.parent_phone}
+                                    onChange={(e) =>
+                                        setData("parent_phone", e.target.value)
+                                    }
+                                    className="w-full rounded-xl border border-sky-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                    placeholder="e.g. 09171234567 or +639171234567"
+                                    required
+                                />
+                                {errors.parent_phone && (
+                                    <p className="mt-1 text-xs text-red-600">
+                                        {errors.parent_phone}
+                                    </p>
+                                )}
+                                <p className="mt-1 text-xs text-sky-700">
+                                    {normalizedParentContact &&
+                                    normalizedParentContact !== "N/A"
+                                        ? "Pre-filled from the student's saved parent contact."
+                                        : "No saved parent number was found. Enter the parent's number above."}
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="mb-2 block text-sm font-semibold text-sky-900">
+                                    Custom Message to Parent
+                                </label>
+                                <textarea
+                                    value={data.sms_custom_message}
+                                    onChange={(e) =>
+                                        setData(
+                                            "sms_custom_message",
+                                            e.target.value,
+                                        )
+                                    }
+                                    className="w-full rounded-xl border border-sky-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500 h-24 resize-none"
+                                    placeholder="Type the exact text you want to send to the parent..."
+                                    required
+                                />
+                                {errors.sms_custom_message && (
+                                    <p className="mt-1 text-xs text-red-600">
+                                        {errors.sms_custom_message}
+                                    </p>
+                                )}
+                                <p className="mt-1 text-xs text-sky-700">
+                                    This message is sent via SMS and logged as a
+                                    Parent Contact intervention.
+                                </p>
+                            </div>
                         </div>
                     )}
 
@@ -1709,7 +1872,9 @@ function InterventionManagementModal({
         intervention.progressPercent ??
         (totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0);
     const selectedStrategy = INTERVENTION_STRATEGIES[data.type] ?? null;
-    const deadlineRequired = (selectedStrategy?.tier ?? 1) >= 2;
+    const isParentContactType = data.type === PARENT_CONTACT_TYPE;
+    const deadlineRequired =
+        (selectedStrategy?.tier ?? 1) >= 2 && !isParentContactType;
     const canApproveDirectly =
         intervention.isTier3 && intervention.status === "active";
 
@@ -1929,7 +2094,9 @@ function InterventionManagementModal({
                     <h3 className="text-sm font-semibold text-gray-800">
                         Intervention Details
                     </h3>
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div
+                        className={`grid grid-cols-1 gap-3 ${deadlineRequired ? "md:grid-cols-2" : ""}`}
+                    >
                         <div>
                             <label className="mb-1 block text-xs font-semibold text-gray-600 uppercase tracking-wide">
                                 Intervention Type
@@ -1950,28 +2117,30 @@ function InterventionManagementModal({
                                 )}
                             </select>
                         </div>
-                        <div>
-                            <label className="mb-1 block text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                                Deadline
-                            </label>
-                            <input
-                                type="datetime-local"
-                                value={data.deadline_at}
-                                onChange={(e) =>
-                                    setData("deadline_at", e.target.value)
-                                }
-                                min={toDateTimeLocalValue(
-                                    new Date(Date.now() + 60_000),
+                        {deadlineRequired && (
+                            <div>
+                                <label className="mb-1 block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                    Deadline
+                                </label>
+                                <input
+                                    type="datetime-local"
+                                    value={data.deadline_at}
+                                    onChange={(e) =>
+                                        setData("deadline_at", e.target.value)
+                                    }
+                                    min={toDateTimeLocalValue(
+                                        new Date(Date.now() + 60_000),
+                                    )}
+                                    className="w-full rounded-lg border border-gray-300 text-sm"
+                                    required={deadlineRequired}
+                                />
+                                {errors.deadline_at && (
+                                    <p className="mt-1 text-xs text-red-600">
+                                        {errors.deadline_at}
+                                    </p>
                                 )}
-                                className="w-full rounded-lg border border-gray-300 text-sm"
-                                required={deadlineRequired}
-                            />
-                            {errors.deadline_at && (
-                                <p className="mt-1 text-xs text-red-600">
-                                    {errors.deadline_at}
-                                </p>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
 
                     <div>
@@ -2349,10 +2518,15 @@ function InterventionDashboard({ students, onSelectStudent }) {
         [sortedStudents],
     );
 
+    const priorityWatchlistStudents = useMemo(
+        () => sortedStudents.filter((s) => !s.hasActiveIntervention),
+        [sortedStudents],
+    );
+
     const studentsForCurrentView =
         viewMode === "intervention_given"
             ? interventionGivenStudents
-            : sortedStudents;
+            : priorityWatchlistStudents;
 
     const filteredStudents = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
@@ -2895,19 +3069,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
     const pendingRequest = studentData?.pendingCompletionRequest ?? null;
     const activeIntervention = student?.activeIntervention ?? null;
     const hasActiveIntervention = Boolean(activeIntervention);
-
-    // Grade-related derived values
-    const numericGrade = parseInt(student?.currentGrade ?? "0");
-    const isBelowPassing = numericGrade < 75;
-    const gradeTrend = student?.gradeTrend ?? [];
-    const trendDir =
-        gradeTrend.length > 1
-            ? gradeTrend[0] > gradeTrend[gradeTrend.length - 1]
-                ? "down"
-                : gradeTrend[0] < gradeTrend[gradeTrend.length - 1]
-                  ? "up"
-                  : "flat"
-            : "flat";
+    const priorityReason = student?.priorityReason ?? "Under Observation";
 
     const handleApproveCompletion = () => {
         if (!pendingRequest) return;
@@ -3065,7 +3227,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                         <span className="mr-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                                             Parent
                                         </span>
-                                        {student.parentContact}
+                                        {student.parentContact || "N/A"}
                                     </span>
                                 </div>
 
@@ -3183,215 +3345,14 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                 </div>
             )}
 
-            {/* Academic vitals grid */}
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-                {/* Grade card */}
-                <div className="rounded-2xl border border-gray-200/90 bg-gradient-to-br from-white to-slate-50 p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-gray-700 dark:from-gray-800 dark:to-gray-800">
-                    <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-[0.14em]">
-                            Academic Status
-                        </h3>
-                        <div
-                            className={`w-3 h-3 rounded-full ${isBelowPassing ? "bg-red-500" : "bg-green-500"}`}
-                        />
-                    </div>
-                    <p
-                        className={`text-3xl font-bold ${isBelowPassing ? "text-red-600" : "text-green-600"}`}
-                    >
-                        {student.currentGrade}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-3 flex items-center gap-1.5">
-                        {trendDir === "down" && (
-                            <>
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="h-4 w-4 text-red-500"
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                >
-                                    <path
-                                        fillRule="evenodd"
-                                        d="M16.707 10.293a1 1 0 010 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l4.293-4.293a1 1 0 011.414 0z"
-                                        clipRule="evenodd"
-                                    />
-                                </svg>
-                                <span className="text-red-500 font-medium">
-                                    Decreasing
-                                </span>
-                            </>
-                        )}
-                        {trendDir === "up" && (
-                            <>
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="h-4 w-4 text-green-500"
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                >
-                                    <path
-                                        fillRule="evenodd"
-                                        d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z"
-                                        clipRule="evenodd"
-                                    />
-                                </svg>
-                                <span className="text-green-500 font-medium">
-                                    Increasing
-                                </span>
-                            </>
-                        )}
-                        {trendDir === "flat" && (
-                            <span className="text-gray-500 font-medium">
-                                Stable
-                            </span>
-                        )}
-                    </p>
-                </div>
-
-                {/* Engagement card */}
-                <div className="rounded-2xl border border-gray-200/90 bg-gradient-to-br from-white to-slate-50 p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-gray-700 dark:from-gray-800 dark:to-gray-800">
-                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-[0.14em] mb-3">
-                        Engagement
-                    </h3>
-                    <div className="flex items-center gap-2 mb-3">
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5 text-blue-500"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                        >
-                            <path
-                                fillRule="evenodd"
-                                d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
-                                clipRule="evenodd"
-                            />
-                        </svg>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            {student.attendanceSummary}
-                        </span>
-                    </div>
-                    {student.missingAssignments?.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-                            <p className="text-xs font-semibold text-red-600 uppercase tracking-wider mb-2">
-                                Missing ({student.missingAssignments.length})
-                            </p>
-                            <div className="space-y-1.5 max-h-24 overflow-y-auto">
-                                {student.missingAssignments.map((a) => (
-                                    <div
-                                        key={a.id}
-                                        className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400"
-                                    >
-                                        <span className="w-1.5 h-1.5 bg-red-400 rounded-full flex-shrink-0" />
-                                        <span className="truncate">
-                                            {a.title}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Behavioral notes card */}
-                <div className="rounded-2xl border border-gray-200/90 bg-gradient-to-br from-white to-slate-50 p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-gray-700 dark:from-gray-800 dark:to-gray-800">
-                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-[0.14em] mb-3">
-                        Behavioral Notes
-                    </h3>
-                    {student.behaviorLog?.length > 0 ? (
-                        <div className="space-y-2 max-h-32 overflow-y-auto">
-                            {student.behaviorLog.map((log, i) => (
-                                <div
-                                    key={i}
-                                    className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
-                                >
-                                    <span className="w-1.5 h-1.5 bg-amber-400 rounded-full flex-shrink-0 mt-1.5" />
-                                    <span>{log}</span>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-2 text-gray-400 dark:text-gray-500">
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-5 w-5"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                            >
-                                <path
-                                    fillRule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                    clipRule="evenodd"
-                                />
-                            </svg>
-                            <span className="text-sm">
-                                No behavioral concerns
-                            </span>
-                        </div>
-                    )}
-                </div>
+            <div className="rounded-2xl border border-gray-200/90 bg-gradient-to-br from-white to-slate-50 p-5 shadow-sm dark:border-gray-700 dark:from-gray-800 dark:to-gray-800">
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-[0.14em] mb-3">
+                    Reason for Priority
+                </h3>
+                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                    {priorityReason}
+                </p>
             </div>
-
-            {/* Attention banner (shown when grade is below passing) */}
-            {isBelowPassing && (
-                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/60 rounded-xl shadow-sm overflow-hidden">
-                    <div className="p-5 flex items-start gap-4">
-                        <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-6 w-6 text-white"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                            >
-                                <path
-                                    fillRule="evenodd"
-                                    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                                    clipRule="evenodd"
-                                />
-                            </svg>
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-1">
-                                Attention Required
-                            </h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                                This student's academic performance is below the
-                                passing threshold. Consider taking action to
-                                help improve their grades.
-                            </p>
-                            <div className="flex flex-col gap-2 sm:flex-row">
-                                <button
-                                    onClick={() => setOpenFeedbackModal(true)}
-                                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 sm:w-auto"
-                                >
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        className="h-4 w-4 text-blue-500"
-                                        viewBox="0 0 20 20"
-                                        fill="currentColor"
-                                    >
-                                        <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z" />
-                                        <path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z" />
-                                    </svg>
-                                    Send Feedback
-                                </button>
-                                <button
-                                    onClick={() =>
-                                        hasActiveIntervention
-                                            ? setShowInterventionManagementModal(
-                                                  true,
-                                              )
-                                            : setIsInterventionModalOpen(true)
-                                    }
-                                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 sm:w-auto"
-                                >
-                                    {hasActiveIntervention
-                                        ? "Manage Intervention"
-                                        : "Start Intervention"}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Intervention history log */}
             <div className="rounded-2xl border border-gray-200/90 bg-gradient-to-br from-white to-slate-50 p-5 shadow-sm dark:border-gray-700 dark:from-gray-800 dark:to-gray-800">
@@ -3505,6 +3466,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                 enrollmentId={enrollmentId}
                 studentName={student.name}
                 priority={student.priority}
+                parentContact={student.parentContact}
             />
 
             <InterventionManagementModal

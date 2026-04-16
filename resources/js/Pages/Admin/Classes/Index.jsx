@@ -519,9 +519,6 @@ export default function Index({
                                             </p>
                                             <p className="mt-0.5 text-xs text-slate-500">
                                                 {item.section_code || "-"}
-                                                {item.cohort
-                                                    ? ` • Cohort ${item.cohort}`
-                                                    : ""}
                                             </p>
                                         </div>
 
@@ -802,9 +799,6 @@ export default function Index({
                                                 >
                                                     {section.section_name} (
                                                     {section.section_code})
-                                                    {section.cohort
-                                                        ? ` - Cohort ${section.cohort}`
-                                                        : ""}
                                                 </option>
                                             ))}
                                         </select>
@@ -825,8 +819,6 @@ export default function Index({
                                             </p>
                                             <p className="mt-1 text-xs text-indigo-600">
                                                 {selectedSection.section_code} •
-                                                Cohort{" "}
-                                                {selectedSection.cohort || "-"}
                                                 {selectedSection.grade_level
                                                     ? ` • ${selectedSection.grade_level}`
                                                     : ""}

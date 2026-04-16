@@ -29,7 +29,7 @@ class ClassController extends Controller
         $classesQuery = SchoolClass::query()
             ->with([
                 'subject:id,subject_name,subject_code',
-                'sectionRecord:id,department_id,section_name,section_code,cohort,grade_level,strand,track,is_active',
+                'sectionRecord:id,department_id,section_name,section_code,grade_level,strand,track,is_active',
                 'teacher:id,first_name,middle_name,last_name,department_id',
             ])
             ->whereHas('sectionRecord', function ($query) use ($departmentId) {
@@ -47,8 +47,7 @@ class ClassController extends Controller
                     })
                     ->orWhereHas('sectionRecord', function ($sectionQuery) use ($search) {
                         $sectionQuery->where('section_name', 'like', "%{$search}%")
-                            ->orWhere('section_code', 'like', "%{$search}%")
-                            ->orWhere('cohort', 'like', "%{$search}%");
+                            ->orWhere('section_code', 'like', "%{$search}%");
                     })
                     ->orWhereHas('teacher', function ($teacherQuery) use ($search) {
                         $teacherQuery->where('first_name', 'like', "%{$search}%")
@@ -74,7 +73,6 @@ class ClassController extends Controller
                     'subject_code' => $schoolClass->subject?->subject_code,
                     'section_name' => $schoolClass->sectionRecord?->section_name,
                     'section_code' => $schoolClass->sectionRecord?->section_code,
-                    'cohort' => $schoolClass->sectionRecord?->cohort,
                     'teacher_name' => $schoolClass->teacher?->name,
                     'school_year' => $schoolClass->school_year,
                     'created_at' => $schoolClass->created_at?->toIso8601String(),
@@ -99,13 +97,12 @@ class ClassController extends Controller
             ->where('department_id', $departmentId)
             ->where('is_active', true)
             ->orderBy('section_name')
-            ->get(['id', 'section_name', 'section_code', 'cohort', 'grade_level', 'strand', 'track'])
+            ->get(['id', 'section_name', 'section_code', 'grade_level', 'strand', 'track'])
             ->map(function (Section $section) {
                 return [
                     'id' => $section->id,
                     'section_name' => $section->section_name,
                     'section_code' => $section->section_code,
-                    'cohort' => $section->cohort,
                     'grade_level' => $section->grade_level,
                     'strand' => $section->strand,
                     'track' => $section->track,

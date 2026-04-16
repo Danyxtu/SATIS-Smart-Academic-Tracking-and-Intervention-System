@@ -325,6 +325,19 @@ const normalizeCsvHeader = (value = "") => {
         return "lrn";
     }
 
+    if (
+        [
+            "parentcontactnumber",
+            "parentcontact",
+            "parentphone",
+            "guardiancontactnumber",
+            "guardiancontact",
+            "guardianphone",
+        ].includes(normalized)
+    ) {
+        return "parent_contact_number";
+    }
+
     if (["email", "personalemail", "mail"].includes(normalized)) {
         return "email";
     }
@@ -350,6 +363,7 @@ const parseStudentCsv = (text = "") => {
     const lastNameIndex = headers.indexOf("last_name");
     const middleNameIndex = headers.indexOf("middle_name");
     const lrnIndex = headers.indexOf("lrn");
+    const parentContactNumberIndex = headers.indexOf("parent_contact_number");
 
     if (firstNameIndex === -1 || lastNameIndex === -1 || lrnIndex === -1) {
         return {
@@ -371,6 +385,10 @@ const parseStudentCsv = (text = "") => {
                 ? String(row[middleNameIndex] || "").trim()
                 : "";
         const lrn = String(row[lrnIndex] || "").trim();
+        const parentContactNumber =
+            parentContactNumberIndex >= 0
+                ? String(row[parentContactNumberIndex] || "").trim()
+                : "";
 
         if (!firstName && !lastName && !middleName && !lrn) {
             continue;
@@ -396,6 +414,7 @@ const parseStudentCsv = (text = "") => {
             last_name: lastName,
             middle_name: middleName,
             lrn,
+            parent_contact_number: parentContactNumber,
             username: "",
         });
     }
@@ -431,14 +450,11 @@ function emptyStudentDraft() {
         last_name: "",
         middle_name: "",
         lrn: "",
+        parent_contact_number: "",
     };
 }
 
-const applyStudentQueueUsernames = (
-    queue,
-    yearNumber,
-    latestByPrefix = {},
-) => {
+const applyStudentQueueUsernames = (queue, yearNumber, latestByPrefix = {}) => {
     const runningSequenceByPrefix = {};
 
     return queue.map((queueItem) => {
@@ -453,8 +469,9 @@ const applyStudentQueueUsernames = (
         );
 
         const nextSequence =
-            normalizeUsernameSequence(runningSequenceByPrefix[usernamePrefix]) ||
-            baseSequence;
+            normalizeUsernameSequence(
+                runningSequenceByPrefix[usernamePrefix],
+            ) || baseSequence;
 
         const resolvedSequence = nextSequence + 1;
         runningSequenceByPrefix[usernamePrefix] = resolvedSequence;
@@ -516,6 +533,7 @@ export default function CreateUserModal({
         last_name: "",
         middle_name: "",
         lrn: "",
+        parent_contact_number: "",
         email: "",
         username: "",
         password: "",
@@ -810,6 +828,7 @@ export default function CreateUserModal({
             setData("section_id", "");
             setData("student_queue", []);
             setData("lrn", "");
+            setData("parent_contact_number", "");
             setData("username", "");
             setData("password", generateRandomPassword());
         }
@@ -894,6 +913,7 @@ export default function CreateUserModal({
                 last_name: queueItem.last_name,
                 middle_name: queueItem.middle_name || "",
                 lrn: queueItem.lrn || "",
+                parent_contact_number: queueItem.parent_contact_number || "",
                 username: queueItem.username,
             })),
         );
@@ -924,6 +944,9 @@ export default function CreateUserModal({
                             .filter(Boolean)
                             .join(" ") || "Student",
                     lrn: String(data.lrn || "").trim(),
+                    parent_contact_number: String(
+                        data.parent_contact_number || "",
+                    ).trim(),
                     username,
                     password: generatedPassword,
                 },
@@ -944,6 +967,9 @@ export default function CreateUserModal({
                     .filter(Boolean)
                     .join(" ") || "Student",
             lrn: String(queueItem.lrn || "").trim(),
+            parent_contact_number: String(
+                queueItem.parent_contact_number || "",
+            ).trim(),
             username: queueItem.username,
             password: generatedPassword,
         }));
@@ -955,6 +981,7 @@ export default function CreateUserModal({
         data.middle_name,
         data.last_name,
         data.lrn,
+        data.parent_contact_number,
         studentMode,
         studentQueue,
     ]);
@@ -1043,6 +1070,7 @@ export default function CreateUserModal({
                     field === "last_name" ||
                     field === "middle_name" ||
                     field === "lrn" ||
+                    field === "parent_contact_number" ||
                     field === "email" ||
                     field === "grade_level" ||
                     field === "username" ||
@@ -1111,6 +1139,7 @@ export default function CreateUserModal({
             setSelectedCreatedStudentId("");
             setData("email", "");
             setData("lrn", "");
+            setData("parent_contact_number", "");
             setData("grade_level", "");
             setData("section_id", "");
             return;
@@ -1126,6 +1155,7 @@ export default function CreateUserModal({
         setSelectedCreatedStudentId("");
         setData("student_queue", []);
         setData("lrn", "");
+        setData("parent_contact_number", "");
         setData("username", "");
         setData("grade_level", "");
         setData("section_id", "");
@@ -1158,6 +1188,7 @@ export default function CreateUserModal({
         setSelectedCreatedStudentId("");
         setShowStudentSectionOptions(false);
         setData("student_queue", []);
+        setData("parent_contact_number", "");
         setClientErrors({});
     };
 
@@ -1352,6 +1383,9 @@ export default function CreateUserModal({
         const lastName = String(studentDraft.last_name || "").trim();
         const middleName = String(studentDraft.middle_name || "").trim();
         const lrn = String(studentDraft.lrn || "").trim();
+        const parentContactNumber = String(
+            studentDraft.parent_contact_number || "",
+        ).trim();
 
         if (!firstName) {
             nextErrors.student_queue_first_name = "First name is required.";
@@ -1388,6 +1422,7 @@ export default function CreateUserModal({
             last_name: lastName,
             middle_name: middleName,
             lrn,
+            parent_contact_number: parentContactNumber,
             username: "",
         };
     };
@@ -1737,6 +1772,8 @@ export default function CreateUserModal({
                     last_name: queueItem.last_name,
                     middle_name: queueItem.middle_name || "",
                     lrn: queueItem.lrn,
+                    parent_contact_number:
+                        queueItem.parent_contact_number || "",
                     username: queueItem.username,
                 })),
             };
@@ -1757,6 +1794,7 @@ export default function CreateUserModal({
                 last_name: data.last_name,
                 middle_name: data.middle_name,
                 lrn: data.lrn,
+                parent_contact_number: data.parent_contact_number,
                 username: data.username,
                 password: data.password,
                 role: "student",
@@ -2219,6 +2257,31 @@ export default function CreateUserModal({
                                                 placeholder="Learner Reference Number"
                                                 minLength={LRN_LENGTH}
                                                 maxLength={LRN_LENGTH}
+                                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-emerald-500 focus:bg-white focus:ring-emerald-500"
+                                            />
+                                        </Field>
+                                    )}
+
+                                    {isStudent && (
+                                        <Field
+                                            label="Parent Contact Number"
+                                            icon={Shield}
+                                            optional
+                                            error={errors.parent_contact_number}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={
+                                                    data.parent_contact_number ||
+                                                    ""
+                                                }
+                                                onChange={(event) =>
+                                                    setData(
+                                                        "parent_contact_number",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="e.g., +639171234567"
                                                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-emerald-500 focus:bg-white focus:ring-emerald-500"
                                             />
                                         </Field>
@@ -2799,6 +2862,28 @@ export default function CreateUserModal({
                                                         maxLength={LRN_LENGTH}
                                                         className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                                                     />
+
+                                                    <input
+                                                        type="text"
+                                                        value={
+                                                            studentDraft.parent_contact_number
+                                                        }
+                                                        onChange={(event) =>
+                                                            setStudentDraft(
+                                                                (
+                                                                    previousDraft,
+                                                                ) => ({
+                                                                    ...previousDraft,
+                                                                    parent_contact_number:
+                                                                        event
+                                                                            .target
+                                                                            .value,
+                                                                }),
+                                                            )
+                                                        }
+                                                        placeholder="Parent contact (optional)"
+                                                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                                    />
                                                 </div>
 
                                                 <button
@@ -2828,7 +2913,8 @@ export default function CreateUserModal({
                                                         Required headers:
                                                         first_name, last_name,
                                                         lrn. Optional:
-                                                        middle_name.
+                                                        middle_name,
+                                                        parent_contact_number.
                                                     </p>
                                                     {studentCsvFileName && (
                                                         <p className="mt-1 text-xs text-slate-600">
@@ -2936,6 +3022,11 @@ export default function CreateUserModal({
                                                                     <p className="truncate text-xs text-slate-500">
                                                                         LRN:{" "}
                                                                         {queueItem.lrn ||
+                                                                            "-"}
+                                                                    </p>
+                                                                    <p className="truncate text-xs text-slate-500">
+                                                                        Parent:{" "}
+                                                                        {queueItem.parent_contact_number ||
                                                                             "-"}
                                                                     </p>
                                                                 </div>
@@ -3287,6 +3378,11 @@ export default function CreateUserModal({
                                                             <p className="text-xs text-slate-600">
                                                                 LRN:{" "}
                                                                 {studentProfile.lrn ||
+                                                                    "-"}
+                                                            </p>
+                                                            <p className="text-xs text-slate-600">
+                                                                Parent:{" "}
+                                                                {studentProfile.parent_contact_number ||
                                                                     "-"}
                                                             </p>
                                                             <p className="font-mono text-xs text-slate-600">

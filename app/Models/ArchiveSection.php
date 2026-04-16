@@ -16,7 +16,6 @@ class ArchiveSection extends Model
         'original_department_id',
         'section_name',
         'section_code',
-        'cohort',
         'grade_level',
         'strand',
         'track',

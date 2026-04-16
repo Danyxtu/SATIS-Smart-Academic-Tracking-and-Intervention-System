@@ -4,7 +4,7 @@ import Modal from "@/Components/Modal";
 import { QRCodeSVG } from "qrcode.react";
 
 const DEFAULT_APP_DOWNLOAD_URL =
-    "https://github.com/Danyxtu/SATIS-Smart-Academic-Tracking-and-Intervention-System-App/releases/download/v1.0.4(Beta)/satis-faction.apk";
+    "https://github.com/Danyxtu/SATIS-Smart-Academic-Tracking-and-Intervention-System-App/releases/download/v1.0.5(beta)/satis-faction-app.apk";
 
 export default function AppDownloadCTA({
     href = DEFAULT_APP_DOWNLOAD_URL,

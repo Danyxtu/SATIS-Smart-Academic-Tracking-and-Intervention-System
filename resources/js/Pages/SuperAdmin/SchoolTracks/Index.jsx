@@ -1,7 +1,15 @@
 import { Head, Link, router, useForm } from "@inertiajs/react";
 import { useEffect, useState } from "react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
-import { GitBranch, Plus, Search, Trash2, X } from "lucide-react";
+import {
+    AlertTriangle,
+    GitBranch,
+    Loader2,
+    Plus,
+    Search,
+    Trash2,
+    X,
+} from "lucide-react";
 import SchoolTrackDetailModal from "@/Components/Superadmin/SchoolTrackDetailModal";
 
 function TrackModal({
@@ -168,6 +176,165 @@ function TrackModal({
     );
 }
 
+function DeleteTrackModal({ isOpen, track, deleting, onClose, onConfirm }) {
+    const [confirmName, setConfirmName] = useState("");
+    const [copyState, setCopyState] = useState("idle");
+
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        setConfirmName("");
+        setCopyState("idle");
+    }, [isOpen, track?.id]);
+
+    if (!isOpen || !track) {
+        return null;
+    }
+
+    const expectedName = String(track.track_name || "").trim();
+    const canDelete = confirmName.trim() === expectedName;
+
+    const handleCopyName = async () => {
+        if (!expectedName) {
+            return;
+        }
+
+        try {
+            if (navigator?.clipboard?.writeText) {
+                await navigator.clipboard.writeText(expectedName);
+                setCopyState("copied");
+                return;
+            }
+
+            throw new Error("Clipboard not available");
+        } catch (_error) {
+            setCopyState("failed");
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto p-4 pb-10 sm:items-center">
+            <div
+                className="absolute inset-0 bg-slate-950/45 backdrop-blur-[2px]"
+                onClick={deleting ? undefined : onClose}
+            />
+
+            <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-rose-100 bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-rose-100 bg-gradient-to-r from-rose-600 to-rose-700 px-5 py-4">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/20 text-white">
+                            <AlertTriangle size={16} />
+                        </div>
+                        <div>
+                            <p className="text-sm font-semibold text-white">
+                                Delete School Track
+                            </p>
+                            <p className="text-xs text-rose-100">
+                                This action cannot be undone.
+                            </p>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={deleting}
+                        className="rounded-lg p-1.5 text-rose-100 transition-colors hover:bg-white/15 hover:text-white disabled:opacity-60"
+                    >
+                        <X size={15} />
+                    </button>
+                </div>
+
+                <div className="space-y-3 p-5">
+                    <p className="text-sm text-slate-700">
+                        Are you sure you want to delete this school track?
+                    </p>
+
+                    <div className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2.5">
+                        <p className="text-sm font-semibold text-slate-900">
+                            {track.track_name}
+                        </p>
+                        <p className="text-xs text-slate-600">
+                            {track.track_code} •{" "}
+                            {track.school_year || "No school year"}
+                        </p>
+                    </div>
+
+                    <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                        <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                Type track name to confirm
+                            </p>
+                            <button
+                                type="button"
+                                onClick={handleCopyName}
+                                disabled={deleting}
+                                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+                            >
+                                Copy Name
+                            </button>
+                        </div>
+
+                        <input
+                            type="text"
+                            value={confirmName}
+                            onChange={(event) =>
+                                setConfirmName(event.target.value)
+                            }
+                            placeholder={expectedName}
+                            disabled={deleting}
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
+                        />
+
+                        {copyState === "copied" ? (
+                            <p className="text-[11px] font-medium text-emerald-600">
+                                Track name copied. Paste it above to confirm.
+                            </p>
+                        ) : null}
+
+                        {copyState === "failed" ? (
+                            <p className="text-[11px] font-medium text-amber-600">
+                                Could not copy automatically. Please copy the
+                                track name manually.
+                            </p>
+                        ) : null}
+
+                        {!canDelete ? (
+                            <p className="text-[11px] font-medium text-rose-600">
+                                Enter the exact track name to enable deletion.
+                            </p>
+                        ) : null}
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={deleting}
+                            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onConfirm(track)}
+                            disabled={deleting || !canDelete}
+                            className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
+                        >
+                            {deleting ? (
+                                <Loader2 size={14} className="animate-spin" />
+                            ) : null}
+                            {deleting ? "Deleting..." : "Delete Track"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function Index({
     schoolTracks,
     schoolYears = [],
@@ -179,6 +346,8 @@ export default function Index({
     const [showModal, setShowModal] = useState(false);
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [selectedTrack, setSelectedTrack] = useState(null);
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deletingTrack, setDeletingTrack] = useState(false);
 
     const { data, setData, post, processing, errors, clearErrors, reset } =
         useForm({
@@ -227,6 +396,14 @@ export default function Index({
         setSelectedTrack(null);
     };
 
+    const closeDeleteModal = () => {
+        if (deletingTrack) {
+            return;
+        }
+
+        setDeleteTarget(null);
+    };
+
     const closeModal = () => {
         if (processing) {
             return;
@@ -256,16 +433,23 @@ export default function Index({
     };
 
     const handleDelete = (track) => {
-        if (
-            !window.confirm(
-                `Delete ${track.track_name}? This cannot be undone.`,
-            )
-        ) {
+        setDeleteTarget(track);
+    };
+
+    const confirmDelete = (track) => {
+        if (!track?.id) {
             return;
         }
 
+        setDeletingTrack(true);
         router.delete(route("superadmin.school-tracks.destroy", track.id), {
             preserveScroll: true,
+            onFinish: () => {
+                setDeletingTrack(false);
+            },
+            onSuccess: () => {
+                setDeleteTarget(null);
+            },
         });
     };
 
@@ -515,6 +699,14 @@ export default function Index({
                 onSaved={() =>
                     router.reload({ only: ["schoolTracks", "filters"] })
                 }
+            />
+
+            <DeleteTrackModal
+                isOpen={Boolean(deleteTarget)}
+                track={deleteTarget}
+                deleting={deletingTrack}
+                onClose={closeDeleteModal}
+                onConfirm={confirmDelete}
             />
         </>
     );

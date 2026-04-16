@@ -65,7 +65,6 @@ return new class extends Migration
             $table->unsignedBigInteger('original_department_id')->nullable()->index();
             $table->string('section_name');
             $table->string('section_code', 80)->nullable();
-            $table->string('cohort', 32)->nullable();
             $table->string('grade_level', 32)->nullable();
             $table->string('strand', 120)->nullable();
             $table->string('track', 32)->nullable();

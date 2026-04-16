@@ -75,7 +75,7 @@ class AcademicManagementController extends Controller
             ->with([
                 'subject:id,subject_name,subject_code',
                 'teacher:id,first_name,middle_name,last_name,department_id',
-                'sectionRecord:id,department_id,section_name,section_code,cohort,grade_level,strand,track,is_active',
+                'sectionRecord:id,department_id,section_name,section_code,grade_level,strand,track,is_active',
                 'sectionRecord.department:id,department_name,department_code',
                 'enrollments:id,user_id,class_id,q1_grade,q2_grade,final_grade,remarks',
                 'enrollments.user:id,first_name,middle_name,last_name,username,personal_email',
@@ -94,7 +94,6 @@ class AcademicManagementController extends Controller
             $sectionsQuery->where(function ($query) use ($search) {
                 $query->where('section_name', 'like', "%{$search}%")
                     ->orWhere('section_code', 'like', "%{$search}%")
-                    ->orWhere('cohort', 'like', "%{$search}%")
                     ->orWhere('grade_level', 'like', "%{$search}%")
                     ->orWhere('strand', 'like', "%{$search}%")
                     ->orWhere('track', 'like', "%{$search}%")
@@ -113,7 +112,6 @@ class AcademicManagementController extends Controller
                     ->orWhereHas('sectionRecord', function ($sectionQuery) use ($search) {
                         $sectionQuery->where('section_name', 'like', "%{$search}%")
                             ->orWhere('section_code', 'like', "%{$search}%")
-                            ->orWhere('cohort', 'like', "%{$search}%")
                             ->orWhere('grade_level', 'like', "%{$search}%")
                             ->orWhere('strand', 'like', "%{$search}%")
                             ->orWhere('track', 'like', "%{$search}%")
@@ -150,7 +148,6 @@ class AcademicManagementController extends Controller
                         $section->section_name,
                     ),
                     'section_code' => $section->section_code,
-                    'cohort' => $section->cohort,
                     'grade_level' => $section->grade_level,
                     'strand' => $section->strand,
                     'track' => $section->track,
@@ -215,7 +212,6 @@ class AcademicManagementController extends Controller
                         )
                         : null,
                     'section_code' => $schoolClass->sectionRecord?->section_code,
-                    'cohort' => $schoolClass->sectionRecord?->cohort,
                     'grade_level' => $schoolClass->sectionRecord?->grade_level,
                     'strand' => $schoolClass->sectionRecord?->strand,
                     'track' => $schoolClass->sectionRecord?->track,
@@ -243,7 +239,6 @@ class AcademicManagementController extends Controller
                 'department_id',
                 'section_name',
                 'section_code',
-                'cohort',
                 'grade_level',
                 'strand',
                 'track',
@@ -259,7 +254,6 @@ class AcademicManagementController extends Controller
                     $section->section_name,
                 ),
                 'section_code' => $section->section_code,
-                'cohort' => $section->cohort,
                 'grade_level' => $section->grade_level,
                 'strand' => $section->strand,
                 'track' => $section->track,
@@ -465,9 +459,8 @@ class AcademicManagementController extends Controller
         }
 
         $createdBy = $request->user()?->id;
-        $cohort = $this->resolveCohortFromSchoolYear($currentSchoolYear);
 
-        $createdCount = DB::transaction(function () use ($templates, $createdBy, $cohort, $currentSchoolYear) {
+        $createdCount = DB::transaction(function () use ($templates, $createdBy, $currentSchoolYear) {
             $created = 0;
 
             foreach ($templates as $template) {
@@ -497,16 +490,16 @@ class AcademicManagementController extends Controller
                     continue;
                 }
 
-                $templateSectionCode = $this->normalizeNullableText($template['section_code'] ?? null);
-                $sectionCode = $templateSectionCode !== null
-                    ? $this->normalizeSectionCode($templateSectionCode)
-                    : $this->generateSectionCode($sectionName);
+                $templateStrand = $this->normalizeNullableText($template['strand'] ?? null)
+                    ?? $department->department_code;
+                $sectionCode = satis_generate_section_code(
+                    '11',
+                    $templateStrand,
+                    $sectionName,
+                );
+                $resolvedTrack = satis_resolve_department_track($department);
 
-                if ($sectionCode === '') {
-                    $sectionCode = $this->generateSectionCode($sectionName);
-                }
-
-                $sectionCode = $this->ensureUniqueSectionCode($departmentId, $cohort, $sectionCode);
+                $sectionCode = $this->ensureUniqueSectionCode($departmentId, $currentSchoolYear, $sectionCode);
 
                 Section::query()->create([
                     'department_id' => $departmentId,
@@ -514,10 +507,9 @@ class AcademicManagementController extends Controller
                     'created_by' => $createdBy,
                     'section_name' => $sectionName,
                     'section_code' => $sectionCode,
-                    'cohort' => $cohort,
                     'grade_level' => '11',
-                    'strand' => $this->normalizeNullableText($template['strand'] ?? null) ?? $department->department_code,
-                    'track' => $this->normalizeNullableText($template['track'] ?? null) ?? ($department->track ?: 'Academic'),
+                    'strand' => $templateStrand,
+                    'track' => $resolvedTrack,
                     'school_year' => $currentSchoolYear,
                     'description' => $this->normalizeNullableText($template['description'] ?? null),
                     'is_active' => true,
@@ -650,10 +642,9 @@ class AcademicManagementController extends Controller
             $normalizedSpecialization = Str::upper((string) $department->department_code);
         }
 
-        $resolvedTrack = $this->resolveTrackFromDepartmentCode((string) $department->department_code);
+        $resolvedTrack = satis_resolve_department_track($department);
 
         $schoolYear = SystemSetting::getCurrentSchoolYear();
-        $cohort = $this->resolveCohortFromSchoolYear($schoolYear);
 
         $sectionBaseName = satis_extract_section_base_name($validated['section_name'])
             ?? $this->normalizeText($validated['section_name']);
@@ -665,7 +656,11 @@ class AcademicManagementController extends Controller
             ]);
         }
 
-        $sectionCode = $this->generateSectionCode($sectionBaseName);
+        $sectionCode = satis_generate_section_code(
+            $gradeLevel,
+            $normalizedSpecialization,
+            $sectionBaseName,
+        );
 
         $advisorTeacherId = isset($validated['advisor_teacher_id'])
             ? (int) $validated['advisor_teacher_id']
@@ -677,8 +672,8 @@ class AcademicManagementController extends Controller
             $advisorTeacherId = null;
         }
 
-        $this->ensureUniqueSectionName((int) $department->id, $cohort, $sectionBaseName);
-        $sectionCode = $this->ensureUniqueSectionCode((int) $department->id, $cohort, $sectionCode);
+        $this->ensureUniqueSectionName((int) $department->id, $schoolYear, $sectionBaseName);
+        $sectionCode = $this->ensureUniqueSectionCode((int) $department->id, $schoolYear, $sectionCode);
 
         $assignedStudentIds = collect($validated['assigned_student_ids'] ?? [])
             ->map(fn($value) => (int) $value)
@@ -703,7 +698,6 @@ class AcademicManagementController extends Controller
                 $request,
                 $department,
                 $schoolYear,
-                $cohort,
                 $gradeLevel,
                 $sectionBaseName,
                 $sectionCode,
@@ -719,7 +713,6 @@ class AcademicManagementController extends Controller
                     'advisor_teacher_id' => $advisorTeacherId,
                     'section_name' => $sectionBaseName,
                     'section_code' => $sectionCode,
-                    'cohort' => $cohort,
                     'grade_level' => $gradeLevel,
                     'strand' => $normalizedSpecialization,
                     'track' => $resolvedTrack,
@@ -819,7 +812,6 @@ class AcademicManagementController extends Controller
                     'section_code' => $section->section_code,
                     'department_name' => $department->department_name,
                     'department_code' => $department->department_code,
-                    'cohort' => $section->cohort,
                     'grade_level' => $section->grade_level,
                     'specialization' => $section->strand,
                     'track' => $section->track,
@@ -836,13 +828,13 @@ class AcademicManagementController extends Controller
         } catch (UniqueConstraintViolationException $exception) {
             $existingSection = Section::query()
                 ->where('department_id', (int) $department->id)
-                ->where('cohort', $cohort)
+                ->where('school_year', $schoolYear)
                 ->where('section_code', $sectionCode)
                 ->first();
 
             if ($existingSection) {
                 throw ValidationException::withMessages([
-                    'section_name' => 'A section with this code already exists for the selected cohort and department.',
+                    'section_name' => 'A section with this code already exists for the selected school year and department.',
                 ]);
             }
 
@@ -862,16 +854,20 @@ class AcademicManagementController extends Controller
         $department = Department::query()->findOrFail((int) $validated['department_id']);
         $sectionName = satis_extract_section_base_name($validated['section_name'])
             ?? $this->normalizeText($validated['section_name']);
-        $cohort = $this->normalizeText($validated['cohort']);
         $gradeLevel = satis_normalize_grade_level($validated['grade_level'] ?? null);
+        $normalizedStrand = $this->normalizeNullableText($validated['strand'] ?? null)
+            ?? $department->department_code;
+        $resolvedSchoolYear = $this->normalizeNullableText($validated['school_year'] ?? null)
+            ?? SystemSetting::getCurrentSchoolYear();
+        $sectionCode = satis_generate_section_code(
+            $gradeLevel,
+            $normalizedStrand,
+            $sectionName,
+        );
+        $resolvedTrack = satis_resolve_department_track($department);
 
-        $sectionCode = $this->normalizeNullableText($validated['section_code'] ?? null);
-        $sectionCode = $sectionCode !== null
-            ? $this->normalizeSectionCode($sectionCode)
-            : $this->generateSectionCode($sectionName);
-
-        $this->ensureUniqueSectionName((int) $department->id, $cohort, $sectionName, (int) $section->id);
-        $sectionCode = $this->ensureUniqueSectionCode((int) $department->id, $cohort, $sectionCode, (int) $section->id);
+        $this->ensureUniqueSectionName((int) $department->id, $resolvedSchoolYear, $sectionName, (int) $section->id);
+        $sectionCode = $this->ensureUniqueSectionCode((int) $department->id, $resolvedSchoolYear, $sectionCode, (int) $section->id);
 
         $advisorTeacherId = isset($validated['advisor_teacher_id'])
             ? (int) $validated['advisor_teacher_id']
@@ -888,11 +884,10 @@ class AcademicManagementController extends Controller
             'advisor_teacher_id' => $advisorTeacherId,
             'section_name' => $sectionName,
             'section_code' => $sectionCode,
-            'cohort' => $cohort,
             'grade_level' => $gradeLevel,
-            'strand' => $this->normalizeNullableText($validated['strand'] ?? null) ?? $department->department_code,
-            'track' => $this->normalizeNullableText($validated['track'] ?? null),
-            'school_year' => $this->normalizeNullableText($validated['school_year'] ?? null) ?? SystemSetting::getCurrentSchoolYear(),
+            'strand' => $normalizedStrand,
+            'track' => $resolvedTrack,
+            'school_year' => $resolvedSchoolYear,
             'description' => $this->normalizeNullableText($validated['description'] ?? null),
             'is_active' => (bool) ($validated['is_active'] ?? true),
         ]);
@@ -1551,11 +1546,8 @@ class AcademicManagementController extends Controller
         return [
             'department_id' => ['required', 'integer', Rule::exists('departments', 'id')],
             'section_name' => ['required', 'string', 'max:255'],
-            'section_code' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9\s\-]+$/'],
-            'cohort' => ['required', 'string', 'max:120'],
             'grade_level' => ['nullable', 'string', Rule::in(satis_grade_level_options())],
             'strand' => ['nullable', 'string', 'max:100'],
-            'track' => ['nullable', 'string', 'max:100'],
             'school_year' => ['nullable', 'string', 'max:20'],
             'description' => ['nullable', 'string', 'max:1000'],
             'advisor_teacher_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
@@ -1597,31 +1589,6 @@ class AcademicManagementController extends Controller
         $normalized = $this->normalizeNullableText($specialization);
 
         return $normalized ? Str::upper($normalized) : '';
-    }
-
-    private function resolveTrackFromDepartmentCode(?string $departmentCode): string
-    {
-        $normalizedDepartmentCode = Str::upper(trim((string) $departmentCode));
-
-        if ($normalizedDepartmentCode === '') {
-            return 'Academic';
-        }
-
-        $departmentTrack = Department::query()
-            ->whereRaw('UPPER(department_code) = ?', [$normalizedDepartmentCode])
-            ->value('track');
-
-        $normalizedTrack = Str::lower(trim((string) $departmentTrack));
-
-        if ($normalizedTrack === 'tvl') {
-            return 'TVL';
-        }
-
-        if ($normalizedTrack === 'academic') {
-            return 'Academic';
-        }
-
-        return $normalizedDepartmentCode === 'ICT' ? 'TVL' : 'Academic';
     }
 
     private function ensureTeacherAssignable(int $teacherId, int $departmentId, string $field = 'teacher_id'): void
@@ -1732,47 +1699,16 @@ class AcademicManagementController extends Controller
         return $normalized !== null ? Str::lower($normalized) : null;
     }
 
-    private function resolveCohortFromSchoolYear(string $schoolYear): string
-    {
-        if (preg_match('/^(\d{4})-\d{4}$/', $schoolYear, $matches) === 1) {
-            return $matches[1];
-        }
-
-        if (preg_match('/(\d{4})/', $schoolYear, $matches) === 1) {
-            return $matches[1];
-        }
-
-        return (string) now()->year;
-    }
-
-    private function normalizeSectionCode(string $value): string
-    {
-        $normalized = Str::upper($this->normalizeText($value));
-
-        return preg_replace('/[^A-Z0-9\-\s]/', '', $normalized) ?? $normalized;
-    }
-
-    private function generateSectionCode(string $sectionName): string
-    {
-        $candidate = Str::upper(Str::slug($sectionName, '-'));
-
-        if ($candidate === '') {
-            return 'SECTION';
-        }
-
-        return $candidate;
-    }
-
     private function ensureUniqueSectionCode(
         int $departmentId,
-        string $cohort,
+        string $schoolYear,
         string $baseCode,
         ?int $ignoreSectionId = null,
     ): string {
         $counter = 1;
         $candidate = $baseCode;
 
-        while ($this->sectionCodeExists($departmentId, $cohort, $candidate, $ignoreSectionId)) {
+        while ($this->sectionCodeExists($departmentId, $schoolYear, $candidate, $ignoreSectionId)) {
             $counter++;
             $candidate = $baseCode . '-' . $counter;
         }
@@ -1782,13 +1718,13 @@ class AcademicManagementController extends Controller
 
     private function sectionCodeExists(
         int $departmentId,
-        string $cohort,
+        string $schoolYear,
         string $sectionCode,
         ?int $ignoreSectionId = null,
     ): bool {
         $query = Section::query()
             ->where('department_id', $departmentId)
-            ->where('cohort', $cohort)
+            ->where('school_year', $schoolYear)
             ->where('section_code', $sectionCode);
 
         if ($ignoreSectionId !== null) {
@@ -1800,13 +1736,13 @@ class AcademicManagementController extends Controller
 
     private function ensureUniqueSectionName(
         int $departmentId,
-        string $cohort,
+        string $schoolYear,
         string $sectionName,
         ?int $ignoreSectionId = null,
     ): void {
         $query = Section::query()
             ->where('department_id', $departmentId)
-            ->where('cohort', $cohort)
+            ->where('school_year', $schoolYear)
             ->where('section_name', $sectionName);
 
         if ($ignoreSectionId !== null) {
@@ -1815,7 +1751,7 @@ class AcademicManagementController extends Controller
 
         if ($query->exists()) {
             throw ValidationException::withMessages([
-                'section_name' => 'A section with this name already exists for the selected cohort and department.',
+                'section_name' => 'A section with this name already exists for the selected school year and department.',
             ]);
         }
     }

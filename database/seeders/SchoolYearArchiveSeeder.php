@@ -327,7 +327,6 @@ class SchoolYearArchiveSeeder extends Seeder
             [
                 'section_name' => 'STEM-A',
                 'section_code' => 'STEMA-' . substr($schoolYear, 2, 2),
-                'cohort' => substr($schoolYear, 0, 4),
                 'grade_level' => '11',
                 'strand' => 'STEM',
                 'track' => 'Academic',
@@ -336,7 +335,6 @@ class SchoolYearArchiveSeeder extends Seeder
             [
                 'section_name' => 'ABM-A',
                 'section_code' => 'ABMA-' . substr($schoolYear, 2, 2),
-                'cohort' => substr($schoolYear, 0, 4),
                 'grade_level' => '11',
                 'strand' => 'ABM',
                 'track' => 'Academic',
@@ -345,7 +343,6 @@ class SchoolYearArchiveSeeder extends Seeder
             [
                 'section_name' => 'STEM-B',
                 'section_code' => 'STEMB-' . substr($schoolYear, 2, 2),
-                'cohort' => substr($schoolYear, 0, 4),
                 'grade_level' => '12',
                 'strand' => 'STEM',
                 'track' => 'Academic',
@@ -354,7 +351,6 @@ class SchoolYearArchiveSeeder extends Seeder
             [
                 'section_name' => 'ABM-B',
                 'section_code' => 'ABMB-' . substr($schoolYear, 2, 2),
-                'cohort' => substr($schoolYear, 0, 4),
                 'grade_level' => '12',
                 'strand' => 'ABM',
                 'track' => 'Academic',
@@ -375,7 +371,6 @@ class SchoolYearArchiveSeeder extends Seeder
                 'original_department_id' => null,
                 'section_name' => $section['section_name'],
                 'section_code' => $section['section_code'],
-                'cohort' => $section['cohort'],
                 'grade_level' => $section['grade_level'],
                 'strand' => $section['strand'],
                 'track' => $section['track'],

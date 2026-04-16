@@ -139,7 +139,7 @@ const Dashboard = ({
             icon: ClipboardList,
             iconBgColor: "bg-amber-500",
             label: observeNeedsAttention
-                ? `absences > ${needsAttentionAbsenceThreshold} or failing activities > ${needsAttentionFailingActivitiesThreshold}`
+                ? `absences >= ${needsAttentionAbsenceThreshold} or failing activities >= ${needsAttentionFailingActivitiesThreshold}`
                 : "hidden in Class Settings",
             gradient: "from-amber-500 to-amber-600",
         },

@@ -32,9 +32,14 @@ class StudentActionsController extends Controller
 
     public function completeInterventionTask(Request $request, $taskId)
     {
+        $schoolYear = Intervention::resolveCurrentSchoolYear();
+
         $task = InterventionTask::query()
             ->whereHas('intervention.enrollment', function ($query) use ($request) {
                 $query->where('user_id', $request->user()->id);
+            })
+            ->whereHas('intervention', function ($query) use ($schoolYear) {
+                $query->forSchoolYear($schoolYear);
             })
             ->with('intervention.tasks')
             ->findOrFail($taskId);
@@ -65,7 +70,10 @@ class StudentActionsController extends Controller
 
     public function requestInterventionCompletion(Request $request, $interventionId)
     {
+        $schoolYear = Intervention::resolveCurrentSchoolYear();
+
         $intervention = Intervention::query()
+            ->forSchoolYear($schoolYear)
             ->whereHas('enrollment', function ($query) use ($request) {
                 $query->where('user_id', $request->user()->id);
             })

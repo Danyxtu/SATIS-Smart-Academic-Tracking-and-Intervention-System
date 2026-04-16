@@ -175,8 +175,15 @@ class SchoolTrackController extends Controller
     {
         $this->authorize('delete-department');
 
-        if ($schoolTrack->departments()->exists()) {
-            return back()->with('error', 'Cannot delete a school track with assigned departments.');
+        $departmentsWithClassesCount = $schoolTrack->departments()
+            ->whereHas('sections.classes')
+            ->count();
+
+        if ($departmentsWithClassesCount > 0) {
+            return back()->with(
+                'error',
+                'Cannot delete this school track because it is already used by department classes.',
+            );
         }
 
         $schoolTrack->delete();

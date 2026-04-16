@@ -17,7 +17,6 @@ class Section extends Model
         'created_by',
         'section_name',
         'section_code',
-        'cohort',
         'grade_level',
         'strand',
         'track',

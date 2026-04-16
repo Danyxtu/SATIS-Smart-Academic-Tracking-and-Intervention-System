@@ -674,7 +674,6 @@ export default function ManagementDetailModal({
         department_id: "",
         section_name: "",
         section_code: "",
-        cohort: "",
         grade_level: "",
         strand: "",
         track: "",
@@ -712,6 +711,7 @@ export default function ManagementDetailModal({
         last_name: "",
         middle_name: "",
         email: "",
+        parent_contact_number: "",
         password: "",
         role: "student",
         department_id: "",
@@ -855,7 +855,6 @@ export default function ManagementDetailModal({
                 row?.department_name || row?.department?.department_name,
             department_code:
                 row?.department_code || row?.department?.department_code,
-            cohort: row?.cohort,
             grade_level: row?.grade_level,
             strand: row?.strand,
             track: row?.track,
@@ -895,7 +894,6 @@ export default function ManagementDetailModal({
                 merged.department_name || department.department_name || "",
             department_code:
                 merged.department_code || department.department_code || "",
-            cohort: merged.cohort || "",
             grade_level: merged.grade_level || "",
             strand: merged.strand || "",
             track: merged.track || "",
@@ -1039,7 +1037,6 @@ export default function ManagementDetailModal({
             sourceSection.section_name ?? "",
             sourceSection.section_code ?? "",
             sourceSection.department_id ?? "",
-            sourceSection.cohort ?? "",
             sourceSection.grade_level ?? "",
             sourceSection.strand ?? "",
             sourceSection.track ?? "",
@@ -1454,7 +1451,6 @@ export default function ManagementDetailModal({
                 : "",
             section_name: section.section_name || "",
             section_code: section.section_code || "",
-            cohort: section.cohort || "",
             grade_level: section.grade_level || "",
             strand: section.strand || "",
             track: section.track || "",
@@ -1912,6 +1908,10 @@ export default function ManagementDetailModal({
             last_name: currentUser.last_name || "",
             middle_name: currentUser.middle_name || "",
             email: currentUser.email || currentUser.personal_email || "",
+            parent_contact_number:
+                currentUser.parent_contact_number ||
+                currentUser.student_section?.parent_contact_number ||
+                "",
             password: "",
             role: resolvedRole,
             department_id: currentUser.department_id
@@ -1996,6 +1996,10 @@ export default function ManagementDetailModal({
             last_name: source.last_name || "",
             middle_name: source.middle_name || "",
             email: source.email || source.personal_email || "",
+            parent_contact_number:
+                source.parent_contact_number ||
+                source.student_section?.parent_contact_number ||
+                "",
             password: "",
             role: resolvedRole,
             department_id: source.department_id
@@ -3763,6 +3767,35 @@ export default function ManagementDetailModal({
                                     )}
                                 </div>
 
+                                {userIsStudent && (
+                                    <div>
+                                        <p className="mb-1 text-[11px] font-semibold text-emerald-700">
+                                            Parent Contact Number
+                                        </p>
+                                        <input
+                                            type="text"
+                                            value={
+                                                userData.parent_contact_number
+                                            }
+                                            onChange={(event) =>
+                                                setUserData(
+                                                    "parent_contact_number",
+                                                    event.target.value,
+                                                )
+                                            }
+                                            className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+                                            placeholder="e.g., +639171234567"
+                                        />
+                                        {userErrors.parent_contact_number && (
+                                            <p className="mt-1 text-[11px] text-rose-600">
+                                                {
+                                                    userErrors.parent_contact_number
+                                                }
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
                                 {userIsTeacherOrStudent && (
                                     <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
                                         <p className="text-[11px] font-semibold text-emerald-700">
@@ -3940,6 +3973,16 @@ export default function ManagementDetailModal({
                                         current.email || current.personal_email
                                     }
                                 />
+                                {hasStudentRole && (
+                                    <FieldRow
+                                        label="Parent Contact"
+                                        value={
+                                            studentSection?.parent_contact_number ||
+                                            current.parent_contact_number ||
+                                            "-"
+                                        }
+                                    />
+                                )}
                                 <FieldRow
                                     label="Primary role"
                                     value={toLabelRole(prioritizedRole)}
@@ -4535,7 +4578,6 @@ export default function ManagementDetailModal({
                     subtitle: section.section_code || "section",
                     tags: [
                         section.grade_level || null,
-                        section.cohort ? `Cohort ${section.cohort}` : null,
                         section.is_active ? "Active" : "Inactive",
                     ].filter(Boolean),
                     keyLabel: "Section ID",
@@ -4718,28 +4760,6 @@ export default function ManagementDetailModal({
 
                                         <div>
                                             <p className="mb-1 text-[11px] font-semibold text-emerald-700">
-                                                Cohort
-                                            </p>
-                                            <input
-                                                type="text"
-                                                value={sectionData.cohort}
-                                                onChange={(event) =>
-                                                    setSectionData(
-                                                        "cohort",
-                                                        event.target.value,
-                                                    )
-                                                }
-                                                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
-                                            />
-                                            {sectionErrors.cohort && (
-                                                <p className="mt-1 text-[11px] text-rose-600">
-                                                    {sectionErrors.cohort}
-                                                </p>
-                                            )}
-                                        </div>
-
-                                        <div>
-                                            <p className="mb-1 text-[11px] font-semibold text-emerald-700">
                                                 Grade Level
                                             </p>
                                             <input
@@ -4895,10 +4915,6 @@ export default function ManagementDetailModal({
                                                 ? `${departmentName} (${departmentCode || "-"})`
                                                 : departmentCode || "-"
                                         }
-                                    />
-                                    <FieldRow
-                                        label="Cohort"
-                                        value={section.cohort || "-"}
                                     />
                                     <FieldRow
                                         label="Grade"
@@ -6113,7 +6129,6 @@ export default function ManagementDetailModal({
                         section_name: sectionData.section_name || "",
                         section_full_label: sectionData.section_name || "",
                         section_code: sectionData.section_code || "",
-                        cohort: sectionData.cohort || "",
                         grade_level: sectionData.grade_level || "",
                         strand: sectionData.strand || "",
                         track: sectionData.track || "",

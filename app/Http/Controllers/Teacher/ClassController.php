@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
+use App\Models\ArchiveClass;
 use App\Models\Enrollment;
 use App\Models\Department;
 use App\Models\Grade;
@@ -137,11 +138,11 @@ class ClassController extends Controller
                 'subject_code' => $subject->subject_code,
             ])
             ->values();
-        $sectionsCohort = $this->cohortFromSchoolYear($classesData['defaultSchoolYear']);
+        $sectionsSchoolYear = $classesData['defaultSchoolYear'];
         $availableSections = Section::query()
             ->with('department:id,department_code,department_name')
             ->where('is_active', true)
-            ->where('cohort', $sectionsCohort)
+            ->where('school_year', $sectionsSchoolYear)
             ->orderBy('section_name')
             ->get([
                 'id',
@@ -151,7 +152,6 @@ class ClassController extends Controller
                 'grade_level',
                 'strand',
                 'track',
-                'cohort',
             ])
             ->map(function (Section $section) {
                 $specialization = $section->strand
@@ -183,6 +183,11 @@ class ClassController extends Controller
         $semester1Count = $classesData['semester1Count'];
         $semester2Count = $classesData['semester2Count'];
         $roster = $classesData['roster'];
+        $archivedClassYears = $this->buildArchivedClassYears(
+            (int) $request->user()->id,
+            (string) $defaultSchoolYear,
+            (string) $currentSemester,
+        );
 
         return Inertia::render('Teacher/MyClasses', compact(
             'classes',
@@ -195,6 +200,7 @@ class ClassController extends Controller
             'departments',
             'availableSubjects',
             'availableSections',
+            'archivedClassYears',
         ));
     }
 
@@ -461,6 +467,148 @@ class ClassController extends Controller
         return redirect()
             ->route('teacher.classes.index')
             ->with('success', 'Class updated successfully.');
+    }
+
+    public function restoreArchivedClass(Request $request, ArchiveClass $archiveClass): RedirectResponse
+    {
+        $teacherId = (int) $request->user()->id;
+
+        if ((int) $archiveClass->teacher_user_id !== $teacherId) {
+            abort(403, 'You are not allowed to restore this archived class.');
+        }
+
+        $currentSchoolYear = (string) SystemSetting::getCurrentSchoolYear();
+        $currentSemester = (string) SystemSetting::getCurrentSemester();
+
+        if (! in_array($currentSemester, ['1', '2'], true)) {
+            $currentSemester = '1';
+        }
+
+        $gradeLevel = trim((string) ($archiveClass->grade_level ?? ''));
+
+        if ($gradeLevel === '') {
+            return back()->with('error', 'Unable to restore class because the archived grade level is missing.');
+        }
+
+        $normalizedStrand = strtoupper(trim((string) ($archiveClass->strand ?: $archiveClass->teacher_department_code)));
+
+        if ($normalizedStrand === '') {
+            return back()->with('error', 'Unable to restore class because the archived strand is missing.');
+        }
+
+        $sectionSource = trim((string) ($archiveClass->section_name ?: $archiveClass->section_code));
+
+        if ($sectionSource === '') {
+            return back()->with('error', 'Unable to restore class because the archived section is missing.');
+        }
+
+        $sectionCombined = $this->buildArchivedSectionIdentifier($normalizedStrand, $sectionSource);
+
+        if ($sectionCombined === '') {
+            return back()->with('error', 'Unable to restore class because the archived section could not be resolved.');
+        }
+
+        $sectionId = $this->resolveSectionRecordId(
+            $teacherId,
+            $currentSchoolYear,
+            $sectionCombined,
+            $gradeLevel,
+            $normalizedStrand,
+            $archiveClass->strand,
+        );
+
+        $normalizedSubjectName = preg_replace('/\s+/', ' ', trim((string) ($archiveClass->subject_name ?? '')));
+        $normalizedSubjectName = is_string($normalizedSubjectName) ? $normalizedSubjectName : '';
+
+        $subject = null;
+
+        if ($archiveClass->original_subject_id) {
+            $subject = Subject::query()->find($archiveClass->original_subject_id);
+        }
+
+        if (! $subject && $normalizedSubjectName !== '') {
+            $subject = Subject::query()
+                ->whereRaw('LOWER(TRIM(subject_name)) = ?', [mb_strtolower($normalizedSubjectName)])
+                ->first();
+        }
+
+        if (! $subject) {
+            if ($normalizedSubjectName === '') {
+                return back()->with('error', 'Unable to restore class because the archived subject is missing.');
+            }
+
+            $subjectCode = Str::slug($normalizedSubjectName, '_') . '_' . Str::random(6);
+            $subject = Subject::query()->create([
+                'subject_name' => $normalizedSubjectName,
+                'subject_code' => $subjectCode,
+            ]);
+        }
+
+        $resolvedTrack = trim((string) ($archiveClass->track ?? ''));
+        $resolvedTrack = $resolvedTrack !== ''
+            ? Str::lower($resolvedTrack)
+            : $this->resolveTrackFromDepartmentCode($normalizedStrand);
+
+        $resolvedColor = trim((string) ($archiveClass->color ?? ''));
+
+        if (! in_array($resolvedColor, self::COLOR_OPTIONS, true)) {
+            $resolvedColor = 'indigo';
+        }
+
+        $gradeCategories = is_array($archiveClass->grade_categories) && $archiveClass->grade_categories !== []
+            ? $archiveClass->grade_categories
+            : $this->defaultGradeCategories();
+
+        $classLock = Cache::lock(
+            $this->buildTeacherClassAssignmentLockKey(
+                $teacherId,
+                (int) $subject->id,
+                $gradeLevel,
+                $sectionCombined,
+                $currentSchoolYear,
+                $currentSemester,
+            ),
+            10,
+        );
+
+        try {
+            $classLock->block(3);
+
+            $this->ensureTeacherClassAssignmentIsUnique(
+                $teacherId,
+                (int) $subject->id,
+                $gradeLevel,
+                $sectionCombined,
+                $currentSchoolYear,
+                $currentSemester,
+            );
+
+            SchoolClass::query()->create([
+                'subject_id' => (int) $subject->id,
+                'section_id' => $sectionId,
+                'teacher_id' => $teacherId,
+                'grade_level' => $gradeLevel,
+                'section' => $sectionCombined,
+                'strand' => $normalizedStrand,
+                'track' => $resolvedTrack,
+                'color' => $resolvedColor,
+                'school_year' => $currentSchoolYear,
+                'semester' => $currentSemester,
+                'grade_categories' => $gradeCategories,
+            ]);
+        } catch (LockTimeoutException $exception) {
+            throw ValidationException::withMessages([
+                'archive_restore' => self::DUPLICATE_CLASS_ERROR_MESSAGE,
+            ]);
+        } finally {
+            optional($classLock)->release();
+        }
+
+        $restoredSubjectName = $subject->subject_name ?: $normalizedSubjectName;
+
+        return redirect()
+            ->route('teacher.classes.index', ['semester' => $currentSemester])
+            ->with('success', "Archived class {$restoredSubjectName} ({$sectionCombined}) was added to {$currentSchoolYear} with an empty student list.");
     }
 
     public function destroyClass(Request $request, SchoolClass $subjectTeacher): RedirectResponse
@@ -1356,6 +1504,185 @@ class ClassController extends Controller
         return 'https://ui-avatars.com/api/?background=4c1d95&color=fff&name=' . urlencode($fullName);
     }
 
+    private function buildArchivedClassYears(int $teacherId, string $currentSchoolYear, string $targetSemester): array
+    {
+        $normalizedTargetSemester = in_array($targetSemester, ['1', '2'], true)
+            ? $targetSemester
+            : (string) SystemSetting::getCurrentSemester();
+
+        if (! in_array($normalizedTargetSemester, ['1', '2'], true)) {
+            $normalizedTargetSemester = '1';
+        }
+
+        $archivedClasses = ArchiveClass::query()
+            ->where('teacher_user_id', $teacherId)
+            ->whereHas('archive')
+            ->with('archive:id,archive_key,school_year,next_school_year,captured_at')
+            ->orderByDesc('school_year_archive_id')
+            ->orderBy('semester')
+            ->orderBy('subject_name')
+            ->get([
+                'id',
+                'school_year_archive_id',
+                'original_subject_id',
+                'subject_name',
+                'subject_code',
+                'grade_level',
+                'section_name',
+                'section_code',
+                'strand',
+                'track',
+                'semester',
+                'color',
+                'students_total',
+            ]);
+
+        if ($archivedClasses->isEmpty()) {
+            return [];
+        }
+
+        $currentClasses = SchoolClass::query()
+            ->where('teacher_id', $teacherId)
+            ->where('school_year', $currentSchoolYear)
+            ->where('semester', $normalizedTargetSemester)
+            ->with('subject:id,subject_name')
+            ->get([
+                'id',
+                'subject_id',
+                'grade_level',
+                'section',
+            ]);
+
+        $existingBySubjectId = [];
+        $existingBySubjectName = [];
+
+        foreach ($currentClasses as $currentClass) {
+            $assignmentSignature = $this->buildClassAssignmentSignature(
+                $currentClass->grade_level,
+                $currentClass->section,
+            );
+
+            if ($currentClass->subject_id) {
+                $existingBySubjectId[(int) $currentClass->subject_id . '|' . $assignmentSignature] = true;
+            }
+
+            $subjectNameKey = $this->normalizeSubjectNameKey($currentClass->subject?->subject_name);
+
+            if ($subjectNameKey !== '') {
+                $existingBySubjectName[$subjectNameKey . '|' . $assignmentSignature] = true;
+            }
+        }
+
+        return $archivedClasses
+            ->groupBy(fn(ArchiveClass $archiveClass) => (int) $archiveClass->school_year_archive_id)
+            ->map(function ($classesForArchive) use ($existingBySubjectId, $existingBySubjectName, $normalizedTargetSemester) {
+                $archiveMetadata = $classesForArchive->first()?->archive;
+
+                $classRows = $classesForArchive
+                    ->map(function (ArchiveClass $archiveClass) use ($existingBySubjectId, $existingBySubjectName) {
+                        $sectionSource = $archiveClass->section_name ?: $archiveClass->section_code;
+                        $sectionIdentifier = $this->buildArchivedSectionIdentifier(
+                            $archiveClass->strand,
+                            $sectionSource,
+                        );
+
+                        $assignmentSignature = $this->buildClassAssignmentSignature(
+                            $archiveClass->grade_level,
+                            $sectionIdentifier,
+                        );
+
+                        $alreadyRestored = false;
+
+                        if ($archiveClass->original_subject_id) {
+                            $alreadyRestored = isset($existingBySubjectId[(int) $archiveClass->original_subject_id . '|' . $assignmentSignature]);
+                        }
+
+                        if (! $alreadyRestored) {
+                            $subjectNameKey = $this->normalizeSubjectNameKey($archiveClass->subject_name);
+
+                            if ($subjectNameKey !== '') {
+                                $alreadyRestored = isset($existingBySubjectName[$subjectNameKey . '|' . $assignmentSignature]);
+                            }
+                        }
+
+                        return [
+                            'id' => (int) $archiveClass->id,
+                            'subject_name' => $archiveClass->subject_name,
+                            'subject_code' => $archiveClass->subject_code,
+                            'grade_level' => $archiveClass->grade_level,
+                            'section_name' => $archiveClass->section_name,
+                            'section_code' => $archiveClass->section_code,
+                            'section_identifier' => $sectionIdentifier,
+                            'strand' => $archiveClass->strand,
+                            'track' => $archiveClass->track,
+                            'semester' => (int) ($archiveClass->semester ?? 0),
+                            'color' => $archiveClass->color,
+                            'students_total' => (int) ($archiveClass->students_total ?? 0),
+                            'already_restored' => $alreadyRestored,
+                        ];
+                    })
+                    ->values();
+
+                return [
+                    'archive_id' => (int) ($classesForArchive->first()->school_year_archive_id ?? 0),
+                    'archive_key' => $archiveMetadata?->archive_key,
+                    'school_year' => $archiveMetadata?->school_year,
+                    'next_school_year' => $archiveMetadata?->next_school_year,
+                    'captured_at' => $archiveMetadata?->captured_at,
+                    'restore_target_semester' => (int) $normalizedTargetSemester,
+                    'summary' => [
+                        'classes_total' => $classRows->count(),
+                        'students_total' => (int) $classRows->sum('students_total'),
+                        'semester_1_classes' => $classRows->where('semester', 1)->count(),
+                        'semester_2_classes' => $classRows->where('semester', 2)->count(),
+                        'already_restored' => $classRows->where('already_restored', true)->count(),
+                    ],
+                    'classes' => $classRows,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function buildClassAssignmentSignature(?string $gradeLevel, ?string $section): string
+    {
+        $normalizedGradeLevel = satis_normalize_grade_level((string) $gradeLevel);
+        $gradePart = $normalizedGradeLevel !== null
+            ? (string) $normalizedGradeLevel
+            : Str::lower(trim((string) $gradeLevel));
+
+        $sectionPart = strtoupper(trim((string) $section));
+
+        return $gradePart . '|' . $sectionPart;
+    }
+
+    private function buildArchivedSectionIdentifier(?string $strand, ?string $sectionName): string
+    {
+        $normalizedStrand = strtoupper(trim((string) $strand));
+        $normalizedSectionName = strtoupper(trim((string) $sectionName));
+
+        if ($normalizedSectionName === '') {
+            return $normalizedStrand;
+        }
+
+        if ($normalizedStrand === '') {
+            return $normalizedSectionName;
+        }
+
+        if (str_starts_with($normalizedSectionName, $normalizedStrand . '-')) {
+            return $normalizedSectionName;
+        }
+
+        return $normalizedStrand . '-' . $normalizedSectionName;
+    }
+
+    private function normalizeSubjectNameKey(?string $subjectName): string
+    {
+        $normalized = preg_replace('/\s+/', ' ', trim((string) $subjectName));
+
+        return Str::lower((string) ($normalized ?? ''));
+    }
+
     private function rowIsEmpty(array $row): bool
     {
         foreach ($row as $value) {
@@ -1514,8 +1841,11 @@ class ClassController extends Controller
             $normalizedSpecialization = strtoupper((string) $department->department_code);
         }
 
-        $cohort = $this->cohortFromSchoolYear($schoolYear);
-        $sectionCode = $normalizedGradeLevel . '-' . $normalizedSection;
+        $sectionCode = satis_generate_section_code(
+            $normalizedGradeLevel,
+            $normalizedSpecialization,
+            $sectionBaseName,
+        );
         $gradeLevelCandidates = [
             $normalizedGradeLevel,
             'Grade ' . $normalizedGradeLevel,
@@ -1524,8 +1854,8 @@ class ClassController extends Controller
 
         $existingByUniqueCode = Section::query()
             ->where('department_id', $department->id)
-            ->where('cohort', $cohort)
-            ->whereRaw('UPPER(section_code) = ?', [$sectionCode])
+            ->where('school_year', $schoolYear)
+            ->whereRaw('UPPER(section_code) = ?', [strtoupper($sectionCode)])
             ->first();
 
         if ($existingByUniqueCode) {
@@ -1534,7 +1864,7 @@ class ClassController extends Controller
 
         $sectionRecord = Section::query()
             ->where('department_id', $department->id)
-            ->where('cohort', $cohort)
+            ->where('school_year', $schoolYear)
             ->whereIn('grade_level', $gradeLevelCandidates)
             ->where(function ($query) use ($sectionBaseName, $normalizedSection) {
                 $query
@@ -1560,7 +1890,6 @@ class ClassController extends Controller
                 'created_by' => $teacherId,
                 'section_name' => $sectionBaseName,
                 'section_code' => $sectionCode,
-                'cohort' => $cohort,
                 'grade_level' => $normalizedGradeLevel,
                 'strand' => $normalizedSpecialization,
                 'track' => $this->resolveTrackFromDepartmentCode((string) $department->department_code),
@@ -1571,8 +1900,8 @@ class ClassController extends Controller
         } catch (UniqueConstraintViolationException $exception) {
             $existingSection = Section::query()
                 ->where('department_id', $department->id)
-                ->where('cohort', $cohort)
-                ->whereRaw('UPPER(section_code) = ?', [$sectionCode])
+                ->where('school_year', $schoolYear)
+                ->whereRaw('UPPER(section_code) = ?', [strtoupper($sectionCode)])
                 ->first();
 
             if ($existingSection) {
@@ -1584,17 +1913,6 @@ class ClassController extends Controller
 
         return (int) $sectionRecord->id;
     }
-
-    private function cohortFromSchoolYear(string $schoolYear): string
-    {
-        if (preg_match('/^(\d{4})-\d{4}$/', $schoolYear, $matches) === 1) {
-            return $matches[1];
-        }
-
-        return $schoolYear;
-    }
-
-
 
     /**
      * Send a nudge notification to all students in a class.

@@ -104,6 +104,7 @@ export default function AdminUserDetailModal({
         last_name: "",
         middle_name: "",
         email: "",
+        parent_contact_number: "",
         role: "student",
     });
 
@@ -118,6 +119,10 @@ export default function AdminUserDetailModal({
             last_name: source?.last_name || "",
             middle_name: source?.middle_name || "",
             email: source?.email || source?.personal_email || "",
+            parent_contact_number:
+                source?.parent_contact_number ||
+                source?.student?.parent_contact_number ||
+                "",
             role: resolvedRole,
         });
     };
@@ -163,6 +168,10 @@ export default function AdminUserDetailModal({
     ]
         .filter((value) => String(value || "").trim() !== "")
         .join(" - ");
+    const parentContactNumber =
+        activeUser?.parent_contact_number ||
+        activeUser?.student?.parent_contact_number ||
+        "";
 
     const resetQrPayload = useMemo(() => {
         if (!resetCredentials?.password) {
@@ -452,6 +461,12 @@ export default function AdminUserDetailModal({
                                         label="Role"
                                         value={activeUser?.role}
                                     />
+                                    {isStudentRole && (
+                                        <DetailRow
+                                            label="Parent Contact"
+                                            value={parentContactNumber}
+                                        />
+                                    )}
                                     <DetailRow
                                         label="Section"
                                         value={sectionDisplay}
@@ -635,6 +650,36 @@ export default function AdminUserDetailModal({
                                         </div>
                                         <FieldError message={errors.email} />
                                     </div>
+
+                                    {isStudentRole && (
+                                        <div>
+                                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                                                Parent Contact Number
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={
+                                                    data.parent_contact_number
+                                                }
+                                                onChange={(event) =>
+                                                    setData(
+                                                        "parent_contact_number",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className={`w-full rounded-xl border px-3 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 ${
+                                                    errors.parent_contact_number
+                                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
+                                                        : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
+                                                }`}
+                                            />
+                                            <FieldError
+                                                message={
+                                                    errors.parent_contact_number
+                                                }
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

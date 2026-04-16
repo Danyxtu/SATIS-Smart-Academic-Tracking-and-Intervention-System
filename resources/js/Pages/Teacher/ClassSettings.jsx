@@ -218,12 +218,12 @@ function ClassSettings({ settings = {}, globalRules = {} }) {
                                     Needs Attention
                                 </p>
                                 <p className="mt-2 text-sm text-amber-900 dark:text-amber-100">
-                                    Absences above{" "}
+                                    Absences at least{" "}
                                     {globalRules?.needs_attention
                                         ?.absence_threshold ?? 3}
                                 </p>
                                 <p className="text-sm text-amber-900 dark:text-amber-100">
-                                    Failing activities above{" "}
+                                    Failing activities at least{" "}
                                     {globalRules?.needs_attention
                                         ?.failing_activities_threshold ?? 3}
                                 </p>
@@ -289,8 +289,8 @@ function ClassSettings({ settings = {}, globalRules = {} }) {
                                     className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                                 />
                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    Students are flagged when absences are
-                                    greater than this value.
+                                    Students are flagged when absences are at
+                                    least this value.
                                 </p>
                                 {form.errors[
                                     "needs_attention.absence_threshold"
@@ -332,7 +332,7 @@ function ClassSettings({ settings = {}, globalRules = {} }) {
                                 />
                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                     Students are flagged when failing activities
-                                    are greater than this value.
+                                    are at least this value.
                                 </p>
                                 {form.errors[
                                     "needs_attention.failing_activities_threshold"

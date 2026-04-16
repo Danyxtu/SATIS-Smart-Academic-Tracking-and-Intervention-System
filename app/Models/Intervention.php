@@ -8,6 +8,7 @@ class Intervention extends Model
 {
     protected $fillable = [
         'enrollment_id',
+        'school_year',
         'type',
         'status',
         'notes',
@@ -22,11 +23,36 @@ class Intervention extends Model
     ];
 
     protected $casts = [
+        'school_year' => 'string',
         'deadline_at' => 'datetime',
         'completion_requested_at' => 'datetime',
         'approved_at' => 'datetime',
         'rejected_at' => 'datetime',
     ];
+
+    public function scopeForSchoolYear($query, ?string $schoolYear = null)
+    {
+        $resolvedSchoolYear = is_string($schoolYear) && trim($schoolYear) !== ''
+            ? trim($schoolYear)
+            : static::resolveCurrentSchoolYear();
+
+        if ($resolvedSchoolYear === null) {
+            return $query;
+        }
+
+        return $query->where('school_year', $resolvedSchoolYear);
+    }
+
+    public static function resolveCurrentSchoolYear(): ?string
+    {
+        $schoolYear = SystemSetting::getCurrentSchoolYear();
+
+        if (! is_string($schoolYear) || trim($schoolYear) === '') {
+            return null;
+        }
+
+        return trim($schoolYear);
+    }
 
     public function enrollment()
     {

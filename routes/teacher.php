@@ -51,6 +51,8 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
         Route::get('/classes', [ClassController::class, 'goToMyClasses'])->name('classes.index');
         Route::get('/classes/{subjectTeacher}', [ClassController::class, 'myClass'])->name('class');
         Route::post('/classes', [ClassController::class, 'createAClass'])->name('classes.store');
+        Route::post('/classes/archived/{archiveClass}/restore', [ClassController::class, 'restoreArchivedClass'])
+            ->name('classes.archived.restore');
         Route::put('/classes/{subjectTeacher}', [ClassController::class, 'updateClass'])
             ->name('classes.update');
         Route::delete('/classes/{subjectTeacher}', [ClassController::class, 'destroyClass'])

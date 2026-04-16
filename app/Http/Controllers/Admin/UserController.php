@@ -12,9 +12,9 @@ use App\Models\Enrollment;
 use App\Models\PasswordResetRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -183,6 +183,7 @@ class UserController extends Controller
                 $payload['section'] = $user->student->section;
                 $payload['grade_level'] = $user->student->grade_level;
                 $payload['strand'] = $user->student->strand;
+                $payload['parent_contact_number'] = $user->student->parent_contact_number;
 
                 $enrollments = $enrollmentsByUserId->get($user->id, collect());
 
@@ -248,92 +249,178 @@ class UserController extends Controller
         $admin = Auth::user();
         $departmentId = $admin->department_id;
 
-        // Admin can only create teachers (not other admins)
-        // Different validation rules based on role
-        $rules = [
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'middle_name' => 'nullable|string|max:255',
-            'role' => 'required|in:student,teacher', // Admin cannot create other admins
-        ];
+        $role = (string) $request->input('role', '');
+        $studentMode = (string) $request->input('student_mode', 'single');
 
-        if ($request->role === 'student') {
-            $rules['email'] = 'required|string|email|max:255|unique:users,personal_email';
-        } else {
-            $rules['email'] = 'required|string|email|max:255|unique:users,personal_email';
+        if ($role === 'student' && in_array($studentMode, ['multiple', 'csv'], true)) {
+            $validated = $request->validate([
+                'role' => ['required', 'in:student'],
+                'student_mode' => ['required', 'in:multiple,csv'],
+                'grade_level' => ['required', 'in:11,12'],
+                'student_queue' => ['required', 'array', 'min:1'],
+                'student_queue.*.first_name' => ['required', 'string', 'max:255'],
+                'student_queue.*.last_name' => ['required', 'string', 'max:255'],
+                'student_queue.*.middle_name' => ['nullable', 'string', 'max:255'],
+                'student_queue.*.lrn' => ['required', 'string', 'size:12', 'distinct', 'unique:students,lrn'],
+                'student_queue.*.parent_contact_number' => ['nullable', 'string', 'max:40'],
+            ]);
+
+            $createdStudentCredentials = [];
+
+            DB::transaction(function () use ($validated, $admin, &$createdStudentCredentials) {
+                foreach ($validated['student_queue'] as $studentPayload) {
+                    $tempPassword = $this->generateTemporaryPassword(10);
+                    $seed = trim(($studentPayload['first_name'] ?? '') . ' ' . ($studentPayload['last_name'] ?? ''));
+                    $username = User::generateUniqueUsername($seed);
+
+                    $student = User::create([
+                        'first_name' => $studentPayload['first_name'],
+                        'last_name' => $studentPayload['last_name'],
+                        'middle_name' => $studentPayload['middle_name'] ?? null,
+                        'personal_email' => null,
+                        'username' => $username,
+                        'temporary_password' => $tempPassword,
+                        'password' => Hash::make($tempPassword),
+                        'department_id' => null,
+                        'must_change_password' => true,
+                        'email_verified_at' => null,
+                        'created_by' => $admin->id,
+                    ]);
+
+                    $student->syncRolesByName(['student']);
+
+                    $studentName = trim(implode(' ', array_filter([
+                        $studentPayload['first_name'] ?? null,
+                        $studentPayload['middle_name'] ?? null,
+                        $studentPayload['last_name'] ?? null,
+                    ])));
+
+                    Student::create([
+                        'user_id' => $student->id,
+                        'student_name' => $studentName,
+                        'lrn' => (string) $studentPayload['lrn'],
+                        'parent_contact_number' => isset($studentPayload['parent_contact_number'])
+                            ? (trim((string) $studentPayload['parent_contact_number']) ?: null)
+                            : null,
+                        'grade_level' => (string) $validated['grade_level'],
+                    ]);
+
+                    $createdStudentCredentials[] = [
+                        'id' => $student->id,
+                        'first_name' => (string) ($studentPayload['first_name'] ?? ''),
+                        'middle_name' => (string) ($studentPayload['middle_name'] ?? ''),
+                        'last_name' => (string) ($studentPayload['last_name'] ?? ''),
+                        'full_name' => $studentName,
+                        'lrn' => (string) ($studentPayload['lrn'] ?? ''),
+                        'username' => (string) ($student->username ?? ''),
+                        'password' => $tempPassword,
+                    ];
+                }
+            });
+
+            $createdCount = count($validated['student_queue']);
+            $label = $createdCount === 1 ? 'student' : 'students';
+
+            return redirect()->route('admin.users.index')
+                ->with('success', "{$createdCount} {$label} created successfully.")
+                ->with('created_student_credentials', $createdStudentCredentials);
         }
 
-        // Require LRN for student role
-        if ($request->role === 'student') {
-            $rules['lrn'] = 'required|string|size:12|unique:students,lrn';
-        }
+        if ($role === 'student') {
+            $validated = $request->validate([
+                'first_name' => ['required', 'string', 'max:255'],
+                'last_name' => ['required', 'string', 'max:255'],
+                'middle_name' => ['nullable', 'string', 'max:255'],
+                'lrn' => ['required', 'string', 'size:12', 'unique:students,lrn'],
+                'parent_contact_number' => ['nullable', 'string', 'max:40'],
+                'role' => ['required', 'in:student'],
+                'student_mode' => ['nullable', 'in:single'],
+                'grade_level' => ['required', 'in:11,12'],
+            ]);
 
-        $validated = $request->validate($rules);
-
-        $tempPassword = $validated['role'] === 'teacher'
-            ? Str::random(12)
-            : Str::random(10);
-
-        // Create user with department assignment for teachers
-        $userData = [
-            'first_name' => $validated['first_name'],
-            'last_name' => $validated['last_name'],
-            'middle_name' => $validated['middle_name'] ?? null,
-            'personal_email' => $validated['email'] ?? null,
-            'password' => Hash::make($tempPassword),
-            'created_by' => $admin->id,
-            'email_verified_at' => null,
-        ];
-
-        if ($validated['role'] === 'student') {
+            $tempPassword = $this->generateTemporaryPassword(10);
             $seed = trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? ''));
-            $userData['username'] = User::generateUniqueUsername($seed);
-        }
+            $username = User::generateUniqueUsername($seed);
 
-        $userData['temporary_password'] = $tempPassword;
-        $userData['must_change_password'] = true;
+            $student = User::create([
+                'first_name' => $validated['first_name'],
+                'last_name' => $validated['last_name'],
+                'middle_name' => $validated['middle_name'] ?? null,
+                'personal_email' => null,
+                'username' => $username,
+                'temporary_password' => $tempPassword,
+                'password' => Hash::make($tempPassword),
+                'department_id' => null,
+                'must_change_password' => true,
+                'email_verified_at' => null,
+                'created_by' => $admin->id,
+            ]);
 
-        // Assign department for teachers
-        if ($validated['role'] === 'teacher' && $departmentId) {
-            $userData['department_id'] = $departmentId;
-        }
+            $student->syncRolesByName(['student']);
 
-        $user = User::create($userData);
-        $user->syncRolesByName([$validated['role']]);
-
-        // If creating a student, also create the student profile
-        if ($validated['role'] === 'student') {
             $middleName = $validated['middle_name'] ?? null;
             $studentName = trim($validated['first_name'] . ' ' . ($middleName ? $middleName . ' ' : '') . $validated['last_name']);
 
             Student::create([
-                'user_id' => $user->id,
+                'user_id' => $student->id,
                 'student_name' => $studentName,
                 'lrn' => $validated['lrn'],
+                'parent_contact_number' => isset($validated['parent_contact_number'])
+                    ? (trim((string) $validated['parent_contact_number']) ?: null)
+                    : null,
+                'grade_level' => (string) $validated['grade_level'],
             ]);
 
-            Mail::to($user->email)->send(new TemporaryCredentials(
-                user: $user,
-                plainPassword: (string) $tempPassword,
-                issuedBy: $admin,
-                context: 'new student account',
-            ));
-
             return redirect()->route('admin.users.index')
-                ->with('success', 'Student created successfully. Temporary credentials were sent via email.');
+                ->with('success', 'Student created successfully.')
+                ->with('created_student_credentials', [[
+                    'id' => $student->id,
+                    'first_name' => (string) ($validated['first_name'] ?? ''),
+                    'middle_name' => (string) ($validated['middle_name'] ?? ''),
+                    'last_name' => (string) ($validated['last_name'] ?? ''),
+                    'full_name' => $studentName,
+                    'lrn' => (string) ($validated['lrn'] ?? ''),
+                    'username' => (string) ($student->username ?? ''),
+                    'password' => $tempPassword,
+                ]]);
         }
 
+        $validated = $request->validate([
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'middle_name' => ['nullable', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,personal_email'],
+            'role' => ['required', 'in:teacher'],
+        ]);
+
+        $tempPassword = $this->generateTemporaryPassword(12);
+
+        $teacher = User::create([
+            'first_name' => $validated['first_name'],
+            'last_name' => $validated['last_name'],
+            'middle_name' => $validated['middle_name'] ?? null,
+            'personal_email' => $validated['email'],
+            'temporary_password' => $tempPassword,
+            'password' => Hash::make($tempPassword),
+            'department_id' => $departmentId,
+            'must_change_password' => true,
+            'email_verified_at' => null,
+            'created_by' => $admin->id,
+        ]);
+
+        $teacher->syncRolesByName(['teacher']);
+
         try {
-            Mail::to($user->email)->send(new TeacherCredentials(
-                teacher: $user,
+            Mail::to($teacher->email)->send(new TeacherCredentials(
+                teacher: $teacher,
                 plainPassword: (string) $tempPassword,
                 issuedBy: $admin,
             ));
         } catch (\Throwable $exception) {
             report($exception);
 
-            $user->roles()->detach();
-            $user->delete();
+            $teacher->roles()->detach();
+            $teacher->delete();
 
             return back()->withErrors([
                 'email' => 'Unable to send login credentials email. Please try again.',
@@ -397,6 +484,7 @@ class UserController extends Controller
             'middle_name' => ['nullable', 'string', 'max:255'],
             'name' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'string', 'email', 'max:255', Rule::unique('users', 'personal_email')->ignore($user->id)],
+            'parent_contact_number' => ['nullable', 'string', 'max:40'],
             'role' => 'required|in:student,teacher', // Admin cannot change role to admin
         ]);
 
@@ -459,13 +547,21 @@ class UserController extends Controller
         if ($oldRole !== 'student' && $validated['role'] === 'student') {
             Student::firstOrCreate(
                 ['user_id' => $user->id],
-                ['student_name' => $studentDisplayName]
+                [
+                    'student_name' => $studentDisplayName,
+                    'parent_contact_number' => isset($validated['parent_contact_number'])
+                        ? (trim((string) $validated['parent_contact_number']) ?: null)
+                        : null,
+                ]
             );
         }
 
         if ($validated['role'] === 'student' && $user->student) {
             $user->student->update([
                 'student_name' => $studentDisplayName,
+                'parent_contact_number' => isset($validated['parent_contact_number'])
+                    ? (trim((string) $validated['parent_contact_number']) ?: null)
+                    : null,
             ]);
         }
 

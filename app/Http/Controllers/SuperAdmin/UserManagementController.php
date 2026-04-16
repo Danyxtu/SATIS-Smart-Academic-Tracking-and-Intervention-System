@@ -309,6 +309,7 @@ class UserManagementController extends Controller
                     'track' => $track,
                     'school_year' => $sectionRecord?->school_year,
                     'lrn' => $studentProfile?->lrn,
+                    'parent_contact_number' => $studentProfile?->parent_contact_number,
                 ];
 
                 $studentClasses = collect($studentClassesByUserId->get($user->id, collect()))
@@ -627,6 +628,7 @@ class UserManagementController extends Controller
                 'student_queue.*.last_name' => ['required', 'string', 'max:100'],
                 'student_queue.*.middle_name' => ['nullable', 'string', 'max:100'],
                 'student_queue.*.lrn' => ['required', 'string', 'size:12', 'distinct', 'unique:students,lrn'],
+                'student_queue.*.parent_contact_number' => ['nullable', 'string', 'max:40'],
                 'student_queue.*.email' => ['nullable', 'email', 'max:255', 'distinct', 'unique:users,personal_email'],
                 'student_queue.*.username' => ['required', 'string', 'regex:/^[a-z]{2}\d{4}\d{5}$/', 'distinct'],
             ]);
@@ -685,6 +687,9 @@ class UserManagementController extends Controller
                         'user_id' => $student->id,
                         'student_name' => $studentName,
                         'lrn' => (string) $studentPayload['lrn'],
+                        'parent_contact_number' => isset($studentPayload['parent_contact_number'])
+                            ? (trim((string) $studentPayload['parent_contact_number']) ?: null)
+                            : null,
                     ] + $this->buildStudentSectionAttributes($selectedSection));
 
                     $createdStudentCredentials[] = [
@@ -713,6 +718,7 @@ class UserManagementController extends Controller
             'last_name'     => ['required', 'string', 'max:100'],
             'middle_name'   => ['nullable', 'string', 'max:100'],
             'lrn'           => ['nullable', 'string', 'size:12', 'unique:students,lrn'],
+            'parent_contact_number' => ['nullable', 'string', 'max:40'],
             'email'         => ['nullable', 'email', 'unique:users,personal_email'],
             'username'      => ['nullable', 'string', 'regex:/^[a-z]{2}\d{4}\d{5}$/'],
             'password'      => ['nullable', Password::min(8)],
@@ -846,6 +852,9 @@ class UserManagementController extends Controller
                 'user_id' => $user->id,
                 'student_name' => $studentName,
                 'lrn' => (string) ($validated['lrn'] ?? ''),
+                'parent_contact_number' => isset($validated['parent_contact_number'])
+                    ? (trim((string) $validated['parent_contact_number']) ?: null)
+                    : null,
             ] + $this->buildStudentSectionAttributes($selectedSection));
 
             return redirect()->route('superadmin.users.index')
@@ -1004,6 +1013,7 @@ class UserManagementController extends Controller
             'role' => ['required', 'in:super_admin,admin,teacher,student'],
             'department_id' => ['nullable', 'exists:departments,id'],
             'status' => ['required', 'in:active,inactive'],
+            'parent_contact_number' => ['nullable', 'string', 'max:40'],
         ]);
 
         $currentRoles = $user->roles()->pluck('name');
@@ -1049,6 +1059,24 @@ class UserManagementController extends Controller
         $roleId = Role::where('name', $validated['role'])->value('id');
         if ($roleId) {
             $user->roles()->sync([$roleId]);
+        }
+
+        if ($validated['role'] === 'student') {
+            $studentDisplayName = trim(implode(' ', array_filter([
+                $validated['first_name'] ?? null,
+                $validated['middle_name'] ?? null,
+                $validated['last_name'] ?? null,
+            ])));
+
+            Student::updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'student_name' => $studentDisplayName,
+                    'parent_contact_number' => isset($validated['parent_contact_number'])
+                        ? (trim((string) $validated['parent_contact_number']) ?: null)
+                        : null,
+                ],
+            );
         }
 
         return redirect()->route('superadmin.users.index')

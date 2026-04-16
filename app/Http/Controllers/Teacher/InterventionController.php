@@ -7,7 +7,9 @@ use App\Mail\InterventionNotification;
 use App\Models\Enrollment;
 use App\Models\Intervention;
 use App\Models\InterventionTask;
+use App\Models\SchoolPersonnel;
 use App\Models\StudentNotification;
+use App\Services\Messaging\TwilioSmsService;
 use App\Services\Teacher\WatchlistSettingsService;
 use App\Services\WatchlistRuleService;
 use App\Support\StudentNameFormatter;
@@ -24,13 +26,16 @@ class InterventionController extends Controller
 {
     protected WatchlistRuleService $watchlistRuleService;
     protected WatchlistSettingsService $watchlistSettingsService;
+    protected TwilioSmsService $twilioSmsService;
 
     public function __construct(
         WatchlistRuleService $watchlistRuleService,
         WatchlistSettingsService $watchlistSettingsService,
+        TwilioSmsService $twilioSmsService,
     ) {
         $this->watchlistRuleService = $watchlistRuleService;
         $this->watchlistSettingsService = $watchlistSettingsService;
+        $this->twilioSmsService = $twilioSmsService;
     }
 
     /**
@@ -39,6 +44,7 @@ class InterventionController extends Controller
     public function index(Request $request): Response
     {
         $teacher = $request->user();
+        $currentSchoolYear = $this->resolveInterventionSchoolYear();
         $watchlistRules = $this->watchlistSettingsService->getEvaluationRulesForTeacher($teacher);
         $observedCategories = $this->watchlistSettingsService->getObservedCategoriesForTeacher($teacher);
 
@@ -52,13 +58,15 @@ class InterventionController extends Controller
             'attendanceRecords',
             'intervention.tasks',
         ])
-            ->where(function ($query) use ($teacher) {
+            ->where(function ($query) use ($teacher, $currentSchoolYear) {
                 $query
-                    ->whereHas('schoolClass', function ($classQuery) use ($teacher) {
+                    ->whereHas('schoolClass', function ($classQuery) use ($teacher, $currentSchoolYear) {
                         $classQuery->where('teacher_id', $teacher->id);
+                        $classQuery->where('school_year', $currentSchoolYear);
                     })
-                    ->orWhereHas('subjectTeacher', function ($legacyQuery) use ($teacher) {
+                    ->orWhereHas('subjectTeacher', function ($legacyQuery) use ($teacher, $currentSchoolYear) {
                         $legacyQuery->where('teacher_id', $teacher->id);
+                        $legacyQuery->where('school_year', $currentSchoolYear);
                     });
             })
             ->get();
@@ -108,6 +116,7 @@ class InterventionController extends Controller
                 'sort_key' => $sortKey,
                 'lrn' => $student?->lrn,
                 'email' => $user?->email,
+                'parentContact' => $student?->parent_contact_number,
                 'avatar' => $student?->avatar,
                 'subject' => trim($subjectName . ' - ' . ($classSection ?? 'N/A')),
                 'subject_id' => $classAssignment?->subject_id,
@@ -192,6 +201,12 @@ class InterventionController extends Controller
             // Use shared global watchlist rules for profile priority as well.
             $risk = $this->watchlistRuleService->evaluateEnrollment($enrollment, $watchlistRules);
             $priority = $risk['priority'] ?? 'Low';
+            $riskReasons = array_values(array_filter((array) ($risk['reasons'] ?? []), function ($reason) {
+                return is_string($reason) && trim($reason) !== '';
+            }));
+            $priorityReason = !empty($riskReasons)
+                ? implode(' ', $riskReasons)
+                : 'Under Observation';
 
             // Build pending completion request data
             $pendingCompletionRequest = null;
@@ -212,13 +227,14 @@ class InterventionController extends Controller
                     'currentGrade' => $gradePercentage !== null ? "{$gradePercentage}%" : 'N/A',
                     'gradeTrend' => $gradeTrend,
                     'specialPrograms' => [],
-                    'parentContact' => $user?->email ?? 'N/A',
+                    'parentContact' => $student?->parent_contact_number,
                     'counselor' => 'Guidance Office',
                     'attendanceSummary' => $this->buildAttendanceSummary($enrollment->attendanceRecords),
                     'missingAssignments' => $missingAssignments,
                     'behaviorLog' => [],
                     'interventionLog' => $interventionLog,
                     'priority' => $priority,
+                    'priorityReason' => $priorityReason,
                     'pendingCompletionRequest' => $pendingCompletionRequest,
                     'activeIntervention' => $intervention ? $this->serializeIntervention($intervention) : null,
                 ],
@@ -265,6 +281,11 @@ class InterventionController extends Controller
             'deadline_at' => 'nullable|date|after:now',
             'tasks' => 'nullable|array',
             'send_email' => 'nullable|boolean',
+            'send_sms' => 'nullable|boolean',
+            'sms_recipients' => 'nullable|array',
+            'sms_recipients.*' => 'nullable|string|max:40',
+            'parent_phone' => 'nullable|string|max:40',
+            'sms_custom_message' => 'nullable|string|max:1000|required_if:type,parent_contact',
         ]);
 
         $deadlineAt = $this->normalizeDeadlineForType(
@@ -273,6 +294,7 @@ class InterventionController extends Controller
         );
 
         $enrollment = Enrollment::with(['schoolClass.subject', 'subjectTeacher.subject', 'user'])->findOrFail($validated['enrollment_id']);
+        $schoolYear = $this->resolveInterventionSchoolYear();
 
         if (! $this->enrollmentOwnedByTeacher($enrollment, (int) $request->user()->id)) {
             abort(403, 'You are not authorized to start an intervention for this student.');
@@ -282,18 +304,32 @@ class InterventionController extends Controller
             [
                 'enrollment_id' => $enrollment->id,
                 'status' => 'active',
+                'school_year' => $schoolYear,
             ],
             [
                 'type' => $validated['type'],
                 'notes' => $validated['notes'] ?? '',
                 'deadline_at' => $deadlineAt,
+                'school_year' => $schoolYear,
             ]
         );
 
         $sendEmail = $validated['send_email'] ?? true;
+        $sendSms = array_key_exists('send_sms', $validated)
+            ? (bool) $validated['send_sms']
+            : (bool) config('services.twilio.interventions_enabled', false);
+        $smsRecipients = $this->resolveRequestedSmsRecipients($validated);
 
         // Handle different intervention types
-        $this->processIntervention($enrollment, $intervention, $validated, $request->user(), $sendEmail);
+        $this->processIntervention(
+            $enrollment,
+            $intervention,
+            $validated,
+            $request->user(),
+            $sendEmail,
+            $sendSms,
+            $smsRecipients,
+        );
 
         $successMessage = sprintf(
             'Intervention for %s is now active.',
@@ -327,6 +363,11 @@ class InterventionController extends Controller
             'deadline_at' => 'nullable|date|after:now',
             'tasks' => 'nullable|array',
             'send_email' => 'nullable|boolean',
+            'send_sms' => 'nullable|boolean',
+            'sms_recipients' => 'nullable|array',
+            'sms_recipients.*' => 'nullable|string|max:40',
+            'parent_phone' => 'nullable|string|max:40',
+            'sms_custom_message' => 'nullable|string|max:1000|required_if:type,parent_contact',
         ]);
 
         $deadlineAt = $this->normalizeDeadlineForType(
@@ -335,7 +376,12 @@ class InterventionController extends Controller
         );
 
         $teacher = $request->user();
+        $schoolYear = $this->resolveInterventionSchoolYear();
         $sendEmail = $validated['send_email'] ?? true;
+        $sendSms = array_key_exists('send_sms', $validated)
+            ? (bool) $validated['send_sms']
+            : (bool) config('services.twilio.interventions_enabled', false);
+        $smsRecipients = $this->resolveRequestedSmsRecipients($validated);
         $successCount = 0;
         $failedCount = 0;
 
@@ -352,15 +398,25 @@ class InterventionController extends Controller
                 [
                     'enrollment_id' => $enrollment->id,
                     'status' => 'active',
+                    'school_year' => $schoolYear,
                 ],
                 [
                     'type' => $validated['type'],
                     'notes' => $validated['notes'] ?? '',
                     'deadline_at' => $deadlineAt,
+                    'school_year' => $schoolYear,
                 ]
             );
 
-            $this->processIntervention($enrollment, $intervention, $validated, $teacher, $sendEmail);
+            $this->processIntervention(
+                $enrollment,
+                $intervention,
+                $validated,
+                $teacher,
+                $sendEmail,
+                $sendSms,
+                $smsRecipients,
+            );
             $successCount++;
         }
 
@@ -566,9 +622,23 @@ class InterventionController extends Controller
     /**
      * Process intervention based on type.
      */
-    private function processIntervention(Enrollment $enrollment, Intervention $intervention, array $validated, $teacher, bool $sendEmail)
-    {
+    private function processIntervention(
+        Enrollment $enrollment,
+        Intervention $intervention,
+        array $validated,
+        $teacher,
+        bool $sendEmail,
+        bool $sendSms,
+        array $smsRecipients,
+    ) {
         $notificationType = $this->getNotificationType($validated['type']);
+        $smsCustomMessage = isset($validated['sms_custom_message'])
+            ? trim((string) $validated['sms_custom_message'])
+            : null;
+
+        if ($smsCustomMessage === '') {
+            $smsCustomMessage = null;
+        }
 
         // Create in-app notification
         $this->createNotification($enrollment, $intervention, $teacher, $notificationType);
@@ -581,6 +651,17 @@ class InterventionController extends Controller
         // Send email if enabled and student has an email
         if ($sendEmail && $enrollment->user?->email) {
             $this->sendEmailNotification($enrollment, $intervention, $teacher, $notificationType);
+        }
+
+        // Send SMS to parent/guidance recipients when enabled.
+        if ($sendSms) {
+            $this->sendSmsNotification(
+                $enrollment,
+                $intervention,
+                $teacher,
+                $smsRecipients,
+                $smsCustomMessage,
+            );
         }
     }
 
@@ -771,6 +852,209 @@ class InterventionController extends Controller
         }
     }
 
+    private function sendSmsNotification(
+        Enrollment $enrollment,
+        Intervention $intervention,
+        $teacher,
+        array $requestedRecipients,
+        ?string $customMessage = null,
+    ): void {
+        if (! $this->twilioSmsService->isEnabled()) {
+            return;
+        }
+
+        if (! $this->twilioSmsService->isConfigured()) {
+            Log::warning('Intervention SMS skipped because Twilio is not fully configured.');
+
+            return;
+        }
+
+        $recipients = array_merge(
+            $requestedRecipients,
+            $this->resolveEnrollmentParentSmsRecipients($enrollment),
+        );
+
+        if (in_array($intervention->type, ['academic_agreement', 'one_on_one_meeting', 'counselor_referral'], true)) {
+            $recipients = array_merge($recipients, $this->resolveGuidanceCounselorSmsRecipients());
+        }
+
+        $recipients = array_values(array_unique($recipients));
+
+        if (empty($recipients)) {
+            Log::info('Intervention SMS skipped because no SMS recipients are available.', [
+                'intervention_id' => $intervention->id,
+                'type' => $intervention->type,
+            ]);
+
+            return;
+        }
+
+        $message = $this->buildInterventionSmsMessage(
+            $enrollment,
+            $intervention,
+            $teacher,
+            $customMessage,
+        );
+
+        foreach ($recipients as $recipient) {
+            $this->twilioSmsService->send($recipient, $message);
+        }
+    }
+
+    private function resolveEnrollmentParentSmsRecipients(Enrollment $enrollment): array
+    {
+        $parentContact = $enrollment->user?->student?->parent_contact_number;
+
+        if (! is_string($parentContact) || trim($parentContact) === '') {
+            return [];
+        }
+
+        $normalized = $this->normalizeSmsPhoneNumber($parentContact);
+
+        return $normalized ? [$normalized] : [];
+    }
+
+    private function buildInterventionSmsMessage(
+        Enrollment $enrollment,
+        Intervention $intervention,
+        $teacher,
+        ?string $customMessage = null,
+    ): string {
+        $studentName = $enrollment->user?->name ?? 'Student';
+        $subjectName = $enrollment->schoolClass?->subject?->subject_name
+            ?? $enrollment->subjectTeacher?->subject?->subject_name
+            ?? 'your class';
+        $teacherName = $teacher->name ?? 'Teacher';
+        $typeLabel = Intervention::getTypes()[$intervention->type] ?? 'Intervention';
+
+        $segments = [
+            "SATIS: {$typeLabel} for {$studentName} in {$subjectName} by {$teacherName}.",
+        ];
+
+        if ($intervention->type === 'parent_contact') {
+            $resolvedCustomMessage = filled($customMessage)
+                ? trim((string) $customMessage)
+                : null;
+
+            if ($resolvedCustomMessage === null && filled($intervention->notes)) {
+                $resolvedCustomMessage = trim((string) $intervention->notes);
+            }
+
+            if ($resolvedCustomMessage === null || $resolvedCustomMessage === '') {
+                $resolvedCustomMessage = "Please coordinate with {$teacherName} regarding {$studentName}'s progress in {$subjectName}.";
+            }
+
+            $message = "SATIS Parent Contact for {$studentName}: {$resolvedCustomMessage}";
+
+            if (mb_strlen($message) > 320) {
+                return mb_substr($message, 0, 317) . '...';
+            }
+
+            return $message;
+        }
+
+        if (filled($intervention->notes)) {
+            $segments[] = 'Notes: ' . mb_substr(trim((string) $intervention->notes), 0, 120) . '.';
+        }
+
+        if ($intervention->deadline_at) {
+            $segments[] = 'Deadline: ' . $intervention->deadline_at->format('M d, Y h:i A') . '.';
+        }
+
+        $message = trim(implode(' ', $segments));
+
+        if (mb_strlen($message) > 320) {
+            return mb_substr($message, 0, 317) . '...';
+        }
+
+        return $message;
+    }
+
+    private function resolveRequestedSmsRecipients(array $validated): array
+    {
+        $rawRecipients = [];
+
+        $recipientList = $validated['sms_recipients'] ?? [];
+        if (is_array($recipientList)) {
+            $rawRecipients = array_merge($rawRecipients, $recipientList);
+        }
+
+        $parentPhone = $validated['parent_phone'] ?? null;
+        if (is_string($parentPhone) && trim($parentPhone) !== '') {
+            $rawRecipients[] = $parentPhone;
+        }
+
+        $normalized = [];
+
+        foreach ($rawRecipients as $value) {
+            if (! is_string($value)) {
+                continue;
+            }
+
+            $tokens = preg_split('/[;,\n\r]+/', $value) ?: [];
+            foreach ($tokens as $token) {
+                $phone = $this->normalizeSmsPhoneNumber($token);
+
+                if ($phone !== null) {
+                    $normalized[] = $phone;
+                }
+            }
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
+    private function resolveGuidanceCounselorSmsRecipients(): array
+    {
+        return SchoolPersonnel::query()
+            ->where('position', 'Guidance Counselor')
+            ->pluck('phone_number')
+            ->map(fn($phone) => $this->normalizeSmsPhoneNumber(is_string($phone) ? $phone : null))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function normalizeSmsPhoneNumber(?string $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $phone = trim($value);
+
+        if ($phone === '') {
+            return null;
+        }
+
+        $phone = preg_replace('/[^\d+]/', '', $phone) ?? '';
+
+        if ($phone === '') {
+            return null;
+        }
+
+        if (str_starts_with($phone, '00')) {
+            $phone = '+' . substr($phone, 2);
+        }
+
+        if (! str_starts_with($phone, '+')) {
+            if (str_starts_with($phone, '09') && strlen($phone) === 11) {
+                $phone = '+63' . substr($phone, 1);
+            } elseif (str_starts_with($phone, '9') && strlen($phone) === 10) {
+                $phone = '+63' . $phone;
+            } else {
+                $phone = '+' . ltrim($phone, '0');
+            }
+        }
+
+        if (preg_match('/^\+[1-9]\d{7,14}$/', $phone) !== 1) {
+            return null;
+        }
+
+        return $phone;
+    }
+
     /**
      * Create a nudge notification for the student.
      * @deprecated Use createNotification instead
@@ -796,12 +1080,7 @@ class InterventionController extends Controller
     public function approveCompletion(Request $request, Intervention $intervention)
     {
         $teacher = $request->user();
-        $enrollment = $intervention->enrollment;
-
-        // Verify the intervention belongs to this teacher's subject
-        if (! $this->enrollmentOwnedByTeacher($enrollment, (int) $teacher->id)) {
-            abort(403, 'Unauthorized');
-        }
+        $enrollment = $this->authorizeInterventionForTeacher($intervention, (int) $teacher->id);
 
         // Check if there's a pending completion request
         if (!$intervention->isPendingApproval()) {
@@ -847,12 +1126,7 @@ class InterventionController extends Controller
     public function rejectCompletion(Request $request, Intervention $intervention)
     {
         $teacher = $request->user();
-        $enrollment = $intervention->enrollment;
-
-        // Verify the intervention belongs to this teacher's subject
-        if (! $this->enrollmentOwnedByTeacher($enrollment, (int) $teacher->id)) {
-            abort(403, 'Unauthorized');
-        }
+        $enrollment = $this->authorizeInterventionForTeacher($intervention, (int) $teacher->id);
 
         // Check if there's a pending completion request
         if (!$intervention->isPendingApproval()) {
@@ -887,12 +1161,30 @@ class InterventionController extends Controller
     private function authorizeInterventionForTeacher(Intervention $intervention, int $teacherId): Enrollment
     {
         $enrollment = $intervention->enrollment;
+        $currentSchoolYear = $this->resolveInterventionSchoolYear();
 
         if (! $enrollment || ! $this->enrollmentOwnedByTeacher($enrollment, $teacherId)) {
             abort(403, 'Unauthorized');
         }
 
+        if ((string) ($intervention->school_year ?? '') !== $currentSchoolYear) {
+            abort(403, 'Unauthorized for this school year.');
+        }
+
         return $enrollment;
+    }
+
+    private function resolveInterventionSchoolYear(): string
+    {
+        $schoolYear = Intervention::resolveCurrentSchoolYear();
+
+        if ($schoolYear !== null) {
+            return $schoolYear;
+        }
+
+        $currentYear = (int) date('Y');
+
+        return $currentYear . '-' . ($currentYear + 1);
     }
 
     private function ensureTaskBelongsToIntervention(Intervention $intervention, InterventionTask $task): void
@@ -969,7 +1261,6 @@ class InterventionController extends Controller
         return in_array($type, [
             'task_list',
             'extension_grant',
-            'parent_contact',
             'academic_agreement',
             'one_on_one_meeting',
             'counselor_referral',
@@ -984,7 +1275,7 @@ class InterventionController extends Controller
 
         if (blank($deadlineAt)) {
             throw ValidationException::withMessages([
-                'deadline_at' => 'Deadline date and time is required for Tier 2 and Tier 3 interventions.',
+                'deadline_at' => 'Deadline date and time is required for this intervention type.',
             ]);
         }
 

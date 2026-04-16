@@ -75,11 +75,8 @@ export default function AdminSectionDetailModal({
 
     const { data, setData, put, processing, errors, clearErrors } = useForm({
         section_name: "",
-        section_code: "",
-        cohort: "",
         grade_level: "",
         strand: "",
-        track: "",
         school_year: "",
         description: "",
         advisor_teacher_id: "",
@@ -89,11 +86,8 @@ export default function AdminSectionDetailModal({
     const hydrateForm = (source = null) => {
         setData({
             section_name: source?.section_name || "",
-            section_code: source?.section_code || "",
-            cohort: source?.cohort || "",
             grade_level: source?.grade_level || "",
             strand: source?.strand || "",
-            track: source?.track || "",
             school_year: source?.school_year || currentSchoolYear || "",
             description: source?.description || "",
             advisor_teacher_id: source?.advisor_teacher_id
@@ -211,9 +205,6 @@ export default function AdminSectionDetailModal({
                                 <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-blue-100">
                                     Grade {activeSection?.grade_level || "-"}
                                 </span>
-                                <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-blue-100">
-                                    Cohort {activeSection?.cohort || "-"}
-                                </span>
                             </div>
                         </div>
 
@@ -310,10 +301,6 @@ export default function AdminSectionDetailModal({
                                     <DetailRow
                                         label="Code"
                                         value={activeSection?.section_code}
-                                    />
-                                    <DetailRow
-                                        label="Cohort"
-                                        value={activeSection?.cohort}
                                     />
                                     <DetailRow
                                         label="Grade Level"
@@ -413,59 +400,9 @@ export default function AdminSectionDetailModal({
                                             />
                                         </div>
 
-                                        <div>
-                                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                                Section Code
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={data.section_code}
-                                                onChange={(event) =>
-                                                    setData(
-                                                        "section_code",
-                                                        event.target.value.toUpperCase(),
-                                                    )
-                                                }
-                                                className={`w-full rounded-xl border px-3 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 ${
-                                                    errors.section_code
-                                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                                        : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
-                                                }`}
-                                            />
-                                            <FieldError
-                                                message={errors.section_code}
-                                            />
-                                        </div>
                                     </div>
 
                                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                        <div>
-                                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                                Cohort{" "}
-                                                <span className="text-rose-500">
-                                                    *
-                                                </span>
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={data.cohort}
-                                                onChange={(event) =>
-                                                    setData(
-                                                        "cohort",
-                                                        event.target.value,
-                                                    )
-                                                }
-                                                className={`w-full rounded-xl border px-3 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 ${
-                                                    errors.cohort
-                                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                                        : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
-                                                }`}
-                                            />
-                                            <FieldError
-                                                message={errors.cohort}
-                                            />
-                                        </div>
-
                                         <div>
                                             <label className="mb-1.5 block text-sm font-medium text-slate-700">
                                                 Grade Level
@@ -529,29 +466,6 @@ export default function AdminSectionDetailModal({
                                             />
                                         </div>
 
-                                        <div>
-                                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                                                Track
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={data.track}
-                                                onChange={(event) =>
-                                                    setData(
-                                                        "track",
-                                                        event.target.value,
-                                                    )
-                                                }
-                                                className={`w-full rounded-xl border px-3 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 ${
-                                                    errors.track
-                                                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                                                        : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-100"
-                                                }`}
-                                            />
-                                            <FieldError
-                                                message={errors.track}
-                                            />
-                                        </div>
                                     </div>
 
                                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

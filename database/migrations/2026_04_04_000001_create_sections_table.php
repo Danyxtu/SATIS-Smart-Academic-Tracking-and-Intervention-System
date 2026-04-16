@@ -18,7 +18,6 @@ return new class extends Migration
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->string('section_name');
             $table->string('section_code');
-            $table->string('cohort');
             $table->string('grade_level')->nullable();
             $table->string('strand')->nullable();
             $table->string('track')->nullable();
@@ -27,7 +26,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            $table->unique(['department_id', 'section_code', 'cohort'], 'sections_department_code_cohort_unique');
+            $table->unique(['department_id', 'section_code', 'school_year'], 'sections_department_code_school_year_unique');
             $table->index(['department_id', 'section_name']);
         });
     }

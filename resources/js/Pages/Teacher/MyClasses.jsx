@@ -3,7 +3,10 @@ import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import { useLoading } from "@/Context/LoadingContext";
 import {
+    Archive,
+    ChevronDown,
     ChevronRight,
+    ChevronUp,
     Plus,
     UploadCloud,
     BookOpen,
@@ -90,6 +93,7 @@ const MyClasses = ({
     selectedSemester = 1,
     semester1Count = 0,
     semester2Count = 0,
+    archivedClassYears = [],
 }) => {
     const page = usePage();
     const flash = page?.props?.flash ?? {};
@@ -140,6 +144,24 @@ const MyClasses = ({
     const [isDragging, setIsDragging] = useState(false);
     const [droppedFile, setDroppedFile] = useState(null);
     const [highlightAddClass, setHighlightAddClass] = useState(false);
+    const [showArchivedClasses, setShowArchivedClasses] = useState(false);
+    const [restoringArchiveClassId, setRestoringArchiveClassId] =
+        useState(null);
+    const [expandedArchiveYears, setExpandedArchiveYears] = useState(() => {
+        const groups = Array.isArray(archivedClassYears)
+            ? archivedClassYears
+            : [];
+
+        return groups.reduce((accumulator, archiveYear) => {
+            const archiveId = Number(archiveYear?.archive_id ?? 0);
+
+            if (archiveId > 0) {
+                accumulator[archiveId] = false;
+            }
+
+            return accumulator;
+        }, {});
+    });
 
     // State for fetched class data (click-to-fetch pattern)
     const [selectedClassData, setSelectedClassData] = useState({});
@@ -252,6 +274,29 @@ const MyClasses = ({
     const [isNudgeModalOpen, setIsNudgeModalOpen] = useState(false);
     const [nudgeTargetClass, setNudgeTargetClass] = useState(null);
     const gradeUploadInputRef = useRef(null);
+
+    useEffect(() => {
+        const groups = Array.isArray(archivedClassYears)
+            ? archivedClassYears
+            : [];
+
+        setExpandedArchiveYears((previous) => {
+            const nextState = { ...previous };
+
+            groups.forEach((archiveYear) => {
+                const archiveId = Number(archiveYear?.archive_id ?? 0);
+
+                if (
+                    archiveId > 0 &&
+                    typeof nextState[archiveId] !== "boolean"
+                ) {
+                    nextState[archiveId] = false;
+                }
+            });
+
+            return nextState;
+        });
+    }, [archivedClassYears]);
 
     // Handle send nudge button click
     const handleSendNudge = (cls) => {
@@ -382,6 +427,17 @@ const MyClasses = ({
     const isReadOnlyMode = isSemesterViewOnly;
     const readOnlySemesterMessage =
         "Past semesters are view-only while the current semester is active.";
+    const currentSemesterLabel =
+        Number(currentSemester) === 1 ? "1st Semester" : "2nd Semester";
+    const archivedYears = Array.isArray(archivedClassYears)
+        ? archivedClassYears
+        : [];
+    const archivedYearCount = archivedYears.length;
+    const archivedClassCount = archivedYears.reduce(
+        (total, archiveYear) =>
+            total + Number(archiveYear?.summary?.classes_total ?? 0),
+        0,
+    );
 
     useEffect(() => {
         if (!isSemesterViewOnly) {
@@ -615,6 +671,38 @@ const MyClasses = ({
         setIsClassCreateSummaryOpen(false);
     };
 
+    const toggleArchiveYear = (archiveId) => {
+        setExpandedArchiveYears((previous) => ({
+            ...previous,
+            [archiveId]: !previous[archiveId],
+        }));
+    };
+
+    const handleRestoreArchivedClass = (archiveClass) => {
+        if (!archiveClass || archiveClass.already_restored) {
+            return;
+        }
+
+        const archiveClassId = Number(archiveClass.id);
+
+        if (!Number.isInteger(archiveClassId) || archiveClassId <= 0) {
+            return;
+        }
+
+        setRestoringArchiveClassId(archiveClassId);
+
+        router.post(
+            route("teacher.classes.archived.restore", archiveClassId),
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => {
+                    setRestoringArchiveClassId(null);
+                },
+            },
+        );
+    };
+
     return (
         <>
             <Head title={myClassesLabel} />
@@ -657,6 +745,25 @@ const MyClasses = ({
 
                     {!hasSelectedClass && (
                         <div className="flex items-center gap-4 relative">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setShowArchivedClasses(
+                                        (previous) => !previous,
+                                    )
+                                }
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
+                                    showArchivedClasses
+                                        ? "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200"
+                                        : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                                }`}
+                            >
+                                <Archive size={16} />
+                                {showArchivedClasses
+                                    ? "Hide Archived Classes"
+                                    : "View Archived Classes"}
+                            </button>
+
                             {/* Help Button & Bubble */}
                             <div className="relative">
                                 <button
@@ -1034,6 +1141,199 @@ const MyClasses = ({
                                 })}
                             </div>
                         </div>
+
+                        {showArchivedClasses && (
+                            <div className="mb-4 space-y-3">
+                                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                                                Archived Classes
+                                            </p>
+                                            <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                                                Your archived classes from
+                                                previous school years are listed
+                                                below. You can add a class setup
+                                                to {defaultSchoolYear} (
+                                                {currentSemesterLabel}) with no
+                                                students.
+                                            </p>
+                                        </div>
+                                        <span className="text-[11px] font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-800/40 dark:text-amber-200">
+                                            {archivedClassCount} classes across{" "}
+                                            {archivedYearCount} school year
+                                            {archivedYearCount === 1 ? "" : "s"}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {archivedYearCount === 0 ? (
+                                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4">
+                                        <p className="text-sm text-gray-600 dark:text-gray-300">
+                                            No archived classes are available
+                                            for your account yet.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {archivedYears.map((archiveYear) => {
+                                            const archiveId = Number(
+                                                archiveYear?.archive_id ?? 0,
+                                            );
+                                            const isExpanded = Boolean(
+                                                expandedArchiveYears[archiveId],
+                                            );
+                                            const summary =
+                                                archiveYear?.summary ?? {};
+                                            const archiveClasses =
+                                                Array.isArray(
+                                                    archiveYear?.classes,
+                                                )
+                                                    ? archiveYear.classes
+                                                    : [];
+
+                                            return (
+                                                <div
+                                                    key={archiveId}
+                                                    className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden"
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            toggleArchiveYear(
+                                                                archiveId,
+                                                            )
+                                                        }
+                                                        className="w-full px-4 py-3 flex items-center justify-between gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                                    >
+                                                        <div className="text-left">
+                                                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                                                School Year{" "}
+                                                                {archiveYear?.school_year ??
+                                                                    "Unknown"}
+                                                            </p>
+                                                            <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">
+                                                                {summary.classes_total ??
+                                                                    0}{" "}
+                                                                classes •{" "}
+                                                                {summary.students_total ??
+                                                                    0}{" "}
+                                                                archived
+                                                                students •{" "}
+                                                                {summary.already_restored ??
+                                                                    0}{" "}
+                                                                already added to
+                                                                current semester
+                                                            </p>
+                                                        </div>
+                                                        {isExpanded ? (
+                                                            <ChevronUp
+                                                                size={16}
+                                                                className="text-gray-400"
+                                                            />
+                                                        ) : (
+                                                            <ChevronDown
+                                                                size={16}
+                                                                className="text-gray-400"
+                                                            />
+                                                        )}
+                                                    </button>
+
+                                                    {isExpanded && (
+                                                        <div className="border-t border-gray-100 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
+                                                            {archiveClasses.length ===
+                                                            0 ? (
+                                                                <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                                                                    No archived
+                                                                    classes
+                                                                    found for
+                                                                    this school
+                                                                    year.
+                                                                </div>
+                                                            ) : (
+                                                                archiveClasses.map(
+                                                                    (
+                                                                        archiveClass,
+                                                                    ) => {
+                                                                        const isRestoring =
+                                                                            restoringArchiveClassId ===
+                                                                            archiveClass.id;
+                                                                        const isAlreadyRestored =
+                                                                            Boolean(
+                                                                                archiveClass.already_restored,
+                                                                            );
+
+                                                                        return (
+                                                                            <div
+                                                                                key={
+                                                                                    archiveClass.id
+                                                                                }
+                                                                                className="px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                                                                            >
+                                                                                <div>
+                                                                                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                                                                        {archiveClass.subject_name ||
+                                                                                            "Untitled Subject"}
+                                                                                    </p>
+                                                                                    <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">
+                                                                                        Grade{" "}
+                                                                                        {archiveClass.grade_level ||
+                                                                                            "-"}{" "}
+                                                                                        •{" "}
+                                                                                        {archiveClass.section_identifier ||
+                                                                                            archiveClass.section_name ||
+                                                                                            "No section"}{" "}
+                                                                                        •
+                                                                                        Semester{" "}
+                                                                                        {archiveClass.semester ||
+                                                                                            "-"}{" "}
+                                                                                        •{" "}
+                                                                                        {archiveClass.students_total ||
+                                                                                            0}{" "}
+                                                                                        archived
+                                                                                        students
+                                                                                    </p>
+                                                                                </div>
+
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() =>
+                                                                                        handleRestoreArchivedClass(
+                                                                                            archiveClass,
+                                                                                        )
+                                                                                    }
+                                                                                    disabled={
+                                                                                        isRestoring ||
+                                                                                        isAlreadyRestored
+                                                                                    }
+                                                                                    className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                                                                        isAlreadyRestored
+                                                                                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 cursor-not-allowed"
+                                                                                            : isRestoring
+                                                                                              ? "bg-indigo-200 text-indigo-700 dark:bg-indigo-800/60 dark:text-indigo-300 cursor-wait"
+                                                                                              : "bg-indigo-600 text-white hover:bg-indigo-700"
+                                                                                    }`}
+                                                                                >
+                                                                                    {isAlreadyRestored
+                                                                                        ? "Already in current semester"
+                                                                                        : isRestoring
+                                                                                          ? "Adding..."
+                                                                                          : "Add to Current School Year"}
+                                                                                </button>
+                                                                            </div>
+                                                                        );
+                                                                    },
+                                                                )
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Dropzone Overlay */}
                         {isDragging && (

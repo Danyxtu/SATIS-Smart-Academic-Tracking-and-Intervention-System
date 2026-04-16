@@ -29,6 +29,8 @@ class SectionController extends Controller
         $departmentCode = $admin?->department?->department_code;
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
 
+        $admin?->loadMissing('department.specializations:id,specialization_name');
+
         $sectionsQuery = Section::query()
             ->with(['advisorTeacher:id,first_name,middle_name,last_name'])
             ->withCount('students')
@@ -39,8 +41,7 @@ class SectionController extends Controller
 
             $sectionsQuery->where(function ($query) use ($search) {
                 $query->where('section_name', 'like', "%{$search}%")
-                    ->orWhere('section_code', 'like', "%{$search}%")
-                    ->orWhere('cohort', 'like', "%{$search}%");
+                    ->orWhere('section_code', 'like', "%{$search}%");
             });
         }
 
@@ -62,7 +63,6 @@ class SectionController extends Controller
                         $section->section_name,
                     ),
                     'section_code' => $section->section_code,
-                    'cohort' => $section->cohort,
                     'grade_level' => $section->grade_level,
                     'strand' => $section->strand,
                     'track' => $section->track,
@@ -136,6 +136,12 @@ class SectionController extends Controller
                 'id' => $admin->department->id,
                 'name' => $admin->department->department_name,
                 'code' => $admin->department->department_code,
+                'specializations' => $admin->department->specializations
+                    ->map(fn($specialization) => [
+                        'id' => (int) $specialization->id,
+                        'specialization_name' => $specialization->specialization_name,
+                    ])
+                    ->values(),
             ] : null,
         ]);
     }
@@ -147,20 +153,20 @@ class SectionController extends Controller
     {
         $admin = $request->user();
         $departmentId = $admin?->department_id;
+        $department = $admin?->department;
 
-        if (!$departmentId) {
+        if (! $departmentId || ! $department) {
             return back()->with('error', 'Your account has no assigned department.');
         }
+
+        $department->loadMissing('schoolTrack');
 
         $currentSchoolYear = SystemSetting::getCurrentSchoolYear();
 
         $validated = $request->validate([
             'section_name' => ['required', 'string', 'max:255'],
-            'section_code' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9\s\-]+$/'],
-            'cohort' => ['required', 'string', 'max:120'],
-            'grade_level' => ['nullable', 'string', Rule::in(satis_grade_level_options())],
-            'strand' => ['nullable', 'string', 'max:100'],
-            'track' => ['nullable', 'string', 'max:100'],
+            'grade_level' => ['required', 'string', Rule::in(satis_grade_level_options())],
+            'strand' => ['required', 'string', 'max:100'],
             'description' => ['nullable', 'string', 'max:1000'],
             'advisor_teacher_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'assigned_student_ids' => ['nullable', 'array'],
@@ -203,25 +209,27 @@ class SectionController extends Controller
 
         $sectionName = satis_extract_section_base_name($validated['section_name'])
             ?? $this->normalizeText($validated['section_name']);
-        $cohort = $this->normalizeText($validated['cohort']);
         $gradeLevel = satis_normalize_grade_level($validated['grade_level'] ?? null);
+        $normalizedStrand = $this->normalizeNullableText($validated['strand'] ?? null)
+            ?? $department->department_code;
+        $resolvedTrack = satis_resolve_department_track($department);
 
-        $sectionCode = $this->normalizeNullableText($validated['section_code'] ?? null);
-        $sectionCode = $sectionCode !== null
-            ? $this->normalizeSectionCode($sectionCode)
-            : $this->generateSectionCode($sectionName);
-
-        $sectionCode = $this->ensureUniqueSectionCode($departmentId, $cohort, $sectionCode);
+        $sectionCode = satis_generate_section_code(
+            $gradeLevel,
+            $normalizedStrand,
+            $sectionName,
+        );
+        $sectionCode = $this->ensureUniqueSectionCode($departmentId, $currentSchoolYear, $sectionCode);
 
         $conflictingSection = Section::query()
             ->where('department_id', $departmentId)
-            ->where('cohort', $cohort)
+            ->where('school_year', $currentSchoolYear)
             ->where('section_name', $sectionName)
             ->exists();
 
         if ($conflictingSection) {
             throw ValidationException::withMessages([
-                'section_name' => 'A section with this name already exists for the selected cohort in your department.',
+                'section_name' => 'A section with this name already exists in your department for the current school year.',
             ]);
         }
 
@@ -255,8 +263,9 @@ class SectionController extends Controller
             $departmentId,
             $sectionName,
             $sectionCode,
-            $cohort,
             $gradeLevel,
+            $normalizedStrand,
+            $resolvedTrack,
             $validated,
             $assignedStudentIds,
             $newStudents,
@@ -269,10 +278,9 @@ class SectionController extends Controller
                 'created_by' => $admin->id,
                 'section_name' => $sectionName,
                 'section_code' => $sectionCode,
-                'cohort' => $cohort,
                 'grade_level' => $gradeLevel,
-                'strand' => $this->normalizeNullableText($validated['strand'] ?? null),
-                'track' => $this->normalizeNullableText($validated['track'] ?? null),
+                'strand' => $normalizedStrand,
+                'track' => $resolvedTrack,
                 'school_year' => $currentSchoolYear,
                 'description' => $this->normalizeNullableText($validated['description'] ?? null),
                 'is_active' => true,
@@ -295,7 +303,6 @@ class SectionController extends Controller
                         'section' => $section->section_name,
                         'grade_level' => $section->grade_level ?? $student->grade_level,
                         'strand' => $section->strand ?? $student->strand,
-                        'track' => $section->track ?? $student->track,
                     ]);
                 }
 
@@ -338,7 +345,6 @@ class SectionController extends Controller
                     'section' => $section->section_name,
                     'section_id' => $section->id,
                     'strand' => $section->strand,
-                    'track' => $section->track,
                 ]);
 
                 $newStudentsCreatedCount++;
@@ -352,7 +358,6 @@ class SectionController extends Controller
                     $section->section_name,
                 ),
                 'section_code' => $section->section_code,
-                'cohort' => $section->cohort,
                 'school_year' => $section->school_year,
                 'existing_assigned_count' => $existingAssignedCount,
                 'new_students_created_count' => $newStudentsCreatedCount,
@@ -373,20 +378,20 @@ class SectionController extends Controller
     {
         $admin = $request->user();
         $departmentId = $admin?->department_id;
+        $department = $admin?->department;
 
-        if (! $departmentId) {
+        if (! $departmentId || ! $department) {
             return back()->with('error', 'Your account has no assigned department.');
         }
+
+        $department->loadMissing('schoolTrack');
 
         $managedSection = $this->resolveManagedSection($section, $departmentId);
 
         $validated = $request->validate([
             'section_name' => ['required', 'string', 'max:255'],
-            'section_code' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9\s\-]+$/'],
-            'cohort' => ['required', 'string', 'max:120'],
             'grade_level' => ['nullable', 'string', Rule::in(satis_grade_level_options())],
             'strand' => ['nullable', 'string', 'max:100'],
-            'track' => ['nullable', 'string', 'max:100'],
             'school_year' => ['required', 'string', 'max:9', 'regex:/^\d{4}-\d{4}$/'],
             'description' => ['nullable', 'string', 'max:1000'],
             'advisor_teacher_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
@@ -405,53 +410,46 @@ class SectionController extends Controller
 
         $sectionName = satis_extract_section_base_name($validated['section_name'])
             ?? $this->normalizeText($validated['section_name']);
-        $cohort = $this->normalizeText($validated['cohort']);
-        $gradeLevel = satis_normalize_grade_level($validated['grade_level'] ?? null);
+        $gradeLevel = satis_normalize_grade_level($validated['grade_level'] ?? null)
+            ?? $managedSection->grade_level;
+        $normalizedStrand = $this->normalizeNullableText($validated['strand'] ?? null)
+            ?? $managedSection->strand
+            ?? $department->department_code;
+        $resolvedTrack = satis_resolve_department_track($department);
         $schoolYear = $this->normalizeText($validated['school_year']);
-        $normalizedSectionCode = $this->normalizeNullableText($validated['section_code'] ?? null);
-
-        if ($normalizedSectionCode !== null) {
-            $normalizedSectionCode = $this->normalizeSectionCode($normalizedSectionCode);
-        }
-
-        $sectionCode = $normalizedSectionCode !== null && $normalizedSectionCode !== ''
-            ? $normalizedSectionCode
-            : $managedSection->section_code;
+        $sectionCode = satis_generate_section_code(
+            $gradeLevel,
+            $normalizedStrand,
+            $sectionName,
+        );
 
         $conflictingSectionName = Section::query()
             ->where('department_id', $departmentId)
-            ->where('cohort', $cohort)
+            ->where('school_year', $schoolYear)
             ->where('section_name', $sectionName)
             ->where('id', '!=', $managedSection->id)
             ->exists();
 
         if ($conflictingSectionName) {
             throw ValidationException::withMessages([
-                'section_name' => 'A section with this name already exists for the selected cohort in your department.',
+                'section_name' => 'A section with this name already exists in your department.',
             ]);
         }
 
-        $conflictingSectionCode = Section::query()
-            ->where('department_id', $departmentId)
-            ->where('cohort', $cohort)
-            ->where('section_code', $sectionCode)
-            ->where('id', '!=', $managedSection->id)
-            ->exists();
-
-        if ($conflictingSectionCode) {
-            throw ValidationException::withMessages([
-                'section_code' => 'Section code is already used in your department for this cohort.',
-            ]);
-        }
+        $sectionCode = $this->ensureUniqueSectionCode(
+            $departmentId,
+            $schoolYear,
+            $sectionCode,
+            (int) $managedSection->id,
+        );
 
         $managedSection->update([
             'advisor_teacher_id' => $advisorTeacherId,
             'section_name' => $sectionName,
             'section_code' => $sectionCode,
-            'cohort' => $cohort,
             'grade_level' => $gradeLevel,
-            'strand' => $this->normalizeNullableText($validated['strand'] ?? null),
-            'track' => $this->normalizeNullableText($validated['track'] ?? null),
+            'strand' => $normalizedStrand,
+            'track' => $resolvedTrack,
             'school_year' => $schoolYear,
             'description' => $this->normalizeNullableText($validated['description'] ?? null),
             'is_active' => array_key_exists('is_active', $validated)
@@ -518,35 +516,29 @@ class SectionController extends Controller
         return $normalized !== null ? Str::lower($normalized) : null;
     }
 
-    private function normalizeSectionCode(string $value): string
-    {
-        $normalized = Str::upper($this->normalizeText($value));
-
-        return preg_replace('/[^A-Z0-9\-\s]/', '', $normalized) ?? $normalized;
-    }
-
-    private function generateSectionCode(string $sectionName): string
-    {
-        $candidate = Str::upper(Str::slug($sectionName, '-'));
-
-        if ($candidate === '') {
-            return 'SECTION';
-        }
-
-        return $candidate;
-    }
-
-    private function ensureUniqueSectionCode(int $departmentId, string $cohort, string $baseCode): string
-    {
+    private function ensureUniqueSectionCode(
+        int $departmentId,
+        string $schoolYear,
+        string $baseCode,
+        ?int $ignoreSectionId = null,
+    ): string {
         $counter = 1;
         $candidate = $baseCode;
 
-        while (Section::query()
-            ->where('department_id', $departmentId)
-            ->where('cohort', $cohort)
-            ->where('section_code', $candidate)
-            ->exists()
-        ) {
+        while (true) {
+            $query = Section::query()
+                ->where('department_id', $departmentId)
+                ->where('school_year', $schoolYear)
+                ->where('section_code', $candidate);
+
+            if ($ignoreSectionId !== null) {
+                $query->where('id', '!=', $ignoreSectionId);
+            }
+
+            if (! $query->exists()) {
+                break;
+            }
+
             $counter++;
             $candidate = $baseCode . '-' . $counter;
         }

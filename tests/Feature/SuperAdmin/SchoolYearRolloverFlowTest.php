@@ -68,7 +68,7 @@ class SchoolYearRolloverFlowTest extends TestCase
             'advisor_teacher_id' => $grade11Adviser->id,
             'created_by' => $superAdmin->id,
             'section_name' => 'Einstein',
-            'section_code' => 'STEM-11-EIN',
+            'section_code' => satis_generate_section_code('11', 'STEM', 'Einstein'),
             'cohort' => '2025',
             'grade_level' => '11',
             'strand' => 'STEM',
@@ -82,7 +82,7 @@ class SchoolYearRolloverFlowTest extends TestCase
             'advisor_teacher_id' => null,
             'created_by' => $superAdmin->id,
             'section_name' => 'Newton',
-            'section_code' => 'STEM-12-NEW',
+            'section_code' => satis_generate_section_code('12', 'STEM', 'Newton'),
             'cohort' => '2025',
             'grade_level' => '12',
             'strand' => 'STEM',
@@ -197,7 +197,7 @@ class SchoolYearRolloverFlowTest extends TestCase
         $promotedSection = Section::query()
             ->where('school_year', $newSchoolYear)
             ->where('grade_level', '12')
-            ->where('section_code', 'STEM-11-EIN')
+            ->where('section_code', satis_generate_section_code('12', 'STEM', 'Einstein'))
             ->first();
 
         $this->assertNotNull($promotedSection);
@@ -234,7 +234,7 @@ class SchoolYearRolloverFlowTest extends TestCase
                 ->has('sections.data', 1)
                 ->where('sections.data.0.school_year', $newSchoolYear)
                 ->where('sections.data.0.grade_level', '12')
-                ->where('sections.data.0.section_code', 'STEM-11-EIN')
+                ->where('sections.data.0.section_code', satis_generate_section_code('12', 'STEM', 'Einstein'))
         );
     }
 
@@ -288,7 +288,7 @@ class SchoolYearRolloverFlowTest extends TestCase
         $this->assertDatabaseHas('sections', [
             'department_id' => $department->id,
             'section_name' => 'Rizal',
-            'section_code' => 'ABM-11-RIZ',
+            'section_code' => satis_generate_section_code('11', 'ABM', 'Rizal'),
             'grade_level' => '11',
             'school_year' => $currentSchoolYear,
             'advisor_teacher_id' => null,
@@ -320,7 +320,7 @@ class SchoolYearRolloverFlowTest extends TestCase
             'advisor_teacher_id' => null,
             'created_by' => $superAdmin->id,
             'section_name' => 'Mabini',
-            'section_code' => 'HUM-11-MAB',
+            'section_code' => satis_generate_section_code('11', 'HUMSS', 'Mabini'),
             'cohort' => '2026',
             'grade_level' => '11',
             'strand' => 'HUMSS',

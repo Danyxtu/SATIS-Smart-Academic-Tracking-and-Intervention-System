@@ -193,6 +193,11 @@ class InterventionController extends Controller
         $intervention = $task->intervention;
         $enrollment = $intervention->enrollment;
 
+        $currentSchoolYear = Intervention::resolveCurrentSchoolYear();
+        if ($currentSchoolYear !== null && (string) ($intervention->school_year ?? '') !== $currentSchoolYear) {
+            abort(403, 'Unauthorized');
+        }
+
         if ($enrollment->user_id !== $request->user()->id) {
             abort(403, 'Unauthorized');
         }
@@ -230,6 +235,11 @@ class InterventionController extends Controller
     {
         // Verify the intervention belongs to this student
         $enrollment = $intervention->enrollment;
+
+        $currentSchoolYear = Intervention::resolveCurrentSchoolYear();
+        if ($currentSchoolYear !== null && (string) ($intervention->school_year ?? '') !== $currentSchoolYear) {
+            abort(403, 'Unauthorized');
+        }
 
         if ($enrollment->user_id !== $request->user()->id) {
             abort(403, 'Unauthorized');

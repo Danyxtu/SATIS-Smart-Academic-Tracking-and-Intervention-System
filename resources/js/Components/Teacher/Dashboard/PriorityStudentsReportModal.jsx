@@ -50,7 +50,7 @@ export default function PriorityStudentsReportModal({
     );
     const recentDeclineRequiresFailingFinalQuarter = Boolean(
         watchlistRuleConfig?.recent_decline?.require_final_quarter_failing ??
-            true,
+        true,
     );
 
     const atRiskCount = students.filter((student) => student.at_risk).length;
@@ -173,7 +173,7 @@ export default function PriorityStudentsReportModal({
         {
             key: "needs_attention",
             label: "Needs Attention",
-            description: `Absences > ${needsAttentionAbsenceThreshold} or failing activities > ${needsAttentionFailingActivitiesThreshold}`,
+            description: `Absences >= ${needsAttentionAbsenceThreshold} or failing activities >= ${needsAttentionFailingActivitiesThreshold}`,
             enabled: observeNeedsAttention,
             count: needsAttentionCount,
             icon: ClipboardList,
@@ -419,7 +419,8 @@ export default function PriorityStudentsReportModal({
                 <div className="shrink-0 border-t border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-800/50 sm:px-6 sm:py-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                            The report will follow your Class Settings and include a formal summary section.
+                            The report will follow your Class Settings and
+                            include a formal summary section.
                         </p>
                         <div className="flex w-full gap-2 sm:w-auto sm:gap-3">
                             <button

@@ -136,7 +136,7 @@ class DashboardServices
             ? $students->filter(fn($s) => $s['at_risk'] === true)->count()
             : 0;
 
-        // 2. Needs Attention (shared policy: absences > 3 or failing activities > 3)
+        // 2. Needs Attention (shared policy: absences >= 3 or failing activities >= 3)
         $needsAttentionCount = $observeNeedsAttention
             ? $students->filter(fn($s) => $s['needs_attention'] === true)->count()
             : 0;
@@ -281,15 +281,15 @@ class DashboardServices
         if ($status === 'medium') {
             $parts = [];
 
-            if ($absences > $needsAttentionAbsenceThreshold) {
-                $parts[] = sprintf('absences %d exceeded threshold %d', $absences, $needsAttentionAbsenceThreshold);
+            if ($absences >= $needsAttentionAbsenceThreshold) {
+                $parts[] = sprintf('absences %d reached threshold %d', $absences, $needsAttentionAbsenceThreshold);
             }
 
             if ($missingActivities > 0) {
                 $parts[] = sprintf('missed %d activities', $missingActivities);
             }
 
-            if ($failingActivities > $needsAttentionFailingActivitiesThreshold) {
+            if ($failingActivities >= $needsAttentionFailingActivitiesThreshold) {
                 $parts[] = sprintf(
                     'failed %d activities (threshold %d)',
                     $failingActivities,

@@ -149,6 +149,7 @@ class HandleInertiaRequests extends Middleware
             })->pluck('id');
 
             $pendingInterventions = Intervention::whereIn('enrollment_id', $enrollmentIds)
+                ->forSchoolYear(SystemSetting::getCurrentSchoolYear())
                 ->whereIn('status', ['in-progress', 'pending'])
                 ->count();
 
