@@ -10,14 +10,29 @@ use App\Models\SystemSetting;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use function Pest\Laravel\actingAs;
+use function Pest\Laravel\getJson;
 use function Pest\Laravel\post;
 use function Pest\Laravel\put;
 use function Pest\Laravel\assertDatabaseHas;
 
-test('teacher can add a student and receives the generated password in session', function () {
+test('teacher can assign an existing student to a class using LRN', function () {
     /** @var User $teacher */
     $teacher = User::factory()->create();
     $teacher->syncRolesByName(['teacher']);
+
+    /** @var User $studentUser */
+    $studentUser = User::factory()->create([
+        'first_name' => 'Test',
+        'last_name' => 'Student',
+        'username' => 'teststudent',
+    ]);
+    $studentUser->syncRolesByName(['student']);
+
+    Student::factory()->create([
+        'user_id' => $studentUser->id,
+        'student_name' => 'Test Student',
+        'lrn' => '111222333444',
+    ]);
 
     $subject = Subject::factory()->create();
     $class = SchoolClass::factory()->create([
@@ -28,20 +43,58 @@ test('teacher can add a student and receives the generated password in session',
     actingAs($teacher);
 
     $response = post(route('teacher.classes.students.store', $class->id), [
-        'student_name' => 'Test Student',
         'lrn' => '111222333444',
     ]);
 
-    $response->assertSessionHas('new_student_password');
+    $response->assertSessionHas('success', 'Student assigned to class.');
+    $response->assertSessionMissing('new_student_password');
 
-    $sessionData = session('new_student_password');
-    $this->assertNotNull($sessionData['password']);
-    $this->assertNotNull($sessionData['username'] ?? null);
+    assertDatabaseHas('enrollments', [
+        'class_id' => $class->id,
+        'user_id' => $studentUser->id,
+    ]);
+});
 
-    $studentRecord = Student::where('lrn', '111222333444')->first();
-    $user = User::find($studentRecord->user_id ?? null);
-    $this->assertNotNull($user);
-    $this->assertTrue(Hash::check($sessionData['password'], $user->password));
+test('teacher can search student by lrn before assigning', function () {
+    /** @var User $teacher */
+    $teacher = User::factory()->create();
+    $teacher->syncRolesByName(['teacher']);
+
+    /** @var User $studentUser */
+    $studentUser = User::factory()->create([
+        'first_name' => 'Search',
+        'last_name' => 'Target',
+        'username' => 'searchtarget',
+    ]);
+    $studentUser->syncRolesByName(['student']);
+
+    Student::factory()->create([
+        'user_id' => $studentUser->id,
+        'student_name' => 'Search Target',
+        'grade_level' => '11',
+        'section' => 'STEM-A',
+        'strand' => 'STEM',
+        'lrn' => '999888777666',
+    ]);
+
+    $subject = Subject::factory()->create();
+    $class = SchoolClass::factory()->create([
+        'teacher_id' => $teacher->id,
+        'subject_id' => $subject->id,
+    ]);
+
+    actingAs($teacher);
+
+    $response = getJson(route('teacher.classes.students.search', [
+        'subjectTeacher' => $class->id,
+        'lrn' => '999888777666',
+    ]));
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('student.lrn', '999888777666')
+        ->assertJsonPath('student.username', 'searchtarget')
+        ->assertJsonPath('student.is_already_assigned', false);
 });
 
 test('teacher can upload a classlist and import summary contains generated passwords for newly-created users', function () {

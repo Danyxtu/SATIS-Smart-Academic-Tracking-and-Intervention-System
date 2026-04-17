@@ -57,6 +57,8 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
             ->name('classes.update');
         Route::delete('/classes/{subjectTeacher}', [ClassController::class, 'destroyClass'])
             ->name('classes.destroy');
+        Route::get('/classes/{subjectTeacher}/students/search', [ClassController::class, 'searchStudentByLrn'])
+            ->name('classes.students.search');
         Route::post('/classes/{subjectTeacher}/students', [ClassController::class, 'enrollStudent'])
             ->name('classes.students.store');
         Route::post('/classes/{subjectTeacher}/classlist', [ClassController::class, 'uploadClasslist'])

@@ -20,7 +20,6 @@ import { getSemesterLabel } from "@/Utils/Teacher/Dashboard";
 import {
     PriorityStudentsReportModal,
     ShowTutorialModal,
-    UploadGradesModal,
     StartInterventionModal,
 } from "@/Components/Teacher/Dashboard";
 import UnifiedDashboardSwitcher from "@/Components/UnifiedDashboardSwitcher";
@@ -82,7 +81,6 @@ const Dashboard = ({
     const [showTutorial, setShowTutorial] = useState(false);
     const [studentFilter, setStudentFilter] = useState("all");
     const [showReportModal, setShowReportModal] = useState(false);
-    const [showUploadGradesModal, setShowUploadGradesModal] = useState(false);
     const [showInterventionModal, setShowInterventionModal] = useState(false);
 
     const currentDate = new Date().toLocaleDateString("en-US", {
@@ -210,12 +208,6 @@ const Dashboard = ({
 
     // Quick actions configuration
     const quickActions = [
-        {
-            label: "Upload Grades",
-            icon: Upload,
-            onClick: () => setShowUploadGradesModal(true),
-            color: "from-indigo-500 to-indigo-600",
-        },
         {
             label: "View Classes",
             icon: Users,
@@ -692,12 +684,6 @@ const Dashboard = ({
                 department={department}
                 watchlistRuleConfig={watchlistRuleConfig}
                 watchlistObservedCategories={watchlistObservedCategories}
-            />
-
-            <UploadGradesModal
-                show={showUploadGradesModal}
-                onClose={() => setShowUploadGradesModal(false)}
-                allSubjects={allSubjects}
             />
 
             <StartInterventionModal

@@ -1909,40 +1909,8 @@ const MyClass = (props) => {
                             {isUploadingClasslist ? "Uploading…" : "Upload"}
                         </button>
 
-                        <button
-                            onClick={
-                                isGradeView
-                                    ? handleDownloadGradeTemplate
-                                    : handleDownloadClasslistTemplate
-                            }
-                            disabled={!selectedClass}
-                            className="flex items-center gap-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            <FileDown size={14} />
-                            Template
-                        </button>
-
                         {isGradeView && (
                             <>
-                                <button
-                                    onClick={handleGradesUploadClick}
-                                    disabled={
-                                        !selectedClass ||
-                                        isImportingGrades ||
-                                        isReadOnlyView
-                                    }
-                                    className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium py-1.5 px-2.5 rounded-md hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60 text-xs"
-                                    title={
-                                        isReadOnlyView
-                                            ? readOnlyHint
-                                            : "Upload grades from CSV"
-                                    }
-                                >
-                                    <Upload size={14} />
-                                    {isImportingGrades
-                                        ? "Uploading…"
-                                        : "Upload Grades"}
-                                </button>
                                 {selectedTab !== "final" &&
                                     !isReadOnlyView &&
                                     (isEditingGrades ? (
@@ -3321,9 +3289,6 @@ const MyClass = (props) => {
                 <AddStudentModal
                     subjectId={selectedClass.id}
                     subjectLabel={selectedClassHeading}
-                    existingLrns={students
-                        .map((student) => student?.lrn)
-                        .filter(Boolean)}
                     onSuccess={refreshCurrentClassData}
                     onClose={() => setIsAddStudentModalOpen(false)}
                 />

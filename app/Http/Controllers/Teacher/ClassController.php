@@ -632,6 +632,61 @@ class ClassController extends Controller
             ->with('success', 'Class deleted successfully.');
     }
 
+    public function searchStudentByLrn(Request $request, SchoolClass $subjectTeacher): JsonResponse
+    {
+        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
+
+        $normalizedLrn = $this->sanitizeLrn($request->query('lrn'));
+
+        $validator = Validator::make([
+            'lrn' => $normalizedLrn,
+        ], [
+            'lrn' => ['required', 'string', 'digits:12', 'not_in:000000000000'],
+        ], [
+            'lrn.digits' => 'LRN must be exactly 12 digits.',
+            'lrn.not_in' => 'LRN cannot be 000000000000.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Please provide a valid LRN.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $student = Student::query()
+            ->with(['user:id,first_name,last_name,middle_name,username,personal_email'])
+            ->where('lrn', $normalizedLrn)
+            ->first();
+
+        if (! $student || ! $student->user_id) {
+            return response()->json([
+                'message' => 'No student account was found for this LRN.',
+            ], 404);
+        }
+
+        $isAlreadyAssigned = Enrollment::query()
+            ->where('class_id', $subjectTeacher->id)
+            ->where('user_id', $student->user_id)
+            ->exists();
+
+        return response()->json([
+            'student' => [
+                'id' => (int) $student->id,
+                'user_id' => (int) $student->user_id,
+                'name' => $this->formatStudentDisplayName($student->user, $student),
+                'lrn' => $student->lrn,
+                'username' => $student->user?->username,
+                'personal_email' => $student->user?->personal_email,
+                'grade_level' => $student->grade_level,
+                'section' => $student->section,
+                'strand' => $student->strand,
+                'track' => $student->track,
+                'is_already_assigned' => $isAlreadyAssigned,
+            ],
+        ]);
+    }
+
     public function enrollStudent(Request $request, SchoolClass $subjectTeacher): RedirectResponse
     {
         $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
@@ -639,60 +694,48 @@ class ClassController extends Controller
         $normalizedLrn = $this->sanitizeLrn($request->input('lrn'));
         $request->merge([
             'lrn' => $normalizedLrn,
-            'personal_email' => $request->input('personal_email', $request->input('email')),
         ]);
 
         $data = $request->validate([
-            'student_name' => ['required', 'string', 'max:255', 'not_regex:/\d/'],
             'lrn' => [
                 'required',
                 'string',
                 'digits:12',
                 'not_in:000000000000',
-                Rule::unique('students', 'lrn'),
+                Rule::exists('students', 'lrn'),
             ],
-            'personal_email' => 'nullable|email|max:255',
         ], [
-            'student_name.not_regex' => 'Student name cannot contain numbers.',
             'lrn.digits' => 'LRN must be exactly 12 digits.',
             'lrn.not_in' => 'LRN cannot be 000000000000.',
-            'lrn.unique' => 'This LRN is already registered and cannot be added again.',
+            'lrn.exists' => 'No student account was found for this LRN.',
         ]);
 
-        // Normalize the student name (remove extra spaces)
-        $studentName = preg_replace('/\s+/', ' ', trim($data['student_name']));
+        $student = Student::query()
+            ->where('lrn', $data['lrn'])
+            ->first();
 
-        $result = $this->persistStudentRecord($subjectTeacher, [
-            'student_name' => $studentName,
-            'grade_level' => $subjectTeacher->grade_level,
-            'section' => $subjectTeacher->section,
-            'strand' => $subjectTeacher->strand,
-            'track' => $subjectTeacher->track,
-            'lrn' => $data['lrn'],
-            'personal_email' => $data['personal_email'] ?? null,
-        ]);
-
-        $statusMessage = match ($result['status']) {
-            'created' => 'Student account created and assigned to class.',
-            'assigned_existing' => 'Existing student assigned to class.',
-            'already_assigned' => 'Student already exists and is already assigned to this class.',
-            default => 'Student added to class.',
-        };
-
-        // Prepare flash with generated password if a new account was created
-        $redirect = redirect()->route('teacher.classes.index')->with('success', $statusMessage);
-
-        if (is_array($result) && ! empty($result['password'])) {
-            $redirect = $redirect->with('new_student_password', [
-                'name' => $studentName,
-                'lrn' => $data['lrn'],
-                'username' => $result['username'] ?? null,
-                'personal_email' => $result['personal_email'] ?? null,
-                'password' => $result['password'],
+        if (! $student || ! $student->user_id) {
+            throw ValidationException::withMessages([
+                'lrn' => 'No student account was found for this LRN.',
             ]);
         }
 
-        return $redirect;
+        $enrollment = Enrollment::firstOrCreate([
+            'user_id' => $student->user_id,
+            'class_id' => $subjectTeacher->id,
+        ], [
+            'risk_status' => 'low',
+            'current_grade' => null,
+            'current_attendance_rate' => null,
+        ]);
+
+        $statusMessage = $enrollment->wasRecentlyCreated
+            ? 'Student assigned to class.'
+            : 'Student is already assigned to this class.';
+
+        return redirect()
+            ->route('teacher.classes.index')
+            ->with('success', $statusMessage);
     }
 
     public function uploadClasslist(Request $request, SchoolClass $subjectTeacher): RedirectResponse

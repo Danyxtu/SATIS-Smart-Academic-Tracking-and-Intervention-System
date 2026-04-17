@@ -1,69 +1,29 @@
-import { useEffect, useMemo } from "react";
+import axios from "axios";
+import { useState } from "react";
 import { useForm } from "@inertiajs/react";
-import { X } from "lucide-react";
+import { Loader2, Search, UserRound, X } from "lucide-react";
 
 const LRN_LENGTH = 12;
 const INVALID_ZERO_LRN = "000000000000";
 const FIELD_CLASS =
     "block w-full h-9 rounded-sm border border-slate-300 bg-white px-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200/80";
 
-const AddStudentModal = ({
-    subjectId,
-    subjectLabel,
-    existingLrns = [],
-    onClose,
-    onSuccess,
-}) => {
-    const { data, setData, post, processing, errors, reset } = useForm({
-        first_name: "",
-        last_name: "",
-        middle_initial: "",
-        student_name: "",
+const AddStudentModal = ({ subjectId, subjectLabel, onClose, onSuccess }) => {
+    const {
+        data,
+        setData,
+        post,
+        processing,
+        errors,
+        reset,
+        setError,
+        clearErrors,
+    } = useForm({
         lrn: "",
-        personal_email: "",
     });
-
-    const normalizedFirstName = data.first_name.replace(/\s+/g, " ").trim();
-    const normalizedLastName = data.last_name.replace(/\s+/g, " ").trim();
-    const normalizedMiddleInitial = data.middle_initial.trim().toUpperCase();
-    const studentNamePayload = [
-        normalizedFirstName,
-        normalizedLastName,
-        normalizedMiddleInitial,
-    ]
-        .filter(Boolean)
-        .join(" ");
-
-    useEffect(() => {
-        if (data.student_name !== studentNamePayload) {
-            setData("student_name", studentNamePayload);
-        }
-    }, [studentNamePayload, data.student_name, setData]);
-
-    const normalizedExistingLrns = useMemo(
-        () =>
-            new Set(
-                existingLrns
-                    .map((lrn) => String(lrn ?? "").replace(/\D/g, ""))
-                    .filter(Boolean),
-            ),
-        [existingLrns],
-    );
-
-    const handleClose = () => {
-        reset();
-        onClose();
-    };
-
-    const firstNameClientError =
-        normalizedFirstName && /\d/.test(normalizedFirstName)
-            ? "First name cannot contain numbers."
-            : "";
-    const lastNameClientError =
-        normalizedLastName && /\d/.test(normalizedLastName)
-            ? "Last name cannot contain numbers."
-            : "";
-    const nameClientError = firstNameClientError || lastNameClientError;
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchResult, setSearchResult] = useState(null);
+    const [searchError, setSearchError] = useState("");
 
     const normalizedLrn = data.lrn.replace(/\D/g, "");
     const lrnClientError =
@@ -71,13 +31,75 @@ const AddStudentModal = ({
             ? "LRN must be exactly 12 digits."
             : normalizedLrn === INVALID_ZERO_LRN
               ? "LRN cannot be 000000000000."
-              : normalizedExistingLrns.has(normalizedLrn)
-                ? "This LRN already exists in the class list."
-                : "";
+              : "";
 
-    const handleSubmit = (e) => {
+    const resetSearchState = () => {
+        setSearchResult(null);
+        setSearchError("");
+    };
+
+    const handleClose = () => {
+        reset();
+        clearErrors();
+        resetSearchState();
+        onClose();
+    };
+
+    const handleSearch = async (e) => {
         e.preventDefault();
-        if (!subjectId || lrnClientError || nameClientError) return;
+        clearErrors("lrn");
+        resetSearchState();
+
+        if (
+            !subjectId ||
+            lrnClientError ||
+            normalizedLrn.length !== LRN_LENGTH
+        ) {
+            return;
+        }
+
+        setIsSearching(true);
+
+        try {
+            const response = await axios.get(
+                route("teacher.classes.students.search", subjectId),
+                {
+                    params: {
+                        lrn: normalizedLrn,
+                    },
+                },
+            );
+
+            const student = response?.data?.student ?? null;
+            if (!student) {
+                setSearchError("No student account was found for this LRN.");
+                return;
+            }
+
+            setSearchResult(student);
+        } catch (error) {
+            const responseErrors = error?.response?.data?.errors;
+            const responseMessage = error?.response?.data?.message;
+            const lrnError = Array.isArray(responseErrors?.lrn)
+                ? responseErrors.lrn[0]
+                : null;
+
+            if (lrnError) {
+                setError("lrn", lrnError);
+            } else {
+                setSearchError(
+                    responseMessage ||
+                        "Unable to search student right now. Please try again.",
+                );
+            }
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    const handleAssign = (e) => {
+        e.preventDefault();
+        if (!subjectId || !canAssign) return;
 
         post(route("teacher.classes.students.store", subjectId), {
             preserveState: true,
@@ -90,19 +112,45 @@ const AddStudentModal = ({
         });
     };
 
-    const canSubmit = Boolean(
+    const canAssign = Boolean(
         subjectId &&
-        normalizedFirstName &&
-        normalizedLastName &&
         normalizedLrn.length === LRN_LENGTH &&
-        !nameClientError &&
-        !lrnClientError,
+        !lrnClientError &&
+        searchResult &&
+        String(searchResult.lrn ?? "") === normalizedLrn &&
+        !searchResult.is_already_assigned,
+    );
+
+    const handleLrnChange = (e) => {
+        const value = e.target.value.replace(/\D/g, "").slice(0, LRN_LENGTH);
+
+        setData("lrn", value);
+        clearErrors("lrn");
+
+        if (searchResult || searchError) {
+            resetSearchState();
+        }
+    };
+
+    const studentMeta = [
+        searchResult?.grade_level ? `Grade ${searchResult.grade_level}` : "",
+        searchResult?.section,
+        searchResult?.strand,
+    ]
+        .filter(Boolean)
+        .join(" • ");
+
+    const searchButtonDisabled = Boolean(
+        isSearching ||
+        processing ||
+        normalizedLrn.length !== LRN_LENGTH ||
+        Boolean(lrnClientError),
     );
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 backdrop-blur-[2px] p-4">
             <div className="w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/20">
-                <form onSubmit={handleSubmit}>
+                <form onSubmit={handleSearch}>
                     <div className="flex justify-between items-center gap-3 bg-gradient-to-r from-slate-50 to-indigo-50 px-5 py-4 border-b border-slate-200">
                         <div>
                             <h3 className="text-lg font-bold text-slate-900 tracking-tight">
@@ -126,103 +174,50 @@ const AddStudentModal = ({
                     <div className="p-5 space-y-4">
                         <div>
                             <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                Name *
-                            </label>
-                            <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                    <input
-                                        type="text"
-                                        name="first_name"
-                                        required
-                                        className={FIELD_CLASS}
-                                        value={data.first_name}
-                                        onChange={(e) =>
-                                            setData(
-                                                "first_name",
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="First Name"
-                                    />
-                                    {firstNameClientError && (
-                                        <p className="text-xs text-red-600 mt-1">
-                                            {firstNameClientError}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <input
-                                        type="text"
-                                        name="last_name"
-                                        required
-                                        className={FIELD_CLASS}
-                                        value={data.last_name}
-                                        onChange={(e) =>
-                                            setData("last_name", e.target.value)
-                                        }
-                                        placeholder="Last Name"
-                                    />
-                                    {lastNameClientError && (
-                                        <p className="text-xs text-red-600 mt-1">
-                                            {lastNameClientError}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="mt-3 max-w-[180px]">
-                                <input
-                                    type="text"
-                                    name="middle_initial"
-                                    className={`${FIELD_CLASS} uppercase`}
-                                    value={data.middle_initial}
-                                    onChange={(e) =>
-                                        setData(
-                                            "middle_initial",
-                                            e.target.value
-                                                .replace(/[^a-zA-Z]/g, "")
-                                                .slice(0, 1)
-                                                .toUpperCase(),
-                                        )
-                                    }
-                                    maxLength={1}
-                                    placeholder="Middle Initial"
-                                />
-                            </div>
-
-                            {!nameClientError && errors.student_name && (
-                                <p className="text-xs text-red-600 mt-1">
-                                    {errors.student_name}
-                                </p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
                                 LRN (Learner Reference Number) *
                             </label>
-                            <input
-                                type="text"
-                                name="lrn"
-                                required
-                                className={`mt-1 ${FIELD_CLASS}`}
-                                value={data.lrn}
-                                onChange={(e) =>
-                                    setData(
-                                        "lrn",
-                                        e.target.value
-                                            .replace(/\D/g, "")
-                                            .slice(0, LRN_LENGTH),
-                                    )
-                                }
-                                inputMode="numeric"
-                                autoComplete="off"
-                                maxLength={LRN_LENGTH}
-                                minLength={LRN_LENGTH}
-                                pattern="[0-9]{12}"
-                                placeholder="e.g., 123456789012"
-                            />
+                            <div className="mt-1 flex flex-col sm:flex-row gap-2">
+                                <input
+                                    type="text"
+                                    name="lrn"
+                                    required
+                                    className={FIELD_CLASS}
+                                    value={data.lrn}
+                                    onChange={handleLrnChange}
+                                    inputMode="numeric"
+                                    autoComplete="off"
+                                    maxLength={LRN_LENGTH}
+                                    minLength={LRN_LENGTH}
+                                    pattern="[0-9]{12}"
+                                    placeholder="e.g., 123456789012"
+                                />
+                                <button
+                                    type="submit"
+                                    className="inline-flex h-9 items-center justify-center gap-1 rounded-sm border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+                                    disabled={searchButtonDisabled}
+                                >
+                                    {isSearching ? (
+                                        <>
+                                            <Loader2
+                                                size={15}
+                                                className="animate-spin"
+                                            />
+                                            Searching
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Search size={15} />
+                                            Search
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+
+                            <p className="mt-1 text-[11px] text-slate-500">
+                                Enter a student LRN to find an existing account,
+                                then assign that student to this class.
+                            </p>
+
                             {lrnClientError ? (
                                 <p className="text-xs text-red-600 mt-1">
                                     {lrnClientError}
@@ -235,30 +230,53 @@ const AddStudentModal = ({
                                 )
                             )}
                         </div>
-                        <div>
-                            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                Personal Email (optional)
-                            </label>
-                            <input
-                                type="email"
-                                name="personal_email"
-                                className={`mt-1 ${FIELD_CLASS}`}
-                                value={data.personal_email}
-                                onChange={(e) =>
-                                    setData("personal_email", e.target.value)
-                                }
-                                placeholder="e.g., student@example.com"
-                            />
-                            <p className="mt-1 text-[11px] text-slate-500">
-                                Username is generated automatically and used as
-                                the student login credential.
+
+                        {searchError && (
+                            <p className="text-xs text-red-600">
+                                {searchError}
                             </p>
-                            {errors.personal_email && (
-                                <p className="text-xs text-red-600 mt-1">
-                                    {errors.personal_email}
+                        )}
+
+                        {searchResult && (
+                            <div className="rounded-md border border-slate-200 bg-slate-50/80 p-3 space-y-2">
+                                <div className="flex items-center gap-2 text-slate-800">
+                                    <UserRound size={16} />
+                                    <p className="text-sm font-semibold">
+                                        Student Found
+                                    </p>
+                                </div>
+
+                                <p className="text-sm text-slate-900">
+                                    {searchResult.name || "Student"}
                                 </p>
-                            )}
-                        </div>
+
+                                <div className="text-xs text-slate-600 space-y-1">
+                                    <p>LRN: {searchResult.lrn}</p>
+                                    {searchResult.username && (
+                                        <p>Username: {searchResult.username}</p>
+                                    )}
+                                    {studentMeta && <p>{studentMeta}</p>}
+                                </div>
+
+                                {searchResult.is_already_assigned ? (
+                                    <p className="text-xs font-medium text-amber-700">
+                                        This student is already assigned to this
+                                        class.
+                                    </p>
+                                ) : (
+                                    <p className="text-xs font-medium text-emerald-700">
+                                        Student is ready to be assigned.
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
+                        {!searchResult && !searchError && (
+                            <p className="text-xs text-slate-500">
+                                Search by LRN to load exactly one student for
+                                assignment.
+                            </p>
+                        )}
                     </div>
 
                     <div className="flex items-center justify-end p-4 border-t border-slate-200 bg-slate-50/80 gap-2">
@@ -270,11 +288,12 @@ const AddStudentModal = ({
                             Cancel
                         </button>
                         <button
-                            type="submit"
+                            type="button"
+                            onClick={handleAssign}
                             className="bg-indigo-600 h-9 px-4 border border-transparent rounded-sm shadow-sm text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition"
-                            disabled={!canSubmit || processing}
+                            disabled={!canAssign || processing || isSearching}
                         >
-                            {processing ? "Adding…" : "Add Student"}
+                            {processing ? "Assigning…" : "Assign Student"}
                         </button>
                     </div>
                 </form>
