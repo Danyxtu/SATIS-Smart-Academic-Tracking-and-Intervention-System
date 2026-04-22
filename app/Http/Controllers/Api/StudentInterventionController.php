@@ -63,6 +63,8 @@ class StudentInterventionController extends Controller
                     'description' => $task->description,
                     'delivery_mode' => $task->delivery_mode,
                     'completed' => $task->is_completed,
+                    'submitted_at' => $task->submitted_at?->toIso8601String(),
+                    'isPendingReview' => $task->isPendingReview(),
                 ]);
 
                 $completedTasks = $tasks->where('completed', true)->count();

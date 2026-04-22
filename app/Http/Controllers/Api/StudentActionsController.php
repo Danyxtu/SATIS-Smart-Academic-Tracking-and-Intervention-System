@@ -46,7 +46,52 @@ class StudentActionsController extends Controller
 
         $intervention = $task->intervention;
 
-        $task->update(['is_completed' => true]);
+        if ($task->is_completed) {
+            return response()->json(['success' => false, 'message' => 'Task is already completed.'], 422);
+        }
+
+        if ($task->delivery_mode === 'remote') {
+            if ($task->submitted_at !== null) {
+                return response()->json(['success' => false, 'message' => 'Proof has already been submitted.'], 422);
+            }
+
+            $request->validate([
+                'proof' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
+                'notes' => 'nullable|string|max:500',
+            ]);
+
+            if ($request->hasFile('proof')) {
+                $path = $request->file('proof')->store('interventions/proofs', 'local');
+
+                $task->update([
+                    'proof_path' => $path,
+                    'proof_notes' => $request->input('notes'),
+                    'submitted_at' => now(),
+                ]);
+
+                // Create notification for the teacher
+                $enrollment = $intervention->enrollment;
+                $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+                $teacher = $class?->teacher;
+                if ($teacher) {
+                    StudentNotification::create([
+                        'user_id' => $teacher->id,
+                        'sender_id' => $request->user()->id,
+                        'intervention_id' => $intervention->id,
+                        'type' => 'alert',
+                        'title' => 'Proof Submitted',
+                        'message' => $request->user()->name . " has submitted proof for the task: \"{$task->task_name}\".",
+                    ]);
+                }
+
+                return response()->json(['success' => true, 'message' => 'Proof submitted successfully!']);
+            }
+        }
+
+        $task->update([
+            'is_completed' => true,
+            'completed_at' => now(),
+        ]);
 
         // If all tasks completed, mark intervention completed
         $remaining = $intervention->tasks()->where('is_completed', false)->count();
@@ -54,7 +99,7 @@ class StudentActionsController extends Controller
             $intervention->update(['status' => 'completed']);
         }
 
-        return response()->json(['success' => true]);
+        return response()->json(['success' => true, 'message' => 'Task marked as completed!']);
     }
 
     public function markFeedbackRead(Request $request, $notificationId)
