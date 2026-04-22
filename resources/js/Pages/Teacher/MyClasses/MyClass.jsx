@@ -12,6 +12,7 @@ import {
     ChevronDown,
     ChevronRight,
     Users,
+    BookOpen,
     X,
     HelpCircle,
     Info,
@@ -1744,6 +1745,36 @@ const MyClass = (props) => {
                 onChange={handleGradesFileChange}
             />
 
+            {/* View Mode Toggle - Full Width */}
+            <div className="flex p-1 bg-gray-100 dark:bg-gray-800 rounded-xl mb-4 shadow-sm border border-gray-200 dark:border-gray-700">
+                <button
+                    onClick={() => {
+                        setStudentViewMode("classList");
+                        setDirtyGrades({});
+                        setIsEditingGrades(false);
+                    }}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold transition-all ${
+                        studentViewMode === "classList"
+                            ? "bg-white dark:bg-gray-900 text-indigo-700 shadow-sm"
+                            : "text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-50/50 dark:hover:bg-gray-700/50"
+                    }`}
+                >
+                    <Users size={18} className={studentViewMode === "classList" ? "text-indigo-600" : "text-gray-400"} />
+                    <span>Student Lists</span>
+                </button>
+                <button
+                    onClick={() => setStudentViewMode("gradeOverview")}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold transition-all ${
+                        studentViewMode === "gradeOverview"
+                            ? "bg-white dark:bg-gray-900 text-indigo-700 shadow-sm"
+                            : "text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-50/50 dark:hover:bg-gray-700/50"
+                    }`}
+                >
+                    <BookOpen size={18} className={studentViewMode === "gradeOverview" ? "text-indigo-600" : "text-gray-400"} />
+                    <span>Students Grades</span>
+                </button>
+            </div>
+
             {/* My Class Container - More Compact */}
             <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
                 {/* Upload Status Messages - Compact */}
@@ -1801,35 +1832,6 @@ const MyClass = (props) => {
                                     {readOnlyBadgeLabel}
                                 </span>
                             )}
-                            {/* View Mode Toggle - Compact */}
-                            <div className="flex items-center p-0.5 bg-gray-100 dark:bg-gray-700 rounded-md">
-                                <button
-                                    onClick={() => {
-                                        setStudentViewMode("classList");
-                                        setDirtyGrades({});
-                                        setIsEditingGrades(false);
-                                    }}
-                                    className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                                        studentViewMode === "classList"
-                                            ? "bg-white dark:bg-gray-900 text-indigo-700 shadow-sm"
-                                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-200"
-                                    }`}
-                                >
-                                    List
-                                </button>
-                                <button
-                                    onClick={() =>
-                                        setStudentViewMode("gradeOverview")
-                                    }
-                                    className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                                        studentViewMode === "gradeOverview"
-                                            ? "bg-white dark:bg-gray-900 text-indigo-700 shadow-sm"
-                                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-200"
-                                    }`}
-                                >
-                                    Grades
-                                </button>
-                            </div>
 
                             {/* Help Button & Bubble */}
                             <div className="relative ml-2">
