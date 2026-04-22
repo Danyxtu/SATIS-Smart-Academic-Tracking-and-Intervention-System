@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -56,7 +57,7 @@ class InterventionController extends Controller
             'subjectTeacher.subject',
             'grades',
             'attendanceRecords',
-            'intervention.tasks',
+            'interventions.tasks',
         ])
             ->where(function ($query) use ($teacher, $currentSchoolYear) {
                 $query
@@ -98,8 +99,10 @@ class InterventionController extends Controller
             $alertReasons = $risk['reasons'] ?? [];
 
             // Get existing intervention info
-            $intervention = $enrollment->intervention;
-            $lastInterventionDate = $intervention?->updated_at?->format('Y-m-d');
+            $interventions = $enrollment->interventions;
+            $activeInterventions = $interventions->where('status', 'active');
+            $latestIntervention = $interventions->sortByDesc('updated_at')->first();
+            $lastInterventionDate = $latestIntervention?->updated_at?->format('Y-m-d');
 
             // Get prediction data
             $prediction = [
@@ -137,14 +140,17 @@ class InterventionController extends Controller
                 'watchLevel' => $risk['watch_level'] ?? 'none',
                 'alertReason' => !empty($alertReasons) ? implode(' ', $alertReasons) : 'Under Observation',
                 'lastInterventionDate' => $lastInterventionDate ?? 'Never',
-                'hasActiveIntervention' => $intervention && $intervention->status === 'active',
+                'hasActiveIntervention' => $activeInterventions->isNotEmpty(),
+                'activeInterventionsCount' => $activeInterventions->count(),
                 // Prediction data
                 'predictedGrade' => $prediction['predicted_grade'],
                 'gradeTrend' => $prediction['trend'],
                 'trendDirection' => $prediction['trend_direction'],
-                'intervention' => $intervention ? $this->serializeIntervention($intervention) : null,
+                'interventions' => $interventions->map(fn($i) => $this->serializeIntervention($i))->toArray(),
+                // Legacy support
+                'intervention' => $latestIntervention ? $this->serializeIntervention($latestIntervention) : null,
                 // Flag for pending completion requests (for easy filtering)
-                'hasPendingCompletionRequest' => $intervention?->isPendingApproval() ?? false,
+                'hasPendingCompletionRequest' => $activeInterventions->contains(fn($i) => $i->isPendingApproval()),
             ];
         })
             // Only include students who are NOT on_track or have active intervention
@@ -186,17 +192,16 @@ class InterventionController extends Controller
                 ])->values()->toArray();
 
             // Get intervention log
-            $intervention = $enrollment->intervention;
-            $interventionLog = [];
-            if ($intervention) {
-                $interventionLog[] = [
-                    'id' => $intervention->id,
-                    'date' => $intervention->created_at?->format('Y-m-d'),
-                    'action' => Intervention::getTypes()[$intervention->type] ?? $intervention->type,
-                    'notes' => $intervention->notes,
-                    'followUp' => null,
-                ];
-            }
+            $interventions = $enrollment->interventions;
+            $interventionLog = $interventions->map(fn($i) => [
+                'id' => $i->id,
+                'date' => $i->created_at?->format('Y-m-d'),
+                'action' => Intervention::getTypes()[$i->type] ?? $i->type,
+                'notes' => $i->notes,
+                'followUp' => null,
+                'status' => $i->status,
+                'completed_at' => $i->completed_at?->format('Y-m-d'),
+            ])->values()->toArray();
 
             // Use shared global watchlist rules for profile priority as well.
             $risk = $this->watchlistRuleService->evaluateEnrollment($enrollment, $watchlistRules);
@@ -209,16 +214,21 @@ class InterventionController extends Controller
                 : 'Under Observation';
 
             // Build pending completion request data
+            $activeInterventions = $interventions->where('status', 'active');
+            $pendingReqIntervention = $activeInterventions->first(fn($i) => $i->isPendingApproval());
+            
             $pendingCompletionRequest = null;
-            if ($intervention && $intervention->isPendingApproval()) {
+            if ($pendingReqIntervention) {
                 $pendingCompletionRequest = [
-                    'interventionId' => $intervention->id,
-                    'type' => $intervention->type,
-                    'typeLabel' => Intervention::getTypes()[$intervention->type] ?? $intervention->type,
-                    'requestedAt' => $intervention->completion_requested_at?->format('M d, Y'),
-                    'requestNotes' => $intervention->completion_request_notes,
+                    'interventionId' => $pendingReqIntervention->id,
+                    'type' => $pendingReqIntervention->type,
+                    'typeLabel' => Intervention::getTypes()[$pendingReqIntervention->type] ?? $pendingReqIntervention->type,
+                    'requestedAt' => $pendingReqIntervention->completion_requested_at?->format('M d, Y'),
+                    'requestNotes' => $pendingReqIntervention->completion_request_notes,
                 ];
             }
+
+            $latestActiveIntervention = $activeInterventions->sortByDesc('updated_at')->first();
 
             return [
                 $enrollment->id => [
@@ -233,10 +243,11 @@ class InterventionController extends Controller
                     'missingAssignments' => $missingAssignments,
                     'behaviorLog' => [],
                     'interventionLog' => $interventionLog,
+                    'interventions' => $interventions->map(fn($i) => $this->serializeIntervention($i))->toArray(),
                     'priority' => $priority,
                     'priorityReason' => $priorityReason,
                     'pendingCompletionRequest' => $pendingCompletionRequest,
-                    'activeIntervention' => $intervention ? $this->serializeIntervention($intervention) : null,
+                    'activeIntervention' => $latestActiveIntervention ? $this->serializeIntervention($latestActiveIntervention) : null,
                 ],
             ];
         })->toArray();
@@ -535,7 +546,7 @@ class InterventionController extends Controller
     public function toggleTaskCompletion(Request $request, Intervention $intervention, InterventionTask $task)
     {
         $teacher = $request->user();
-        $this->authorizeInterventionForTeacher($intervention, (int) $teacher->id);
+        $enrollment = $this->authorizeInterventionForTeacher($intervention, (int) $teacher->id);
         $this->ensureTaskBelongsToIntervention($intervention, $task);
 
         $validated = $request->validate([
@@ -543,12 +554,38 @@ class InterventionController extends Controller
         ]);
 
         $isCompleted = (bool) $validated['is_completed'];
+        $wasPendingReview = $task->isPendingReview();
 
         $task->update([
             'is_completed' => $isCompleted,
-            'completed_at' => $isCompleted ? now() : null,
+            'completed_at' => $isCompleted ? ($task->completed_at ?? now()) : null,
             'approved_by_teacher_at' => $isCompleted ? now() : null,
         ]);
+
+        // If all tasks are completed, mark intervention as completed
+        if ($isCompleted) {
+            $allCompleted = $intervention->tasks()->where('is_completed', false)->count() === 0;
+            if ($allCompleted && $intervention->tasks()->count() > 0) {
+                $intervention->update(['status' => 'completed']);
+            }
+
+            if ($wasPendingReview) {
+                // Notify student of approval
+                StudentNotification::create([
+                    'user_id' => $enrollment->user_id,
+                    'intervention_id' => $intervention->id,
+                    'sender_id' => $teacher->id,
+                    'type' => 'feedback',
+                    'title' => '✅ Task Proof Approved',
+                    'message' => "Your teacher approved your proof for \"{$task->task_name}\".",
+                ]);
+            }
+        } else {
+            // If any task is uncompleted, mark intervention as active again if it was completed
+            if ($intervention->status === 'completed') {
+                $intervention->update(['status' => 'active']);
+            }
+        }
 
         return Redirect::back()->with(
             'success',
@@ -1158,6 +1195,63 @@ class InterventionController extends Controller
         return back()->with('success', 'Completion request rejected. Student has been notified.');
     }
 
+    /**
+     * Download or view a student's task proof.
+     */
+    public function downloadProof(Request $request, Intervention $intervention, InterventionTask $task)
+    {
+        $teacher = $request->user();
+        $this->authorizeInterventionForTeacher($intervention, (int) $teacher->id);
+        $this->ensureTaskBelongsToIntervention($intervention, $task);
+
+        if (!$task->proof_path || !Storage::disk('local')->exists($task->proof_path)) {
+            abort(404, 'Proof file not found.');
+        }
+
+        return Storage::disk('local')->download($task->proof_path);
+    }
+
+    /**
+     * Reject a student's submitted proof for a task.
+     */
+    public function rejectTaskProof(Request $request, Intervention $intervention, InterventionTask $task)
+    {
+        $teacher = $request->user();
+        $enrollment = $this->authorizeInterventionForTeacher($intervention, (int) $teacher->id);
+        $this->ensureTaskBelongsToIntervention($intervention, $task);
+
+        if (!$task->isPendingReview()) {
+            return back()->with('error', 'Task is not pending review.');
+        }
+
+        $request->validate([
+            'reason' => 'required|string|max:500',
+        ]);
+
+        // Delete the file
+        if ($task->proof_path) {
+            Storage::disk('local')->delete($task->proof_path);
+        }
+
+        $task->update([
+            'proof_path' => null,
+            'proof_notes' => null,
+            'submitted_at' => null,
+        ]);
+
+        // Notify student
+        StudentNotification::create([
+            'user_id' => $enrollment->user_id,
+            'intervention_id' => $intervention->id,
+            'sender_id' => $teacher->id,
+            'type' => 'alert',
+            'title' => '❌ Task Proof Rejected',
+            'message' => "Your proof for \"{$task->task_name}\" was rejected. Reason: {$request->input('reason')}. Please resubmit with the correct proof.",
+        ]);
+
+        return back()->with('success', 'Task proof rejected. Student has been notified.');
+    }
+
     private function authorizeInterventionForTeacher(Intervention $intervention, int $teacherId): Enrollment
     {
         $enrollment = $intervention->enrollment;
@@ -1208,6 +1302,7 @@ class InterventionController extends Controller
             'type' => $intervention->type,
             'typeLabel' => Intervention::getTypes()[$intervention->type] ?? $intervention->type,
             'status' => $intervention->status,
+            'completed_at' => $intervention->completed_at?->toIso8601String(),
             'notes' => $intervention->notes,
             'deadlineAt' => $intervention->deadline_at?->toIso8601String(),
             'deadlineLabel' => $intervention->deadline_at?->format('M d, Y h:i A'),
@@ -1245,6 +1340,10 @@ class InterventionController extends Controller
             'is_completed' => (bool) $task->is_completed,
             'completed_at' => $task->completed_at?->toIso8601String(),
             'approved_by_teacher_at' => $task->approved_by_teacher_at?->toIso8601String(),
+            'proof_path' => $task->proof_path,
+            'proof_notes' => $task->proof_notes,
+            'submitted_at' => $task->submitted_at?->toIso8601String(),
+            'is_pending_review' => $task->isPendingReview(),
         ];
     }
 

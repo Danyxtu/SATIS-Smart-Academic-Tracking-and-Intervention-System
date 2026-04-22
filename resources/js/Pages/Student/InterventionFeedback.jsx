@@ -20,6 +20,8 @@ import {
     TrendingUp,
     AlertCircle,
     Loader2,
+    Paperclip,
+    FileText,
 } from "lucide-react";
 
 // --- Filter Tabs Component ---
@@ -162,9 +164,15 @@ const MiniStat = ({ label, value, color = "pink" }) => {
 // --- Task Item Component ---
 const TaskItem = ({ task }) => {
     const [isLoading, setIsLoading] = useState(false);
+    const fileInputRef = useRef(null);
 
     const handleComplete = () => {
-        if (task.completed || isLoading) return;
+        if (task.completed || isLoading || task.isPendingReview) return;
+
+        if (task.delivery_mode === "remote") {
+            fileInputRef.current?.click();
+            return;
+        }
 
         setIsLoading(true);
         router.post(
@@ -177,36 +185,117 @@ const TaskItem = ({ task }) => {
         );
     };
 
+    const handleFileChange = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Simple validation
+        const allowedTypes = ["application/pdf", "image/jpeg", "image/png"];
+        if (!allowedTypes.includes(file.type)) {
+            alert("Please upload a PDF or an image (JPG, PNG).");
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            alert("File size should be less than 5MB.");
+            return;
+        }
+
+        setIsLoading(true);
+        const formData = new FormData();
+        formData.append("proof", file);
+
+        router.post(route("interventions.tasks.complete", { task: task.id }), formData, {
+            preserveScroll: true,
+            onFinish: () => {
+                setIsLoading(false);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+            },
+        });
+    };
+
     return (
-        <div className="flex items-center justify-between py-2">
-            <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300 flex-1">
-                <button
-                    onClick={handleComplete}
-                    disabled={task.completed || isLoading}
-                    className={`flex-shrink-0 transition-colors ${
-                        task.completed
-                            ? "text-pink-600"
-                            : "text-gray-400 dark:text-gray-500 hover:text-pink-500"
-                    }`}
-                >
-                    {isLoading ? (
-                        <Loader2 size={18} className="animate-spin" />
-                    ) : task.completed ? (
-                        <CheckSquare size={18} />
-                    ) : (
-                        <Square size={18} />
+        <div className="flex flex-col border-b border-gray-100 dark:border-gray-800/50 last:border-0">
+            <div className="flex items-center justify-between py-3">
+                <div className="flex items-center gap-3 text-gray-700 dark:text-gray-300 flex-1">
+                    <button
+                        onClick={handleComplete}
+                        disabled={task.completed || isLoading || task.isPendingReview}
+                        className={`flex-shrink-0 transition-colors ${
+                            task.completed
+                                ? "text-green-600"
+                                : task.isPendingReview
+                                  ? "text-amber-500"
+                                  : "text-gray-400 dark:text-gray-500 hover:text-pink-500"
+                        }`}
+                        title={
+                            task.delivery_mode === "remote"
+                                ? "Upload proof of completion"
+                                : "Mark as completed"
+                        }
+                    >
+                        {isLoading ? (
+                            <Loader2 size={20} className="animate-spin" />
+                        ) : task.completed ? (
+                            <CheckSquare size={20} />
+                        ) : task.isPendingReview ? (
+                            <Clock size={20} />
+                        ) : (
+                            <Square size={20} />
+                        )}
+                    </button>
+                    <div className="flex flex-col">
+                        <span
+                            className={`text-sm font-medium ${
+                                task.completed
+                                    ? "line-through text-gray-400 dark:text-gray-500"
+                                    : "text-gray-700 dark:text-gray-200"
+                            }`}
+                        >
+                            {task.text}
+                        </span>
+                        {task.delivery_mode === "remote" && !task.completed && (
+                            <span className="text-[10px] uppercase tracking-wider font-bold text-indigo-500 dark:text-indigo-400 flex items-center gap-1 mt-0.5">
+                                <Paperclip size={10} />
+                                Remote Submission Required
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    {task.isPendingReview && (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-bold uppercase tracking-tight border border-amber-200 dark:border-amber-800/50">
+                            Pending Review
+                        </span>
                     )}
-                </button>
-                <span
-                    className={`text-sm ${
-                        task.completed
-                            ? "line-through text-gray-400 dark:text-gray-500"
-                            : ""
-                    }`}
-                >
-                    {task.text}
-                </span>
+                    
+                    {task.delivery_mode === "remote" && !task.completed && !task.isPendingReview && (
+                        <button
+                            onClick={handleComplete}
+                            disabled={isLoading}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
+                        >
+                            <Paperclip size={14} />
+                            Submit Proof
+                        </button>
+                    )}
+                    
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        onChange={handleFileChange}
+                        accept=".pdf,image/*"
+                    />
+                </div>
             </div>
+            
+            {task.description && task.description !== task.text && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 ml-8 pb-3 -mt-1 pr-4 italic">
+                    {task.description}
+                </p>
+            )}
         </div>
     );
 };

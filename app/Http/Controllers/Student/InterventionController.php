@@ -8,6 +8,7 @@ use App\Models\Intervention;
 use App\Models\InterventionTask;
 use App\Models\StudentNotification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -79,6 +80,8 @@ class InterventionController extends Controller
                     'description' => $task->description,
                     'delivery_mode' => $task->delivery_mode,
                     'completed' => $task->is_completed,
+                    'submitted_at' => $task->submitted_at?->toIso8601String(),
+                    'isPendingReview' => $task->isPendingReview(),
                 ]);
 
                 $completedTasks = $tasks->where('completed', true)->count();
@@ -185,7 +188,7 @@ class InterventionController extends Controller
     }
 
     /**
-     * Mark a task as completed.
+     * Mark a task as completed or submit proof for remote tasks.
      */
     public function completeTask(Request $request, InterventionTask $task)
     {
@@ -202,7 +205,52 @@ class InterventionController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        $task->update(['is_completed' => true]);
+        if ($task->is_completed) {
+            return back()->with('info', 'Task is already completed.');
+        }
+
+        if ($task->delivery_mode === 'remote') {
+            if ($task->submitted_at !== null) {
+                return back()->with('info', 'Proof has already been submitted and is pending review.');
+            }
+
+            $request->validate([
+                'proof' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120', // 5MB limit
+                'notes' => 'nullable|string|max:500',
+            ]);
+
+            if ($request->hasFile('proof')) {
+                $path = $request->file('proof')->store('interventions/proofs', 'local');
+                
+                $task->update([
+                    'proof_path' => $path,
+                    'proof_notes' => $request->input('notes'),
+                    'submitted_at' => now(),
+                ]);
+
+                // Create notification for the teacher
+                $class = $enrollment->subjectTeacher ?? $enrollment->schoolClass;
+                $teacher = $class?->teacher;
+                if ($teacher) {
+                    StudentNotification::create([
+                        'user_id' => $teacher->id,
+                        'sender_id' => $request->user()->id,
+                        'intervention_id' => $intervention->id,
+                        'type' => 'alert',
+                        'title' => 'Proof Submitted',
+                        'message' => $request->user()->name . " has submitted proof for the task: \"{$task->task_name}\".",
+                    ]);
+                }
+
+                return back()->with('success', 'Proof submitted successfully! Your teacher will review it.');
+            }
+        }
+
+        // Legacy/Face-to-face behavior
+        $task->update([
+            'is_completed' => true,
+            'completed_at' => now(),
+        ]);
 
         // Check if all tasks are completed
         $allCompleted = $intervention->tasks()->where('is_completed', false)->count() === 0;

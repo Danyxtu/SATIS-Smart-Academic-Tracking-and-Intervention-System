@@ -15,6 +15,7 @@ import {
     X,
     HelpCircle,
     Info,
+    Mail,
 } from "lucide-react";
 // Utils
 import {
@@ -34,6 +35,7 @@ import {
     ClassList,
     GradeSubmissionModal,
     StartQ2ConfirmModal,
+    DispatchCredentialsModal,
 } from "@/Components/Teacher/MyClasses";
 
 // Fallback Grade Categories
@@ -620,6 +622,7 @@ const MyClass = (props) => {
     const [selectedTab, setSelectedTab] = useState("q1");
     const [showFinalUnlockInfo, setShowFinalUnlockInfo] = useState(false);
     const [isStartQ2ModalOpen, setIsStartQ2ModalOpen] = useState(false);
+    const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
     const currentQuarter = selectedClass?.current_quarter ?? 1;
     const isReadOnlyView = Boolean(isReadOnly);
     const readOnlyBadgeLabel = String(readOnlyModeLabel || "View Only");
@@ -1691,6 +1694,11 @@ const MyClass = (props) => {
         window.URL.revokeObjectURL(url);
     };
 
+    const handleDispatchCredentials = () => {
+        if (isReadOnlyView || !selectedClass) return;
+        setIsDispatchModalOpen(true);
+    };
+
     const handleDownloadGradeTemplate = () => {
         if (!selectedClass || assignmentColumns.length === 0) return;
 
@@ -1908,6 +1916,21 @@ const MyClass = (props) => {
                             <Users size={14} />
                             {isUploadingClasslist ? "Uploading…" : "Upload"}
                         </button>
+
+                        {!isReadOnlyView && (
+                            <button
+                                onClick={handleDispatchCredentials}
+                                disabled={
+                                    !selectedClass ||
+                                    sortedStudents.length === 0
+                                }
+                                className="flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                title="Send login credentials to all students via email"
+                            >
+                                <Mail size={14} />
+                                Send Credentials
+                            </button>
+                        )}
 
                         {isGradeView && (
                             <>
@@ -3355,6 +3378,14 @@ const MyClass = (props) => {
                         setSelectedQuarter(2);
                         await refreshCurrentClassData();
                     }}
+                />
+            )}
+            {!isReadOnlyView && (
+                <DispatchCredentialsModal
+                    isOpen={isDispatchModalOpen}
+                    onClose={() => setIsDispatchModalOpen(false)}
+                    classId={selectedClass?.id}
+                    studentCount={sortedStudents.length}
                 />
             )}
         </>

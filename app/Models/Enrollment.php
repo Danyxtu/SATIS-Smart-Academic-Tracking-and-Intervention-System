@@ -79,6 +79,25 @@ class Enrollment extends Model
         return $this->hasMany(AttendanceRecord::class);
     }
 
+    public function interventions()
+    {
+        $relation = $this->hasMany(Intervention::class);
+
+        $currentSchoolYear = Intervention::resolveCurrentSchoolYear();
+        if ($currentSchoolYear !== null) {
+            $relation->where('school_year', $currentSchoolYear);
+        }
+
+        return $relation;
+    }
+
+    public function activeIntervention()
+    {
+        return $this->hasOne(Intervention::class)
+            ->where('status', 'active')
+            ->latestOfMany();
+    }
+
     public function intervention()
     {
         $relation = $this->hasOne(Intervention::class)->latestOfMany();

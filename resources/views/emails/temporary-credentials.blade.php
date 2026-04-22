@@ -4,6 +4,8 @@
 Temporary SATIS credentials have been issued for your {{ $context }} by **{{ $issuedByName }}**.
 
 <x-mail::panel>
+**Username:** {{ $username }}
+
 **Email:** {{ $email }}
 
 **Temporary Password:** {{ $password }}

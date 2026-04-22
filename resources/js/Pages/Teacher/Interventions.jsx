@@ -20,7 +20,20 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Head, useForm, router } from "@inertiajs/react";
 import { useLoading } from "@/Context/LoadingContext";
-import { ArrowLeft } from "lucide-react";
+import { 
+    ArrowLeft, 
+    Eye, 
+    XCircle, 
+    Download, 
+    CheckCircle,
+    FileText,
+    AlertCircle,
+    CheckSquare,
+    Square,
+    Clock,
+    Paperclip,
+    Inbox,
+} from "lucide-react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 
 // ─────────────────────────────────────────────
@@ -1844,6 +1857,9 @@ function InterventionManagementModal({
         is_completed: false,
     });
     const [completionNotes, setCompletionNotes] = useState("");
+    const [rejectionReason, setRejectionReason] = useState("");
+    const [showRejectModal, setShowRejectModal] = useState(false);
+    const [rejectingTask, setRejectingTask] = useState(null);
     const [isMutating, setIsMutating] = useState(false);
 
     useEffect(() => {
@@ -1859,9 +1875,47 @@ function InterventionManagementModal({
         });
         setEditingTaskId(null);
         setCompletionNotes("");
+        setRejectionReason("");
+        setShowRejectModal(false);
+        setRejectingTask(null);
     }, [open, intervention]);
 
     if (!open || !intervention) return null;
+
+    const handleDownloadProof = (taskId) => {
+        window.open(
+            route("teacher.interventions.tasks.proof", {
+                intervention: intervention.id,
+                task: taskId,
+            }),
+            "_blank",
+        );
+    };
+
+    const handleRejectProof = () => {
+        if (!rejectingTask || !rejectionReason.trim()) return;
+
+        router.post(
+            route("teacher.interventions.tasks.reject-proof", {
+                intervention: intervention.id,
+                task: rejectingTask.id,
+            }),
+            {
+                reason: rejectionReason,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setIsMutating(true),
+                onSuccess: () => {
+                    setShowRejectModal(false);
+                    setRejectingTask(null);
+                    setRejectionReason("");
+                },
+                onFinish: () => setIsMutating(false),
+            },
+        );
+    };
 
     const tasks = Array.isArray(intervention.tasks) ? intervention.tasks : [];
     const completedTasks =
@@ -2339,11 +2393,19 @@ function InterventionManagementModal({
                                         </div>
                                     ) : (
                                         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                                            <div>
-                                                <p className="text-sm font-semibold text-gray-800">
-                                                    {task.task_name ??
-                                                        task.description}
-                                                </p>
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-semibold text-gray-800">
+                                                        {task.task_name ??
+                                                            task.description}
+                                                    </p>
+                                                    {task.is_pending_review && (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 uppercase tracking-tight border border-amber-200">
+                                                            <Clock size={10} />
+                                                            Pending Review
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <p className="text-xs text-gray-600">
                                                     {task.description}
                                                 </p>
@@ -2354,40 +2416,85 @@ function InterventionManagementModal({
                                                         )}
                                                     </span>
                                                 )}
+                                                {task.proof_notes && (
+                                                    <p className="mt-2 text-xs text-indigo-700 bg-indigo-50 p-2 rounded border border-indigo-100 italic">
+                                                        " {task.proof_notes} "
+                                                    </p>
+                                                )}
                                             </div>
                                             <div className="flex flex-wrap items-center gap-2">
+                                                {task.is_pending_review && (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDownloadProof(task.id)}
+                                                            className="flex items-center gap-1 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                                                        >
+                                                            <Eye size={12} />
+                                                            View Proof
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setRejectingTask(task);
+                                                                setShowRejectModal(true);
+                                                            }}
+                                                            className="flex items-center gap-1 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 transition-colors"
+                                                        >
+                                                            <XCircle size={12} />
+                                                            Reject
+                                                        </button>
+                                                    </>
+                                                )}
+                                                
                                                 <button
                                                     type="button"
                                                     onClick={() =>
                                                         handleToggleTask(task)
                                                     }
                                                     disabled={busy}
-                                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${task.is_completed ? "bg-slate-200 text-slate-700" : "bg-emerald-600 text-white"} disabled:opacity-50`}
+                                                    className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                                                        task.is_completed 
+                                                            ? "bg-slate-200 text-slate-700 hover:bg-slate-300" 
+                                                            : task.is_pending_review
+                                                                ? "bg-green-600 text-white hover:bg-green-700"
+                                                                : "bg-emerald-600 text-white hover:bg-emerald-700"
+                                                    } disabled:opacity-50 transition-colors shadow-sm`}
                                                 >
-                                                    {task.is_completed
-                                                        ? "Mark Pending"
-                                                        : "Mark Done"}
+                                                    {task.is_completed ? (
+                                                        "Mark Pending"
+                                                    ) : (
+                                                        <>
+                                                            <CheckCircle size={12} />
+                                                            {task.is_pending_review ? "Approve & Complete" : "Mark Done"}
+                                                        </>
+                                                    )}
                                                 </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        beginTaskEdit(task)
-                                                    }
-                                                    disabled={busy}
-                                                    className="rounded-lg border border-indigo-300 px-3 py-1.5 text-xs font-semibold text-indigo-700 disabled:opacity-50"
-                                                >
-                                                    Edit
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        handleDeleteTask(task)
-                                                    }
-                                                    disabled={busy}
-                                                    className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-50"
-                                                >
-                                                    Delete
-                                                </button>
+                                                
+                                                {!task.is_pending_review && (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                beginTaskEdit(task)
+                                                            }
+                                                            disabled={busy}
+                                                            className="rounded-lg border border-indigo-300 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 transition-colors"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                handleDeleteTask(task)
+                                                            }
+                                                            disabled={busy}
+                                                            className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     )}
@@ -2420,7 +2527,7 @@ function InterventionManagementModal({
                             type="button"
                             onClick={handleApproveDirectly}
                             disabled={busy}
-                            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50 shadow-sm"
                         >
                             Approve and Complete Intervention
                         </button>
@@ -2432,19 +2539,49 @@ function InterventionManagementModal({
                         type="button"
                         onClick={handleDeleteIntervention}
                         disabled={busy}
-                        className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                        className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 transition-colors"
                     >
                         Delete Intervention
                     </button>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200"
+                        className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
                     >
                         Close
                     </button>
                 </div>
             </div>
+
+            <CompletionActionModal
+                open={showRejectModal}
+                onClose={() => {
+                    setShowRejectModal(false);
+                    setRejectingTask(null);
+                    setRejectionReason("");
+                }}
+                title="Reject Task Proof"
+                titleIcon={<XCircle className="text-red-500" size={20} />}
+                submitLabel="Reject Proof"
+                submitColor="bg-red-600 hover:bg-red-700"
+                onSubmit={handleRejectProof}
+                isProcessing={busy}
+            >
+                <div className="space-y-3">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Please provide a reason why you are rejecting the proof for
+                        <span className="font-bold"> "{rejectingTask?.task_name}"</span>.
+                        The student will be notified and asked to resubmit.
+                    </p>
+                    <textarea
+                        value={rejectionReason}
+                        onChange={(e) => setRejectionReason(e.target.value)}
+                        placeholder="e.g. The document is blurry or incorrect."
+                        className="w-full rounded-xl border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm h-24 resize-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                        required
+                    />
+                </div>
+            </CompletionActionModal>
         </ModalShell>
     );
 }
@@ -3052,6 +3189,8 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
     const [openFeedbackModal, setOpenFeedbackModal] = useState(false);
     const [isInterventionModalOpen, setIsInterventionModalOpen] =
         useState(false);
+    const [interventionTab, setInterventionTab] = useState("pending");
+    const [selectedIntervention, setSelectedIntervention] = useState(null);
     const [
         showInterventionManagementModal,
         setShowInterventionManagementModal,
@@ -3066,9 +3205,15 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
         if (studentData) setStudent({ ...studentData });
     }, [studentData]);
 
+    const interventions = student?.interventions ?? [];
+    const pendingInterventions = interventions.filter(i => i.status === "active");
+    const completedInterventions = interventions.filter(i => i.status === "completed");
+
+    const filteredInterventions = interventionTab === "pending" 
+        ? pendingInterventions 
+        : completedInterventions;
+
     const pendingRequest = studentData?.pendingCompletionRequest ?? null;
-    const activeIntervention = student?.activeIntervention ?? null;
-    const hasActiveIntervention = Boolean(activeIntervention);
     const priorityReason = student?.priorityReason ?? "Under Observation";
 
     const handleApproveCompletion = () => {
@@ -3110,18 +3255,12 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
     };
 
     const handleAddFeedback = (message) => {
-        setStudent((prev) => ({
-            ...prev,
-            interventionLog: [
-                ...prev.interventionLog,
-                {
-                    id: Date.now(),
-                    date: new Date().toISOString().split("T")[0],
-                    action: "Teacher Feedback",
-                    notes: message,
-                },
-            ],
-        }));
+        // This is a local UI update for feedback log if needed
+    };
+
+    const handleViewProgress = (intervention) => {
+        setSelectedIntervention(intervention);
+        setShowInterventionManagementModal(true);
     };
 
     if (!student)
@@ -3132,7 +3271,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
         );
 
     return (
-        <div className="space-y-5">
+        <div className="space-y-5 animate-in fade-in duration-500">
             {/* Student identity + action bar */}
             <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-slate-50 to-slate-100/80 shadow-sm dark:border-gray-700 dark:from-gray-800 dark:via-gray-800 dark:to-gray-900/80">
                 <div className="border-b border-slate-200/80 px-4 py-3 dark:border-gray-700 sm:px-5">
@@ -3141,8 +3280,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                             onClick={onBack}
                             className="inline-flex w-full items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 sm:w-auto sm:justify-start"
                         >
-                            <ArrowLeft size={16} className="mr-1.5" /> Back to
-                            Watchlist
+                            <ArrowLeft size={16} className="mr-1.5" /> Back to Dashboard
                         </button>
 
                         <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
@@ -3162,13 +3300,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                 Send Feedback
                             </button>
                             <button
-                                onClick={() =>
-                                    hasActiveIntervention
-                                        ? setShowInterventionManagementModal(
-                                              true,
-                                          )
-                                        : setIsInterventionModalOpen(true)
-                                }
+                                onClick={() => setIsInterventionModalOpen(true)}
                                 className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 sm:w-auto"
                             >
                                 <svg
@@ -3183,9 +3315,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                         clipRule="evenodd"
                                     />
                                 </svg>
-                                {hasActiveIntervention
-                                    ? "Manage Intervention"
-                                    : "Start Intervention"}
+                                Start New Intervention
                             </button>
                         </div>
                     </div>
@@ -3196,12 +3326,12 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                         <Avatar
                             name={student.name}
                             size="md"
-                            className="!h-14 !w-14 !rounded-2xl !text-base"
+                            className="!h-14 !w-14 !rounded-2xl !text-base shadow-sm ring-2 ring-white dark:ring-gray-700"
                         />
 
                         <div className="min-w-0 flex-1">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                <h2 className="truncate text-xl font-semibold text-gray-900 dark:text-gray-100">
+                                <h2 className="truncate text-xl font-bold text-gray-900 dark:text-gray-100">
                                     {student.name}
                                 </h2>
                                 <span
@@ -3252,19 +3382,6 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                     </span>
                                 </div>
                             </div>
-
-                            {student.specialPrograms?.length > 0 && (
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                    {student.specialPrograms.map((p, i) => (
-                                        <span
-                                            key={i}
-                                            className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 dark:border-blue-700/50 dark:bg-blue-900/20 dark:text-blue-300"
-                                        >
-                                            {p}
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -3316,13 +3433,6 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                                     </div>
                                 )}
 
-                                <p className="mb-3 text-xs font-medium text-amber-700 dark:text-amber-300">
-                                    Requested on{" "}
-                                    {formatReadableDate(
-                                        pendingRequest.requestedAt,
-                                    )}
-                                </p>
-
                                 <div className="flex flex-col gap-2 sm:flex-row">
                                     <button
                                         onClick={() =>
@@ -3345,110 +3455,121 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                 </div>
             )}
 
-            <div className="rounded-2xl border border-gray-200/90 bg-gradient-to-br from-white to-slate-50 p-5 shadow-sm dark:border-gray-700 dark:from-gray-800 dark:to-gray-800">
-                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-[0.14em] mb-3">
-                    Reason for Priority
+            <div className="rounded-2xl border border-gray-200/90 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">
+                    Observation Reason
                 </h3>
                 <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
                     {priorityReason}
                 </p>
             </div>
 
-            {/* Intervention history log */}
-            <div className="rounded-2xl border border-gray-200/90 bg-gradient-to-br from-white to-slate-50 p-5 shadow-sm dark:border-gray-700 dark:from-gray-800 dark:to-gray-800">
-                <div className="mb-4 flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                        Intervention History
+            {/* Interventions Section (formerly history) */}
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                        Interventions
                     </h3>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                        {student.interventionLog.length} record
-                        {student.interventionLog.length !== 1 ? "s" : ""}
-                    </span>
                 </div>
 
-                {student.interventionLog.length > 0 ? (
-                    <div className="space-y-3">
-                        {student.interventionLog.map((log) => (
+                {/* Full-width Toggle */}
+                <div className="bg-gray-100 dark:bg-gray-900/50 p-1.5 rounded-2xl flex w-full">
+                    <button
+                        onClick={() => setInterventionTab("pending")}
+                        className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
+                            interventionTab === "pending"
+                                ? "bg-white dark:bg-gray-800 text-indigo-600 shadow-sm ring-1 ring-black/5"
+                                : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                        }`}
+                    >
+                        Pending ({pendingInterventions.length})
+                    </button>
+                    <button
+                        onClick={() => setInterventionTab("completed")}
+                        className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
+                            interventionTab === "completed"
+                                ? "bg-white dark:bg-gray-800 text-indigo-600 shadow-sm ring-1 ring-black/5"
+                                : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                        }`}
+                    >
+                        Completed ({completedInterventions.length})
+                    </button>
+                </div>
+
+                {/* Intervention List */}
+                <div className="space-y-3">
+                    {filteredInterventions.length > 0 ? (
+                        filteredInterventions.map((item) => (
                             <div
-                                key={log.id}
-                                className="rounded-xl border border-gray-200 bg-white/80 p-4 transition-all hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-sm dark:border-gray-700 dark:bg-gray-900/50"
+                                key={item.id}
+                                className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 transition-all hover:border-indigo-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800/50 dark:hover:border-indigo-500/50"
                             >
-                                <div className="flex items-start gap-3">
-                                    <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0 dark:bg-indigo-900/40">
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            className="h-5 w-5 text-indigo-600"
-                                            viewBox="0 0 20 20"
-                                            fill="currentColor"
-                                        >
-                                            <path
-                                                fillRule="evenodd"
-                                                d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
-                                                clipRule="evenodd"
-                                            />
-                                        </svg>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                                {log.action}
-                                            </span>
-                                            <span className="text-xs text-gray-400">
-                                                •
-                                            </span>
-                                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                {formatReadableDate(log.date)}
-                                            </span>
+                                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="flex items-start gap-4">
+                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${item.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30 text-green-600' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600'}`}>
+                                            <FileText size={24} />
                                         </div>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                                            {log.notes}
-                                        </p>
-                                        {log.followUp && (
-                                            <p className="text-xs text-indigo-600 mt-2 flex items-center gap-1">
-                                                <svg
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    className="h-3.5 w-3.5"
-                                                    viewBox="0 0 20 20"
-                                                    fill="currentColor"
-                                                >
-                                                    <path
-                                                        fillRule="evenodd"
-                                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                                                        clipRule="evenodd"
-                                                    />
-                                                </svg>
-                                                Follow-up: {log.followUp}
-                                            </p>
-                                        )}
+                                        <div className="min-w-0">
+                                            <h4 className="font-bold text-gray-900 dark:text-gray-100 truncate">
+                                                {item.typeLabel}
+                                            </h4>
+                                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                                                <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                                    <Clock size={12} />
+                                                    Started: {formatReadableDate(item.createdAt || item.date)}
+                                                </span>
+                                                {item.deadlineLabel && item.status === 'active' && (
+                                                    <span className={`text-xs flex items-center gap-1 font-medium ${item.isDeadlineOverdue ? 'text-red-500' : 'text-amber-600'}`}>
+                                                        <AlertCircle size={12} />
+                                                        Deadline: {item.deadlineLabel}
+                                                    </span>
+                                                )}
+                                                {item.completed_at && (
+                                                    <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+                                                        <CheckCircle size={12} />
+                                                        Finished: {formatReadableDate(item.completed_at)}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 sm:self-center">
+                                        <button
+                                            onClick={() => handleViewProgress(item)}
+                                            className={`inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+                                                item.status === 'completed'
+                                                    ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                                                    : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm'
+                                            }`}
+                                        >
+                                            {item.status === 'completed' ? 'View Details' : 'View Progress'}
+                                        </button>
                                     </div>
                                 </div>
+                                {item.notes && (
+                                    <p className="mt-3 text-xs text-gray-600 dark:text-gray-400 italic line-clamp-2 border-l-2 border-gray-200 dark:border-gray-700 pl-3">
+                                        "{item.notes}"
+                                    </p>
+                                )}
                             </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 p-8 text-center">
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-12 w-12 text-gray-300 mx-auto mb-3"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={1.5}
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                            />
-                        </svg>
-                        <p className="text-gray-500 dark:text-gray-400 font-medium">
-                            No intervention history yet
-                        </p>
-                        <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-                            Start an intervention to create the first record
-                        </p>
-                    </div>
-                )}
+                        ))
+                    ) : (
+                        <div className="py-12 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900/30 rounded-3xl border border-dashed border-gray-200 dark:border-gray-700">
+                            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4 text-gray-400">
+                                <Inbox size={32} strokeWidth={1.5} />
+                            </div>
+                            <p className="text-gray-500 dark:text-gray-400 font-medium">
+                                No {interventionTab} interventions found
+                            </p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                {interventionTab === 'pending' 
+                                    ? "Students who need support will appear here." 
+                                    : "Finalized records will be archived in this tab."}
+                            </p>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* ── Modals ─────────────────────────── */}
@@ -3471,9 +3592,12 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
 
             <InterventionManagementModal
                 open={showInterventionManagementModal}
-                onClose={() => setShowInterventionManagementModal(false)}
+                onClose={() => {
+                    setShowInterventionManagementModal(false);
+                    setSelectedIntervention(null);
+                }}
                 studentName={student.name}
-                intervention={activeIntervention}
+                intervention={selectedIntervention}
             />
 
             {/* Approval modal */}
@@ -3485,18 +3609,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                 }}
                 title="Approve Completion"
                 titleIcon={
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5 text-green-600"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                    >
-                        <path
-                            fillRule="evenodd"
-                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                            clipRule="evenodd"
-                        />
-                    </svg>
+                    <CheckCircle className="text-green-600" size={20} />
                 }
                 submitLabel="Approve"
                 submitColor="bg-green-600 hover:bg-green-700"
@@ -3528,18 +3641,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                 }}
                 title="Reject Completion Request"
                 titleIcon={
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5 text-red-600"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                    >
-                        <path
-                            fillRule="evenodd"
-                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                            clipRule="evenodd"
-                        />
-                    </svg>
+                    <XCircle className="text-red-600" size={20} />
                 }
                 submitLabel="Reject Request"
                 submitColor="bg-red-600 hover:bg-red-700"

@@ -34,6 +34,7 @@ class TemporaryCredentials extends Mailable implements ShouldQueue
             markdown: 'emails.temporary-credentials',
             with: [
                 'userName' => $this->user->name,
+                'username' => $this->user->username,
                 'email' => $this->user->email,
                 'password' => $this->plainPassword,
                 'issuedByName' => $this->issuedBy?->name ?? 'System Administrator',

@@ -75,6 +75,8 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
             ->name('classes.grade-structure.update');
         Route::post('/classes/{subjectTeacher}/nudge', [ClassController::class, 'sendNudge'])
             ->name('classes.nudge');
+        Route::post('/classes/{subjectTeacher}/dispatch-credentials', [ClassController::class, 'dispatchCredentials'])
+            ->name('classes.dispatch-credentials');
 
         /**
          * Grade Calculation Routes
@@ -128,6 +130,10 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
             ->name('interventions.tasks.update');
         Route::post('/interventions/{intervention}/tasks/{task}/toggle', [InterventionController::class, 'toggleTaskCompletion'])
             ->name('interventions.tasks.toggle');
+        Route::get('/interventions/{intervention}/tasks/{task}/proof', [InterventionController::class, 'downloadProof'])
+            ->name('interventions.tasks.proof');
+        Route::post('/interventions/{intervention}/tasks/{task}/reject-proof', [InterventionController::class, 'rejectTaskProof'])
+            ->name('interventions.tasks.reject-proof');
         Route::delete('/interventions/{intervention}/tasks/{task}', [InterventionController::class, 'destroyTask'])
             ->name('interventions.tasks.destroy');
 

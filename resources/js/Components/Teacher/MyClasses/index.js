@@ -20,4 +20,5 @@ export { default as DeleteClassModal } from "./DeleteClassModal";
 export { default as ClassList } from "./ClassList";
 export { default as GradeSubmissionModal } from "./GradeSubmissionModal";
 export { default as StartQ2ConfirmModal } from "./StartQ2ConfirmModal";
+export { default as DispatchCredentialsModal } from "./DispatchCredentialsModal";
 export { default as BulkStudentImportSummaryModal } from "./BulkStudentImportSummaryModal";

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\DispatchStudentCredentials;
 use App\Models\ArchiveClass;
 use App\Models\Enrollment;
 use App\Models\Department;
@@ -2050,6 +2051,20 @@ class ClassController extends Controller
         }
 
         return back()->with('success', "Nudge sent to {$sentCount} student(s) in {$subjectName}!");
+    }
+
+    /**
+     * Dispatch bulk credentials to all students in the class via email.
+     */
+    public function dispatchCredentials(Request $request, SchoolClass $subjectTeacher): RedirectResponse
+    {
+        $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
+
+        $teacher = $request->user();
+
+        DispatchStudentCredentials::dispatch($subjectTeacher, $teacher);
+
+        return back()->with('success', 'Credential distribution has been queued. You will receive an email report once finished.');
     }
 
     /**
