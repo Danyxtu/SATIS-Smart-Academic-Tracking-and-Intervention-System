@@ -17,7 +17,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             // Default bootstrap: roles + one superadmin account with temporary password.
             RoleUserSeeder::class,
-            SuperAdminProductionSeeder::class,
+            // SuperAdminProductionSeeder::class,
             SchoolTrackSeeder::class,
             SchoolPersonnelSeeder::class,
 

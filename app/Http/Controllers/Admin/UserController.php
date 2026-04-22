@@ -183,6 +183,7 @@ class UserController extends Controller
                 $payload['section'] = $user->student->section;
                 $payload['grade_level'] = $user->student->grade_level;
                 $payload['strand'] = $user->student->strand;
+                $payload['lrn'] = $user->student->lrn;
                 $payload['parent_contact_number'] = $user->student->parent_contact_number;
 
                 $enrollments = $enrollmentsByUserId->get($user->id, collect());
@@ -219,8 +220,11 @@ class UserController extends Controller
         // Get unique sections for filter
         $sections = Student::distinct()->pluck('section')->filter()->sort()->values();
 
-        // Get admin's department info
+        // Get admin's department info with specializations
         $department = $admin->department;
+        if ($department) {
+            $department->loadMissing('specializations:id,specialization_name');
+        }
 
         return Inertia::render('Admin/Users/Index', [
             'users' => $users,
@@ -237,6 +241,12 @@ class UserController extends Controller
                 'id' => $department->id,
                 'name' => $department->department_name,
                 'code' => $department->department_code,
+                'specializations' => $department->specializations
+                    ->map(fn($spec) => [
+                        'id' => $spec->id,
+                        'name' => $spec->specialization_name,
+                    ])
+                    ->values(),
             ] : null,
         ]);
     }
@@ -262,6 +272,7 @@ class UserController extends Controller
                 'student_queue.*.last_name' => ['required', 'string', 'max:255'],
                 'student_queue.*.middle_name' => ['nullable', 'string', 'max:255'],
                 'student_queue.*.lrn' => ['required', 'string', 'size:12', 'distinct', 'unique:students,lrn'],
+                'student_queue.*.strand' => ['nullable', 'string', 'max:255'],
                 'student_queue.*.parent_contact_number' => ['nullable', 'string', 'max:40'],
             ]);
 
@@ -273,6 +284,12 @@ class UserController extends Controller
                     $seed = trim(($studentPayload['first_name'] ?? '') . ' ' . ($studentPayload['last_name'] ?? ''));
                     $username = User::generateUniqueUsername($seed);
 
+                    // Auto-assign department based on strand (if it matches a department code)
+                    $autoDepartmentId = null;
+                    if (!empty($studentPayload['strand'])) {
+                        $autoDepartmentId = \App\Models\Department::where('department_code', $studentPayload['strand'])->first()?->id;
+                    }
+
                     $student = User::create([
                         'first_name' => $studentPayload['first_name'],
                         'last_name' => $studentPayload['last_name'],
@@ -281,7 +298,7 @@ class UserController extends Controller
                         'username' => $username,
                         'temporary_password' => $tempPassword,
                         'password' => Hash::make($tempPassword),
-                        'department_id' => null,
+                        'department_id' => $autoDepartmentId ?: $admin->department_id,
                         'must_change_password' => true,
                         'email_verified_at' => null,
                         'created_by' => $admin->id,
@@ -303,6 +320,7 @@ class UserController extends Controller
                             ? (trim((string) $studentPayload['parent_contact_number']) ?: null)
                             : null,
                         'grade_level' => (string) $validated['grade_level'],
+                        'strand' => $studentPayload['strand'] ?? null,
                     ]);
 
                     $createdStudentCredentials[] = [
@@ -336,11 +354,18 @@ class UserController extends Controller
                 'role' => ['required', 'in:student'],
                 'student_mode' => ['nullable', 'in:single'],
                 'grade_level' => ['required', 'in:11,12'],
+                'strand' => ['nullable', 'string', 'max:255'],
             ]);
 
             $tempPassword = $this->generateTemporaryPassword(10);
             $seed = trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? ''));
             $username = User::generateUniqueUsername($seed);
+
+            // Auto-assign department based on strand (if it matches a department code)
+            $autoDepartmentId = null;
+            if (!empty($validated['strand'])) {
+                $autoDepartmentId = \App\Models\Department::where('department_code', $validated['strand'])->first()?->id;
+            }
 
             $student = User::create([
                 'first_name' => $validated['first_name'],
@@ -350,7 +375,7 @@ class UserController extends Controller
                 'username' => $username,
                 'temporary_password' => $tempPassword,
                 'password' => Hash::make($tempPassword),
-                'department_id' => null,
+                'department_id' => $autoDepartmentId ?: $admin->department_id,
                 'must_change_password' => true,
                 'email_verified_at' => null,
                 'created_by' => $admin->id,
@@ -369,6 +394,7 @@ class UserController extends Controller
                     ? (trim((string) $validated['parent_contact_number']) ?: null)
                     : null,
                 'grade_level' => (string) $validated['grade_level'],
+                'strand' => $validated['strand'] ?? null,
             ]);
 
             return redirect()->route('admin.users.index')
@@ -530,7 +556,14 @@ class UserController extends Controller
         if ($validated['role'] === 'teacher' && $admin->department_id) {
             $updateData['department_id'] = $admin->department_id;
         } elseif ($validated['role'] === 'student') {
-            $updateData['department_id'] = null;
+            // Auto-assign department based on strand for students
+            $strand = $request->input('strand');
+            $autoDepartmentId = null;
+            if (!empty($strand)) {
+                $autoDepartmentId = \App\Models\Department::where('department_code', $strand)->first()?->id;
+            }
+            
+            $updateData['department_id'] = $autoDepartmentId ?: $user->department_id;
         }
 
         $user->update($updateData);
@@ -549,6 +582,7 @@ class UserController extends Controller
                 ['user_id' => $user->id],
                 [
                     'student_name' => $studentDisplayName,
+                    'strand' => $request->input('strand'),
                     'parent_contact_number' => isset($validated['parent_contact_number'])
                         ? (trim((string) $validated['parent_contact_number']) ?: null)
                         : null,
@@ -559,6 +593,7 @@ class UserController extends Controller
         if ($validated['role'] === 'student' && $user->student) {
             $user->student->update([
                 'student_name' => $studentDisplayName,
+                'strand' => $request->input('strand') ?? $user->student->strand,
                 'parent_contact_number' => isset($validated['parent_contact_number'])
                     ? (trim((string) $validated['parent_contact_number']) ?: null)
                     : null,

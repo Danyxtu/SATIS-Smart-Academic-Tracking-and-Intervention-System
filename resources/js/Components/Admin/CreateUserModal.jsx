@@ -157,6 +157,7 @@ function emptyStudentDraft() {
         last_name: "",
         middle_name: "",
         lrn: "",
+        strand: "",
         parent_contact_number: "",
     };
 }
@@ -215,6 +216,10 @@ const normalizeCsvHeader = (value = "") => {
         return "lrn";
     }
 
+    if (["strand", "specialization", "course"].includes(normalized)) {
+        return "strand";
+    }
+
     if (
         [
             "parentcontactnumber",
@@ -249,12 +254,13 @@ const parseStudentCsv = (text = "") => {
     const lastNameIndex = headers.indexOf("last_name");
     const middleNameIndex = headers.indexOf("middle_name");
     const lrnIndex = headers.indexOf("lrn");
+    const strandIndex = headers.indexOf("strand");
     const parentContactNumberIndex = headers.indexOf("parent_contact_number");
 
     if (firstNameIndex === -1 || lastNameIndex === -1 || lrnIndex === -1) {
         return {
             rows: [],
-            error: "CSV headers must include first_name, last_name, and lrn. Optional: middle_name.",
+            error: "CSV headers must include first_name, last_name, and lrn. Optional: middle_name, strand.",
         };
     }
 
@@ -270,6 +276,8 @@ const parseStudentCsv = (text = "") => {
                 ? String(row[middleNameIndex] || "").trim()
                 : "";
         const lrn = String(row[lrnIndex] || "").trim();
+        const strand =
+            strandIndex >= 0 ? String(row[strandIndex] || "").trim() : "";
         const parentContactNumber =
             parentContactNumberIndex >= 0
                 ? String(row[parentContactNumberIndex] || "").trim()
@@ -299,6 +307,7 @@ const parseStudentCsv = (text = "") => {
             last_name: lastName,
             middle_name: middleName,
             lrn,
+            strand,
             parent_contact_number: parentContactNumber,
         });
     }
@@ -355,6 +364,7 @@ export default function CreateUserModal({
         last_name: "",
         middle_name: "",
         lrn: "",
+        strand: "",
         parent_contact_number: "",
         email: "",
         role: "",
@@ -410,6 +420,7 @@ export default function CreateUserModal({
                     last_name: String(data.last_name || "").trim(),
                     full_name: fullName || "Student",
                     lrn: String(data.lrn || "").trim(),
+                    strand: String(data.strand || "").trim(),
                     parent_contact_number: String(
                         data.parent_contact_number || "",
                     ).trim(),
@@ -431,6 +442,7 @@ export default function CreateUserModal({
                     .filter(Boolean)
                     .join(" ") || "Student",
             lrn: String(queueItem.lrn || "").trim(),
+            strand: String(queueItem.strand || "").trim(),
             parent_contact_number: String(
                 queueItem.parent_contact_number || "",
             ).trim(),
@@ -661,6 +673,7 @@ export default function CreateUserModal({
         const lastName = String(studentDraft.last_name || "").trim();
         const middleName = String(studentDraft.middle_name || "").trim();
         const lrn = String(studentDraft.lrn || "").trim();
+        const strand = String(studentDraft.strand || "").trim();
         const parentContactNumber = String(
             studentDraft.parent_contact_number || "",
         ).trim();
@@ -688,6 +701,10 @@ export default function CreateUserModal({
             }
         }
 
+        if (!strand) {
+            nextErrors.student_queue_strand = "Strand is required.";
+        }
+
         setClientErrors(nextErrors);
 
         if (Object.keys(nextErrors).length > 0) {
@@ -700,6 +717,7 @@ export default function CreateUserModal({
             last_name: lastName,
             middle_name: middleName,
             lrn,
+            strand,
             parent_contact_number: parentContactNumber,
         };
     };
@@ -807,6 +825,10 @@ export default function CreateUserModal({
                     nextErrors.lrn = "LRN is required.";
                 } else if (lrn.length !== LRN_LENGTH) {
                     nextErrors.lrn = `LRN must be exactly ${LRN_LENGTH} characters.`;
+                }
+
+                if (!String(data.strand || "").trim()) {
+                    nextErrors.strand = "Strand/Specialization is required.";
                 }
 
                 setClientErrors(nextErrors);
@@ -969,6 +991,7 @@ export default function CreateUserModal({
                     last_name: queueItem.last_name,
                     middle_name: queueItem.middle_name || "",
                     lrn: queueItem.lrn,
+                    strand: queueItem.strand,
                     parent_contact_number:
                         queueItem.parent_contact_number || "",
                 })),
@@ -979,6 +1002,7 @@ export default function CreateUserModal({
                 last_name: data.last_name,
                 middle_name: data.middle_name,
                 lrn: data.lrn,
+                strand: data.strand,
                 parent_contact_number: data.parent_contact_number,
                 role: "student",
                 student_mode: STUDENT_MODE_SINGLE,
@@ -1421,6 +1445,50 @@ export default function CreateUserModal({
                                                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-blue-500 focus:bg-white focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                                             />
                                         </Field>
+
+                                        <Field
+                                            label="Strand / Specialization"
+                                            icon={GraduationCap}
+                                            required
+                                            error={errors.strand}
+                                        >
+                                            <select
+                                                value={data.strand || ""}
+                                                onChange={(event) =>
+                                                    setData(
+                                                        "strand",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-blue-500 focus:bg-white focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                            >
+                                                <option value="" disabled>
+                                                    Select Strand
+                                                </option>
+                                                {/* If admin is in a department, show its specializations */}
+                                                {department?.specializations?.map(
+                                                    (spec) => (
+                                                        <option
+                                                            key={spec.id}
+                                                            value={spec.name}
+                                                        >
+                                                            {spec.name}
+                                                        </option>
+                                                    ),
+                                                )}
+                                                {/* Fallback if no specializations are loaded or admin needs to pick a general strand */}
+                                                {(!department?.specializations ||
+                                                    department.specializations
+                                                        .length === 0) && (
+                                                    <option
+                                                        value={department?.code}
+                                                    >
+                                                        {department?.code ||
+                                                            "General"}
+                                                    </option>
+                                                )}
+                                            </select>
+                                        </Field>
                                     </>
                                 )}
 
@@ -1545,6 +1613,61 @@ export default function CreateUserModal({
                                                         placeholder="Parent contact (optional)"
                                                         className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                                                     />
+
+                                                    <select
+                                                        value={
+                                                            studentDraft.strand ||
+                                                            ""
+                                                        }
+                                                        onChange={(event) =>
+                                                            setStudentDraft(
+                                                                (
+                                                                    previousDraft,
+                                                                ) => ({
+                                                                    ...previousDraft,
+                                                                    strand: event
+                                                                        .target
+                                                                        .value,
+                                                                }),
+                                                            )
+                                                        }
+                                                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                                    >
+                                                        <option
+                                                            value=""
+                                                            disabled
+                                                        >
+                                                            Select Strand
+                                                        </option>
+                                                        {department?.specializations?.map(
+                                                            (spec) => (
+                                                                <option
+                                                                    key={
+                                                                        spec.id
+                                                                    }
+                                                                    value={
+                                                                        spec.name
+                                                                    }
+                                                                >
+                                                                    {spec.name}
+                                                                </option>
+                                                            ),
+                                                        )}
+                                                        {(!department?.specializations ||
+                                                            department
+                                                                .specializations
+                                                                .length ===
+                                                                0) && (
+                                                            <option
+                                                                value={
+                                                                    department?.code
+                                                                }
+                                                            >
+                                                                {department?.code ||
+                                                                    "General"}
+                                                            </option>
+                                                        )}
+                                                    </select>
                                                 </div>
 
                                                 <button
@@ -1587,6 +1710,7 @@ export default function CreateUserModal({
                                         {(clientErrors.student_queue_first_name ||
                                             clientErrors.student_queue_last_name ||
                                             clientErrors.student_queue_lrn ||
+                                            clientErrors.student_queue_strand ||
                                             clientErrors.student_queue ||
                                             clientErrors.student_csv) && (
                                             <div className="space-y-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 dark:border-rose-900 dark:bg-rose-900/20">
@@ -1608,6 +1732,13 @@ export default function CreateUserModal({
                                                     <p className="text-xs text-rose-700 dark:text-rose-300">
                                                         {
                                                             clientErrors.student_queue_lrn
+                                                        }
+                                                    </p>
+                                                )}
+                                                {clientErrors.student_queue_strand && (
+                                                    <p className="text-xs text-rose-700 dark:text-rose-300">
+                                                        {
+                                                            clientErrors.student_queue_strand
                                                         }
                                                     </p>
                                                 )}
@@ -1659,6 +1790,10 @@ export default function CreateUserModal({
                                                                     <p className="truncate text-xs text-slate-500 dark:text-slate-400">
                                                                         LRN:{" "}
                                                                         {queueItem.lrn ||
+                                                                            "-"}
+                                                                        {" | "}
+                                                                        Strand:{" "}
+                                                                        {queueItem.strand ||
                                                                             "-"}
                                                                     </p>
                                                                     <p className="truncate text-xs text-slate-500 dark:text-slate-400">
@@ -1923,6 +2058,10 @@ export default function CreateUserModal({
                                                             <p className="text-xs text-slate-600 dark:text-slate-400">
                                                                 LRN:{" "}
                                                                 {studentProfile.lrn ||
+                                                                    "-"}
+                                                                {" | "}
+                                                                Strand:{" "}
+                                                                {studentProfile.strand ||
                                                                     "-"}
                                                             </p>
                                                             <p className="text-xs text-slate-600 dark:text-slate-400">

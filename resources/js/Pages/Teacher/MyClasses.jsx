@@ -141,8 +141,6 @@ const MyClasses = ({
     const [isClassCreateSummaryOpen, setIsClassCreateSummaryOpen] = useState(
         Boolean(classCreateSummary),
     );
-    const [isDragging, setIsDragging] = useState(false);
-    const [droppedFile, setDroppedFile] = useState(null);
     const [highlightAddClass, setHighlightAddClass] = useState(false);
     const [showArchivedClasses, setShowArchivedClasses] = useState(false);
     const [restoringArchiveClassId, setRestoringArchiveClassId] =
@@ -445,7 +443,6 @@ const MyClasses = ({
         }
 
         setIsAddClassModalOpen(false);
-        setDroppedFile(null);
         setEditClassModal({ open: false, classData: null });
         setDeleteClassModal({ open: false, classData: null });
     }, [isSemesterViewOnly]);
@@ -563,44 +560,6 @@ const MyClasses = ({
             setSelectedClassId(null);
             stopLoading();
         }, 150);
-    };
-
-    const handleDragOver = (e) => {
-        e.preventDefault();
-
-        if (isSemesterViewOnly) {
-            setIsDragging(false);
-            return;
-        }
-
-        setIsDragging(true);
-    };
-
-    const handleDragLeave = (e) => {
-        e.preventDefault();
-        setIsDragging(false);
-    };
-
-    const handleDrop = (e) => {
-        e.preventDefault();
-        setIsDragging(false);
-
-        if (isSemesterViewOnly) {
-            return;
-        }
-
-        const file = e.dataTransfer.files[0];
-
-        if (!file) return;
-
-        const isCsv = file.type === "text/csv" || file.name.endsWith(".csv");
-        if (!isCsv) {
-            alert("Please drop a CSV class list file.");
-            return;
-        }
-
-        setDroppedFile(file);
-        setIsAddClassModalOpen(true);
     };
 
     const handleGradesFileSelected = (event) => {
@@ -1038,12 +997,7 @@ const MyClasses = ({
 
                 {/* Main Content */}
                 {!selectedClass ? (
-                    <div
-                        className="relative"
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
-                    >
+                    <div className="relative">
                         {/* Compact Semester Navigation */}
                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-3 mb-4">
                             <div className="flex items-center justify-between mb-2">
@@ -1335,19 +1289,6 @@ const MyClasses = ({
                             </div>
                         )}
 
-                        {/* Dropzone Overlay */}
-                        {isDragging && (
-                            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-indigo-500/90 rounded-xl border-4 border-dashed border-white">
-                                <UploadCloud
-                                    size={48}
-                                    className="text-white mb-3"
-                                />
-                                <p className="text-xl font-bold text-white">
-                                    Drop CSV classlist here
-                                </p>
-                            </div>
-                        )}
-
                         {/* Class Grid */}
                         {classes.length === 0 ? (
                             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-8 text-center">
@@ -1442,11 +1383,9 @@ const MyClasses = ({
                 <AddNewClassModal
                     onClose={() => {
                         setIsAddClassModalOpen(false);
-                        setDroppedFile(null);
                     }}
                     defaultSchoolYear={defaultSchoolYear}
                     currentSemester={currentSemester}
-                    initialFile={droppedFile}
                     departments={departments}
                     availableSubjects={availableSubjects}
                     availableSections={availableSections}

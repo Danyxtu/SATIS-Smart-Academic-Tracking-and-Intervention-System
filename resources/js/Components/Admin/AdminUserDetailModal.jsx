@@ -342,9 +342,6 @@ export default function AdminUserDetailModal({
                                     activeUser?.personal_email ||
                                     "No email"}
                             </p>
-                            <div className="mt-2 inline-flex">
-                                <RolePill role={activeUser?.role} />
-                            </div>
                         </div>
 
                         <div className="flex-1 overflow-y-auto px-3 py-3">
@@ -450,16 +447,18 @@ export default function AdminUserDetailModal({
                                         label="Last Name"
                                         value={activeUser?.last_name}
                                     />
+                                    {isStudentRole && (
+                                        <DetailRow
+                                            label="LRN"
+                                            value={activeUser?.lrn || activeUser?.student?.lrn}
+                                        />
+                                    )}
                                     <DetailRow
                                         label="Email"
                                         value={
                                             activeUser?.email ||
                                             activeUser?.personal_email
                                         }
-                                    />
-                                    <DetailRow
-                                        label="Role"
-                                        value={activeUser?.role}
                                     />
                                     {isStudentRole && (
                                         <DetailRow

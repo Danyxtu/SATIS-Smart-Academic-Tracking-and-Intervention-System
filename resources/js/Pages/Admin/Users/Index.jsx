@@ -750,22 +750,10 @@ export default function Index({
                                     />
                                 </th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                    <SortHeader
-                                        label="Email"
-                                        field="email"
-                                        currentSort={filters.sort}
-                                        currentDirection={filters.direction}
-                                        onSort={handleSort}
-                                    />
+                                    Email
                                 </th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                    <SortHeader
-                                        label="Role"
-                                        field="role"
-                                        currentSort={filters.sort}
-                                        currentDirection={filters.direction}
-                                        onSort={handleSort}
-                                    />
+                                    LRN
                                 </th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                     Section
@@ -822,8 +810,8 @@ export default function Index({
                                         <td className="px-4 py-4 text-gray-600 dark:text-gray-400">
                                             {user.email}
                                         </td>
-                                        <td className="px-4 py-4">
-                                            <RoleBadge role={user.role} />
+                                        <td className="px-4 py-4 text-sm font-mono text-gray-600 dark:text-gray-400">
+                                            {user.lrn || "—"}
                                         </td>
                                         <td className="px-4 py-4">
                                             <SectionBadge

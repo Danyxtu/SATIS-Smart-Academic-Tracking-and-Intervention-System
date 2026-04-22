@@ -687,6 +687,53 @@ class ClassController extends Controller
         ]);
     }
 
+    public function globalSearchStudentByLrn(Request $request): JsonResponse
+    {
+        $normalizedLrn = $this->sanitizeLrn($request->query('lrn'));
+
+        $validator = Validator::make([
+            'lrn' => $normalizedLrn,
+        ], [
+            'lrn' => ['required', 'string', 'digits:12', 'not_in:000000000000'],
+        ], [
+            'lrn.digits' => 'LRN must be exactly 12 digits.',
+            'lrn.not_in' => 'LRN cannot be 000000000000.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Please provide a valid LRN.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $student = Student::query()
+            ->with(['user:id,first_name,last_name,middle_name,username,personal_email'])
+            ->where('lrn', $normalizedLrn)
+            ->first();
+
+        if (! $student || ! $student->user_id) {
+            return response()->json([
+                'message' => 'No student account was found for this LRN.',
+            ], 404);
+        }
+
+        return response()->json([
+            'student' => [
+                'id' => (int) $student->id,
+                'user_id' => (int) $student->user_id,
+                'name' => $this->formatStudentDisplayName($student->user, $student),
+                'lrn' => $student->lrn,
+                'username' => $student->user?->username,
+                'personal_email' => $student->user?->personal_email,
+                'grade_level' => $student->grade_level,
+                'section' => $student->section,
+                'strand' => $student->strand,
+                'track' => $student->track,
+            ],
+        ]);
+    }
+
     public function enrollStudent(Request $request, SchoolClass $subjectTeacher): RedirectResponse
     {
         $this->ensureTeacherOwnsSubjectTeacher($request->user()->id, $subjectTeacher);
@@ -1229,6 +1276,10 @@ class ClassController extends Controller
 
         if ($lrn) {
             $student = Student::where('lrn', $lrn)->first();
+        }
+
+        if (! $student) {
+            throw new RuntimeException("Student account with LRN {$lrn} was not found. Teachers are not allowed to create new student accounts.");
         }
 
         $normalizedPersonalEmail = ! empty($payload['personal_email'])

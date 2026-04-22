@@ -666,7 +666,7 @@ class UserManagementController extends Controller
                         'username' => $resolvedUsername,
                         'temporary_password' => $validated['password'],
                         'password' => Hash::make($validated['password']),
-                        'department_id' => null,
+                        'department_id' => $selectedSection->department_id,
                         'must_change_password' => true,
                         'status' => 'active',
                         'created_by' => $superAdmin->id,
@@ -826,7 +826,7 @@ class UserManagementController extends Controller
             'password'             => Hash::make($resolvedPassword),
             'department_id'        => $validated['role'] === 'teacher'
                 ? $validated['department_id']
-                : null,
+                : ($selectedSection ? $selectedSection->department_id : null),
             'must_change_password' => true,
             'email_verified_at'    => null,
             'status'               => 'active',

@@ -353,11 +353,11 @@ export default function Index({
                     {userList.length > 0 ? (
                         <>
                             <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50/80 border-b border-slate-100">
-                                <div className="col-span-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                <div className="col-span-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
                                     User
                                 </div>
                                 <div className="col-span-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                    Role
+                                    LRN
                                 </div>
                                 <div className="col-span-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
                                     Email
@@ -387,7 +387,7 @@ export default function Index({
                                             className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-50/60 transition-colors group cursor-pointer"
                                         >
                                             {/* User */}
-                                            <div className="col-span-4 flex items-center gap-3 min-w-0">
+                                            <div className="col-span-3 flex items-center gap-3 min-w-0">
                                                 <div
                                                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white text-sm font-bold shadow-sm"
                                                     style={cfg.avatarStyle}
@@ -404,25 +404,11 @@ export default function Index({
                                                 </div>
                                             </div>
 
-                                            {/* Role */}
-                                            <div className="col-span-2 flex flex-wrap gap-1">
-                                                {(
-                                                    user.roles_list ?? [
-                                                        user.role,
-                                                    ]
-                                                ).map((r) => {
-                                                    const rc = getRoleConfig(r);
-                                                    const RIcon = rc.icon;
-                                                    return (
-                                                        <span
-                                                            key={r}
-                                                            className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-semibold ${rc.badgeClass}`}
-                                                        >
-                                                            <RIcon size={10} />
-                                                            {rc.label}
-                                                        </span>
-                                                    );
-                                                })}
+                                            {/* LRN */}
+                                            <div className="col-span-2">
+                                                <span className="text-sm font-mono text-slate-600">
+                                                    {user.student_section?.lrn || "—"}
+                                                </span>
                                             </div>
 
                                             {/* Email */}
