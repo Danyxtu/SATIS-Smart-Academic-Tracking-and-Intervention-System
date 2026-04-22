@@ -5,15 +5,19 @@ namespace App\Http\Controllers\Teacher;
 use App\Http\Controllers\Controller;
 use App\Mail\InterventionNotification;
 use App\Models\Enrollment;
+use App\Models\Grade;
 use App\Models\Intervention;
 use App\Models\InterventionTask;
 use App\Models\SchoolPersonnel;
 use App\Models\StudentNotification;
+use App\Services\EnrollmentGradeService;
+use App\Services\TransmutationGradeServices;
 use App\Services\Messaging\TwilioSmsService;
 use App\Services\Teacher\WatchlistSettingsService;
 use App\Services\WatchlistRuleService;
 use App\Support\StudentNameFormatter;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Redirect;
@@ -28,15 +32,133 @@ class InterventionController extends Controller
     protected WatchlistRuleService $watchlistRuleService;
     protected WatchlistSettingsService $watchlistSettingsService;
     protected TwilioSmsService $twilioSmsService;
+    protected EnrollmentGradeService $enrollmentGradeService;
+    protected TransmutationGradeServices $transmutationService;
 
     public function __construct(
         WatchlistRuleService $watchlistRuleService,
         WatchlistSettingsService $watchlistSettingsService,
         TwilioSmsService $twilioSmsService,
+        EnrollmentGradeService $enrollmentGradeService,
+        TransmutationGradeServices $transmutationService,
     ) {
         $this->watchlistRuleService = $watchlistRuleService;
         $this->watchlistSettingsService = $watchlistSettingsService;
         $this->twilioSmsService = $twilioSmsService;
+        $this->enrollmentGradeService = $enrollmentGradeService;
+        $this->transmutationService = $transmutationService;
+    }
+
+    /**
+     * Helper to recalculate enrollment grades.
+     */
+    private function recalculateGrades(Enrollment $enrollment): void
+    {
+        $class = $enrollment->schoolClass ?? $enrollment->subjectTeacher;
+        if (!$class) return;
+
+        $gradeStructure = $class->grade_categories ?? [];
+
+        // Apply any targeted grade recovery rewards from completed/approved interventions
+        $enrollment->interventions()
+            ->where('status', 'completed')
+            ->whereNotNull('approved_at')
+            ->get()
+            ->each(function (Intervention $intervention) use ($enrollment, &$class, &$gradeStructure) {
+                if ($intervention->agreement_type === 'recovery') {
+                    // Logic for recovering EXISTING tasks
+                    if ($intervention->target_task_id && $intervention->reward_score !== null) {
+                        Grade::updateOrCreate(
+                            [
+                                'enrollment_id' => $enrollment->id,
+                                'assignment_key' => $intervention->target_task_id,
+                                'quarter' => $intervention->quarter,
+                            ],
+                            [
+                                'assignment_name' => $intervention->target_task_name,
+                                'score' => $intervention->reward_score,
+                            ]
+                        );
+                    }
+                } elseif ($intervention->agreement_type === 'bonus') {
+                    // Logic for adding NEW intervention tasks/categories
+                    if (!$intervention->target_task_name || $intervention->reward_score === null) return;
+
+                    $quarter = (string) ($intervention->quarter ?? 1);
+                    $categories = $gradeStructure[$quarter]['categories'] ?? $gradeStructure['categories'] ?? [];
+                    
+                    // 1. Try to find the category by ID or Name
+                    $catIndex = -1;
+                    foreach ($categories as $index => $cat) {
+                        if (($intervention->target_category_id && $cat['id'] === $intervention->target_category_id) || 
+                            (strtolower($cat['label']) === strtolower($intervention->target_category_name))) {
+                            $catIndex = $index;
+                            break;
+                        }
+                    }
+
+                    // 2. If category doesn't exist, create it as a bonus category
+                    if ($catIndex === -1) {
+                        $newCatId = $intervention->target_category_id ?: 'bonus_intervention_' . time();
+                        $categories[] = [
+                            'id' => $newCatId,
+                            'label' => $intervention->target_category_name ?: 'Intervention Bonus',
+                            'weight' => (float) ($intervention->target_category_weight ?: 0.05),
+                            'is_bonus' => true,
+                            'tasks' => []
+                        ];
+                        $catIndex = count($categories) - 1;
+                    }
+
+                    // 3. Ensure task exists in that category
+                    $taskIndex = -1;
+                    $tasks = $categories[$catIndex]['tasks'] ?? [];
+                    foreach ($tasks as $index => $task) {
+                        if (strtolower($task['label']) === strtolower($intervention->target_task_name)) {
+                            $taskIndex = $index;
+                            break;
+                        }
+                    }
+
+                    if ($taskIndex === -1) {
+                        $newTaskId = 'task_recovery_' . time() . '_' . rand(100, 999);
+                        $tasks[] = [
+                            'id' => $newTaskId,
+                            'label' => $intervention->target_task_name,
+                            'total' => 100 // Default total for recovery tasks
+                        ];
+                        $categories[$catIndex]['tasks'] = $tasks;
+                        $taskIndex = count($tasks) - 1;
+                    }
+
+                    $finalTaskId = $categories[$catIndex]['tasks'][$taskIndex]['id'];
+
+                    // 4. Update the class structure if we made changes
+                    if (isset($gradeStructure[$quarter])) {
+                        $gradeStructure[$quarter]['categories'] = $categories;
+                    } else {
+                        $gradeStructure['categories'] = $categories;
+                    }
+                    
+                    $class->update(['grade_categories' => $gradeStructure]);
+
+                    // 5. Update the student's grade for this new task
+                    Grade::updateOrCreate(
+                        [
+                            'enrollment_id' => $enrollment->id,
+                            'assignment_key' => $finalTaskId,
+                            'quarter' => $intervention->quarter,
+                        ],
+                        [
+                            'assignment_name' => $intervention->target_task_name,
+                            'score' => $intervention->reward_score,
+                            'total_score' => 100
+                        ]
+                    );
+                }
+            });
+
+        $this->enrollmentGradeService->recalculateEnrollmentGrades($enrollment, $gradeStructure);
     }
 
     /**
@@ -151,16 +273,34 @@ class InterventionController extends Controller
                 'intervention' => $latestIntervention ? $this->serializeIntervention($latestIntervention) : null,
                 // Flag for pending completion requests (for easy filtering)
                 'hasPendingCompletionRequest' => $activeInterventions->contains(fn($i) => $i->isPendingApproval()),
+                'is_ignored' => (bool) $enrollment->is_ignored,
+                'has_interventions' => $interventions->isNotEmpty(),
             ];
         })
-            // Only include students who are NOT on_track or have active intervention
+            // Filter logic:
+            // 1. Priority Watchlist: Observed risk category AND NOT ignored AND NO active intervention
+            // 2. Intervention Given: Has at least one intervention (regardless of risk/ignored)
+            // 3. Ignore Student: Is ignored
+            // We'll pass ALL these to the frontend and let it filter based on the active tab,
+            // but we need to ensure we don't exclude students who have interventions but are now 'on_track'.
             ->filter(function ($student) use ($observedCategories) {
-                if (!empty($student['hasActiveIntervention'])) {
+                // Keep if ignored (for Ignore Student list)
+                if ($student['is_ignored']) {
                     return true;
                 }
 
-                $riskCategory = (string) ($student['riskCategory'] ?? 'on_track');
+                // Keep if has any intervention (for Intervention Given list)
+                if ($student['has_interventions']) {
+                    return true;
+                }
 
+                // Keep if active intervention (redundant with above but for clarity)
+                if ($student['hasActiveIntervention']) {
+                    return true;
+                }
+
+                // Keep if at risk and not on_track
+                $riskCategory = (string) ($student['riskCategory'] ?? 'on_track');
                 return $this->isRiskCategoryObserved($riskCategory, $observedCategories);
             })
             ->sortBy('sort_key', SORT_NATURAL | SORT_FLAG_CASE)
@@ -175,7 +315,43 @@ class InterventionController extends Controller
 
             $totalScore = $grades->sum('score');
             $totalPossible = $grades->sum('total_score');
-            $gradePercentage = $totalPossible > 0 ? round(($totalScore / $totalPossible) * 100) : null;
+            $rawGrade = $totalPossible > 0 ? ($totalScore / $totalPossible) * 100 : null;
+            
+            $gradePercentage = $rawGrade !== null 
+                ? (float) $this->transmutationService->transmuteGrade($rawGrade)
+                : null;
+
+            // Get class categories and normalize them for the current quarter
+            $classAssignment = $enrollment->schoolClass ?? $enrollment->subjectTeacher;
+            $currentQuarter = (int) ($classAssignment?->current_quarter ?? 1);
+            $rawCategories = $classAssignment?->grade_categories ?? [];
+            
+            // Extract categories for the active quarter
+            $quarterKey = (string) $currentQuarter;
+            $gradeCategories = [];
+
+            if (isset($rawCategories[$quarterKey])) {
+                // Per-quarter format: check if it's the direct categories array or wrapped in a 'categories' key
+                $quarterData = $rawCategories[$quarterKey];
+                if (isset($quarterData['categories']) && is_array($quarterData['categories'])) {
+                    $gradeCategories = $quarterData['categories'];
+                } else {
+                    $gradeCategories = $quarterData;
+                }
+            } elseif (isset($rawCategories['categories']) && is_array($rawCategories['categories'])) {
+                // Legacy flat format with explicit 'categories' key
+                $gradeCategories = $rawCategories['categories'];
+            } else {
+                // Legacy flat format (raw list)
+                $gradeCategories = $rawCategories;
+            }
+
+            // Ensure we only pass standard categories for recovery selection
+            // unless bonus categories also have tasks.
+            $gradeCategories = array_values(array_filter((array) $gradeCategories, function($cat) {
+                // Extra safety: ensure $cat is an array before checking for tasks
+                return is_array($cat) && !empty($cat['tasks']);
+            }));
 
             // Build grade trend (last 4 grade entries)
             $gradeTrend = $grades->sortBy('created_at')
@@ -235,11 +411,28 @@ class InterventionController extends Controller
                     'id' => $enrollment->id,
                     'name' => $displayName,
                     'currentGrade' => $gradePercentage !== null ? "{$gradePercentage}%" : 'N/A',
+                    'rawGrade' => $rawGrade,
+                    'currentQuarter' => $classAssignment?->current_quarter ?? 1,
+                    'gradeCategories' => $gradeCategories,
+                    'allGrades' => $grades->map(fn($g) => [
+                        'id' => $g->id,
+                        'assignment_key' => $g->assignment_key,
+                        'assignment_name' => $g->assignment_name,
+                        'score' => $g->score,
+                        'total_score' => $g->total_score,
+                        'quarter' => $g->quarter,
+                    ])->values()->toArray(),
                     'gradeTrend' => $gradeTrend,
                     'specialPrograms' => [],
                     'parentContact' => $student?->parent_contact_number,
                     'counselor' => 'Guidance Office',
                     'attendanceSummary' => $this->buildAttendanceSummary($enrollment->attendanceRecords),
+                    'attendanceHistory' => $enrollment->attendanceRecords->map(fn($a) => [
+                        'id' => $a->id,
+                        'date' => $a->date?->format('Y-m-d'),
+                        'status' => $a->status,
+                        'remarks' => $a->remarks,
+                    ])->values()->toArray(),
                     'missingAssignments' => $missingAssignments,
                     'behaviorLog' => [],
                     'interventionLog' => $interventionLog,
@@ -297,6 +490,13 @@ class InterventionController extends Controller
             'sms_recipients.*' => 'nullable|string|max:40',
             'parent_phone' => 'nullable|string|max:40',
             'sms_custom_message' => 'nullable|string|max:1000|required_if:type,parent_contact',
+            'target_task_id' => 'nullable|string',
+            'target_task_name' => 'nullable|string',
+            'target_category_id' => 'nullable|string',
+            'target_category_name' => 'nullable|string',
+            'target_category_weight' => 'nullable|numeric',
+            'reward_score' => 'nullable|numeric',
+            'agreement_type' => ['nullable', 'string', Rule::in(['recovery', 'bonus'])],
         ]);
 
         $deadlineAt = $this->normalizeDeadlineForType(
@@ -311,17 +511,29 @@ class InterventionController extends Controller
             abort(403, 'You are not authorized to start an intervention for this student.');
         }
 
+        $class = $enrollment->schoolClass ?? $enrollment->subjectTeacher;
+        $currentQuarter = $class?->current_quarter ?? 1;
+
         $intervention = Intervention::updateOrCreate(
             [
                 'enrollment_id' => $enrollment->id,
                 'status' => 'active',
                 'school_year' => $schoolYear,
+                'quarter' => $currentQuarter,
             ],
             [
                 'type' => $validated['type'],
                 'notes' => $validated['notes'] ?? '',
                 'deadline_at' => $deadlineAt,
                 'school_year' => $schoolYear,
+                'quarter' => $currentQuarter,
+                'target_task_id' => $validated['target_task_id'] ?? null,
+                'target_task_name' => $validated['target_task_name'] ?? null,
+                'target_category_id' => $validated['target_category_id'] ?? null,
+                'target_category_name' => $validated['target_category_name'] ?? null,
+                'target_category_weight' => $validated['target_category_weight'] ?? null,
+                'reward_score' => $validated['reward_score'] ?? null,
+                'agreement_type' => $validated['agreement_type'] ?? 'recovery',
             ]
         );
 
@@ -405,17 +617,22 @@ class InterventionController extends Controller
                 continue;
             }
 
+            $class = $enrollment->schoolClass ?? $enrollment->subjectTeacher;
+            $currentQuarter = $class?->current_quarter ?? 1;
+
             $intervention = Intervention::updateOrCreate(
                 [
                     'enrollment_id' => $enrollment->id,
                     'status' => 'active',
                     'school_year' => $schoolYear,
+                    'quarter' => $currentQuarter,
                 ],
                 [
                     'type' => $validated['type'],
                     'notes' => $validated['notes'] ?? '',
                     'deadline_at' => $deadlineAt,
                     'school_year' => $schoolYear,
+                    'quarter' => $currentQuarter,
                 ]
             );
 
@@ -451,6 +668,13 @@ class InterventionController extends Controller
             'type' => ['required', 'string', Rule::in(array_keys(Intervention::getTypes()))],
             'notes' => 'nullable|string|max:5000',
             'deadline_at' => 'nullable|date|after:now',
+            'target_task_id' => 'nullable|string',
+            'target_task_name' => 'nullable|string',
+            'target_category_id' => 'nullable|string',
+            'target_category_name' => 'nullable|string',
+            'target_category_weight' => 'nullable|numeric',
+            'reward_score' => 'nullable|numeric',
+            'agreement_type' => ['nullable', 'string', Rule::in(['recovery', 'bonus'])],
         ]);
 
         $deadlineValue = array_key_exists('deadline_at', $validated)
@@ -461,6 +685,13 @@ class InterventionController extends Controller
             'type' => $validated['type'],
             'notes' => $validated['notes'] ?? '',
             'deadline_at' => $this->normalizeDeadlineForType($validated['type'], $deadlineValue),
+            'target_task_id' => $validated['target_task_id'] ?? $intervention->target_task_id,
+            'target_task_name' => $validated['target_task_name'] ?? $intervention->target_task_name,
+            'target_category_id' => $validated['target_category_id'] ?? $intervention->target_category_id,
+            'target_category_name' => $validated['target_category_name'] ?? $intervention->target_category_name,
+            'target_category_weight' => $validated['target_category_weight'] ?? $intervention->target_category_weight,
+            'reward_score' => $validated['reward_score'] ?? $intervention->reward_score,
+            'agreement_type' => $validated['agreement_type'] ?? $intervention->agreement_type,
         ]);
 
         return Redirect::back()->with('success', 'Intervention updated successfully.');
@@ -472,9 +703,14 @@ class InterventionController extends Controller
     public function destroy(Request $request, Intervention $intervention)
     {
         $teacher = $request->user();
-        $this->authorizeInterventionForTeacher($intervention, (int) $teacher->id);
+        $enrollment = $this->authorizeInterventionForTeacher($intervention, (int) $teacher->id);
 
+        $wasCompleted = $intervention->status === 'completed';
         $intervention->delete();
+
+        if ($wasCompleted) {
+            $this->recalculateGrades($enrollment);
+        }
 
         return Redirect::back()->with('success', 'Intervention deleted successfully.');
     }
@@ -567,6 +803,7 @@ class InterventionController extends Controller
             $allCompleted = $intervention->tasks()->where('is_completed', false)->count() === 0;
             if ($allCompleted && $intervention->tasks()->count() > 0) {
                 $intervention->update(['status' => 'completed']);
+                $this->recalculateGrades($enrollment);
             }
 
             if ($wasPendingReview) {
@@ -640,6 +877,8 @@ class InterventionController extends Controller
             'rejected_at' => null,
             'rejection_reason' => null,
         ]);
+
+        $this->recalculateGrades($enrollment);
 
         StudentNotification::create([
             'user_id' => $enrollment->user_id,
@@ -1143,6 +1382,8 @@ class InterventionController extends Controller
             'approval_notes' => $request->input('notes'),
         ]);
 
+        $this->recalculateGrades($enrollment);
+
         // Notify the student
         StudentNotification::create([
             'user_id' => $enrollment->user_id,
@@ -1379,5 +1620,27 @@ class InterventionController extends Controller
         }
 
         return $deadlineAt;
+    }
+
+    /**
+     * Toggle the ignore status for an enrollment.
+     */
+    public function toggleIgnore(Request $request, Enrollment $enrollment): RedirectResponse
+    {
+        $teacher = $request->user();
+
+        // Ensure the teacher has access to this enrollment
+        $hasAccess = $enrollment->schoolClass()->where('teacher_id', $teacher->id)->exists()
+            || $enrollment->subjectTeacher()->where('teacher_id', $teacher->id)->exists();
+
+        if (!$hasAccess) {
+            abort(403);
+        }
+
+        $enrollment->update([
+            'is_ignored' => !$enrollment->is_ignored
+        ]);
+
+        return back()->with('success', $enrollment->is_ignored ? 'Student added to ignore list.' : 'Student removed from ignore list.');
     }
 }

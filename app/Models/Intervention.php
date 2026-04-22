@@ -9,6 +9,14 @@ class Intervention extends Model
     protected $fillable = [
         'enrollment_id',
         'school_year',
+        'quarter',
+        'target_task_id',
+        'target_task_name',
+        'target_category_id',
+        'target_category_name',
+        'target_category_weight',
+        'reward_score',
+        'agreement_type',
         'type',
         'status',
         'notes',
@@ -24,6 +32,9 @@ class Intervention extends Model
 
     protected $casts = [
         'school_year' => 'string',
+        'quarter' => 'integer',
+        'reward_score' => 'float',
+        'target_category_weight' => 'float',
         'deadline_at' => 'datetime',
         'completion_requested_at' => 'datetime',
         'approved_at' => 'datetime',

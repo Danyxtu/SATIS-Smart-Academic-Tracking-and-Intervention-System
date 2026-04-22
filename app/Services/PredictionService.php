@@ -41,6 +41,10 @@ class PredictionService
         ],
     ];
 
+    public function __construct(
+        protected TransmutationGradeServices $transmutationService
+    ) {}
+
     /**
      * Determine the risk category for a student based on their performance.
      */
@@ -63,6 +67,9 @@ class PredictionService
             return self::RISK_CATEGORIES['on_track'];
         }
 
+        // Transmute raw grade to transmuted scale (e.g. 60 -> 75)
+        $transmutedGrade = (float) $this->transmutationService->transmuteGrade($currentGrade);
+
         // Weighted score calculation
         $gradeWeight = 0.6;
         $attendanceWeight = 0.25;
@@ -71,8 +78,8 @@ class PredictionService
         // Normalize missing assignments (0-100 scale, inverse)
         $missingScore = max(0, 100 - ($missingAssignments * 15));
 
-        // Calculate weighted performance score
-        $performanceScore = ($currentGrade * $gradeWeight)
+        // Calculate weighted performance score using transmuted grade
+        $performanceScore = ($transmutedGrade * $gradeWeight)
             + ($attendanceRate * $attendanceWeight)
             + ($missingScore * $missingWeight);
 
@@ -153,7 +160,10 @@ class PredictionService
         $trendImpact = $trend['slope'] * $remainingAssignments;
 
         // Predicted grade with trend adjustment (clamped to 0-100)
-        $predictedGrade = max(0, min(100, $currentGrade + ($trendImpact * 0.5)));
+        $predictedRawGrade = max(0, min(100, $currentGrade + ($trendImpact * 0.5)));
+        
+        // Transmute predicted raw grade
+        $predictedGrade = (float) $this->transmutationService->transmuteGrade($predictedRawGrade);
 
         // Calculate confidence based on data points
         $dataPoints = $grades->count();
@@ -174,6 +184,7 @@ class PredictionService
         return [
             'current_grade' => round($currentGrade, 1),
             'predicted_grade' => round($predictedGrade, 1),
+            'raw_predicted_grade' => round($predictedRawGrade, 1),
             'confidence' => $confidence,
             'trend' => $trendDescription,
             'trend_direction' => $trendDirection,
@@ -218,11 +229,31 @@ class PredictionService
     {
         // Get the subject's grade structure
         $classAssignment = $enrollment->schoolClass ?? $enrollment->subjectTeacher;
-        $gradeCategories = $classAssignment?->grade_categories ?? [];
+        $currentQuarter = $classAssignment?->current_quarter ?? 1;
+        $rawCategories = $classAssignment?->grade_categories ?? [];
+
+        // Correctly resolve categories for the current quarter
+        $categories = [];
+        $quarterKey = (string) $currentQuarter;
+        
+        if (isset($rawCategories[$quarterKey])) {
+            $quarterData = $rawCategories[$quarterKey];
+            $categories = (isset($quarterData['categories']) && is_array($quarterData['categories']))
+                ? $quarterData['categories']
+                : $quarterData;
+        } elseif (isset($rawCategories['categories']) && is_array($rawCategories['categories'])) {
+            $categories = $rawCategories['categories'];
+        } else {
+            $categories = $rawCategories;
+        }
+
+        if (!is_array($categories)) {
+            $categories = [];
+        }
 
         // Count total expected assignments from structure
         $totalExpected = 0;
-        foreach ($gradeCategories as $category) {
+        foreach ($categories as $category) {
             $totalExpected += count($category['tasks'] ?? []);
         }
 
@@ -245,8 +276,7 @@ class PredictionService
      */
     private function generatePredictionMessage(float $current, float $predicted, string $trend): string
     {
-        $difference = $predicted - $current;
-
+        // current and predicted are already transmuted (75 scale)
         if ($predicted >= 90) {
             return "Excellent! You're on track for outstanding performance.";
         }
@@ -266,10 +296,10 @@ class PredictionService
         }
 
         if ($trend === 'Improving') {
-            return "You're improving, but need to accelerate. Seek help if needed.";
+            return "You're improving, but still below passing (75%). Keep pushing!";
         }
 
-        return "Alert: Your predicted grade is below passing. Immediate action required.";
+        return "Alert: Your predicted grade is below passing (75%). Immediate action required.";
     }
 
     /**
@@ -282,7 +312,12 @@ class PredictionService
 
         $totalScore = $grades->sum('score');
         $totalPossible = $grades->sum('total_score');
-        $currentGrade = $totalPossible > 0 ? ($totalScore / $totalPossible) * 100 : null;
+        $rawGrade = $totalPossible > 0 ? ($totalScore / $totalPossible) * 100 : null;
+        
+        // Transmute current grade
+        $currentGrade = $rawGrade !== null 
+            ? (float) $this->transmutationService->transmuteGrade($rawGrade)
+            : null;
 
         $totalDays = $attendance->count();
         $presentDays = $attendance->whereIn('status', ['present', 'excused'])->count();
@@ -435,9 +470,12 @@ class PredictionService
 
         // Calculate percentages
         foreach ($categories as $key => &$data) {
-            $data['percentage'] = $data['total'] > 0
-                ? round(($data['score'] / $data['total']) * 100)
-                : null;
+            if ($data['total'] > 0) {
+                $rawPercent = ($data['score'] / $data['total']) * 100;
+                $data['percentage'] = (float) $this->transmutationService->transmuteGrade($rawPercent);
+            } else {
+                $data['percentage'] = null;
+            }
         }
 
         return $categories;
@@ -476,7 +514,12 @@ class PredictionService
         // Calculate current metrics
         $totalScore = $grades->sum('score');
         $totalPossible = $grades->sum('total_score');
-        $currentGrade = $totalPossible > 0 ? ($totalScore / $totalPossible) * 100 : null;
+        $rawGrade = $totalPossible > 0 ? ($totalScore / $totalPossible) * 100 : null;
+        
+        // Transmute current grade
+        $currentGrade = $rawGrade !== null 
+            ? (float) $this->transmutationService->transmuteGrade($rawGrade)
+            : null;
 
         $totalDays = $attendance->count();
         $presentDays = $attendance->whereIn('status', ['present', 'excused'])->count();

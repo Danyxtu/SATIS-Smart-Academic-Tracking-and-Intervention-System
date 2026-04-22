@@ -325,6 +325,10 @@ const normalizeCsvHeader = (value = "") => {
         return "lrn";
     }
 
+    if (["email", "emailaddress", "personalemail", "mail"].includes(normalized)) {
+        return "email";
+    }
+
     if (
         [
             "parentcontactnumber",
@@ -336,10 +340,6 @@ const normalizeCsvHeader = (value = "") => {
         ].includes(normalized)
     ) {
         return "parent_contact_number";
-    }
-
-    if (["email", "personalemail", "mail"].includes(normalized)) {
-        return "email";
     }
 
     return normalized;
@@ -363,12 +363,18 @@ const parseStudentCsv = (text = "") => {
     const lastNameIndex = headers.indexOf("last_name");
     const middleNameIndex = headers.indexOf("middle_name");
     const lrnIndex = headers.indexOf("lrn");
+    const emailIndex = headers.indexOf("email");
     const parentContactNumberIndex = headers.indexOf("parent_contact_number");
 
-    if (firstNameIndex === -1 || lastNameIndex === -1 || lrnIndex === -1) {
+    if (
+        firstNameIndex === -1 ||
+        lastNameIndex === -1 ||
+        lrnIndex === -1 ||
+        emailIndex === -1
+    ) {
         return {
             rows: [],
-            error: "CSV headers must include first_name, last_name, and lrn. Optional: middle_name.",
+            error: "CSV headers must include first_name, last_name, lrn, and email. Optional: middle_name.",
         };
     }
 
@@ -385,19 +391,27 @@ const parseStudentCsv = (text = "") => {
                 ? String(row[middleNameIndex] || "").trim()
                 : "";
         const lrn = String(row[lrnIndex] || "").trim();
+        const email = String(row[emailIndex] || "").trim();
         const parentContactNumber =
             parentContactNumberIndex >= 0
                 ? String(row[parentContactNumberIndex] || "").trim()
                 : "";
 
-        if (!firstName && !lastName && !middleName && !lrn) {
+        if (!firstName && !lastName && !middleName && !lrn && !email) {
             continue;
         }
 
-        if (!firstName || !lastName || !lrn) {
+        if (!firstName || !lastName || !lrn || !email) {
             return {
                 rows: [],
-                error: `Row ${rowIndex + 1}: first_name, last_name, and lrn are required.`,
+                error: `Row ${rowIndex + 1}: first_name, last_name, lrn, and email are required.`,
+            };
+        }
+
+        if (!EMAIL_FORMAT.test(email)) {
+            return {
+                rows: [],
+                error: `Row ${rowIndex + 1}: email address is invalid.`,
             };
         }
 
@@ -414,6 +428,7 @@ const parseStudentCsv = (text = "") => {
             last_name: lastName,
             middle_name: middleName,
             lrn,
+            email,
             parent_contact_number: parentContactNumber,
             username: "",
         });
@@ -450,6 +465,7 @@ function emptyStudentDraft() {
         last_name: "",
         middle_name: "",
         lrn: "",
+        email: "",
         parent_contact_number: "",
     };
 }
@@ -1383,6 +1399,7 @@ export default function CreateUserModal({
         const lastName = String(studentDraft.last_name || "").trim();
         const middleName = String(studentDraft.middle_name || "").trim();
         const lrn = String(studentDraft.lrn || "").trim();
+        const email = String(studentDraft.email || "").trim();
         const parentContactNumber = String(
             studentDraft.parent_contact_number || "",
         ).trim();
@@ -1410,6 +1427,12 @@ export default function CreateUserModal({
             }
         }
 
+        if (!email) {
+            nextErrors.student_queue_email = "Email is required.";
+        } else if (!EMAIL_FORMAT.test(email)) {
+            nextErrors.student_queue_email = "Enter a valid email address.";
+        }
+
         setClientErrors(nextErrors);
 
         if (Object.keys(nextErrors).length > 0) {
@@ -1422,6 +1445,7 @@ export default function CreateUserModal({
             last_name: lastName,
             middle_name: middleName,
             lrn,
+            email,
             parent_contact_number: parentContactNumber,
             username: "",
         };
@@ -1623,6 +1647,12 @@ export default function CreateUserModal({
                 nextErrors.lrn = `LRN must be exactly ${LRN_LENGTH} characters.`;
             }
 
+            if (!String(data.email || "").trim()) {
+                nextErrors.email = "Email address is required.";
+            } else if (!EMAIL_FORMAT.test(String(data.email || "").trim())) {
+                nextErrors.email = "Enter a valid email address.";
+            }
+
             if (!String(data.username || "").trim()) {
                 nextErrors.username = "Username is required.";
             } else if (!isValidStudentUsername(data.username)) {
@@ -1772,6 +1802,7 @@ export default function CreateUserModal({
                     last_name: queueItem.last_name,
                     middle_name: queueItem.middle_name || "",
                     lrn: queueItem.lrn,
+                    email: queueItem.email,
                     parent_contact_number:
                         queueItem.parent_contact_number || "",
                     username: queueItem.username,
@@ -1794,6 +1825,7 @@ export default function CreateUserModal({
                 last_name: data.last_name,
                 middle_name: data.middle_name,
                 lrn: data.lrn,
+                email: data.email,
                 parent_contact_number: data.parent_contact_number,
                 username: data.username,
                 password: data.password,
@@ -2262,6 +2294,30 @@ export default function CreateUserModal({
                                         </Field>
                                     )}
 
+                                    {isStudent && (
+                                        <Field
+                                            label="Email Address"
+                                            icon={Mail}
+                                            required
+                                            error={
+                                                errors.email ||
+                                                clientErrors.email
+                                            }
+                                        >
+                                            <input
+                                                type="email"
+                                                value={data.email || ""}
+                                                onChange={(event) =>
+                                                    setData(
+                                                        "email",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="student@school.edu"
+                                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-emerald-500 focus:bg-white focus:ring-emerald-500"
+                                            />
+                                        </Field>
+                                    )}
                                     {isStudent && (
                                         <Field
                                             label="Parent Contact Number"
@@ -2864,6 +2920,24 @@ export default function CreateUserModal({
                                                     />
 
                                                     <input
+                                                        type="email"
+                                                        value={studentDraft.email}
+                                                        onChange={(event) =>
+                                                            setStudentDraft(
+                                                                (
+                                                                    previousDraft,
+                                                                ) => ({
+                                                                    ...previousDraft,
+                                                                    email: event
+                                                                        .target
+                                                                        .value,
+                                                                }),
+                                                            )
+                                                        }
+                                                        placeholder="Email address"
+                                                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                                    />
+                                                    <input
                                                         type="text"
                                                         value={
                                                             studentDraft.parent_contact_number
@@ -2912,8 +2986,8 @@ export default function CreateUserModal({
                                                     <p className="mt-2 text-xs text-slate-500">
                                                         Required headers:
                                                         first_name, last_name,
-                                                        lrn. Optional:
-                                                        middle_name,
+                                                        lrn, and email.
+                                                        Optional: middle_name,
                                                         parent_contact_number.
                                                     </p>
                                                     {studentCsvFileName && (

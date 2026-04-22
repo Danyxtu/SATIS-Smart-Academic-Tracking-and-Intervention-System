@@ -118,6 +118,8 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
             ->name('interventions.update');
         Route::delete('/interventions/{intervention}', [InterventionController::class, 'destroy'])
             ->name('interventions.destroy');
+        Route::post('/interventions/enrollments/{enrollment}/toggle-ignore', [InterventionController::class, 'toggleIgnore'])
+            ->name('interventions.enrollments.toggle-ignore');
         Route::post('/interventions/{intervention}/complete', [InterventionController::class, 'completeWithoutRequest'])
             ->name('interventions.complete');
         Route::post('/interventions/{intervention}/approve', [InterventionController::class, 'approveCompletion'])

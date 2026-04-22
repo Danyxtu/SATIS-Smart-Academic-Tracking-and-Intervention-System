@@ -34,7 +34,10 @@ class WatchlistRuleService
         ],
     ];
 
-    public function __construct(private PredictionService $predictionService) {}
+    public function __construct(
+        private PredictionService $predictionService,
+        private TransmutationGradeServices $transmutationService,
+    ) {}
 
     /**
      * Evaluate one enrollment against the shared watchlist policy.
@@ -71,8 +74,13 @@ class WatchlistRuleService
         $grades = $enrollment->grades;
         $scoredGrades = $this->filterScoredGrades($grades);
 
-        $overallGrade = $this->calculateOverallGradePercentage($scoredGrades);
-        $hasGrades = $overallGrade !== null;
+        $rawOverallGrade = $this->calculateOverallGradePercentage($scoredGrades);
+        $hasGrades = $rawOverallGrade !== null;
+        
+        // TRANSMUTE RAW GRADE TO DEPED SCALE
+        $transmutedOverallGrade = $hasGrades 
+            ? (float) $this->transmutationService->transmuteGrade($rawOverallGrade)
+            : null;
 
         $absences = (int) $enrollment->attendanceRecords
             ->where('status', 'absent')
@@ -84,8 +92,17 @@ class WatchlistRuleService
         $isRemarkedPassed = $normalizedRemarks === 'passed';
 
         $quarterAverages = $this->calculateQuarterAverages($scoredGrades);
-        $midtermGrade = $this->resolveMidtermAverage($quarterAverages);
-        $finalQuarterGrade = $this->resolveFinalQuarterAverage($quarterAverages);
+        $midtermRawGrade = $this->resolveMidtermAverage($quarterAverages);
+        $finalQuarterRawGrade = $this->resolveFinalQuarterAverage($quarterAverages);
+        
+        // Transmute quarter averages for better decline comparison and failing check
+        $midtermGrade = $midtermRawGrade !== null 
+            ? (float) $this->transmutationService->transmuteGrade($midtermRawGrade)
+            : null;
+        $finalQuarterGrade = $finalQuarterRawGrade !== null
+            ? (float) $this->transmutationService->transmuteGrade($finalQuarterRawGrade)
+            : null;
+
         $finalQuarterNumber = $quarterAverages->keys()->last();
 
         $finalQuarterFailingActivities = $finalQuarterNumber !== null
@@ -95,10 +112,18 @@ class WatchlistRuleService
             )
             : 0;
 
+        $midtermExamTaken = $this->hasQuarterlyExam($scoredGrades, 1);
+        $finalQuarterExamTaken = $this->hasQuarterlyExam($scoredGrades, 2);
+
         $prediction = $this->predictionService->predictFinalGrade($enrollment);
-        $predictedGrade = is_numeric(data_get($prediction, 'predicted_grade'))
+        $predictedRawGrade = is_numeric(data_get($prediction, 'predicted_grade'))
             ? (float) data_get($prediction, 'predicted_grade')
-            : $finalQuarterGrade;
+            : $finalQuarterRawGrade;
+        
+        $predictedGrade = $predictedRawGrade !== null
+            ? (float) $this->transmutationService->transmuteGrade($predictedRawGrade)
+            : null;
+
         $trendDirection = (int) data_get($prediction, 'trend_direction', 0);
         $trendLabel = (string) data_get($prediction, 'trend', 'Stable');
 
@@ -111,12 +136,19 @@ class WatchlistRuleService
             ? round(($dropPoints / $midtermGrade) * 100, 2)
             : null;
 
-        // High risk: below passing OR absences reached the high-risk threshold,
+        // Determine individual quarter risk
+        $midtermFailing = $midtermGrade !== null && $midtermGrade < $passingGrade;
+        // BUG FIX: Quarter 2 risk evaluation ONLY after final exam taken
+        $finalQuarterFailing = $finalQuarterGrade !== null && $finalQuarterGrade < $passingGrade && $finalQuarterExamTaken;
+        $absenceThresholdReached = $absences >= $highRiskAbsenceThreshold;
+
+        // High risk: below passing in Q1, Q2 OR absences reached the high-risk threshold,
         // except when the enrollment is explicitly marked as Passed.
         $atRisk = ! $isRemarkedPassed
             && (
-                ($hasGrades && $overallGrade < $passingGrade)
-                || $absences >= $highRiskAbsenceThreshold
+                $midtermFailing
+                || $finalQuarterFailing
+                || $absenceThresholdReached
             );
 
         // Medium risk: either attendance concern OR sustained failing activity pattern.
@@ -166,28 +198,31 @@ class WatchlistRuleService
             'recent_decline' => $riskKey === 'recent_decline',
             'reasons' => $this->buildReasons(
                 $riskKey,
-                $overallGrade,
-                $absences,
-                $failingActivitiesTotal,
                 $midtermGrade,
                 $finalQuarterGrade,
+                $absences,
+                $failingActivitiesTotal,
                 $dropPoints,
                 $dropPercent,
                 $passingGrade,
                 $highRiskAbsenceThreshold,
                 $needsAttentionAbsenceThreshold,
                 $needsAttentionFailingActivitiesThreshold,
+                $finalQuarterExamTaken,
             ),
             'metrics' => [
                 'has_grades' => $hasGrades,
                 'graded_items_count' => $scoredGrades->count(),
                 'total_items_count' => $grades->count(),
-                'current_grade' => $overallGrade,
+                'current_grade' => $transmutedOverallGrade,
+                'raw_grade' => $rawOverallGrade,
                 'absences' => $absences,
                 'failing_activities_total' => $failingActivitiesTotal,
                 'failing_activities_final_quarter' => $finalQuarterFailingActivities,
                 'midterm_grade' => $midtermGrade,
+                'midterm_exam_taken' => $midtermExamTaken,
                 'final_quarter_grade' => $finalQuarterGrade,
+                'final_quarter_exam_taken' => $finalQuarterExamTaken,
                 'predicted_grade' => $predictedGrade,
                 'trend_direction' => $trendDirection,
                 'trend' => $trendLabel,
@@ -233,24 +268,14 @@ class WatchlistRuleService
 
     private function resolveMidtermAverage(Collection $quarterAverages): ?float
     {
-        if ($quarterAverages->isEmpty()) {
-            return null;
-        }
-
-        if ($quarterAverages->has(1)) {
-            return (float) $quarterAverages->get(1);
-        }
-
-        return (float) $quarterAverages->first();
+        // Explicitly only Q1
+        return $quarterAverages->has(1) ? (float) $quarterAverages->get(1) : null;
     }
 
     private function resolveFinalQuarterAverage(Collection $quarterAverages): ?float
     {
-        if ($quarterAverages->isEmpty()) {
-            return null;
-        }
-
-        return (float) $quarterAverages->last();
+        // Explicitly only Q2
+        return $quarterAverages->has(2) ? (float) $quarterAverages->get(2) : null;
     }
 
     private function countFailingActivities(Collection $grades, float $passingGrade): int
@@ -288,24 +313,36 @@ class WatchlistRuleService
             ->values();
     }
 
+    private function hasQuarterlyExam(Collection $grades, int $quarter): bool
+    {
+        return $grades->where('quarter', $quarter)->contains(function ($grade) {
+            $name = strtolower($grade->assignment_name ?? '');
+            $key = strtolower($grade->assignment_key ?? '');
+            return str_contains($name, 'exam') || str_contains($key, 'exam') || str_contains($name, 'quarterly') || str_contains($key, 'qe');
+        });
+    }
+
     private function buildReasons(
         string $riskKey,
-        ?float $overallGrade,
-        int $absences,
-        int $failingActivitiesTotal,
         ?float $midtermGrade,
         ?float $finalQuarterGrade,
+        int $absences,
+        int $failingActivitiesTotal,
         ?float $dropPoints,
         ?float $dropPercent,
         float $passingGrade,
         int $highRiskAbsenceThreshold,
         int $needsAttentionAbsenceThreshold,
         int $needsAttentionFailingActivitiesThreshold,
+        bool $finalQuarterExamTaken = false,
     ): array {
         return match ($riskKey) {
             'at_risk' => array_values(array_filter([
-                $overallGrade !== null
-                    ? sprintf('Current grade %.2f%% is below %.2f%%.', $overallGrade, $passingGrade)
+                ($midtermGrade !== null && $midtermGrade < $passingGrade)
+                    ? sprintf('Quarter 1 grade %.1f%% is below %.0f%%.', $midtermGrade, $passingGrade)
+                    : null,
+                ($finalQuarterGrade !== null && $finalQuarterGrade < $passingGrade && $finalQuarterExamTaken)
+                    ? sprintf('Quarter 2 grade %.1f%% is below %.0f%%.', $finalQuarterGrade, $passingGrade)
                     : null,
                 $absences >= $highRiskAbsenceThreshold
                     ? sprintf(
@@ -333,13 +370,13 @@ class WatchlistRuleService
             ])),
             'recent_decline' => array_values(array_filter([
                 $midtermGrade !== null && $finalQuarterGrade !== null
-                    ? sprintf('Midterm %.2f%% to final quarter %.2f%%.', $midtermGrade, $finalQuarterGrade)
+                    ? sprintf('Midterm %.1f%% to final quarter %.1f%%.', $midtermGrade, $finalQuarterGrade)
                     : null,
                 $dropPoints !== null
-                    ? sprintf('Decline of %.2f point(s) (%.2f%%).', $dropPoints, (float) ($dropPercent ?? 0.0))
+                    ? sprintf('Decline of %.1f point(s) (%.1f%%).', $dropPoints, (float) ($dropPercent ?? 0.0))
                     : null,
-                $finalQuarterGrade !== null && $finalQuarterGrade < $passingGrade
-                    ? sprintf('Final quarter %.2f%% is below the passing score %.2f%%.', $finalQuarterGrade, $passingGrade)
+                $finalQuarterGrade !== null && $finalQuarterGrade < $passingGrade && $finalQuarterExamTaken
+                    ? sprintf('Final quarter %.1f%% is below the passing score %.0f%%.', $finalQuarterGrade, $passingGrade)
                     : null,
             ])),
             default => ['Performance is currently within watchlist thresholds.'],

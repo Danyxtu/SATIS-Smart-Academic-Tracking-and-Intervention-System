@@ -30,6 +30,10 @@ const EditGradeCategoriesModal = ({
         );
     };
 
+    const isBonusCategory = (category) => {
+        return category?.is_bonus === true;
+    };
+
     const [localCategories, setLocalCategories] = useState([]);
 
     // Initialize local state when modal opens
@@ -39,20 +43,32 @@ const EditGradeCategoriesModal = ({
                 categories.map((cat) => ({
                     ...cat,
                     weight: Math.round((cat.weight || 0) * 100), // Convert to percentage
+                    is_bonus: cat.is_bonus || false,
                 })),
             );
         }
     }, [isOpen, categories]);
 
-    // Calculate total percentage
+    // Calculate total percentage (excluding bonus categories)
     const totalPercentage = useMemo(() => {
-        return localCategories.reduce(
-            (sum, cat) => sum + (parseFloat(cat.weight) || 0),
-            0,
-        );
+        return localCategories
+            .filter((cat) => !cat.is_bonus)
+            .reduce((sum, cat) => sum + (parseFloat(cat.weight) || 0), 0);
     }, [localCategories]);
 
     const isValidTotal = Math.abs(totalPercentage - 100) < 0.01;
+
+    // Handle bonus toggle
+    const handleBonusToggle = (index) => {
+        setLocalCategories((prev) => {
+            const updated = [...prev];
+            updated[index] = {
+                ...updated[index],
+                is_bonus: !updated[index].is_bonus,
+            };
+            return updated;
+        });
+    };
 
     // Handle weight change
     const handleWeightChange = (index, value) => {
@@ -154,6 +170,21 @@ const EditGradeCategoriesModal = ({
                 label: "New Category",
                 weight: 0,
                 tasks: [],
+                is_bonus: false,
+            },
+        ]);
+    };
+
+    const addInterventionBonusCategory = () => {
+        const bonusId = `bonus_intervention_${Date.now()}`;
+        setLocalCategories((prev) => [
+            ...prev,
+            {
+                id: bonusId,
+                label: "Intervention Bonus",
+                weight: 5,
+                tasks: [],
+                is_bonus: true,
             },
         ]);
     };
@@ -248,6 +279,7 @@ const EditGradeCategoriesModal = ({
             label: cat.label.trim(),
             weight: (parseFloat(cat.weight) || 0) / 100,
             tasks: cat.tasks || [],
+            is_bonus: cat.is_bonus || false,
         }));
 
         setProcessing(true);
@@ -337,7 +369,7 @@ const EditGradeCategoriesModal = ({
                                         : "text-red-700"
                                 }`}
                             >
-                                Total: {totalPercentage.toFixed(0)}%
+                                Base Total: {totalPercentage.toFixed(0)}%
                             </span>
                             {!isValidTotal && (
                                 <span className="text-xs text-red-600">
@@ -359,14 +391,27 @@ const EditGradeCategoriesModal = ({
                         {localCategories.map((category, index) => (
                             <div
                                 key={category.id || index}
-                                className="bg-gray-50 rounded-lg p-3 border border-gray-200"
+                                className={`rounded-lg p-3 border transition-colors ${category.is_bonus ? "bg-amber-50/50 border-amber-200" : "bg-gray-50 border-gray-200"}`}
                             >
                                 <div className="flex items-end gap-3">
                                     {/* Category Label */}
                                     <div className="flex-1">
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">
-                                            Category Name
-                                        </label>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <label className="block text-xs font-medium text-gray-500">
+                                                Category Name
+                                            </label>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    handleBonusToggle(index)
+                                                }
+                                                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all border ${category.is_bonus ? "bg-amber-100 text-amber-700 border-amber-300" : "bg-gray-200 text-gray-500 border-gray-300 hover:bg-gray-300"}`}
+                                            >
+                                                {category.is_bonus
+                                                    ? "★ Bonus"
+                                                    : "Standard"}
+                                            </button>
+                                        </div>
                                         <input
                                             type="text"
                                             value={category.label}
@@ -485,14 +530,24 @@ const EditGradeCategoriesModal = ({
                     </div>
 
                     {/* Add Category Button */}
-                    <button
-                        type="button"
-                        onClick={addCategory}
-                        className="mt-3 w-full py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition flex items-center justify-center gap-2"
-                    >
-                        <Plus size={16} />
-                        Add New Category
-                    </button>
+                    <div className="grid grid-cols-2 gap-2 mt-3">
+                        <button
+                            type="button"
+                            onClick={addCategory}
+                            className="py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition flex items-center justify-center gap-2"
+                        >
+                            <Plus size={16} />
+                            Add Standard
+                        </button>
+                        <button
+                            type="button"
+                            onClick={addInterventionBonusCategory}
+                            className="py-2.5 border-2 border-dashed border-amber-300 rounded-lg text-sm text-amber-600 hover:border-amber-400 hover:text-amber-700 transition flex items-center justify-center gap-2 bg-amber-50/30"
+                        >
+                            <Plus size={16} />
+                            Add Bonus
+                        </button>
+                    </div>
 
                     {!localCategories.some((category) =>
                         isAttendanceCategory(category),
@@ -514,21 +569,19 @@ const EditGradeCategoriesModal = ({
                         </h4>
                         <ul className="text-xs text-blue-700 space-y-1">
                             <li>
-                                • Standard SHS grading: Written Works (30%),
-                                Performance Tasks (40%), Quarterly Exam (30%)
-                            </li>
-                            <li>• All weights must add up to exactly 100%</li>
-                            <li>
-                                • Categories with tasks cannot be removed -
-                                remove tasks first
+                                • <b>Standard Categories:</b> These must sum up
+                                to 100% (e.g., WW 30, PT 40, Exam 30).
                             </li>
                             <li>
-                                • Attendance uses Present / Total Meetings and
-                                is auto-computed from Attendance Module
+                                • <b>Bonus Categories:</b> These add directly
+                                to the raw grade (e.g., +5%) and do not count
+                                towards the 100% base.
                             </li>
                             <li>
-                                • Use "Distribute Evenly" to auto-balance
-                                weights
+                                • <b>Intervention Bonus:</b> If named "Intervention Bonus" and marked as bonus, it automatically applies points for completed interventions.
+                            </li>
+                            <li>
+                                • Attendance is auto-computed from the Attendance Module.
                             </li>
                         </ul>
                     </div>

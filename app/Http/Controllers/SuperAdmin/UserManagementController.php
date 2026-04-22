@@ -579,7 +579,7 @@ class UserManagementController extends Controller
                             'first_name' => $teacherPayload['first_name'],
                             'last_name' => $teacherPayload['last_name'],
                             'middle_name' => $teacherPayload['middle_name'] ?? null,
-                            'personal_email' => $teacherPayload['email'] ?? null,
+                            'email' => $teacherPayload['email'] ?? null,
                             'temporary_password' => $tempPassword,
                             'password' => Hash::make($tempPassword),
                             'department_id' => $teacherPayload['department_id'],
@@ -629,7 +629,7 @@ class UserManagementController extends Controller
                 'student_queue.*.middle_name' => ['nullable', 'string', 'max:100'],
                 'student_queue.*.lrn' => ['required', 'string', 'size:12', 'distinct', 'unique:students,lrn'],
                 'student_queue.*.parent_contact_number' => ['nullable', 'string', 'max:40'],
-                'student_queue.*.email' => ['nullable', 'email', 'max:255', 'distinct', 'unique:users,personal_email'],
+                'student_queue.*.email' => ['required', 'email', 'max:255', 'distinct', 'unique:users,email'],
                 'student_queue.*.username' => ['required', 'string', 'regex:/^[a-z]{2}\d{4}\d{5}$/', 'distinct'],
             ]);
 
@@ -662,7 +662,7 @@ class UserManagementController extends Controller
                         'first_name' => $studentPayload['first_name'],
                         'last_name' => $studentPayload['last_name'],
                         'middle_name' => $studentPayload['middle_name'] ?? null,
-                        'personal_email' => $studentPayload['email'] ?? null,
+                        'email' => $studentPayload['email'],
                         'username' => $resolvedUsername,
                         'temporary_password' => $validated['password'],
                         'password' => Hash::make($validated['password']),
@@ -719,7 +719,7 @@ class UserManagementController extends Controller
             'middle_name'   => ['nullable', 'string', 'max:100'],
             'lrn'           => ['nullable', 'string', 'size:12', 'unique:students,lrn'],
             'parent_contact_number' => ['nullable', 'string', 'max:40'],
-            'email'         => ['nullable', 'email', 'unique:users,personal_email'],
+            'email'         => ['nullable', 'email', 'unique:users,email'],
             'username'      => ['nullable', 'string', 'regex:/^[a-z]{2}\d{4}\d{5}$/'],
             'password'      => ['nullable', Password::min(8)],
             'role'          => ['required', 'in:teacher,student'],
@@ -819,7 +819,7 @@ class UserManagementController extends Controller
             'first_name'           => $validated['first_name'],
             'last_name'            => $validated['last_name'],
             'middle_name'          => $validated['middle_name'] ?? null,
-            'personal_email'       => $validated['email'] ?? null,
+            'email'                => $validated['email'] ?? null,
             'temporary_password'   => $validated['role'] === 'student'
                 ? $validated['password']
                 : $teacherTempPassword,

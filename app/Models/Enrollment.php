@@ -16,24 +16,30 @@ class Enrollment extends Model
         'current_grade',
         'current_attendance_rate',
         'initial_grade_q1',
+        'q1_intervention_bonus',
         'expected_grade_q1',
         'q1_grade',
         'initial_grade_q2',
+        'q2_intervention_bonus',
         'expected_grade_q2',
         'q2_grade',
         'final_grade',
         'remarks',
+        'is_ignored',
     ];
 
     protected $casts = [
         'initial_grade_q1' => 'float',
+        'q1_intervention_bonus' => 'float',
         'expected_grade_q1' => 'float',
         'q1_grade' => 'integer',
         'initial_grade_q2' => 'float',
+        'q2_intervention_bonus' => 'float',
         'expected_grade_q2' => 'float',
         'q2_grade' => 'integer',
         'final_grade' => 'integer',
         'remarks' => 'string',
+        'is_ignored' => 'boolean',
     ];
 
     public function user()

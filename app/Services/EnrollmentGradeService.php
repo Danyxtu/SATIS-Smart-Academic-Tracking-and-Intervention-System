@@ -60,6 +60,11 @@ class EnrollmentGradeService
 
         // --- Quarter 1 ---
         $initialQ1 = $this->computeInitialGrade($q1Grades, $q1Categories, $attendanceRate);
+        $bonusQ1 = $this->computeInterventionBonus($enrollment, $q1Categories, 1);
+        if ($initialQ1 !== null) {
+            $initialQ1 += $bonusQ1;
+        }
+
         $expectedQ1 = $this->computeExpectedGrade($q1Grades, $q1Categories, $attendanceRate);
         $q1Transmuted = $initialQ1 !== null
             ? $this->transmutationService->transmuteGrade($initialQ1)
@@ -67,6 +72,11 @@ class EnrollmentGradeService
 
         // --- Quarter 2 ---
         $initialQ2 = $this->computeInitialGrade($q2Grades, $q2Categories, $attendanceRate);
+        $bonusQ2 = $this->computeInterventionBonus($enrollment, $q2Categories, 2);
+        if ($initialQ2 !== null) {
+            $initialQ2 += $bonusQ2;
+        }
+
         $expectedQ2 = $this->computeExpectedGrade($q2Grades, $q2Categories, $attendanceRate);
         $q2Transmuted = $initialQ2 !== null
             ? $this->transmutationService->transmuteGrade($initialQ2)
@@ -80,9 +90,11 @@ class EnrollmentGradeService
 
         $enrollment->update([
             'initial_grade_q1' => $initialQ1 !== null ? round($initialQ1, 2) : null,
+            'q1_intervention_bonus' => $bonusQ1 > 0 ? $bonusQ1 : null,
             'expected_grade_q1' => $expectedQ1 !== null ? round($expectedQ1, 2) : null,
             'q1_grade' => $q1Transmuted,
             'initial_grade_q2' => $initialQ2 !== null ? round($initialQ2, 2) : null,
+            'q2_intervention_bonus' => $bonusQ2 > 0 ? $bonusQ2 : null,
             'expected_grade_q2' => $expectedQ2 !== null ? round($expectedQ2, 2) : null,
             'q2_grade' => $q2Transmuted,
             'final_grade' => $finalGrade,
@@ -97,9 +109,11 @@ class EnrollmentGradeService
     {
         return [
             'initial_grade_q1' => $enrollment->initial_grade_q1,
+            'q1_intervention_bonus' => $enrollment->q1_intervention_bonus,
             'expected_grade_q1' => $enrollment->expected_grade_q1,
             'q1_grade' => $enrollment->q1_grade,
             'initial_grade_q2' => $enrollment->initial_grade_q2,
+            'q2_intervention_bonus' => $enrollment->q2_intervention_bonus,
             'expected_grade_q2' => $enrollment->expected_grade_q2,
             'q2_grade' => $enrollment->q2_grade,
             'final_grade' => $enrollment->final_grade,
@@ -110,6 +124,42 @@ class EnrollmentGradeService
     // =========================================================================
     // Grade Computation (private)
     // =========================================================================
+
+    /**
+     * Compute the intervention bonus points for an enrollment in a quarter.
+     */
+    private function computeInterventionBonus(Enrollment $enrollment, array $categories, int $quarter): float
+    {
+        $bonusPoints = 0;
+
+        foreach ($categories as $category) {
+            if (! ($category['is_bonus'] ?? false)) {
+                continue;
+            }
+
+            $weight = (float) ($category['weight'] ?? 0);
+            if ($weight <= 0) {
+                continue;
+            }
+
+            // Check if student has a completed intervention for this quarter
+            // For Tier 3, we also require it to be approved by a teacher.
+            $hasCompletedIntervention = $enrollment->interventions()
+                ->where('quarter', $quarter)
+                ->where('status', 'completed')
+                ->where(function ($query) {
+                    $query->whereNotIn('type', ['academic_agreement', 'one_on_one_meeting', 'counselor_referral'])
+                        ->orWhereNotNull('approved_at');
+                })
+                ->exists();
+
+            if ($hasCompletedIntervention) {
+                $bonusPoints += $weight;
+            }
+        }
+
+        return $bonusPoints;
+    }
 
     /**
      * Compute the raw weighted percentage for a set of grades (already filtered by quarter).
@@ -123,6 +173,11 @@ class EnrollmentGradeService
         $hasAnyScore = false;
 
         foreach ($categories as $category) {
+            // Skip bonus categories in the base 100% calculation
+            if ($category['is_bonus'] ?? false) {
+                continue;
+            }
+
             $tasks = $category['tasks'] ?? [];
             $weight = (float) ($category['weight'] ?? 0);
 

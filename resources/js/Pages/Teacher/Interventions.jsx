@@ -33,6 +33,8 @@ import {
     Clock,
     Paperclip,
     Inbox,
+    Plus,
+    Info,
 } from "lucide-react";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
 
@@ -1246,6 +1248,7 @@ function StartInterventionModal({
     studentName,
     priority,
     parentContact,
+    studentData = {},
 }) {
     const isHighRisk = priority === "High";
     const normalizedParentContact =
@@ -1263,6 +1266,13 @@ function StartInterventionModal({
                     ? normalizedParentContact
                     : "",
             sms_custom_message: "",
+            target_task_id: "",
+            target_task_name: "",
+            target_category_id: "",
+            target_category_name: "",
+            target_category_weight: 0.05,
+            reward_score: "",
+            agreement_type: "recovery", // 'recovery' or 'bonus'
         });
 
     const [taskDraft, setTaskDraft] = useState({
@@ -1350,6 +1360,13 @@ function StartInterventionModal({
             return {
                 ...basePayload,
                 deadline_at: deadlineRequired ? current.deadline_at : null,
+                target_task_id: isAcademicAgreement ? current.target_task_id : null,
+                target_task_name: isAcademicAgreement ? current.target_task_name : null,
+                target_category_id: isAcademicAgreement ? current.target_category_id : null,
+                target_category_name: isAcademicAgreement ? current.target_category_name : null,
+                target_category_weight: isAcademicAgreement ? current.target_category_weight : null,
+                reward_score: isAcademicAgreement ? current.reward_score : null,
+                agreement_type: isAcademicAgreement ? current.agreement_type : 'recovery',
                 ...(current.type === PARENT_CONTACT_TYPE
                     ? {
                           send_sms: true,
@@ -1371,6 +1388,112 @@ function StartInterventionModal({
                 onClose();
             },
         });
+    };
+
+    // ─────────────────────────────────────────────
+    // TARGETED RECOVERY LOGIC
+    // ─────────────────────────────────────────────
+    
+    // Group grades by category for selection
+    const allCategories = useMemo(() => {
+        const raw = studentData?.gradeCategories;
+        if (!raw) return [];
+        if (Array.isArray(raw)) return raw;
+        
+        // Handle per-quarter map { "1": [...], "2": [...] } or wrapped objects
+        if (typeof raw === 'object') {
+            const currentQuarter = String(studentData?.currentQuarter || "1");
+            const quarterData = raw[currentQuarter];
+            
+            if (quarterData) {
+                // If the quarter data is directly the array, use it
+                if (Array.isArray(quarterData)) return quarterData;
+                // If it's wrapped in a .categories key, use that
+                if (quarterData.categories && Array.isArray(quarterData.categories)) {
+                    return quarterData.categories;
+                }
+            }
+            
+            // Legacy/fallback for generic objects with .categories
+            if (raw.categories && Array.isArray(raw.categories)) return raw.categories;
+            
+            // Final fallback: try the first key's categories or the first key's array itself
+            const firstValue = Object.values(raw)[0];
+            if (Array.isArray(firstValue)) return firstValue;
+            if (firstValue?.categories && Array.isArray(firstValue.categories)) {
+                return firstValue.categories;
+            }
+        }
+        return [];
+    }, [studentData]);
+
+    const availableCategories = useMemo(() => {
+        // Filter to categories that actually have tasks to recover and are not bonus categories
+        return allCategories.filter(cat => (cat.tasks?.length ?? 0) > 0 && !cat.is_bonus);
+    }, [allCategories]);
+
+    const isRecoveryType = data.agreement_type === 'recovery';
+
+    const selectedCategory = useMemo(() => {
+        return allCategories.find(c => c.id === data.target_category_id);
+    }, [allCategories, data.target_category_id]);
+
+    const availableTasks = useMemo(() => {
+        if (!selectedCategory) return [];
+        return selectedCategory.tasks || [];
+    }, [selectedCategory]);
+
+    const selectedTask = useMemo(() => {
+        return availableTasks.find(t => t.id === data.target_task_id);
+    }, [availableTasks, data.target_task_id]);
+
+    // Calculate suggested score to reach passing (75 transmuted = 60 raw)
+    const suggestedScore = useMemo(() => {
+        if (!isAcademicAgreement || !isRecoveryType || !selectedCategory || !selectedTask) return null;
+        
+        const rawGrade = studentData.rawGrade || 0;
+        const targetRaw = 60.0; // Goal raw grade for passing
+        const gap = targetRaw - rawGrade;
+        
+        if (gap <= 0) return 0;
+
+        const weight = parseFloat(selectedCategory.weight || 0);
+        if (weight <= 0) return 0;
+        
+        const taskTotal = parseFloat(selectedTask.total || 100);
+        const needed = (gap * taskTotal) / (weight * 100);
+        
+        return Math.min(taskTotal, Math.ceil(needed * 10) / 10);
+    }, [isAcademicAgreement, isRecoveryType, selectedCategory, selectedTask, studentData.rawGrade]);
+
+    const handleCategoryChange = (e) => {
+        const catId = e.target.value;
+        const cat = allCategories.find(c => c.id === catId);
+        setData(prev => ({
+            ...prev,
+            target_category_id: catId,
+            target_category_name: cat?.label || "",
+            target_task_id: "",
+            target_task_name: "",
+            reward_score: ""
+        }));
+    };
+
+    const handleTaskChange = (e) => {
+        const taskId = e.target.value;
+        const task = availableTasks.find(t => t.id === taskId);
+        setData(prev => ({
+            ...prev,
+            target_task_id: taskId,
+            target_task_name: task?.label || "",
+            reward_score: ""
+        }));
+    };
+
+    const applySuggestion = () => {
+        if (suggestedScore !== null) {
+            setData("reward_score", suggestedScore);
+        }
     };
 
     if (!open) return null;
@@ -1455,43 +1578,112 @@ function StartInterventionModal({
                         </div>
                     </div>
 
-                    {/* Selected strategy info banner */}
-                    {selectedStrategy && (
-                        <div className={`p-4 rounded-xl border ${tc.infoBg}`}>
-                            <div className="flex items-start gap-3">
-                                <div className="flex-shrink-0 w-11 h-11 bg-white dark:bg-gray-900 rounded-lg shadow-sm flex items-center justify-center">
-                                    {(() => {
-                                        const Icon =
-                                            StrategyIcons[
-                                                selectedStrategy.iconKey
-                                            ];
-                                        return Icon ? (
-                                            <Icon
-                                                className={`w-6 h-6 ${tc.icon}`}
-                                            />
-                                        ) : null;
-                                    })()}
+                    {/* Targeted Recovery (Academic Agreement Only) */}
+                    {isAcademicAgreement && (
+                        <div className="p-4 rounded-2xl border border-indigo-200 bg-indigo-50/30 space-y-5">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-sm shadow-indigo-200">
+                                    <CheckSquare size={20} />
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                                        <h4 className="font-semibold text-gray-900 dark:text-gray-100">
-                                            {selectedStrategy.label}
-                                        </h4>
-                                        <span
-                                            className={`text-xs px-2 py-0.5 rounded-full font-medium border ${tc.badge}`}
+                                <div>
+                                    <h4 className="font-bold text-indigo-900 leading-none mb-1">Academic Performance Agreement</h4>
+                                    <p className="text-[10px] text-indigo-600 font-medium uppercase tracking-wider">Configure Grade Impact</p>
+                                </div>
+                            </div>
+
+                            <p className="text-xs text-indigo-700/80 leading-relaxed px-1">
+                                Select an existing task where the student failed. The agreed score will replace or update the original mark upon approval.
+                            </p>
+
+                            {/* ─────────────────────────────────── */}
+                            {/* OPTION 1: SCORE RECOVERY AGREEMENT */}
+                            {/* ─────────────────────────────────── */}
+                            <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-indigo-900 mb-1.5 uppercase tracking-wider">
+                                            Failing Category
+                                        </label>
+                                        <select
+                                            value={data.target_category_id}
+                                            onChange={handleCategoryChange}
+                                            className="w-full bg-white border border-indigo-200 rounded-lg text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all shadow-sm"
                                         >
-                                            Tier {selectedStrategy.tier} •{" "}
-                                            {selectedStrategy.tierLabel}
-                                        </span>
+                                            <option value="">Select Category...</option>
+                                            {availableCategories.map(cat => (
+                                                <option key={cat.id} value={cat.id}>{cat.label} ({Math.round(cat.weight * 100)}%)</option>
+                                            ))}
+                                        </select>
                                     </div>
-                                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                                        {selectedStrategy.description}
-                                    </p>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-indigo-900 mb-1.5 uppercase tracking-wider">
+                                            Target Task to Recover
+                                        </label>
+                                        <select
+                                            value={data.target_task_id}
+                                            onChange={handleTaskChange}
+                                            disabled={!data.target_category_id}
+                                            className="w-full bg-white border border-indigo-200 rounded-lg text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all disabled:bg-gray-100/50 disabled:opacity-50 shadow-sm"
+                                        >
+                                            <option value="">Select Activity...</option>
+                                            {availableTasks.map(task => (
+                                                <option key={task.id} value={task.id}>{task.label} (Total: {task.total})</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
+
+                                {selectedTask && (
+                                    <div className="flex flex-col md:flex-row md:items-end gap-4 bg-white/80 p-4 rounded-xl border border-indigo-100 shadow-sm">
+                                        <div className="flex-1">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
+                                                Recovery Score
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    step="0.1"
+                                                    min="0"
+                                                    max={selectedTask.total}
+                                                    value={data.reward_score}
+                                                    onChange={e => setData("reward_score", e.target.value)}
+                                                    className="w-full border border-gray-200 rounded-lg text-lg font-bold px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent pr-16 shadow-inner"
+                                                    placeholder="0.0"
+                                                />
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">
+                                                    / {selectedTask.total}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex-1 space-y-2">
+                                            {suggestedScore > 0 && (
+                                                <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100 flex items-start gap-2 shadow-sm">
+                                                    <AlertCircle size={14} className="text-emerald-600 mt-0.5" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-[11px] text-emerald-800 leading-tight">
+                                                            To reach <b>75% transmuted</b>, student needs <b>{suggestedScore}</b> points.
+                                                        </p>
+                                                        <button 
+                                                            type="button"
+                                                            onClick={applySuggestion}
+                                                            className="mt-1 text-[10px] font-bold text-emerald-700 hover:underline flex items-center gap-1"
+                                                        >
+                                                            <CheckCircle size={10} /> Apply Suggestion
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <p className="text-[10px] text-gray-500 italic px-1">
+                                                Points will be updated automatically in the gradebook upon intervention approval.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
-
                     {/* Deadline input (Tier 2+) */}
                     {deadlineRequired && (
                         <div className="p-4 rounded-xl border border-amber-200 bg-amber-50">
@@ -2651,19 +2843,25 @@ function InterventionDashboard({ students, onSelectStudent }) {
     );
 
     const interventionGivenStudents = useMemo(
-        () => sortedStudents.filter((s) => s.hasActiveIntervention),
+        () => sortedStudents.filter((s) => s.has_interventions && !s.is_ignored),
+        [sortedStudents],
+    );
+
+    const ignoredStudents = useMemo(
+        () => sortedStudents.filter((s) => s.is_ignored),
         [sortedStudents],
     );
 
     const priorityWatchlistStudents = useMemo(
-        () => sortedStudents.filter((s) => !s.hasActiveIntervention),
+        () => sortedStudents.filter((s) => !s.has_interventions && !s.is_ignored),
         [sortedStudents],
     );
 
-    const studentsForCurrentView =
-        viewMode === "intervention_given"
-            ? interventionGivenStudents
-            : priorityWatchlistStudents;
+    const studentsForCurrentView = useMemo(() => {
+        if (viewMode === "intervention_given") return interventionGivenStudents;
+        if (viewMode === "ignored") return ignoredStudents;
+        return priorityWatchlistStudents;
+    }, [viewMode, interventionGivenStudents, ignoredStudents, priorityWatchlistStudents]);
 
     const filteredStudents = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
@@ -2703,12 +2901,27 @@ function InterventionDashboard({ students, onSelectStudent }) {
         (s) => s.hasActiveIntervention,
     ).length;
 
-    const tableTitle =
-        viewMode === "watchlist" ? "Priority Watchlist" : "Intervention Given";
-    const tableSubtitle =
-        viewMode === "watchlist"
-            ? "Students requiring attention"
-            : "Students with active interventions";
+    const tableTitle = useMemo(() => {
+        if (viewMode === "watchlist") return "Priority Watchlist";
+        if (viewMode === "intervention_given") return "Intervention Given";
+        return "Ignored Students";
+    }, [viewMode]);
+
+    const tableSubtitle = useMemo(() => {
+        if (viewMode === "watchlist") return "Students requiring attention";
+        if (viewMode === "intervention_given") return "Students with previous or active interventions";
+        return "Students manually removed from priority tracking";
+    }, [viewMode]);
+
+    const handleToggleIgnore = (student, e) => {
+        if (e) e.stopPropagation();
+        router.post(route('teacher.interventions.enrollments.toggle-ignore', student.id), {}, {
+            preserveScroll: true,
+            onSuccess: () => {
+                // Flash message is handled by backend
+            }
+        });
+    };
 
     // Selection helpers
     const visibleIds = filteredStudents.map((s) => s.id);
@@ -2759,7 +2972,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
 
             {/* View toggle */}
             <div className="rounded-2xl border border-gray-200/90 bg-white p-2 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                     <button
                         type="button"
                         onClick={() => setViewMode("watchlist")}
@@ -2781,6 +2994,17 @@ function InterventionDashboard({ students, onSelectStudent }) {
                         }`}
                     >
                         Intervention Given
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setViewMode("ignored")}
+                        className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
+                            viewMode === "ignored"
+                                ? "bg-indigo-600 text-white shadow-sm"
+                                : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300"
+                        }`}
+                    >
+                        Ignore Student
                     </button>
                 </div>
             </div>
@@ -2991,14 +3215,23 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                           "Priority",
                                           "Subject",
                                           "Last Intervention",
+                                          "Actions",
                                       ]
-                                    : [
-                                          "Student Name",
-                                          "Intervention Type",
-                                          "Status",
-                                          "Subject",
-                                          "Last Intervention",
-                                      ]
+                                    : viewMode === "ignored"
+                                      ? [
+                                            "Student Name",
+                                            "Alert Reason",
+                                            "Priority",
+                                            "Subject",
+                                            "Actions",
+                                        ]
+                                      : [
+                                            "Student Name",
+                                            "Intervention Type",
+                                            "Status",
+                                            "Subject",
+                                            "Last Intervention",
+                                        ]
                                 ).map((head) => (
                                     <th
                                         key={head}
@@ -3015,7 +3248,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                 <tr>
                                     <td
                                         colSpan={
-                                            viewMode === "watchlist" ? "6" : "5"
+                                            viewMode === "watchlist" ? 7 : (viewMode === "ignored" ? 5 : 5)
                                         }
                                         className="px-6 py-12 text-center"
                                     >
@@ -3109,7 +3342,7 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                             </div>
                                         </td>
 
-                                        {viewMode === "watchlist" ? (
+                                        {viewMode === "watchlist" || viewMode === "ignored" ? (
                                             <>
                                                 <td className="px-4 py-3 whitespace-nowrap">
                                                     <span className="text-xs text-gray-600 dark:text-gray-400">
@@ -3155,13 +3388,39 @@ function InterventionDashboard({ students, onSelectStudent }) {
                                                 {s.subject}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 whitespace-nowrap">
-                                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                {formatReadableDate(
-                                                    s.lastInterventionDate,
-                                                )}
-                                            </span>
-                                        </td>
+                                        {viewMode !== "ignored" && (
+                                            <td className="px-4 py-3 whitespace-nowrap">
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                    {formatReadableDate(
+                                                        s.lastInterventionDate,
+                                                    )}
+                                                </span>
+                                            </td>
+                                        )}
+                                        {(viewMode === "watchlist" || viewMode === "ignored") && (
+                                            <td className="px-4 py-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    onClick={(e) => handleToggleIgnore(s, e)}
+                                                    className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                                                        s.is_ignored 
+                                                            ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" 
+                                                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                                    }`}
+                                                >
+                                                    {s.is_ignored ? (
+                                                        <>
+                                                            <CheckCircle size={10} />
+                                                            Restore
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <XCircle size={10} />
+                                                            Ignore
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </td>
+                                        )}
                                     </tr>
                                 ))
                             )}
@@ -3459,9 +3718,95 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                 <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">
                     Observation Reason
                 </h3>
-                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 leading-relaxed mb-4">
                     {priorityReason}
                 </p>
+
+                {/* ── OBSERVATION BREAKDOWN ── */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-5 pt-5 border-t border-gray-100 dark:border-gray-700">
+                    {/* Failing Grades Breakdown */}
+                    <div className="space-y-3">
+                        <h4 className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <AlertCircle size={14} /> Gap-to-Pass Analysis (Failing Scores)
+                        </h4>
+                        <div className="space-y-2">
+                            {(() => {
+                                const allGrades = student.allGrades || [];
+                                const failing = allGrades.filter(g => {
+                                    // Skip intervention bonus tasks
+                                    if (
+                                        g.assignment_name?.toLowerCase().includes("intervention bonus") || 
+                                        g.is_bonus === true ||
+                                        g.assignment_name?.toLowerCase().startsWith("ib")
+                                    ) return false;
+
+                                    const score = parseFloat(g.score || 0);
+                                    const total = parseFloat(g.total_score || 0);
+                                    if (total <= 0) return false;
+                                    return (score / total) < 0.6; // Below 75% transmuted
+                                });
+
+                                if (failing.length === 0) {
+                                    return <p className="text-xs text-gray-500 italic">No individual failing scores detected.</p>;
+                                }
+
+                                return failing.map(g => (
+                                    <div key={g.id} className="flex items-center justify-between p-2.5 rounded-xl bg-rose-50/50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/30">
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">{g.assignment_name}</p>
+                                            <p className="text-[10px] text-rose-600 dark:text-rose-400 font-medium">Quarter {g.quarter}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-xs font-black text-rose-600 dark:text-rose-400">{g.score} / {g.total_score}</span>
+                                            <p className="text-[10px] text-gray-500">{Math.round((g.score / g.total_score) * 100)}% Raw</p>
+                                        </div>
+                                    </div>
+                                ));
+                            })()}
+                        </div>
+                    </div>
+
+                    {/* Attendance History Breakdown */}
+                    <div className="space-y-3">
+                        <h4 className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <Clock size={14} /> Attendance History (Last 5 Concerns)
+                        </h4>
+                        <div className="space-y-2">
+                            {(() => {
+                                const history = student.attendanceHistory || [];
+                                const concerns = history
+                                    .filter(a => a.status === 'absent' || a.status === 'late')
+                                    .sort((a, b) => new Date(b.date) - new Date(a.date))
+                                    .slice(0, 5);
+
+                                if (concerns.length === 0) {
+                                    return <p className="text-xs text-gray-500 italic">No attendance concerns recorded.</p>;
+                                }
+
+                                return concerns.map(a => (
+                                    <div key={a.id} className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-2 h-2 rounded-full ${a.status === 'absent' ? 'bg-rose-500 animate-pulse' : 'bg-amber-500'}`} />
+                                            <div>
+                                                <p className="text-xs font-bold text-gray-900 dark:text-gray-100">
+                                                    {new Date(a.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                </p>
+                                                <p className={`text-[10px] font-bold uppercase ${a.status === 'absent' ? 'text-rose-600' : 'text-amber-600'}`}>
+                                                    {a.status}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        {a.remarks && (
+                                            <span className="text-[10px] text-gray-500 italic max-w-[120px] truncate" title={a.remarks}>
+                                                "{a.remarks}"
+                                            </span>
+                                        )}
+                                    </div>
+                                ));
+                            })()}
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Interventions Section (formerly history) */}
@@ -3588,6 +3933,7 @@ function StudentInterventionProfile({ enrollmentId, studentData, onBack }) {
                 studentName={student.name}
                 priority={student.priority}
                 parentContact={student.parentContact}
+                studentData={student}
             />
 
             <InterventionManagementModal

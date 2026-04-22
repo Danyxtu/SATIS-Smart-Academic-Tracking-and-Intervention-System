@@ -18,7 +18,7 @@ class GradeCalculationService
      *
      * $grades is a quarter-grouped array: [ 1 => [ taskId => score ], 2 => [ taskId => score ] ]
      */
-    public function calculateFinalGrade(array $grades, array $categories, int $quarter = 1, ?float $attendanceRate = null): string
+    public function calculateFinalGrade(array $grades, array $categories, int $quarter = 1, ?float $attendanceRate = null, float $directBonus = 0): string
     {
         if (empty($categories)) {
             return 'N/A';
@@ -32,16 +32,30 @@ class GradeCalculationService
         foreach ($categories as $category) {
             $tasks = $category['tasks'] ?? [];
             $weight = $category['weight'] ?? 0;
+            $isBonus = $category['is_bonus'] ?? false;
 
             if ($this->isAttendanceCategory($category)) {
                 if ($weight && $attendanceRate !== null) {
                     $weightedScore += $attendanceRate * $weight;
-                    $totalWeight += $weight;
+                    if (!$isBonus) {
+                        $totalWeight += $weight;
+                    }
                 }
                 continue;
             }
 
-            if (empty($tasks) || !$weight) {
+            if (!$weight) {
+                continue;
+            }
+
+            // If it's a bonus category and it doesn't have tasks, 
+            // it might be the Intervention Bonus which is handled via directBonus or logic.
+            if ($isBonus && empty($tasks)) {
+                // We'll skip it here as it's added via directBonus or separately
+                continue;
+            }
+
+            if (empty($tasks)) {
                 continue;
             }
 
@@ -70,14 +84,17 @@ class GradeCalculationService
 
             $categoryAverage = $earned / $possible;
             $weightedScore += $categoryAverage * $weight;
-            $totalWeight += $weight;
+            
+            if (!$isBonus) {
+                $totalWeight += $weight;
+            }
         }
 
         if ($totalWeight === 0) {
             return '—';
         }
 
-        $percentage = ($weightedScore / $totalWeight) * 100;
+        $percentage = (($weightedScore / $totalWeight) * 100) + $directBonus;
         return number_format($percentage, 1) . '%';
     }
 
@@ -154,7 +171,7 @@ class GradeCalculationService
     /**
      * Calculate the overall final grade (average of Q1 and Q2)
      */
-    public function calculateOverallFinalGrade(array $grades, array $q1Categories, array $q2Categories = [], ?float $attendanceRate = null): string
+    public function calculateOverallFinalGrade(array $grades, array $q1Categories, array $q2Categories = [], ?float $attendanceRate = null, float $q1Bonus = 0, float $q2Bonus = 0): string
     {
         // If q2Categories not provided, use q1Categories for both (legacy compat)
         if (empty($q2Categories)) {
@@ -168,8 +185,8 @@ class GradeCalculationService
             return '—';
         }
 
-        $q1Grade = $this->calculateFinalGrade($grades, $q1Categories, 1, $attendanceRate);
-        $q2Grade = $this->calculateFinalGrade($grades, $q2Categories, 2, $attendanceRate);
+        $q1Grade = $this->calculateFinalGrade($grades, $q1Categories, 1, $attendanceRate, $q1Bonus);
+        $q2Grade = $this->calculateFinalGrade($grades, $q2Categories, 2, $attendanceRate, $q2Bonus);
 
         if ($q1Grade === '—' || $q2Grade === '—') {
             return '—';
@@ -271,10 +288,14 @@ class GradeCalculationService
         $q2Categories = $gradeStructure['2']['categories'] ?? $gradeStructure['categories'] ?? [];
         $attendanceRate = $this->resolveAttendanceRate($enrollment);
 
+        // Fetch bonuses from the enrollment record (persisted by EnrollmentGradeService)
+        $q1Bonus = (float) ($enrollment->q1_intervention_bonus ?? 0);
+        $q2Bonus = (float) ($enrollment->q2_intervention_bonus ?? 0);
+
         return [
-            'q1_grade' => $this->calculateFinalGrade($grades, $q1Categories, 1, $attendanceRate),
-            'q2_grade' => $this->calculateFinalGrade($grades, $q2Categories, 2, $attendanceRate),
-            'overall_grade' => $this->calculateOverallFinalGrade($grades, $q1Categories, $q2Categories, $attendanceRate),
+            'q1_grade' => $this->calculateFinalGrade($grades, $q1Categories, 1, $attendanceRate, $q1Bonus),
+            'q2_grade' => $this->calculateFinalGrade($grades, $q2Categories, 2, $attendanceRate, $q2Bonus),
+            'overall_grade' => $this->calculateOverallFinalGrade($grades, $q1Categories, $q2Categories, $attendanceRate, $q1Bonus, $q2Bonus),
             'q1_complete' => $this->isQuarterComplete($grades, $q1Categories, 1, $attendanceRate),
             'q2_complete' => $this->isQuarterComplete($grades, $q2Categories, 2, $attendanceRate),
             'q1_has_exam' => $this->hasQuarterlyExamScores($grades, $q1Categories, 1),

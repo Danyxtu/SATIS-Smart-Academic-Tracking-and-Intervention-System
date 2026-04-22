@@ -638,9 +638,7 @@ const AddNewClassModal = ({
     const activeClasslist = activeSectionWorkflow?.classlist ?? null;
     const activeSectionColorName = activeSectionWorkflow?.color ?? data.color;
     const activeQueuedStudents = activeSectionWorkflow?.manualStudents ?? [];
-    const canMarkStudentsDone =
-        Boolean(activeQueuedSection) &&
-        (activeQueuedStudents.length > 0 || Boolean(activeClasslist));
+    const canMarkStudentsDone = Boolean(activeQueuedSection);
     const canMarkColorDone =
         Boolean(activeQueuedSection) && Boolean(activeSectionColorName);
 
