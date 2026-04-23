@@ -23,11 +23,13 @@ class SchoolClass extends Model
         'color',
         'current_quarter',
         'grade_categories',
+        'seating_layout',
         'semester',
     ];
 
     protected $casts = [
         'grade_categories' => 'array',
+        'seating_layout' => 'array',
         'current_quarter' => 'integer',
     ];
 

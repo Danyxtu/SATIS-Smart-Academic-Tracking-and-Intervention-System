@@ -25,18 +25,36 @@ class AttendanceController extends Controller
     }
 
     // Render the attendance taking interface
-    public function index(Request $request): Response
+    public function index(Request $request, $classId = null): Response
     {
         $teacher = $request->user();
+
+        // If provided, classId can be from the route or as a query param
+        $inputClassId = $classId ?? $request->input('classId');
 
         $results = $this->attendanceService->index($teacher);
 
         $classes = $results['classes'];
         $rosters = $results['rosters'];
+        
+        $initialSelectedClassId = null;
+        if ($inputClassId) {
+            $class = SchoolClass::find($inputClassId);
+            if ($class && $class->teacher_id === $teacher->id) {
+                $initialSelectedClassId = (int) $inputClassId;
+            } else if ($class) {
+                // If the class exists but belongs to someone else, it's a security issue
+                return Inertia::render('Error', [
+                    'status' => 403,
+                    'message' => 'Unauthorized access to this class.',
+                ]);
+            }
+        }
 
         return Inertia::render('Teacher/Attendance', compact(
             'classes',
-            'rosters'
+            'rosters',
+            'initialSelectedClassId'
         ));
     }
 
@@ -128,6 +146,7 @@ class AttendanceController extends Controller
             'students' => ['required', 'array'],
             'students.*.id' => ['required', 'integer', 'exists:enrollments,id'],
             'students.*.status' => ['required', 'string'],
+            'seatLayout' => ['nullable', 'array'],
         ]);
 
         $result = $this->attendanceService->createAttendance($data, $teacher);
@@ -140,6 +159,24 @@ class AttendanceController extends Controller
                 ? 'Failed to save attendance.'
                 : 'Attendance saved successfully!';
         }
+
+        return response()->json($result, $status);
+    }
+
+    /**
+     * Update the seating layout for a specific class.
+     */
+    public function updateLayout(Request $request)
+    {
+        $teacher = $request->user();
+
+        $data = $request->validate([
+            'classId' => ['required', 'integer', 'exists:classes,id'],
+            'seatLayout' => ['required', 'array'],
+        ]);
+
+        $result = $this->attendanceService->updateLayout($data, $teacher);
+        $status = (int) ($result['status'] ?? 200);
 
         return response()->json($result, $status);
     }

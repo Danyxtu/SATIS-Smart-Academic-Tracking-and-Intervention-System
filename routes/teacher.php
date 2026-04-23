@@ -91,18 +91,20 @@ Route::middleware(['auth', 'verified', 'can:access-teacher-portal'])
         /**
          * Attendance Routes
          */
-        Route::get('/attendance', [AttendanceController::class, 'index'])
-            ->name('attendance.index');
+        Route::get('/attendance/check', [AttendanceController::class, 'checkExists'])
+            ->name('attendance.check');
         Route::get('/attendance/log/{subjectTeacher}', [AttendanceController::class, 'attendanceLogOfSpecificSection'])
             ->name('attendance.log.show');
         Route::get('/attendance/log/{subjectTeacher}/export', [AttendanceController::class, 'exportCSV'])
             ->name('attendance.log.export');
         Route::get('/attendance/log/{subjectTeacher}/export/pdf', [AttendanceController::class, 'exportPdf'])
             ->name('attendance.log.export.pdf');
-        Route::get('/attendance/check', [AttendanceController::class, 'checkExists'])
-            ->name('attendance.check');
+        Route::post('/attendance/layout', [AttendanceController::class, 'updateLayout'])
+            ->name('attendance.layout.update');
         Route::post('/attendance', [AttendanceController::class, 'createAttendance'])
             ->name('attendance.create');
+        Route::get('/attendance/{classId?}', [AttendanceController::class, 'index'])
+            ->name('attendance.index');
 
 
         /**

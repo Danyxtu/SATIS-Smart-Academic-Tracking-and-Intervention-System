@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import SchoolStaffLayout from "@/Layouts/SchoolStaffLayout";
-import { Head, Link } from "@inertiajs/react";
+import { Head, Link, router } from "@inertiajs/react";
 import { useLoading } from "@/Context/LoadingContext";
 import {
     ArrowLeft,
@@ -61,15 +61,25 @@ const CLASS_COLOR_STYLES = {
 
 const getTodayDateString = () => new Date().toISOString().split("T")[0];
 
-const Attendance = ({ classes, rosters }) => {
+const Attendance = ({ classes, rosters, initialSelectedClassId = null }) => {
     const { startLoading, stopLoading } = useLoading();
     const dateInputRef = useRef(null);
     const [viewMode, setViewMode] = useState("grid");
-    const [selectedClassId, setSelectedClassId] = useState(null);
+    const [selectedClassId, setSelectedClassId] = useState(
+        initialSelectedClassId ? Number(initialSelectedClassId) : null,
+    );
     const [currentDate, setCurrentDate] = useState(getTodayDateString());
     const [isDraggingEnabled, setIsDraggingEnabled] = useState(false);
     const [attendanceAlreadySaved, setAttendanceAlreadySaved] = useState(false);
     const [checkingAttendance, setCheckingAttendance] = useState(false);
+
+    useEffect(() => {
+        if (initialSelectedClassId) {
+            setSelectedClassId(Number(initialSelectedClassId));
+        } else {
+            setSelectedClassId(null);
+        }
+    }, [initialSelectedClassId]);
 
     const isSunday = useMemo(() => {
         const date = new Date(currentDate);
@@ -87,7 +97,7 @@ const Attendance = ({ classes, rosters }) => {
 
             map[cls.id] = {
                 students: roster,
-                seatLayout: buildSeatLayout(roster),
+                seatLayout: buildSeatLayout(roster, cls.seating_layout),
             };
         });
 
@@ -202,7 +212,17 @@ const Attendance = ({ classes, rosters }) => {
     };
 
     const handleClassSelect = (classId) => {
-        setSelectedClassId(Number(classId));
+        const id = Number(classId);
+        
+        // Use router.get to visit the class-specific URL
+        // This ensures the browser address bar updates to /teacher/attendance/1
+        router.get(route("teacher.attendance.index", { classId: id }), {}, {
+            preserveState: true,
+            preserveScroll: true,
+        });
+
+        // Set local state for immediate visual feedback
+        setSelectedClassId(id);
         setViewMode("grid");
         setCurrentDate(getTodayDateString());
         setIsDraggingEnabled(false);
@@ -211,6 +231,13 @@ const Attendance = ({ classes, rosters }) => {
     };
 
     const handleBackToClassCards = () => {
+        // Visit the root attendance URL
+        router.get(route("teacher.attendance.index"), {}, {
+            preserveState: true,
+            preserveScroll: true,
+        });
+
+        // Clear local state
         setSelectedClassId(null);
         setIsDraggingEnabled(false);
         setAttendanceAlreadySaved(false);
@@ -324,6 +351,31 @@ const Attendance = ({ classes, rosters }) => {
 
             return newLayout;
         });
+    };
+
+    const handleSaveLayout = async () => {
+        if (!selectedClassId) return;
+
+        startLoading();
+        try {
+            const response = await axios.post(
+                route("teacher.attendance.layout.update"),
+                {
+                    classId: selectedClassId,
+                    seatLayout,
+                },
+            );
+            showToast.success(
+                response.data.message || "Seating layout saved successfully.",
+            );
+
+            // Update the local classes prop so it's persisted correctly
+            router.reload({ only: ["classes"] });
+        } catch (error) {
+            showToast.error("Failed to save seating layout.");
+        } finally {
+            stopLoading();
+        }
     };
 
     const handleSubmit = async () => {
@@ -628,6 +680,15 @@ const Attendance = ({ classes, rosters }) => {
                                 </div>
 
                                 <div className="flex flex-wrap items-end gap-2">
+                                    {isDraggingEnabled && (
+                                        <button
+                                            onClick={handleSaveLayout}
+                                            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm"
+                                        >
+                                            Save Layout
+                                        </button>
+                                    )}
+
                                     <button
                                         onClick={() =>
                                             setIsDraggingEnabled(

@@ -81,6 +81,7 @@ class AttendanceServices
                 'section' => $class->section,
                 'subject' => $class->subject?->subject_name ?? 'N/A',
                 'color' => $class->color ?? 'indigo',
+                'seating_layout' => $class->seating_layout,
                 'student_count' => $class->enrollments->count(),
                 'attendance_summary' => [
                     'days_recorded' => $daysRecorded,
@@ -199,6 +200,13 @@ class AttendanceServices
             ];
         }
 
+        // Save seating layout if provided
+        if (isset($data['seatLayout'])) {
+            $subjectTeacher->update([
+                'seating_layout' => $data['seatLayout'],
+            ]);
+        }
+
         $date = $data['date'];
         $dateObj = new \DateTime($date);
 
@@ -243,6 +251,34 @@ class AttendanceServices
         return [
             'status' => 200,
             'message' => 'Attendance saved successfully!',
+        ];
+    }
+
+    /**
+     * Update the seating layout for a class.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public function updateLayout(array $data, $teacher): array
+    {
+        $subjectTeacher = SchoolClass::findOrFail($data['classId']);
+
+        // Ensure the teacher owns this class assignment
+        if ($subjectTeacher->teacher_id !== $teacher->id) {
+            return [
+                'status' => 403,
+                'message' => 'Unauthorized to modify layout for this class.',
+            ];
+        }
+
+        $subjectTeacher->update([
+            'seating_layout' => $data['seatLayout'],
+        ]);
+
+        return [
+            'status' => 200,
+            'message' => 'Seating layout saved successfully!',
         ];
     }
 
