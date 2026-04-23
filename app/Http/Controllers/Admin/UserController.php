@@ -272,7 +272,7 @@ class UserController extends Controller
                 'student_queue.*.last_name' => ['required', 'string', 'max:255'],
                 'student_queue.*.middle_name' => ['nullable', 'string', 'max:255'],
                 'student_queue.*.lrn' => ['required', 'string', 'size:12', 'distinct', 'unique:students,lrn'],
-                'student_queue.*.email' => ['required', 'email', 'max:255', 'distinct', 'unique:users,email'],
+                'student_queue.*.email' => ['required', 'email', 'max:255', 'distinct', 'unique:users,personal_email'],
                 'student_queue.*.strand' => ['nullable', 'string', 'max:255'],
                 'student_queue.*.parent_contact_number' => ['nullable', 'string', 'max:40'],
             ]);
@@ -351,7 +351,7 @@ class UserController extends Controller
                 'last_name' => ['required', 'string', 'max:255'],
                 'middle_name' => ['nullable', 'string', 'max:255'],
                 'lrn' => ['required', 'string', 'size:12', 'unique:students,lrn'],
-                'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+                'email' => ['required', 'email', 'max:255', 'unique:users,personal_email'],
                 'parent_contact_number' => ['nullable', 'string', 'max:40'],
                 'role' => ['required', 'in:student'],
                 'student_mode' => ['nullable', 'in:single'],
